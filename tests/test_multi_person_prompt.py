@@ -165,6 +165,9 @@ def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:
     assert '"狐莉": "white hair, red eyes, fox ears"' in prompt
     assert 'Leave "appearance" empty' in prompt
     assert "Never use top_left" in prompt
+    assert "order characters by semantic role" in prompt
+    assert "Describe it from both sides" in prompt
+    assert "bare symmetric word such as embrace" in prompt
 
 
 def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character():
@@ -409,6 +412,8 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
     assert result.summary["composition_source"] == "deterministic"
     assert "white-haired fox girl: fox ears, white hair" in result.final_prompt
     assert "silver-haired vampire girl: silver hair, red eyes" in result.final_prompt
+    assert "leaning forward" in result.final_prompt
+    assert "lying on her back" in result.final_prompt
     assert (
         "the white-haired fox girl is pouncing on top of the silver-haired vampire girl."
         in (result.final_prompt)

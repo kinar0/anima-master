@@ -108,6 +108,30 @@ class StructuredPromptCharacter:
     detail_tags: str
 
 
+_UNBOUND_DIRECTIONAL_TAGS = {
+    "embrace",
+    "embracing",
+    "cuddle",
+    "cuddling",
+    "hug",
+    "hugging",
+    "lying",
+    "sitting",
+}
+
+
+def filter_unbound_directional_tags(tag_text: str) -> tuple[str, tuple[str, ...]]:
+    """Remove bare shared tags that cannot encode interaction ownership."""
+    kept: list[str] = []
+    removed: list[str] = []
+    for tag in split_tags(tag_text):
+        if tag.strip().lower() in _UNBOUND_DIRECTIONAL_TAGS:
+            removed.append(tag)
+        else:
+            kept.append(tag)
+    return ", ".join(kept), tuple(removed)
+
+
 def extract_structured_prompt(
     text: str,
 ) -> tuple[tuple[str, ...], tuple[StructuredPromptCharacter, ...], str, str]:
@@ -860,7 +884,11 @@ class PromptPipeline:
                     grouped_contact=grouped_contact,
                     explicit_positions=spatial_mode == "explicit_positions",
                     identity_anchors=tuple(rendered_identity_tags),
-                    include_pose=not grouped_contact,
+                    # Sitting/lying/leaning ownership is essential in close
+                    # contact scenes. The planner already keeps the directed
+                    # interaction out of pose, so retaining pose here does not
+                    # duplicate the relationship.
+                    include_pose=True,
                 )
             )
 
@@ -906,6 +934,10 @@ class PromptPipeline:
             for tag in plan.common_tags
             if not any(marker in tag.lower() for marker in blocked_positive_markers)
             and tag.strip().lower() != str(plan.relationship_tag or "").strip().lower()
+            and not (
+                plan.interactions
+                and tag.strip().lower() in _UNBOUND_DIRECTIONAL_TAGS
+            )
             and not re.fullmatch(
                 r"\s*\d+\s*(girls?|boys?|people|persons?)\s*",
                 tag,
@@ -924,7 +956,12 @@ class PromptPipeline:
                     )
                 )
             )
-        relationship_tag = str(plan.relationship_tag or "").strip()
+        planned_relationship_tag = str(plan.relationship_tag or "").strip()
+        relationship_tag_suppressed = bool(
+            plan.interactions
+            and planned_relationship_tag.lower() in _UNBOUND_DIRECTIONAL_TAGS
+        )
+        relationship_tag = "" if relationship_tag_suppressed else planned_relationship_tag
         common_content = ", ".join(
             (
                 *deterministic_count_tags,
@@ -1072,6 +1109,8 @@ class PromptPipeline:
                 "character_roles": character_roles,
                 "interaction_count": len(plan.interactions),
                 "relationship_tag": relationship_tag,
+                "planned_relationship_tag": planned_relationship_tag,
+                "relationship_tag_suppressed": relationship_tag_suppressed,
                 "emphasized_anchor_count": emphasized_anchor_count,
                 "grouped_contact": grouped_contact,
                 "spatial_mode": spatial_mode,
@@ -1410,6 +1449,9 @@ class PromptPipeline:
                 summary["structured_format_retry"] = False
         structured_character_mode = bool(structured_characters)
         if structured_character_mode:
+            structured_scene, removed_unbound_tags = filter_unbound_directional_tags(
+                structured_scene
+            )
             rendered_characters: list[str] = []
             resolution_statuses: list[dict[str, Any]] = []
             configured_characters = fixed_character_tags(prompt_config)
@@ -1481,6 +1523,9 @@ class PromptPipeline:
             summary["structured_character_mode"] = True
             summary["structured_character_count"] = len(structured_characters)
             summary["structured_roster_tags"] = list(structured_roster_tags)
+            summary["removed_unbound_directional_tags"] = list(
+                removed_unbound_tags
+            )
             summary["character_resolution_statuses"] = resolution_statuses
             use_fixed_character = False
             fixed_character_name = ""

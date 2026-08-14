@@ -11,9 +11,11 @@ if str(PLUGIN_DIR) not in sys.path:
 from prompt_pipeline import (  # noqa: E402
     PromptPipeline,
     extract_structured_prompt,
+    filter_unbound_directional_tags,
     normalize_structured_nltags,
 )
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
+from prompt_templates import build_llm_prompt  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
 from task_summary import (  # noqa: E402
     apply_verification_summary,
@@ -409,6 +411,55 @@ def test_extract_structured_prompt_keeps_character_scopes() -> None:
     assert characters[0].detail_tags == "togawa_sakiko cosplays Hatsune Miku"
     assert scene == "standing together, concert stage"
     assert nltags == "Togawa Sakiko and Chihaya Anon pose together."
+
+
+def test_llm_prompt_requires_bidirectional_directed_interaction_binding() -> None:
+    prompt = build_llm_prompt(
+        "一张白色的大床，穿红黑礼服的丰川祥子抱着穿黑色风衣的千早爱音",
+        original_theme="一张白色的大床，穿红黑礼服的丰川祥子抱着穿黑色风衣的千早爱音",
+    )
+
+    assert "Return exactly six single-line brace blocks" in prompt
+    assert "List the actor/holder/supporter before the recipient" in prompt
+    assert "wraps her arms around" in prompt
+    assert "is being held by" in prompt
+    assert "Do not use `in someone's arms` as the only relationship cue" in prompt
+    assert "Tags must not contain unbound" in prompt
+    assert "recipient rests passively or is being held" in prompt
+
+
+def test_structured_prompt_preserves_actor_first_bidirectional_details() -> None:
+    roster_tags, characters, scene, nltags = extract_structured_prompt(
+        "{Count: 2girls, yuri}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Identity: togawa_sakiko has blue hair and yellow eyes; "
+        "chihaya_anon has pink hair and grey eyes}\n"
+        "{Details: togawa_sakiko sits upright and holds chihaya_anon in her arms, "
+        "wrapping her arms around chihaya_anon; chihaya_anon lies against "
+        "togawa_sakiko's chest and is being held by togawa_sakiko}\n"
+        "{Tags: full body, large white bed, warm lighting}\n"
+        "{Nltags: togawa_sakiko holds chihaya_anon. Sakiko's arms are wrapped "
+        "around Anon. chihaya_anon rests passively against togawa_sakiko's chest.}"
+    )
+
+    assert roster_tags == ("2girls", "yuri")
+    assert [character.name for character in characters] == [
+        "togawa_sakiko",
+        "chihaya_anon",
+    ]
+    assert "holds chihaya_anon" in characters[0].detail_tags
+    assert "is being held by togawa_sakiko" in characters[1].detail_tags
+    assert scene == "full body, large white bed, warm lighting"
+    assert "rests passively" in nltags
+
+
+def test_shared_tags_drop_unbound_directional_action_and_pose_words() -> None:
+    filtered, removed = filter_unbound_directional_tags(
+        "full body, embrace, cuddling, lying, sitting, large white bed, warm lighting"
+    )
+
+    assert filtered == "full body, large white bed, warm lighting"
+    assert removed == ("embrace", "cuddling", "lying", "sitting")
 
 
 def test_structured_prompt_rejects_a_relationship_without_count_tag() -> None:
