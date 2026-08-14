@@ -97,6 +97,41 @@ def test_generate_action_rejects_unavailable_size_before_generation():
     assert calls == []
 
 
+def test_img2img_refusal_does_not_call_comfyui() -> None:
+    tool_calls: list[list[str]] = []
+
+    async def run_tool(args: list[str]):
+        tool_calls.append(args)
+        return {"ok": True}
+
+    handler = CommandActionHandler(
+        config={"img2img_enabled": True, "prompt_optimize_img2img_enabled": True},
+        task_recorder=_Recorder(),
+        reference_context=None,
+        is_allowed=lambda _event: True,
+        run_tool=run_tool,
+        ensure_ready=lambda _event: asyncio.sleep(0, result={"ok": True}),
+        send_payload=lambda _event, _payload: asyncio.sleep(0, result="ok"),
+        generate=lambda *_args, **_kwargs: asyncio.sleep(0),
+        event_image_input=lambda _event: asyncio.sleep(0, result="input.png"),
+        build_prompt=lambda *_args, **_kwargs: asyncio.sleep(0, result=""),
+        format_spell_payload=lambda _payload: "spell",
+        get_bool=lambda key, default: bool(
+            {
+                "img2img_enabled": True,
+                "prompt_optimize_img2img_enabled": True,
+            }.get(key, default)
+        ),
+        shorten=lambda text, limit: text[:limit],
+        config_store=None,
+    )
+
+    result = asyncio.run(handler.edit(object(), "修改衣服"))
+
+    assert result == "模型拒绝了生成"
+    assert tool_calls == []
+
+
 def test_multi_person_action_uses_square_default_and_request_flag():
     calls = []
 

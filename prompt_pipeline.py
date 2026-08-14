@@ -132,6 +132,21 @@ def filter_unbound_directional_tags(tag_text: str) -> tuple[str, tuple[str, ...]
     return ", ".join(kept), tuple(removed)
 
 
+def is_chinese_model_refusal(text: str) -> bool:
+    """Return whether an expected prompt response is a Chinese refusal."""
+    response = re.sub(r"\s+", " ", str(text or "")).strip()
+    if len(re.findall(r"[\u3400-\u9fff]", response)) < 4:
+        return False
+    refusal_patterns = (
+        r"(?:抱歉|对不起|很遗憾).{0,48}(?:不能|无法|不可以|没法|不便)",
+        r"(?:不能|无法|不可以|没法|不便).{0,36}"
+        r"(?:满足|帮助|协助|生成|创作|提供|完成|处理|遵循|支持).{0,20}"
+        r"(?:要求|请求|内容|指令)?",
+        r"(?:拒绝|不能接受|无法接受).{0,24}(?:要求|请求|生成|创作|内容)",
+    )
+    return any(re.search(pattern, response) for pattern in refusal_patterns)
+
+
 def extract_structured_prompt(
     text: str,
 ) -> tuple[tuple[str, ...], tuple[StructuredPromptCharacter, ...], str, str]:
@@ -304,6 +319,34 @@ class PromptPipeline:
         self._float = get_float
         self._str = get_str
         self._shorten = shorten
+
+    def _model_refusal_result(
+        self,
+        summary: dict[str, Any],
+        response: str,
+        *,
+        multi_person: bool = False,
+    ) -> PromptPipelineResult:
+        """Build an empty prompt result that stops generation after refusal."""
+        self.logger.warning("[comfyui_agent] prompt model refused generation")
+        summary.update(
+            {
+                "model_refused_generation": True,
+                "model_refusal_head": self._shorten(response, 300),
+                "skipped_reason": "model_refused_generation",
+                "final_prompt_head": "",
+                "final_prompt_chars": 0,
+            }
+        )
+        if multi_person:
+            summary.update(
+                {
+                    "multi_person_mode": True,
+                    "multi_person_plan_failed": False,
+                    "multi_person_error": "",
+                }
+            )
+        return PromptPipelineResult("", summary)
 
     async def _current_chat_provider_id(self, event: Any) -> str:
         configured = self._str("prompt_builder_provider_id", "").strip()
@@ -585,6 +628,12 @@ class PromptPipeline:
                     exc,
                 )
             else:
+                if is_chinese_model_refusal(raw_plan):
+                    return self._model_refusal_result(
+                        summary,
+                        raw_plan,
+                        multi_person=True,
+                    )
                 candidate = parse_multi_person_plan(raw_plan)
                 if candidate is not None:
                     allowed_aliases = {
@@ -1384,6 +1433,9 @@ class PromptPipeline:
                     llm_error = str(retry_exc)
                     llm_content = ""
 
+        if is_chinese_model_refusal(llm_content):
+            return self._model_refusal_result(summary, llm_content)
+
         # Keep the protocol trace at INFO while the structured response format
         # is being rolled out.  A malformed Details block otherwise silently
         # falls back to the legacy tag path and is impossible to diagnose from
@@ -1426,6 +1478,8 @@ class PromptPipeline:
                     "[comfyui_agent] structured prompt LLM raw (retry):\n%s",
                     retry_content,
                 )
+                if is_chinese_model_refusal(retry_content):
+                    return self._model_refusal_result(summary, retry_content)
                 (
                     structured_roster_tags,
                     structured_characters,

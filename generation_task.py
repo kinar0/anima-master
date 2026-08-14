@@ -180,6 +180,15 @@ class GenerationTaskRunner:
             )
             prompt_summary = dict(self._prompt_summary())
         self._task_recorder.mark_prompt_built(task, prompt_summary)
+        if prompt_summary.get("model_refused_generation"):
+            payload = {
+                "ok": False,
+                "error": "model_refused_generation",
+                "task_id": task["task_id"],
+            }
+            self._task_recorder.mark_failure(task, payload["error"])
+            self._persist_task(task)
+            return payload
         if multi_person and (
             not prompt or prompt_summary.get("multi_person_plan_failed")
         ):

@@ -319,6 +319,8 @@ class CommandActionHandler:
             return "改图失败：请在本次消息中附图，或引用一条包含图片的消息。"
         if self._bool("prompt_optimize_img2img_enabled", False):
             prompt = await self._build_prompt(event, prompt, mode="img2img")
+            if not prompt:
+                return "模型拒绝了生成"
         payload = await self._run_tool(
             ["edit", "--prompt", prompt, "--input", image_input]
         )

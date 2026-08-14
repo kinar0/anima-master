@@ -151,6 +151,8 @@ class ComfyUIRuntime:
             return "ComfyUI 完成了任务但没有产出图片"
         if detail == "multi_person_plan_failed":
             return "多人场景规划连续失败，已停止生成以避免回退成单人图片"
+        if detail == "model_refused_generation":
+            return "模型拒绝了生成"
         if detail == "multi_person_verification_failed":
             return "多人图片在重试后仍未通过人物数量、统一场景或角色一致性检查，失败图片未发送"
         if detail == "comfyui_offline":
@@ -193,7 +195,11 @@ class ComfyUIRuntime:
             )
         if not payload.get("ok"):
             reason = self.failure_reason(payload)
-            message = f"ComfyUI 操作失败：{reason}。"
+            message = (
+                "模型拒绝了生成"
+                if payload.get("error") == "model_refused_generation"
+                else f"ComfyUI 操作失败：{reason}。"
+            )
             payload["delivery"] = operation_failed_delivery(payload, message)
             await event.send(event.plain_result(message))
             return message
