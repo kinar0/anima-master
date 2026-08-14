@@ -115,8 +115,14 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 - `send_result_to_chat`：是否把图片发回聊天。
 - `max_send_images`：最多发送几张。
+- `notify_drawing_and_at_sender`：同一个开关控制两项行为：接受生图请求后发送“正在绘画中，请等待”；图片完成后在群聊中 At 原申请人并告知今日剩余次数。不限额和白名单用户显示“今日剩余次数：不限”；私聊不会 At。
 - `admin_only`：是否仅管理员可用。
 - `allowed_sender_ids`：允许使用的用户 ID 列表。
+- `daily_generation_limit`：每个 QQ 号每天最多发起的生图次数；`0` 表示不限制。一次多人请求及其候选重试只计一次，请求被接受后即占用次数。
+- `generation_whitelist_sender_ids`：免限额白名单。名单内 QQ 不受每日次数和 `allowed_sender_ids` 限制。
+- `generation_blacklist_sender_ids`：黑名单，优先级最高；同时出现在黑白名单时按黑名单处理。
+
+每日计数按 AstrBot 服务器本地日期统计，并保存在插件数据目录的 `daily_generation_usage.json`，重启 AstrBot 不会清空当天计数。
 
 ## 由 AstrBot 启动 ComfyUI
 

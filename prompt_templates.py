@@ -83,6 +83,7 @@ def build_llm_prompt(
     prompt_builder_template: str = "",
     outfit_transfer_rule: str = "",
     original_theme: str = "",
+    fixed_character_hints: dict[str, str] | None = None,
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation.
 
@@ -96,13 +97,37 @@ def build_llm_prompt(
         prompt_builder_template: Optional custom prompt template.
         outfit_transfer_rule: Optional outfit-transfer instructions.
         original_theme: User text before reference-image or quoted-spell expansion.
+        fixed_character_hints: Locally saved character identity hints found in
+            the user request. Values may mix tags and natural language.
 
     Returns:
         Complete instruction text for the prompt-building LLM.
     """
     theme = str(theme or "").strip()
     search_context = str(search_context or "").strip()
-    if character_name:
+    local_hints = {
+        str(name).strip(): str(tags).strip()
+        for name, tags in dict(fixed_character_hints or {}).items()
+        if str(name).strip() and str(tags).strip()
+    }
+    has_fixed_context = bool(local_hints or character_name or fixed_character)
+    if local_hints:
+        hint_lines = "\n".join(
+            f"- {name}: {tags}" for name, tags in local_hints.items()
+        )
+        character_rule = (
+            "用户原始要求中命中了以下本地保存的角色辅助信息。内容可能是 "
+            "Danbooru tags 与自然语言 identity 的混合，请依靠你的理解使用，"
+            "不要求逐字复制：\n"
+            f"{hint_lines}\n"
+            "请为 Characters 输出你认为最可信的罗马音 Danbooru 角色 tag，并在 "
+            "Identity 中结合这些辅助信息写出角色的主要可见特征。不要无故生成与"
+            "辅助信息冲突的发色、瞳色、体型或固定特征；同时结合用户原始要求，"
+            "在不产生明显冲突的情况下尽可能满足其外观、服装、动作、表情和道具要求。"
+            "对于未列出的现有作品角色，仍需自行给出最可信的 Danbooru 角色 tag "
+            "和主要 identity，程序会查询 character 分类并校正候选。"
+        )
+    elif character_name:
         character_rule = (
             f"最终 prompt 前缀中会拼接固定角色“{character_name}”的角色词，"
             "因此具体内容段不要重复列出该角色的固有发色、瞳色、种族和固定配饰。"
@@ -140,7 +165,7 @@ def build_llm_prompt(
             "引用法术正面提示词",
         )
     ):
-        if fixed_character:
+        if has_fixed_context:
             reference_rule = """
 -----------
 本次带有引用图、图片反推或引用法术上下文，同时用户指定了固定角色。
@@ -181,6 +206,11 @@ def build_llm_prompt(
         prompt = template.format(**values)
     except Exception:
         prompt = DEFAULT_LLM_PROMPT_TEMPLATE.format(**values)
+    if local_hints and hint_lines not in prompt:
+        # A custom template may omit {character_rule}.  Local character context
+        # must still reach the LLM, so append it without requiring users to
+        # migrate their stored template.
+        prompt += f"\n\n-----------\n角色辅助信息：\n{character_rule}"
     if mode == "txt2img":
         prompt += BACKGROUND_POLICY_TEMPLATE.format(
             original_theme=str(original_theme or theme).strip(),

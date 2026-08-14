@@ -35,6 +35,7 @@ try:
     from .prompt_presets import (
         apply_config_preset,
         fixed_character_tags,
+        mentioned_fixed_characters,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -71,6 +72,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from prompt_presets import (
         apply_config_preset,
         fixed_character_tags,
+        mentioned_fixed_characters,
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
@@ -106,6 +108,43 @@ class StructuredPromptCharacter:
     name: str
     identity_tags: str
     detail_tags: str
+
+
+def _normalized_character_key(value: str) -> str:
+    """Normalize a display name or Danbooru tag for local-hint alignment."""
+    normalized = str(value or "").strip().lower().replace("_", " ")
+    normalized = re.sub(r"\s+", " ", normalized)
+    return re.sub(r"[^0-9a-z\u3400-\u9fff]+", "", normalized)
+
+
+def _configured_character_anchor(tags: str) -> str:
+    """Return the likely character-name prefix from a chat-authored entry."""
+    return next(iter(split_tags(tags)), "").strip()
+
+
+def _match_fixed_character_hint(
+    character_name: str,
+    hints: dict[str, str],
+    used_names: set[str],
+    *,
+    structured_character_count: int,
+) -> str:
+    """Match an LLM roster name to a locally mentioned character hint."""
+    target = _normalized_character_key(character_name)
+    if target:
+        for local_name, tags in hints.items():
+            if local_name in used_names:
+                continue
+            variants = {
+                _normalized_character_key(local_name),
+                _normalized_character_key(_configured_character_anchor(tags)),
+            }
+            if target in variants:
+                return local_name
+    remaining = [name for name in hints if name not in used_names]
+    if structured_character_count == 1 and len(remaining) == 1:
+        return remaining[0]
+    return ""
 
 
 _UNBOUND_DIRECTIONAL_TAGS = {
@@ -1266,6 +1305,7 @@ class PromptPipeline:
             return PromptPipelineResult(raw_prompt, summary)
 
         prompt_config = apply_config_preset(dict(self.config))
+        local_character_hints = mentioned_fixed_characters(prompt, prompt_config)
         fixed_character = selected_fixed_character(prompt, prompt_config)
         fixed_character_name = fixed_character[0] if fixed_character else ""
 
@@ -1294,8 +1334,8 @@ class PromptPipeline:
             else ()
         )
         self.logger.info(
-            "[comfyui_agent] prompt builder input fixed_character=%s sensual=%s required_core_tags=%s prompt=%s",
-            fixed_character_name or "none",
+            "[comfyui_agent] prompt builder input fixed_characters=%s sensual=%s required_core_tags=%s prompt=%s",
+            ",".join(local_character_hints) or "none",
             use_sensual_mode,
             ",".join(required_core_tags) or "none",
             prompt[:180],
@@ -1384,6 +1424,7 @@ class PromptPipeline:
             # requests.  The legacy fixed-character fallback remains below.
             fixed_character=False,
             character_name="",
+            fixed_character_hints=local_character_hints,
             sensual_mode=use_sensual_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
@@ -1436,14 +1477,10 @@ class PromptPipeline:
         if is_chinese_model_refusal(llm_content):
             return self._model_refusal_result(summary, llm_content)
 
-        # Keep the protocol trace at INFO while the structured response format
-        # is being rolled out.  A malformed Details block otherwise silently
-        # falls back to the legacy tag path and is impossible to diagnose from
-        # the final ComfyUI prompt alone.
-        self.logger.info(
-            "[comfyui_agent] structured prompt LLM raw (initial):\n%s",
-            llm_content,
-        )
+        if self._bool("debug_prompt_enabled", False):
+            self.logger.info(
+                "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
+            )
         (
             structured_roster_tags,
             structured_characters,
@@ -1451,11 +1488,6 @@ class PromptPipeline:
             structured_nltags,
         ) = (
             extract_structured_prompt(llm_content)
-        )
-        self.logger.info(
-            "[comfyui_agent] structured prompt parse (initial): valid=%s characters=%s",
-            bool(structured_characters),
-            [character.name for character in structured_characters],
         )
         if not structured_characters and "_(" not in llm_content:
             strict_format_prompt = (
@@ -1474,10 +1506,6 @@ class PromptPipeline:
                     fixed_character=False,
                     character_name="",
                 )
-                self.logger.info(
-                    "[comfyui_agent] structured prompt LLM raw (retry):\n%s",
-                    retry_content,
-                )
                 if is_chinese_model_refusal(retry_content):
                     return self._model_refusal_result(summary, retry_content)
                 (
@@ -1486,11 +1514,6 @@ class PromptPipeline:
                     structured_scene,
                     structured_nltags,
                 ) = extract_structured_prompt(retry_content)
-                self.logger.info(
-                    "[comfyui_agent] structured prompt parse (retry): valid=%s characters=%s",
-                    bool(structured_characters),
-                    [character.name for character in structured_characters],
-                )
                 if structured_characters:
                     llm_content = retry_content
                     summary["structured_format_retry"] = True
@@ -1508,23 +1531,22 @@ class PromptPipeline:
             )
             rendered_characters: list[str] = []
             resolution_statuses: list[dict[str, Any]] = []
-            configured_characters = fixed_character_tags(prompt_config)
             used_fixed_names: set[str] = set()
             for character in structured_characters:
-                fixed_name = next(
-                    (
-                        name
-                        for name in configured_characters
-                        if name not in used_fixed_names
-                        and name == character.name
-                    ),
-                    "",
+                fixed_name = _match_fixed_character_hint(
+                    character.name,
+                    local_character_hints,
+                    used_fixed_names,
+                    structured_character_count=len(structured_characters),
                 )
                 if fixed_name:
                     used_fixed_names.add(fixed_name)
-                    identity_tags = tuple(split_tags(configured_characters[fixed_name]))
+                    # The local text is an LLM hint, not a schema.  It may begin
+                    # with natural language rather than a canonical tag, so the
+                    # final roster anchor remains the LLM's structured name.
+                    identity_tags = (character.name,)
                     status = "fixed"
-                    canonical_tag = ""
+                    canonical_tag = character.name
                 else:
                     resolution = await self._danbooru_resolver.resolve_detailed(
                         llm_content=character.name,
@@ -1581,6 +1603,7 @@ class PromptPipeline:
                 removed_unbound_tags
             )
             summary["character_resolution_statuses"] = resolution_statuses
+            summary["local_character_hints"] = list(local_character_hints)
             use_fixed_character = False
             fixed_character_name = ""
             required_core_tags = ()
@@ -1593,12 +1616,6 @@ class PromptPipeline:
                 flags=re.IGNORECASE | re.DOTALL,
             ).strip(" ,\n")
             summary["structured_character_mode"] = False
-        self.logger.info(
-            "[comfyui_agent] structured prompt normalized: mode=%s content=%s nltags=%s",
-            "structured" if structured_character_mode else "legacy_fallback",
-            llm_content,
-            nltags,
-        )
         background_mode = ""
         background_mode_source = "not_applicable"
         if mode == "txt2img":
@@ -1693,12 +1710,6 @@ class PromptPipeline:
             len(built.content_tags),
             len(built.final_prompt),
             built.final_prompt[:300],
-        )
-        self.logger.info(
-            "[comfyui_agent] prompt built full content=%s\n"
-            "[comfyui_agent] prompt built full final=%s",
-            built.content_tags,
-            built.final_prompt,
         )
         summary.update(
             {

@@ -723,6 +723,12 @@
           "send_result_to_chat": true
         }
       },
+      "notify_drawing_and_at_sender": {
+        "description": "绘画中提示并在完成后 At",
+        "type": "bool",
+        "default": false,
+        "hint": "开启后，接受生图请求时发送“正在绘画中，请等待”；图片完成后在群聊中 At 原申请人，并告知今日剩余次数。私聊只发送等待提示。"
+      },
       "admin_only": {
         "description": "仅管理员可用",
         "type": "bool",
@@ -730,10 +736,36 @@
         "hint": "开启后只有 AstrBot 识别为管理员的用户可以使用。"
       },
       "allowed_sender_ids": {
-        "description": "用户白名单",
+        "description": "限制可用用户",
         "type": "list",
         "default": [],
-        "hint": "填写 QQ 号或 AstrBot 识别到的 sender_id；留空表示不限制。示例：123456789",
+        "hint": "旧版访问控制：填写后只有这些 QQ 号可使用；留空表示不限制。免限额白名单不受此项限制。",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "daily_generation_limit": {
+        "description": "每人每天最大生图次数",
+        "type": "int",
+        "default": 0,
+        "hint": "按 QQ 号统计；0 表示不限制。请求被接受时计数，多人候选和自动重试不重复计数。"
+      },
+      "generation_whitelist_sender_ids": {
+        "description": "生图免限额白名单",
+        "type": "list",
+        "default": [],
+        "hint": "填写 QQ 号或 AstrBot sender_id；白名单可绕过每日上限和“限制可用用户”，但不能绕过黑名单。",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "generation_blacklist_sender_ids": {
+        "description": "生图黑名单",
+        "type": "list",
+        "default": [],
+        "hint": "填写 QQ 号或 AstrBot sender_id；黑名单优先级最高，命中后禁止使用整个插件。",
         "collapsed": true,
         "items": {
           "type": "string"

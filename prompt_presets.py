@@ -596,15 +596,30 @@ def selected_fixed_character(
     prompt: str, config: dict[str, Any]
 ) -> tuple[str, str] | None:
     """Return the explicitly requested fixed character, if any."""
+    matches = mentioned_fixed_characters(prompt, config)
+    return next(iter(matches.items()), None)
+
+
+def mentioned_fixed_characters(
+    prompt: str, config: dict[str, Any]
+) -> dict[str, str]:
+    """Return every locally saved character explicitly mentioned by the user.
+
+    Values are intentionally left untouched.  Character entries are commonly
+    authored in chat and may mix a Danbooru name with natural-language identity
+    descriptions; the prompt LLM is better suited to interpret that text than a
+    strict tag parser.
+    """
     text = str(prompt or "")
     text_lower = text.lower()
     if any(marker.lower() in text_lower for marker in NO_CHARACTER_MARKERS):
-        return None
+        return {}
 
-    for name, tags in fixed_character_tags(config).items():
-        if name and name in text:
-            return name, tags
-    return None
+    return {
+        name: tags
+        for name, tags in fixed_character_tags(config).items()
+        if name and name in text
+    }
 
 
 def strip_raw_prefix(prompt: str) -> tuple[bool, str]:

@@ -384,6 +384,102 @@ def test_named_character_uses_evidence_candidate_and_stable_anchors():
     assert "red eyes" not in result.final_prompt
 
 
+def test_unified_roster_uses_local_hints_and_resolves_only_unknown_characters():
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response(
+                "{Count: 3girls}\n"
+                "{Characters: nagasaki_soyo, chihaya_anon, hatsune_miku}\n"
+                "{Identity: nagasaki_soyo has long brown hair, blue eyes, and "
+                "large breasts; chihaya_anon has long pink hair and grey eyes; "
+                "hatsune_miku has aqua hair and aqua eyes}\n"
+                "{Details: nagasaki_soyo wears a white shirt; chihaya_anon wears "
+                "a school uniform; hatsune_miku holds a microphone}\n"
+                "{Tags: full body, standing together, simple background, white "
+                "background, background_mode_default_portrait}\n"
+                "{Nltags: nagasaki_soyo, chihaya_anon, and hatsune_miku stand "
+                "together.}"
+            )
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def __init__(self):
+            self.calls = []
+
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            self.calls.append(llm_content)
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
+
+    config = {
+        "fixed_characters": [
+            (
+                "长崎素世=nagasaki soyo, 1girl with long brown hair, "
+                "blue eyes and large breasts"
+            ),
+            "千早爱音=chihaya anon, 1girl with long pink hair, grey eyes",
+        ]
+    }
+    context = _Context()
+    resolver = _Resolver()
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=resolver,
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    result = asyncio.run(
+        pipeline.build(event, "长崎素世和千早爱音与初音未来一起合影")
+    )
+
+    llm_prompt = context.calls[0]["prompt"]
+    assert "- 长崎素世: nagasaki soyo, 1girl with long brown hair" in llm_prompt
+    assert "- 千早爱音: chihaya anon, 1girl with long pink hair" in llm_prompt
+    assert resolver.calls == ["hatsune_miku"]
+    assert [
+        item["status"] for item in result.summary["character_resolution_statuses"]
+    ] == ["fixed", "fixed", "resolved"]
+    assert result.summary["local_character_hints"] == ["长崎素世", "千早爱音"]
+    assert "nagasaki soyo" in result.final_prompt
+    assert "long brown hair" in result.final_prompt
+    assert "hatsune miku" in result.final_prompt
+
+
 def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
     assert looks_like_danbooru_tags(
         "masterpiece, best quality, 1girl, solo, white dress, simple background"

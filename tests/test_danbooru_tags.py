@@ -86,6 +86,41 @@ def test_non_fixed_character_prompt_requires_queryable_character_candidate() -> 
     assert "程序会联网查询 character 分类并校正候选" in prompt
 
 
+def test_prompt_passes_all_local_character_hints_to_llm_without_reformatting() -> None:
+    prompt = build_llm_prompt(
+        "长崎素世和千早爱音牵手",
+        fixed_character_hints={
+            "长崎素世": (
+                "nagasaki soyo, 1girl with long brown hair, blue eyes and large breasts"
+            ),
+            "千早爱音": "chihaya anon, 1girl with long pink hair, grey eyes",
+        },
+    )
+
+    assert (
+        "- 长崎素世: nagasaki soyo, 1girl with long brown hair, "
+        "blue eyes and large breasts"
+    ) in prompt
+    assert (
+        "- 千早爱音: chihaya anon, 1girl with long pink hair, grey eyes"
+    ) in prompt
+    assert "不要求逐字复制" in prompt
+    assert "对于未列出的现有作品角色" in prompt
+
+
+def test_custom_prompt_cannot_drop_local_character_hints() -> None:
+    prompt = build_llm_prompt(
+        "长崎素世挥手",
+        prompt_builder_template="用户原始要求：{theme}",
+        fixed_character_hints={
+            "长崎素世": "nagasaki soyo, long brown hair, blue eyes"
+        },
+    )
+
+    assert "用户原始要求：长崎素世挥手" in prompt
+    assert "- 长崎素世: nagasaki soyo, long brown hair, blue eyes" in prompt
+
+
 def test_default_prompt_prioritizes_visual_quality_without_fixed_tag_target() -> None:
     prompt = build_llm_prompt("独自旅行的魔法少女")
 

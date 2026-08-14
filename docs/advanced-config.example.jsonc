@@ -151,8 +151,16 @@
   // 发送与权限。
   "send_result_to_chat": true,
   "max_send_images": 1,
+  // 同时控制“正在绘画中”提示，以及群聊完成后 At 申请人并告知今日剩余次数。
+  "notify_drawing_and_at_sender": false,
   "admin_only": false,
   "allowed_sender_ids": [],
+  // 每个 QQ 每天最多发起几次生图；0 表示不限。
+  "daily_generation_limit": 0,
+  // 免每日上限，也不受 allowed_sender_ids 限制；黑名单仍然优先。
+  "generation_whitelist_sender_ids": [],
+  // 命中后禁止使用整个插件。
+  "generation_blacklist_sender_ids": [],
 
   // 由 AstrBot 启动 ComfyUI：不是开机自启，而是“收到绘图请求时，如果 ComfyUI 离线，再尝试启动”。
   // 仅对 AstrBot 所在机器生效。

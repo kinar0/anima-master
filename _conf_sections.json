@@ -146,8 +146,12 @@
       "items": [
         "send_result_to_chat",
         "max_send_images",
+        "notify_drawing_and_at_sender",
         "admin_only",
-        "allowed_sender_ids"
+        "allowed_sender_ids",
+        "daily_generation_limit",
+        "generation_whitelist_sender_ids",
+        "generation_blacklist_sender_ids"
       ]
     },
     {

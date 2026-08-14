@@ -220,11 +220,22 @@ class ComfyUIRuntime:
             return "ComfyUI 已完成任务，但没有产出可发送的图片。"
 
         if self._bool("send_result_to_chat", True):
-            for output in outputs[: self._int("max_send_images", 1)]:
+            for index, output in enumerate(
+                outputs[: self._int("max_send_images", 1)]
+            ):
                 try:
-                    await event.send(
-                        event.chain_result([Comp.Image.fromFileSystem(output)])
-                    )
+                    chain = []
+                    if index == 0 and self._should_at_sender(event):
+                        chain.extend(
+                            [
+                                Comp.At(qq=str(event.get_sender_id())),
+                                Comp.Plain(
+                                    " " + self._remaining_usage_text(payload) + "\n"
+                                ),
+                            ]
+                        )
+                    chain.append(Comp.Image.fromFileSystem(output))
+                    await event.send(event.chain_result(chain))
                 except Exception as exc:
                     wording = str(
                         getattr(exc, "wording", "")
@@ -267,3 +278,25 @@ class ComfyUIRuntime:
         message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
         payload["delivery"] = skipped_delivery(outputs, message)
         return message
+
+    def _should_at_sender(self, event: Any) -> bool:
+        if not self._bool("notify_drawing_and_at_sender", False):
+            return False
+        try:
+            return bool(event.get_group_id()) and bool(event.get_sender_id())
+        except Exception:  # noqa: BLE001 - non-group adapters may omit these methods.
+            return False
+
+    @staticmethod
+    def _remaining_usage_text(payload: dict[str, Any]) -> str:
+        usage = payload.get("daily_usage")
+        if not isinstance(usage, dict):
+            return "今日剩余次数：不限"
+        try:
+            limit = int(usage.get("limit") or 0)
+            remaining = max(0, int(usage.get("remaining") or 0))
+        except (TypeError, ValueError):
+            return "今日剩余次数：不限"
+        if limit <= 0 or bool(usage.get("whitelisted")):
+            return "今日剩余次数：不限"
+        return f"今日剩余次数：{remaining}"

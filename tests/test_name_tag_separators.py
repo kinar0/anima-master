@@ -13,6 +13,7 @@ from prompt_presets import (  # noqa: E402
     active_style_tags,
     artist_presets,
     fixed_character_tags,
+    mentioned_fixed_characters,
     style_presets,
 )
 
@@ -32,6 +33,21 @@ def test_character_config_accepts_fullwidth_separators() -> None:
     assert fixed_character_tags(config) == {
         "狐莉": "1girl, solo",
         "团子": "1girl, vampire",
+    }
+
+
+def test_all_mentioned_fixed_characters_keep_chat_authored_identity_text() -> None:
+    config = {
+        "fixed_characters": [
+            "长崎素世=nagasaki soyo, 1girl with long brown hair, blue eyes",
+            "千早爱音=chihaya anon, 1girl with long pink hair, grey eyes",
+            "丰川祥子=togawa sakiko, blue hair, yellow eyes",
+        ]
+    }
+
+    assert mentioned_fixed_characters("长崎素世牵着千早爱音", config) == {
+        "长崎素世": "nagasaki soyo, 1girl with long brown hair, blue eyes",
+        "千早爱音": "chihaya anon, 1girl with long pink hair, grey eyes",
     }
 
 

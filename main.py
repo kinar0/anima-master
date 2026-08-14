@@ -26,6 +26,7 @@ try:
         resolve_chiyo_profile,
     )
     from .service_container import build_services
+    from .usage_limiter import DailyUsageLimiter
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
     from config_defaults import (
@@ -41,6 +42,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         resolve_chiyo_profile,
     )
     from service_container import build_services
+    from usage_limiter import DailyUsageLimiter
 
 
 class ComfyUIAgentPlugin(Star):
@@ -49,11 +51,10 @@ class ComfyUIAgentPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig | None = None):
         super().__init__(context, config)
         schema_path = Path(__file__).with_name("_conf_schema.json")
-        chiyo_snapshot_path = (
-            Path(get_astrbot_plugin_data_path())
-            / "astrbot_plugin_anima_master"
-            / "chiyo_preset_base.json"
+        plugin_data_path = (
+            Path(get_astrbot_plugin_data_path()) / "astrbot_plugin_anima_master"
         )
+        chiyo_snapshot_path = plugin_data_path / "chiyo_preset_base.json"
         if bool(flatten_config(config or {}).get("reset_to_defaults", False)):
             chiyo_snapshot_path.unlink(missing_ok=True)
         grouped_or_reset = maybe_migrate_to_grouped_config(config or {}, schema_path)
@@ -77,9 +78,16 @@ class ComfyUIAgentPlugin(Star):
         self._multi_generation_semaphore = asyncio.Semaphore(
             max(1, self._int("multi_max_concurrent_generations", 1))
         )
+        self._daily_usage = DailyUsageLimiter(
+            plugin_data_path / "daily_generation_usage.json", logger
+        )
         self._danbooru_tag_cache: dict[str, Any] = {}
         self._last_prompt_summary: ContextVar[dict[str, Any]] = ContextVar(
             f"anima_prompt_summary_{id(self)}",
+            default={},
+        )
+        self._generation_usage_summary: ContextVar[dict[str, Any]] = ContextVar(
+            f"anima_generation_usage_{id(self)}",
             default={},
         )
         self._services = build_services(
@@ -145,15 +153,56 @@ class ComfyUIAgentPlugin(Star):
         return str(value if value is not None else default)
 
     def _is_allowed(self, event: AstrMessageEvent) -> bool:
+        sender_id = str(event.get_sender_id() or "").strip()
+        if sender_id in self._sender_id_set("generation_blacklist_sender_ids"):
+            return False
         if self._bool("admin_only", False) and not event.is_admin():
             return False
+        if sender_id in self._sender_id_set("generation_whitelist_sender_ids"):
+            return True
         allowed = self.config.get("allowed_sender_ids", [])
         if isinstance(allowed, str):
             allowed = [allowed]
         allowed_set = {str(item).strip() for item in allowed or [] if str(item).strip()}
-        if allowed_set and str(event.get_sender_id()) not in allowed_set:
+        if allowed_set and sender_id not in allowed_set:
             return False
         return True
+
+    def _sender_id_set(self, key: str) -> set[str]:
+        values = self.config.get(key, [])
+        if isinstance(values, str):
+            values = [values]
+        return {str(item).strip() for item in values or [] if str(item).strip()}
+
+    def _reserve_generation_call(self, event: AstrMessageEvent) -> str:
+        """Reserve one daily call and return an optional rejection message."""
+        sender_id = str(event.get_sender_id() or "").strip()
+        if not self._is_allowed(event):
+            if sender_id in self._sender_id_set("generation_blacklist_sender_ids"):
+                return "你已被加入生图黑名单，当前无法使用生图功能。"
+            return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
+        decision = self._daily_usage.acquire(
+            sender_id,
+            self._int("daily_generation_limit", 0),
+            whitelisted=(
+                sender_id in self._sender_id_set("generation_whitelist_sender_ids")
+            ),
+        )
+        self._generation_usage_summary.set(
+            {
+                "used": decision.used,
+                "limit": decision.limit,
+                "remaining": decision.remaining,
+                "whitelisted": decision.whitelisted,
+                "day": decision.day,
+            }
+        )
+        if not decision.allowed:
+            return (
+                f"你今天的生图次数已用完（{decision.used}/{decision.limit}）。"
+                "请明天再试。"
+            )
+        return ""
 
     async def _run_tool(self, args: list[str]) -> dict[str, Any]:
         return await self._runtime.run_tool(args)
@@ -240,6 +289,23 @@ class ComfyUIAgentPlugin(Star):
         negative_prompt: str | None = None,
         multi_person: bool = False,
     ) -> str:
+        quota_error = self._reserve_generation_call(event)
+        if quota_error:
+            await event.send(event.plain_result(quota_error))
+            return quota_error
+        if self._bool("notify_drawing_and_at_sender", False):
+            try:
+                await event.send(event.plain_result("正在绘画中，请等待。"))
+            except Exception as exc:
+                logger.warning(
+                    "[comfyui_agent] failed to send drawing progress notice: %s",
+                    str(exc)[:500],
+                )
+        usage_summary = (
+            dict(self._generation_usage_summary.get())
+            if hasattr(self, "_generation_usage_summary")
+            else {}
+        )
         if multi_person:
             await self._multi_generation_semaphore.acquire()
         try:
@@ -253,6 +319,8 @@ class ComfyUIAgentPlugin(Star):
                 negative_prompt=negative_prompt,
                 multi_person=multi_person,
             )
+            if usage_summary:
+                payload["daily_usage"] = usage_summary
             if payload.get("prompt_degraded"):
                 try:
                     await event.send(

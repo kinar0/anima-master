@@ -33,6 +33,9 @@ CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
         "chiyo_preset",
         "admin_only",
         "allowed_sender_ids",
+        "daily_generation_limit",
+        "generation_whitelist_sender_ids",
+        "generation_blacklist_sender_ids",
     ),
     "prompt": (
         "prompt_builder_template",
@@ -64,6 +67,7 @@ CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
     "output": (
         "send_result_to_chat",
         "max_send_images",
+        "notify_drawing_and_at_sender",
         "img2img_enabled",
     ),
     "verify_debug": (
@@ -144,6 +148,8 @@ def build_config_debug_lines(
         f"- Danbooru 核心 tag 查询：{_bool(config, 'danbooru_core_tag_lookup_enabled', True)}",
         f"- 图生图：{_bool(config, 'img2img_enabled', False)}",
         f"- 发送到聊天：{_bool(config, 'send_result_to_chat', True)} / 最多 {_int(config, 'max_send_images', 1)} 张",
+        f"- 绘画中提示并在群聊 At：{_bool(config, 'notify_drawing_and_at_sender', False)}",
+        f"- 每日生图上限：{_int(config, 'daily_generation_limit', 0) or '不限'} / 免限额白名单 {len(config.get('generation_whitelist_sender_ids') or [])} 人 / 黑名单 {len(config.get('generation_blacklist_sender_ids') or [])} 人",
         f"- 生成后自检：{_bool(config, 'enable_verify', False)} / 分数线 {_int(config, 'verify_pass_score', 7)} / 最多重画 {_int(config, 'max_verify_retry', 1)} 次",
         f"- 多人候选：{_int(config, 'multi_candidate_count', 2)} 张 / 自检 {_bool(config, 'multi_verify_enabled', True)} / 分数线 {_int(config, 'multi_verify_pass_score', 6)} / 降级发送 {_bool(config, 'multi_send_degraded_candidate', True)} / 并发 {_int(config, 'multi_max_concurrent_generations', 1)}",
         f"- ComfyUI：{_str(config, 'comfyui_base_url', 'http://127.0.0.1:8188')}",
