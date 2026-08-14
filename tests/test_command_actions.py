@@ -80,6 +80,25 @@ def test_generate_action_passes_one_time_size_override():
     assert calls == [("少女站在河岸", {"width": 1216, "height": 832})]
 
 
+def test_generate_action_accepts_space_after_explicit_size():
+    calls = []
+
+    async def generate(event, prompt, **kwargs):
+        calls.append((prompt, kwargs))
+
+    handler = _handler(
+        config={"allowed_sizes": ["1024x1024", "1216x832"]},
+        generate=generate,
+    )
+
+    result = asyncio.run(
+        handler.handle_action(object(), "generate", "1216x832 少女站在河岸")
+    )
+
+    assert result is None
+    assert calls == [("少女站在河岸", {"width": 1216, "height": 832})]
+
+
 def test_generate_action_rejects_unavailable_size_before_generation():
     calls = []
 

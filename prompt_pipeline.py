@@ -188,23 +188,29 @@ def is_chinese_model_refusal(text: str) -> bool:
 
 def extract_structured_prompt(
     text: str,
-) -> tuple[tuple[str, ...], tuple[StructuredPromptCharacter, ...], str, str]:
+) -> tuple[
+    tuple[str, ...],
+    tuple[str, ...],
+    tuple[StructuredPromptCharacter, ...],
+    str,
+    str,
+]:
     """Parse the unified character-first LLM response format.
 
     Args:
-        text: LLM completion containing Count, Characters, per-character
-            sections, shared tags, and Nltags.
+        text: LLM completion containing Count, Characters, Copyright,
+            per-character sections, shared tags, and Nltags.
 
     Returns:
-        Roster count/relationship tags, character sections, shared scene tags,
-        and natural-language tags. Empty character sections signal that a legacy
-        tag-only completion was returned.
+        Roster count/relationship tags, copyright tags, character sections,
+        shared scene tags, and natural-language tags. Empty character sections
+        signal that a legacy tag-only completion was returned.
     """
     raw = str(text or "").replace("\r\n", "\n").strip()
     blocks = {
         key.lower(): value.strip()
         for key, value in re.findall(
-            r"\{\s*(Count|Characters|Identity|Details|Tags|Nltags)\s*:\s*(.*?)\s*\}",
+            r"\{\s*(Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:\s*(.*?)\s*\}",
             raw,
             flags=re.IGNORECASE | re.DOTALL,
         )
@@ -212,12 +218,13 @@ def extract_structured_prompt(
     if set(blocks) != {
         "count",
         "characters",
+        "copyright",
         "identity",
         "details",
         "tags",
         "nltags",
     }:
-        return (), (), raw, ""
+        return (), (), (), raw, ""
     roster_tags: list[str] = []
     has_count_tag = False
     for item in (item.strip() for item in blocks["count"].split(",") if item.strip()):
@@ -232,8 +239,13 @@ def extract_structured_prompt(
         for item in blocks["characters"].split(",")
         if item.strip()
     ]
+    copyright_tags = tuple(
+        item.strip()
+        for item in blocks["copyright"].split(",")
+        if item.strip()
+    )
     if not has_count_tag or not roster:
-        return (), (), raw, ""
+        return (), (), (), raw, ""
 
     def sentence_for(name: str, section: str) -> str:
         display = re.escape(name.replace("_", " "))
@@ -258,8 +270,14 @@ def extract_structured_prompt(
         for name in roster
     )
     if any(not character.identity_tags or not character.detail_tags for character in characters):
-        return (), (), raw, ""
-    return tuple(roster_tags), characters, blocks["tags"], blocks["nltags"]
+        return (), (), (), raw, ""
+    return (
+        tuple(roster_tags),
+        copyright_tags,
+        characters,
+        blocks["tags"],
+        blocks["nltags"],
+    )
 
 
 def extract_nltags(text: str) -> tuple[str, str]:
@@ -438,7 +456,7 @@ class PromptPipeline:
                 "不要解释，不要 Markdown，不要输出质量词或画师词。"
                 "严格按用户原始文字判断背景；未提背景时使用白底立绘。"
                 "按用户是否明确要求场景，在最后输出且只输出一个背景控制标记。"
-                "Follow the user prompt's six-brace-block response format exactly. "
+                "Follow the user prompt's seven-brace-block response format exactly. "
                 "Count must contain the exact Danbooru people-count tag, while "
                 "Characters contains names only; never omit Count or merge it into "
                 "Characters."
@@ -1306,6 +1324,21 @@ class PromptPipeline:
 
         prompt_config = apply_config_preset(dict(self.config))
         local_character_hints = mentioned_fixed_characters(prompt, prompt_config)
+        profile_tags_getter = getattr(
+            self._danbooru_resolver, "required_profile_tags_for_prompt", None
+        )
+        required_profile_tags = (
+            tuple(profile_tags_getter(prompt)) if profile_tags_getter else ()
+        )
+        profile_hints_getter = getattr(
+            self._danbooru_resolver, "profile_hints_for_prompt", None
+        )
+        profile_hints = (
+            dict(profile_hints_getter(prompt)) if profile_hints_getter else {}
+        )
+        profile_outfit_rule = "\n".join(
+            f"{name}: {hint}" for name, hint in profile_hints.items()
+        )
         fixed_character = selected_fixed_character(prompt, prompt_config)
         fixed_character_name = fixed_character[0] if fixed_character else ""
 
@@ -1428,8 +1461,13 @@ class PromptPipeline:
             sensual_mode=use_sensual_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
-            outfit_transfer_rule=build_outfit_transfer_block(
-                outfit_plan, outfit_summary
+            outfit_transfer_rule="\n".join(
+                part
+                for part in (
+                    build_outfit_transfer_block(outfit_plan, outfit_summary),
+                    profile_outfit_rule,
+                )
+                if part
             ),
             original_theme=background_intent_prompt,
         )
@@ -1483,6 +1521,7 @@ class PromptPipeline:
             )
         (
             structured_roster_tags,
+            structured_copyright_tags,
             structured_characters,
             structured_scene,
             structured_nltags,
@@ -1492,10 +1531,11 @@ class PromptPipeline:
         if not structured_characters and "_(" not in llm_content:
             strict_format_prompt = (
                 llm_prompt
-                + "\n\nYour previous response was invalid. Return exactly the six "
-                "brace blocks {Count: ...} {Characters: ...} {Identity: ...} "
-                "{Details: ...} {Tags: ...} {Nltags: ...}; Count must include an "
-                "exact people-count tag and every named character must appear once "
+                + "\n\nYour previous response was invalid. Return exactly the seven "
+                "brace blocks {Count: ...} {Characters: ...} {Copyright: ...} "
+                "{Identity: ...} {Details: ...} {Tags: ...} {Nltags: ...}; Count "
+                "must include an exact people-count tag, Copyright must contain "
+                "only work/IP tags, and every named character must appear once "
                 "in both Identity and Details."
             )
             try:
@@ -1510,6 +1550,7 @@ class PromptPipeline:
                     return self._model_refusal_result(summary, retry_content)
                 (
                     structured_roster_tags,
+                    structured_copyright_tags,
                     structured_characters,
                     structured_scene,
                     structured_nltags,
@@ -1587,6 +1628,8 @@ class PromptPipeline:
                 part
                 for part in (
                     *structured_roster_tags,
+                    *required_profile_tags,
+                    *structured_copyright_tags,
                     *rendered_characters,
                     structured_scene,
                 )
@@ -1599,6 +1642,10 @@ class PromptPipeline:
             summary["structured_character_mode"] = True
             summary["structured_character_count"] = len(structured_characters)
             summary["structured_roster_tags"] = list(structured_roster_tags)
+            summary["structured_copyright_tags"] = list(
+                structured_copyright_tags
+            )
+            summary["required_profile_tags"] = list(required_profile_tags)
             summary["removed_unbound_directional_tags"] = list(
                 removed_unbound_tags
             )
@@ -1610,7 +1657,7 @@ class PromptPipeline:
         else:
             llm_content, nltags = extract_nltags(llm_content)
             llm_content = re.sub(
-                r"\{\s*(?:Count|Characters|Identity|Details|Tags|Nltags)\s*:[^}]*\}",
+                r"\{\s*(?:Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:[^}]*\}",
                 "",
                 llm_content,
                 flags=re.IGNORECASE | re.DOTALL,
@@ -1659,7 +1706,15 @@ class PromptPipeline:
                 )
         llm_content = character_resolution.text
         if character_resolution.identity_tags:
-            required_core_tags = character_resolution.identity_tags
+            required_core_tags = tuple(
+                dict.fromkeys(
+                    (*character_resolution.identity_tags, *required_profile_tags)
+                )
+            )
+        elif required_profile_tags:
+            required_core_tags = tuple(
+                dict.fromkeys((*required_core_tags, *required_profile_tags))
+            )
         low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
         constraint_raw = ""
         constraint_plan = parse_constraint_plan("")
@@ -1731,6 +1786,7 @@ class PromptPipeline:
                 "removed_constraint_tags": list(built.removed_constraint_tags),
                 "constraint_reason": built.constraint_reason,
                 "required_core_tags": list(built.required_core_tags),
+                "required_profile_tags": list(required_profile_tags),
                 "named_character_detected": character_resolution.status
                 in {"resolved", "unresolved", "source_unavailable"},
                 "character_resolution_status": character_resolution.status,

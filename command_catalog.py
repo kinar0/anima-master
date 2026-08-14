@@ -191,7 +191,8 @@ def build_help_text(img2img_enabled: bool = False) -> str:
             lines.append(entry.help_line)
     lines.extend(
         [
-            "  可在描述开头写“竖图/横图/方图/宽屏”，或写“1024x1536：描述”",
+            "  可在 anm 后写“宽x高 描述”，如“anm 1216x832 白色礼服少女”",
+            "  也可在描述开头写“竖图/横图/方图/宽屏”",
             "  也可在末尾写“--尺寸 1216x832”指定本次尺寸",
             "  自然语言生图默认由 LLM 自主拓展主题并丰富完整画面",
             "",

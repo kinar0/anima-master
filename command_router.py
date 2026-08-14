@@ -62,7 +62,7 @@ def parse_generation_size(
     for pattern in (
         rf"(?<!\S)--(?:尺寸|分辨率)\s*(?:=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
         rf"(?:尺寸|分辨率)\s*(?:为|是|=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
-        rf"^\s*{_SIZE_VALUE_PATTERN}\s*[：:,，]",
+        rf"^\s*{_SIZE_VALUE_PATTERN}(?=$|\s|[：:,，])\s*[：:,，]?",
     ):
         size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
         if size_match:

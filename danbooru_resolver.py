@@ -11,7 +11,9 @@ try:
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
         character_resolution_requested,
+        profile_hints_for_prompt,
         required_core_tags_for_prompt,
+        required_profile_tags_for_prompt,
         resolve_core_tags,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
@@ -19,7 +21,9 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
         character_resolution_requested,
+        profile_hints_for_prompt,
         required_core_tags_for_prompt,
+        required_profile_tags_for_prompt,
         resolve_core_tags,
     )
 
@@ -77,6 +81,14 @@ class DanbooruResolver:
             Required core tags.
         """
         return required_core_tags_for_prompt(user_prompt)
+
+    def required_profile_tags_for_prompt(self, user_prompt: str) -> tuple[str, ...]:
+        """Return deterministic tags for an explicitly requested variant."""
+        return required_profile_tags_for_prompt(user_prompt)
+
+    def profile_hints_for_prompt(self, user_prompt: str) -> dict[str, str]:
+        """Return locally verified variant context for the prompt LLM."""
+        return profile_hints_for_prompt(user_prompt)
 
     def _base_urls(self) -> tuple[str, ...]:
         base_urls_text = self._str("danbooru_tag_base_urls", "").strip()

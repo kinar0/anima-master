@@ -223,6 +223,7 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
                 (
                     "{Count: 1girl, solo}\n"
                     "{Characters: togawa_sakiko}\n"
+                    "{Copyright: bang_dream!}\n"
                     "{Identity: togawa_sakiko has blue_hair}\n"
                     "{Details: togawa_sakiko wears black_pantyhose}\n"
                     "{Tags: full_body, white_background}\n"
@@ -275,8 +276,124 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
     result = asyncio.run(pipeline.build(event, "draw Sakiko"))
 
     assert result.summary["structured_format_retry"] is True
+    assert result.summary["structured_copyright_tags"] == ["bang_dream!"]
+    assert "bang dream!" in result.final_prompt
     assert "_" not in result.final_prompt
     assert ", Nltags:" in result.final_prompt
+
+
+def test_oblivionis_profile_is_forced_when_llm_returns_plain_sakiko() -> None:
+    class _Response:
+        completion_text = (
+            "{Count: 1girl, solo}\n"
+            "{Characters: togawa_sakiko}\n"
+            "{Copyright: bang_dream!}\n"
+            "{Identity: togawa_sakiko has blue hair and yellow eyes}\n"
+            "{Details: togawa_sakiko wears a stage costume}\n"
+            "{Tags: full body, white background, background_mode_default_portrait}\n"
+            "{Nltags: togawa_sakiko wears an Oblivionis stage costume.}"
+        )
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response()
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ("oblivionis_(bang_dream!)",)
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return (
+                "oblivionis_(bang_dream!)",
+                "bang_dream!",
+                "red_dress",
+                "puffy_sleeves",
+                "black_mask",
+            )
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {
+                "Oblivionis 服装来源": "source: oblivionis_(bang_dream!)"
+            }
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
+
+    context = _Context()
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    pipeline = PromptPipeline(
+        context=context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+
+    result = asyncio.run(
+        pipeline.build(event, "穿着oblivionis服装的丰川祥子")
+    )
+
+    assert "source: oblivionis_(bang_dream!)" in context.calls[0]["prompt"]
+    for tag in (
+        "togawa sakiko",
+        "oblivionis (bang dream!)",
+        "bang dream!",
+        "red dress",
+        "puffy sleeves",
+        "black mask",
+    ):
+        assert tag in result.final_prompt
+
+    _Response.completion_text = _Response.completion_text.replace(
+        "togawa_sakiko", "chihaya_anon"
+    )
+    anon_context = _Context()
+    anon_pipeline = PromptPipeline(
+        context=anon_context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    anon_result = asyncio.run(
+        anon_pipeline.build(event, "穿着oblivionis服装的千早爱音")
+    )
+
+    assert "chihaya anon" in anon_result.final_prompt
+    assert "oblivionis (bang dream!)" in anon_result.final_prompt
+    assert "togawa sakiko" not in anon_result.final_prompt
 
 
 def test_named_character_uses_evidence_candidate_and_stable_anchors():
@@ -401,6 +518,7 @@ def test_unified_roster_uses_local_hints_and_resolves_only_unknown_characters():
             return _Response(
                 "{Count: 3girls}\n"
                 "{Characters: nagasaki_soyo, chihaya_anon, hatsune_miku}\n"
+                "{Copyright: bang_dream!, vocaloid}\n"
                 "{Identity: nagasaki_soyo has long brown hair, blue eyes, and "
                 "large breasts; chihaya_anon has long pink hair and grey eyes; "
                 "hatsune_miku has aqua hair and aqua eyes}\n"
@@ -487,9 +605,10 @@ def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
 
 
 def test_extract_structured_prompt_keeps_character_scopes() -> None:
-    roster_tags, characters, scene, nltags = extract_structured_prompt(
+    roster_tags, copyright_tags, characters, scene, nltags = extract_structured_prompt(
         "{Count: 2girls, yuri}\n"
         "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
         "{Identity: togawa_sakiko has blue hair and long hair; "
         "chihaya_anon has pink hair and long hair}\n"
         "{Details: togawa_sakiko cosplays Hatsune Miku; "
@@ -503,6 +622,7 @@ def test_extract_structured_prompt_keeps_character_scopes() -> None:
         "chihaya_anon",
     ]
     assert roster_tags == ("2girls", "yuri")
+    assert copyright_tags == ("bang_dream!",)
     assert characters[0].identity_tags == "togawa_sakiko has blue hair and long hair"
     assert characters[0].detail_tags == "togawa_sakiko cosplays Hatsune Miku"
     assert scene == "standing together, concert stage"
@@ -515,7 +635,8 @@ def test_llm_prompt_requires_bidirectional_directed_interaction_binding() -> Non
         original_theme="一张白色的大床，穿红黑礼服的丰川祥子抱着穿黑色风衣的千早爱音",
     )
 
-    assert "Return exactly six single-line brace blocks" in prompt
+    assert "Return exactly seven single-line brace blocks" in prompt
+    assert "{Copyright:" in prompt
     assert "List the actor/holder/supporter before the recipient" in prompt
     assert "wraps her arms around" in prompt
     assert "is being held by" in prompt
@@ -525,9 +646,10 @@ def test_llm_prompt_requires_bidirectional_directed_interaction_binding() -> Non
 
 
 def test_structured_prompt_preserves_actor_first_bidirectional_details() -> None:
-    roster_tags, characters, scene, nltags = extract_structured_prompt(
+    roster_tags, copyright_tags, characters, scene, nltags = extract_structured_prompt(
         "{Count: 2girls, yuri}\n"
         "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
         "{Identity: togawa_sakiko has blue hair and yellow eyes; "
         "chihaya_anon has pink hair and grey eyes}\n"
         "{Details: togawa_sakiko sits upright and holds chihaya_anon in her arms, "
@@ -539,6 +661,7 @@ def test_structured_prompt_preserves_actor_first_bidirectional_details() -> None
     )
 
     assert roster_tags == ("2girls", "yuri")
+    assert copyright_tags == ("bang_dream!",)
     assert [character.name for character in characters] == [
         "togawa_sakiko",
         "chihaya_anon",
@@ -559,9 +682,10 @@ def test_shared_tags_drop_unbound_directional_action_and_pose_words() -> None:
 
 
 def test_structured_prompt_rejects_a_relationship_without_count_tag() -> None:
-    roster_tags, characters, scene, nltags = extract_structured_prompt(
+    roster_tags, copyright_tags, characters, scene, nltags = extract_structured_prompt(
         "{Count: yuri}\n"
         "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
         "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
         "{Details: togawa_sakiko sits; chihaya_anon lies down}\n"
         "{Tags: bedroom}\n"
@@ -569,15 +693,17 @@ def test_structured_prompt_rejects_a_relationship_without_count_tag() -> None:
     )
 
     assert roster_tags == ()
+    assert copyright_tags == ()
     assert characters == ()
     assert scene.startswith("{Count:")
     assert nltags == ""
 
 
 def test_structured_prompt_rejects_character_only_mentioned_in_anothers_details() -> None:
-    roster_tags, characters, scene, nltags = extract_structured_prompt(
+    roster_tags, copyright_tags, characters, scene, nltags = extract_structured_prompt(
         "{Count: 2girls, yuri}\n"
         "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
         "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
         "{Details: chihaya_anon wears a black trench coat and lies in "
         "togawa_sakiko's arms}\n"
@@ -586,6 +712,7 @@ def test_structured_prompt_rejects_character_only_mentioned_in_anothers_details(
     )
 
     assert roster_tags == ()
+    assert copyright_tags == ()
     assert characters == ()
     assert scene.startswith("{Count:")
     assert nltags == ""

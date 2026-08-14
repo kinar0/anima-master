@@ -23,6 +23,10 @@ DEFAULT_SAFEBOORU_DAPI_URL = "https://safebooru.org/index.php"
 DEFAULT_USER_AGENT = "AstrBotComfyUIAgent/0.13"
 
 KNOWN_CORE_ALIASES: dict[str, tuple[str, ...]] = {
+    "oblivionis": (
+        "oblivionis_(bang_dream!)",
+        "oblivionis",
+    ),
     "忍野忍": ("oshino_shinobu", "shinobu_oshino"),
     "洛茜": ("rossi_(arknights)", "rossi_(arknights:endfield)", "rossi"),
     "妃咲": ("kisaki_(blue_archive)", "kisaki", "hisaki_(blue_archive)", "hisaki"),
@@ -35,6 +39,8 @@ KNOWN_CORE_ALIASES: dict[str, tuple[str, ...]] = {
     "suzuran": ("suzuran_(arknights)", "suzuran"),
 }
 KNOWN_CANONICAL_CORE_TAGS: dict[str, str] = {
+    "oblivionis": "oblivionis_(bang_dream!)",
+    "oblivionis_(bang_dream!)": "oblivionis_(bang_dream!)",
     "shinobu_oshino": "oshino_shinobu",
     "rossi": "rossi_(arknights)",
     "rossi_(arknights:endfield)": "rossi_(arknights)",
@@ -43,6 +49,45 @@ KNOWN_CANONICAL_CORE_TAGS: dict[str, str] = {
     "hisaki_(blue_archive)": "kisaki_(blue_archive)",
     "suzuran": "suzuran_(arknights)",
 }
+
+KNOWN_CHARACTER_PROFILE_TAGS: dict[str, tuple[str, ...]] = {
+    "oblivionis_(bang_dream!)": (
+        "oblivionis_(bang_dream!)",
+        "bang_dream!",
+        "red_dress",
+        "puffy_sleeves",
+        "black_mask",
+    ),
+}
+
+
+def _contains_alias(text: str, alias: str) -> bool:
+    """Return whether text contains an alias, case-insensitively for ASCII."""
+    return str(alias or "").lower() in str(text or "").lower()
+
+
+def required_profile_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
+    """Return deterministic character-variant tags requested by the user."""
+    if _contains_alias(user_prompt, "oblivionis"):
+        return KNOWN_CHARACTER_PROFILE_TAGS["oblivionis_(bang_dream!)"]
+    return ()
+
+
+def profile_hints_for_prompt(user_prompt: str) -> dict[str, str]:
+    """Return LLM-facing context for locally known character variants."""
+    if not _contains_alias(user_prompt, "oblivionis"):
+        return {}
+    return {
+        "Oblivionis 服装来源": (
+            "Keep the user's actual target character as the only roster "
+            "identity. Treat oblivionis_(bang_dream!) as a costume/cosplay "
+            "source anchor, analogous to kasane_teto_(cosplay), not as a "
+            "replacement target or an additional visible person. "
+            "copyright tag: bang_dream!; required visible outfit anchors: "
+            "red_dress, puffy_sleeves, black_mask. Treat this as Togawa "
+            "Sakiko's Oblivionis stage persona/outfit, not a generic red dress."
+        )
+    }
 
 GENERAL_TAG_WORDS = {
     "arms",
@@ -170,7 +215,7 @@ def required_core_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
     text = str(user_prompt or "")
     anchors: list[str] = []
     for alias, queries in KNOWN_CORE_ALIASES.items():
-        if alias not in text:
+        if not _contains_alias(text, alias):
             continue
         record = _known_canonical_record(list(queries))
         if record and record.name not in anchors:
@@ -775,7 +820,7 @@ def character_resolution_requested(
         candidate_hints
         or scoped_candidate
         or _user_character_queries(user_prompt)
-        or any(alias in user_prompt for alias in KNOWN_CORE_ALIASES)
+        or any(_contains_alias(user_prompt, alias) for alias in KNOWN_CORE_ALIASES)
     )
 
 
@@ -830,7 +875,7 @@ def resolve_core_tags(
     if allow_insert:
         existing = {_normalize_query(tag) for tag in tags}
         for alias, queries in KNOWN_CORE_ALIASES.items():
-            if alias not in user_prompt:
+            if not _contains_alias(user_prompt, alias):
                 continue
             alias_queries = list(queries)
             best = _known_canonical_record(alias_queries) or _best_character(
@@ -936,7 +981,10 @@ def resolve_core_tags(
         allow_insert
         and (
             _user_character_queries(user_prompt)
-            or any(alias in user_prompt for alias in KNOWN_CORE_ALIASES)
+            or any(
+                _contains_alias(user_prompt, alias)
+                for alias in KNOWN_CORE_ALIASES
+            )
         )
     )
     requested = character_resolution_requested(

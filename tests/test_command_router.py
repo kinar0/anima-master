@@ -91,12 +91,28 @@ def test_parse_generation_size_aliases_choose_closest_allowed_ratio():
 
 
 def test_parse_generation_size_explicit_forms_remove_control_text():
+    assert parse_generation_size("1216x832 白色礼服少女", ALLOWED_SIZES) == (
+        "白色礼服少女",
+        (1216, 832),
+        None,
+    )
     assert parse_generation_size("1024x1536：白色礼服少女", ALLOWED_SIZES) == (
         "白色礼服少女",
         (1024, 1536),
         None,
     )
     assert parse_generation_size("少女站在河岸 --尺寸 1216x832", ALLOWED_SIZES) == (
+        "少女站在河岸",
+        (1216, 832),
+        None,
+    )
+
+
+def test_anm_size_and_prompt_are_space_separated():
+    action, prompt = parse_hard_route("/anm 1216x832 少女站在河岸")
+
+    assert action == "generate"
+    assert parse_generation_size(prompt, ALLOWED_SIZES) == (
         "少女站在河岸",
         (1216, 832),
         None,

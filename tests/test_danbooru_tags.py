@@ -232,6 +232,32 @@ def test_common_scoped_free_tags_do_not_request_character_resolution() -> None:
     )
 
 
+def test_oblivionis_alias_resolves_direct_name_without_network(monkeypatch) -> None:
+    monkeypatch.setattr(tags_module, "_best_character", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        tags_module, "_fetch_stable_identity_tags", lambda *args, **kwargs: ()
+    )
+
+    result = resolve_core_tags(
+        "oblivionis",
+        user_prompt="oblivionis",
+        allow_insert=True,
+    )
+
+    assert result.status == "resolved"
+    assert result.canonical_tag == "oblivionis_(bang_dream!)"
+    assert result.text == "oblivionis_(bang_dream!)"
+    assert tags_module.required_profile_tags_for_prompt(
+        "穿着Oblivionis服装的丰川祥子"
+    ) == (
+        "oblivionis_(bang_dream!)",
+        "bang_dream!",
+        "red_dress",
+        "puffy_sleeves",
+        "black_mask",
+    )
+
+
 def test_empty_lookup_cache_expires_quickly(monkeypatch) -> None:
     clock = [100.0]
     calls: list[str] = []

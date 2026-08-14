@@ -15,14 +15,15 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。
 
 输出要求：
-- 只输出六个单行花括号字段，字段外不得输出任何文字：
+- 只输出七个单行花括号字段，字段外不得输出任何文字：
   `{{Count: 2girls, yuri}}`
   `{{Characters: chihaya_anon, togawa_sakiko}}`
+  `{{Copyright: bang_dream!}}`
   `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`
   `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
   `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
-- `Count` 必须含准确的人数 Danbooru tag；`Characters` 只能含角色名。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- `Count` 必须含准确的人数 Danbooru tag；`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
 - 不要输出 masterpiece、best quality、score 等质量前缀。
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
@@ -61,6 +62,7 @@ BACKGROUND_POLICY_TEMPLATE = """
 
 
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    "1ca427c3208fc3d59f66d0a4c033a6ce19745d7df1858c96d009cc5a3460fa1c",
     "f63d42fcc21ae1d9dcc5a94c63c787f4e7d699e6c76fb3da90a1a46a2a0978f8",
     "95d7bfecaa58255d97685577e7ad2ddeac595b6237d3dd623407f077646bd2cc",
     "5e7ec9859914e12a8af8ccbc893d3658bd3c73e01e8fbda32367b1a0d8960e88",
@@ -219,13 +221,15 @@ def build_llm_prompt(
         )
     return (
         prompt
-        + "\n\nReturn exactly six single-line brace blocks, with no Markdown, "
+        + "\n\nReturn exactly seven single-line brace blocks, with no Markdown, "
         "headings, or text outside the braces. This applies to one or multiple "
         "people alike:\n"
         "{Count: <required count/relationship tags only, such as `1girl, solo`, "
         "`1girl, 1boy, hetero`, or `2girls, yuri`>}\n"
         "{Characters: <every Danbooru character tag or original-person label, "
         "with no count, relationship, clothing, or appearance tags>}\n"
+        "{Copyright: <canonical Danbooru copyright tags for the listed existing "
+        "characters, deduplicated; leave empty for original or unknown characters>}\n"
         "{Identity: <one semicolon-separated sentence per character, for example "
         "`chihaya_anon has pink hair, grey eyes, and flat chest; togawa_sakiko "
         "has blue hair, yellow eyes, and normal breasts`>}\n"
@@ -236,8 +240,9 @@ def build_llm_prompt(
         "lighting, background, and creative visible details>}\n"
         "{Nltags: <one concise English natural-language description using the "
         "same names as Characters>}\n"
-        "Count must contain the exact Danbooru people-count tag and Characters "
-        "must contain names only. Identity and Details "
+        "Count must contain the exact Danbooru people-count tag, Characters "
+        "must contain names only, and Copyright must contain work/IP tags only. "
+        "Identity and Details "
         "must mention every listed character exactly once and must never mix their "
         "traits, clothing, or actions. Keep personality, artistic creativity, "
         "visual aesthetics, and extra concrete details in Tags and Nltags. Put any "
