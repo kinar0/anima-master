@@ -114,8 +114,8 @@ def extract_structured_prompt(
     """Parse the unified character-first LLM response format.
 
     Args:
-        text: LLM completion containing Characters, per-character sections,
-            Scene tags, and optional Nltags.
+        text: LLM completion containing Count, Characters, per-character
+            sections, shared tags, and Nltags.
 
     Returns:
         Roster count/relationship tags, character sections, shared scene tags,
@@ -123,80 +123,65 @@ def extract_structured_prompt(
         tag-only completion was returned.
     """
     raw = str(text or "").replace("\r\n", "\n").strip()
-    match = re.search(r"(?im)^\s*characters\s*:\s*(.+)$", raw)
-    if not match:
+    blocks = {
+        key.lower(): value.strip()
+        for key, value in re.findall(
+            r"\{\s*(Count|Characters|Identity|Details|Tags|Nltags)\s*:\s*(.*?)\s*\}",
+            raw,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+    }
+    if set(blocks) != {
+        "count",
+        "characters",
+        "identity",
+        "details",
+        "tags",
+        "nltags",
+    }:
         return (), (), raw, ""
     roster_tags: list[str] = []
-    roster: list[str] = []
-    for item in (item.strip() for item in match.group(1).split(",") if item.strip()):
+    has_count_tag = False
+    for item in (item.strip() for item in blocks["count"].split(",") if item.strip()):
         normalized = item.lower()
-        if re.fullmatch(r"(?:[1-9]\+?(?:girls?|boys?)|multiple (?:girls|boys|people)|solo|duo|hetero|yuri|yaoi)", normalized):
+        if re.fullmatch(r"(?:[1-9]\+?(?:girls?|boys?)|multiple (?:girls|boys|people))", normalized):
             roster_tags.append(item)
-        else:
-            roster.append(item)
-    lines = raw[match.end() :].splitlines()
-    identity_sections: dict[str, list[str]] = {name: [] for name in roster}
-    detail_sections: dict[str, list[str]] = {name: [] for name in roster}
-    scene: list[str] = []
-    nltags: list[str] = []
-    current = ""
-    current_field = "details"
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        header = re.match(r"^([^:]{1,160})\s*:\s*(.*)$", stripped)
-        if header:
-            name, value = header.group(1).strip(), header.group(2).strip()
-            normalized = name.lower()
-            if normalized in {"scene", "shared", "tags", "scene tags"}:
-                current = "scene"
-                if value:
-                    scene.append(value)
-                continue
-            if normalized == "nltags":
-                current = "nltags"
-                if value:
-                    nltags.append(value)
-                continue
-            if normalized in {"identity", "identity tags", "features"} and current in roster:
-                current_field = "identity"
-                if value:
-                    identity_sections[current].append(value)
-                continue
-            if normalized in {"details", "detail tags", "clothing and action"} and current in roster:
-                current_field = "details"
-                if value:
-                    detail_sections[current].append(value)
-                continue
-            matched_name = next(
-                (candidate for candidate in roster if candidate.lower() == normalized), ""
-            )
-            if matched_name:
-                current = matched_name
-                current_field = "details"
-                if value:
-                    detail_sections[matched_name].append(value)
-                continue
-        if current == "scene":
-            scene.append(stripped)
-        elif current == "nltags":
-            nltags.append(stripped)
-        elif current in roster:
-            target = identity_sections if current_field == "identity" else detail_sections
-            target[current].append(stripped)
+            has_count_tag = True
+        elif normalized in {"solo", "duo", "hetero", "yuri", "yaoi"}:
+            roster_tags.append(item)
+    roster = [
+        item.strip()
+        for item in blocks["characters"].split(",")
+        if item.strip()
+    ]
+    if not has_count_tag or not roster:
+        return (), (), raw, ""
+
+    def sentence_for(name: str, section: str) -> str:
+        display = re.escape(name.replace("_", " "))
+        source = re.escape(name)
+        match = re.search(
+            # A role name mentioned inside somebody else's clause (for example
+            # "chihaya_anon lies in togawa_sakiko's arms") is not that
+            # character's own Details entry.  Require a clause to *start* with
+            # the role name, either at the section start or after a semicolon.
+            rf"(?:^|;)\s*(?:{source}|{display})(?!\w)[^;]*",
+            section,
+            flags=re.IGNORECASE,
+        )
+        return match.group(0).strip(" ,;") if match else ""
+
     characters = tuple(
         StructuredPromptCharacter(
             name=name,
-            identity_tags=", ".join(identity_sections[name]),
-            detail_tags=", ".join(detail_sections[name]),
+            identity_tags=sentence_for(name, blocks["identity"]),
+            detail_tags=sentence_for(name, blocks["details"]),
         )
         for name in roster
-        if identity_sections[name] or detail_sections[name]
     )
-    if not characters:
+    if any(not character.identity_tags or not character.detail_tags for character in characters):
         return (), (), raw, ""
-    return tuple(roster_tags), characters, ", ".join(scene), " ".join(nltags)
+    return tuple(roster_tags), characters, blocks["tags"], blocks["nltags"]
 
 
 def extract_nltags(text: str) -> tuple[str, str]:
@@ -347,10 +332,10 @@ class PromptPipeline:
                 "不要解释，不要 Markdown，不要输出质量词或画师词。"
                 "严格按用户原始文字判断背景；未提背景时使用白底立绘。"
                 "按用户是否明确要求场景，在最后输出且只输出一个背景控制标记。"
-                "Follow the user prompt's character-first response format exactly. "
-                "List every character first, then keep each character's tags in "
-                "that character's own section, followed by shared Scene tags and "
-                "a final Nltags line."
+                "Follow the user prompt's six-brace-block response format exactly. "
+                "Count must contain the exact Danbooru people-count tag, while "
+                "Characters contains names only; never omit Count or merge it into "
+                "Characters."
                 f"{character_rule}"
                 f"{creative_rule}"
             ),
@@ -1305,8 +1290,12 @@ class PromptPipeline:
         llm_prompt = build_llm_prompt(
             prompt,
             search_context=search_context,
-            fixed_character=use_fixed_character,
-            character_name=fixed_character_name,
+            # The structured protocol owns the full roster.  Do not tell the
+            # LLM that a first matched character will be added later: doing so
+            # makes its Identity/Details blocks incomplete in multi-person
+            # requests.  The legacy fixed-character fallback remains below.
+            fixed_character=False,
+            character_name="",
             sensual_mode=use_sensual_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
@@ -1326,8 +1315,8 @@ class PromptPipeline:
                 provider_id=provider_id,
                 llm_prompt=llm_prompt,
                 use_deep_thinking=research_plan.use_deep_thinking,
-                fixed_character=use_fixed_character,
-                character_name=fixed_character_name,
+                fixed_character=False,
+                character_name="",
             )
         except Exception as exc:
             if not research_plan.use_deep_thinking:
@@ -1346,8 +1335,8 @@ class PromptPipeline:
                         provider_id=provider_id,
                         llm_prompt=llm_prompt,
                         use_deep_thinking=False,
-                        fixed_character=use_fixed_character,
-                        character_name=fixed_character_name,
+                        fixed_character=False,
+                        character_name="",
                     )
                 except Exception as retry_exc:
                     self.logger.warning(
@@ -1356,10 +1345,14 @@ class PromptPipeline:
                     llm_error = str(retry_exc)
                     llm_content = ""
 
-        if self._bool("debug_prompt_enabled", False):
-            self.logger.info(
-                "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
-            )
+        # Keep the protocol trace at INFO while the structured response format
+        # is being rolled out.  A malformed Details block otherwise silently
+        # falls back to the legacy tag path and is impossible to diagnose from
+        # the final ComfyUI prompt alone.
+        self.logger.info(
+            "[comfyui_agent] structured prompt LLM raw (initial):\n%s",
+            llm_content,
+        )
         (
             structured_roster_tags,
             structured_characters,
@@ -1368,20 +1361,31 @@ class PromptPipeline:
         ) = (
             extract_structured_prompt(llm_content)
         )
+        self.logger.info(
+            "[comfyui_agent] structured prompt parse (initial): valid=%s characters=%s",
+            bool(structured_characters),
+            [character.name for character in structured_characters],
+        )
         if not structured_characters and "_(" not in llm_content:
             strict_format_prompt = (
                 llm_prompt
-                + "\n\nYour previous response did not use the required format. "
-                "Return only the required Characters / Identity / Details / Scene "
-                "/ Nltags fields now. Do not return a flat tag list."
+                + "\n\nYour previous response was invalid. Return exactly the six "
+                "brace blocks {Count: ...} {Characters: ...} {Identity: ...} "
+                "{Details: ...} {Tags: ...} {Nltags: ...}; Count must include an "
+                "exact people-count tag and every named character must appear once "
+                "in both Identity and Details."
             )
             try:
                 retry_content = await self._generate_prompt_tags_with_llm(
                     provider_id=provider_id,
                     llm_prompt=strict_format_prompt,
                     use_deep_thinking=False,
-                    fixed_character=use_fixed_character,
-                    character_name=fixed_character_name,
+                    fixed_character=False,
+                    character_name="",
+                )
+                self.logger.info(
+                    "[comfyui_agent] structured prompt LLM raw (retry):\n%s",
+                    retry_content,
                 )
                 (
                     structured_roster_tags,
@@ -1389,6 +1393,11 @@ class PromptPipeline:
                     structured_scene,
                     structured_nltags,
                 ) = extract_structured_prompt(retry_content)
+                self.logger.info(
+                    "[comfyui_agent] structured prompt parse (retry): valid=%s characters=%s",
+                    bool(structured_characters),
+                    [character.name for character in structured_characters],
+                )
                 if structured_characters:
                     llm_content = retry_content
                     summary["structured_format_retry"] = True
@@ -1478,7 +1487,19 @@ class PromptPipeline:
             required_core_tags = ()
         else:
             llm_content, nltags = extract_nltags(llm_content)
+            llm_content = re.sub(
+                r"\{\s*(?:Count|Characters|Identity|Details|Tags|Nltags)\s*:[^}]*\}",
+                "",
+                llm_content,
+                flags=re.IGNORECASE | re.DOTALL,
+            ).strip(" ,\n")
             summary["structured_character_mode"] = False
+        self.logger.info(
+            "[comfyui_agent] structured prompt normalized: mode=%s content=%s nltags=%s",
+            "structured" if structured_character_mode else "legacy_fallback",
+            llm_content,
+            nltags,
+        )
         background_mode = ""
         background_mode_source = "not_applicable"
         if mode == "txt2img":
@@ -1551,6 +1572,7 @@ class PromptPipeline:
             background_mode=background_mode,
             nltags=nltags,
             suppress_fixed_character=structured_character_mode,
+            force_multi_character=structured_character_mode,
         )
         initial_input_tag_count = len(split_tags(llm_content))
         content_tag_count = len(split_tags(built.content_tags))
@@ -1572,6 +1594,12 @@ class PromptPipeline:
             len(built.content_tags),
             len(built.final_prompt),
             built.final_prompt[:300],
+        )
+        self.logger.info(
+            "[comfyui_agent] prompt built full content=%s\n"
+            "[comfyui_agent] prompt built full final=%s",
+            built.content_tags,
+            built.final_prompt,
         )
         summary.update(
             {

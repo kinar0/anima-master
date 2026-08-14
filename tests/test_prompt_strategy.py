@@ -219,11 +219,12 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
             self.outputs = [
                 "blue_hair, black_pantyhose",
                 (
-                    "Characters: 1girl, solo, togawa_sakiko\n"
-                    "togawa_sakiko:\nIdentity: blue_hair\n"
-                    "Details: black_pantyhose\n"
-                    "Scene: full_body, white_background\n"
-                    "Nltags: togawa_sakiko wears black_pantyhose."
+                    "{Count: 1girl, solo}\n"
+                    "{Characters: togawa_sakiko}\n"
+                    "{Identity: togawa_sakiko has blue_hair}\n"
+                    "{Details: togawa_sakiko wears black_pantyhose}\n"
+                    "{Tags: full_body, white_background}\n"
+                    "{Nltags: togawa_sakiko wears black_pantyhose.}"
                 ),
             ]
 
@@ -389,15 +390,14 @@ def test_danbooru_tag_fast_path_detection_accepts_tag_lists():
 
 def test_extract_structured_prompt_keeps_character_scopes() -> None:
     roster_tags, characters, scene, nltags = extract_structured_prompt(
-        "Characters: 2girls, yuri, togawa_sakiko, chihaya_anon\n"
-        "togawa_sakiko:\n"
-        "Identity: blue hair, long hair\n"
-        "Details: cosplay, hatsune miku\n"
-        "chihaya_anon:\n"
-        "Identity: pink hair, long hair\n"
-        "Details: cosplay, dark magician girl\n"
-        "Scene: 2girls, standing together, concert stage\n"
-        "Nltags: Togawa Sakiko and Chihaya Anon pose together."
+        "{Count: 2girls, yuri}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Identity: togawa_sakiko has blue hair and long hair; "
+        "chihaya_anon has pink hair and long hair}\n"
+        "{Details: togawa_sakiko cosplays Hatsune Miku; "
+        "chihaya_anon cosplays Dark Magician Girl}\n"
+        "{Tags: standing together, concert stage}\n"
+        "{Nltags: Togawa Sakiko and Chihaya Anon pose together.}"
     )
 
     assert [character.name for character in characters] == [
@@ -405,10 +405,43 @@ def test_extract_structured_prompt_keeps_character_scopes() -> None:
         "chihaya_anon",
     ]
     assert roster_tags == ("2girls", "yuri")
-    assert characters[0].identity_tags == "blue hair, long hair"
-    assert characters[0].detail_tags == "cosplay, hatsune miku"
-    assert scene == "2girls, standing together, concert stage"
+    assert characters[0].identity_tags == "togawa_sakiko has blue hair and long hair"
+    assert characters[0].detail_tags == "togawa_sakiko cosplays Hatsune Miku"
+    assert scene == "standing together, concert stage"
     assert nltags == "Togawa Sakiko and Chihaya Anon pose together."
+
+
+def test_structured_prompt_rejects_a_relationship_without_count_tag() -> None:
+    roster_tags, characters, scene, nltags = extract_structured_prompt(
+        "{Count: yuri}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
+        "{Details: togawa_sakiko sits; chihaya_anon lies down}\n"
+        "{Tags: bedroom}\n"
+        "{Nltags: togawa_sakiko and chihaya_anon are together.}"
+    )
+
+    assert roster_tags == ()
+    assert characters == ()
+    assert scene.startswith("{Count:")
+    assert nltags == ""
+
+
+def test_structured_prompt_rejects_character_only_mentioned_in_anothers_details() -> None:
+    roster_tags, characters, scene, nltags = extract_structured_prompt(
+        "{Count: 2girls, yuri}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
+        "{Details: chihaya_anon wears a black trench coat and lies in "
+        "togawa_sakiko's arms}\n"
+        "{Tags: red and black dress, white bed}\n"
+        "{Nltags: Togawa Sakiko holds Chihaya Anon.}"
+    )
+
+    assert roster_tags == ()
+    assert characters == ()
+    assert scene.startswith("{Count:")
+    assert nltags == ""
 
 
 def test_structured_nltags_uses_roster_display_names() -> None:

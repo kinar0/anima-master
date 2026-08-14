@@ -15,7 +15,14 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。
 
 输出要求：
-- 只输出一行英文 tags，使用英文逗号分隔。
+- 只输出六个单行花括号字段，字段外不得输出任何文字：
+  `{{Count: 2girls, yuri}}`
+  `{{Characters: chihaya_anon, togawa_sakiko}}`
+  `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`
+  `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`
+  `{{Tags: full body, composition, lighting, background, creative visual details}}`
+  `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
+- `Count` 必须含准确的人数 Danbooru tag；`Characters` 只能含角色名。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
 - 不要输出 masterpiece、best quality、score 等质量前缀。
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
@@ -182,31 +189,30 @@ def build_llm_prompt(
         )
     return (
         prompt
-        + "\n\nUse this exact character-first format. It applies to one or "
-        "multiple people alike:\n"
-        "Characters: <required Danbooru count/relationship tags such as `1girl, "
-        "solo`, `1girl, 1boy, hetero`, or `2girls, yuri`>, <then one "
-        "comma-separated list of the Danbooru character tags or stable "
-        "original-person labels that appear in the image>\n"
-        "<character 1 label>:\n"
-        "Identity: <only this person's stable identity: name tag, hair, eyes, "
-        "species, fixed accessories as English Danbooru tags>\n"
-        "Details: <only this person's mutable clothing, expression, pose, and "
-        "props as English Danbooru tags>\n"
-        "<character 2 label>:\n"
-        "Identity: <only this second person's stable identity tags>\n"
-        "Details: <only this second person's clothing and action tags>\n"
-        "Scene: <shared count, composition, interaction, camera, lighting, "
-        "background, and other non-person-specific English Danbooru tags>\n"
-        "Nltags: <one concise English description that clearly distinguishes "
-        "the characters and their interaction>\n"
-        "The Characters line must begin with count/relationship tags; do not "
-        "repeat those tags in Scene. Repeat one character line for every listed "
-        "character. Each character must have separate Identity and Details "
-        "lines. Do not put one "
-        "person's traits in another person's line. Characters and Scene are "
-        "required; Nltags is final. Do not output Markdown or explanations. "
-        "When a background control marker is required, put it in Scene."
+        + "\n\nReturn exactly five single-line brace blocks, with no Markdown, "
+        "headings, or text outside the braces. This applies to one or multiple "
+        "people alike:\n"
+        "{Count: <required count/relationship tags only, such as `1girl, solo`, "
+        "`1girl, 1boy, hetero`, or `2girls, yuri`>}\n"
+        "{Characters: <every Danbooru character tag or original-person label, "
+        "with no count, relationship, clothing, or appearance tags>}\n"
+        "{Identity: <one semicolon-separated sentence per character, for example "
+        "`chihaya_anon has pink hair, grey eyes, and flat chest; togawa_sakiko "
+        "has blue hair, yellow eyes, and normal breasts`>}\n"
+        "{Details: <one semicolon-separated sentence per character, for example "
+        "`chihaya_anon wears grey pantyhose and a white school uniform, standing "
+        "beside togawa_sakiko; togawa_sakiko wears black pantyhose and a black "
+        "school uniform, looking at viewer`>}\n"
+        "{Tags: <shared English Danbooru tags: composition, interaction, camera, "
+        "lighting, background, and creative visible details>}\n"
+        "{Nltags: <one concise English natural-language description using the "
+        "same names as Characters>}\n"
+        "Count must contain the exact Danbooru people-count tag and Characters "
+        "must contain names only. Identity and Details "
+        "must mention every listed character exactly once and must never mix their "
+        "traits, clothing, or actions. Keep personality, artistic creativity, "
+        "visual aesthetics, and extra concrete details in Tags and Nltags. Put any "
+        "background control marker in Tags."
     )
 
 
