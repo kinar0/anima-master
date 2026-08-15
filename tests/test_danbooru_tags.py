@@ -79,6 +79,117 @@ def test_core_resolver_uses_generic_dapi_fallback(monkeypatch) -> None:
     )
 
 
+def test_donmai_read_timeout_falls_through_to_next_source(monkeypatch) -> None:
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        text = "[]"
+
+        @staticmethod
+        def json():
+            return [
+                {
+                    "name": "example_character",
+                    "category": 4,
+                    "post_count": 321,
+                    "is_deprecated": False,
+                }
+            ]
+
+    calls: list[str] = []
+
+    def get(url, **_kwargs):
+        calls.append(url)
+        if url.startswith("https://safebooru.donmai.us"):
+            raise tags_module.requests.exceptions.ReadTimeout("read timed out")
+        return Response()
+
+    monkeypatch.setattr(tags_module.requests, "get", get)
+
+    records = tags_module._fetch_tag_records(
+        "example_character",
+        donmai_base_urls=(
+            "https://safebooru.donmai.us",
+            "https://danbooru.donmai.us",
+        ),
+        timeout=2.0,
+        user_agent="test",
+        cache={},
+    )
+
+    assert [record.name for record in records] == ["example_character"]
+    assert records[0].source == "https://danbooru.donmai.us"
+    assert calls == [
+        "https://safebooru.donmai.us/tags.json",
+        "https://danbooru.donmai.us/tags.json",
+    ]
+
+
+def test_resolver_does_not_warn_when_next_source_resolves_timeout(
+    monkeypatch,
+) -> None:
+    class Response:
+        status_code = 200
+        headers = {"content-type": "application/json"}
+        text = "[]"
+
+        @staticmethod
+        def json():
+            return [
+                {
+                    "name": "example_character",
+                    "category": 4,
+                    "post_count": 321,
+                    "is_deprecated": False,
+                }
+            ]
+
+    def get(url, **_kwargs):
+        if url.startswith("https://safebooru.donmai.us"):
+            raise tags_module.requests.exceptions.ReadTimeout("read timed out")
+        return Response()
+
+    class _Logger:
+        def __init__(self) -> None:
+            self.warnings: list[str] = []
+
+        def warning(self, message, *args) -> None:
+            self.warnings.append(message % args)
+
+        def info(self, *_args) -> None:
+            pass
+
+    monkeypatch.setattr(tags_module.requests, "get", get)
+    monkeypatch.setattr(
+        tags_module,
+        "_fetch_stable_identity_tags",
+        lambda *_args, **_kwargs: (),
+    )
+    logger = _Logger()
+    resolver = DanbooruResolver(
+        logger=logger,
+        cache={},
+        get_bool=lambda key, default: (
+            True if key == "danbooru_core_tag_lookup_enabled" else default
+        ),
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+
+    outcome = asyncio.run(
+        resolver.resolve_detailed(
+            llm_content="example_character, 1girl, solo",
+            user_prompt="候选角色",
+            fixed_character=False,
+        )
+    )
+
+    assert outcome.status == "resolved"
+    assert outcome.canonical_tag == "example_character"
+    assert not any("lookup failed" in warning for warning in logger.warnings)
+
+
 def test_non_fixed_character_prompt_requires_queryable_character_candidate() -> None:
     prompt = build_llm_prompt("画一个被点名的现有作品角色")
 
@@ -374,7 +485,9 @@ def test_danbooru_resolver_enforces_total_lookup_budget(monkeypatch) -> None:
     resolver = DanbooruResolver(
         logger=logger,
         cache={},
-        get_bool=lambda _key, default: default,
+        get_bool=lambda key, default: (
+            True if key == "danbooru_core_tag_lookup_enabled" else default
+        ),
         get_int=lambda _key, default: default,
         get_float=lambda _key, _default: 1.0,
         get_str=lambda _key, default: default,
@@ -396,3 +509,36 @@ def test_danbooru_resolver_enforces_total_lookup_budget(monkeypatch) -> None:
     assert result == "candidate_character, 1girl"
     assert elapsed < 1.3
     assert any("total" in warning for warning in logger.warnings)
+
+
+def test_remote_core_lookup_is_disabled_by_default(monkeypatch) -> None:
+    def should_not_resolve(*_args, **_kwargs):
+        raise AssertionError("remote core resolver must stay disabled by default")
+
+    class _Logger:
+        def warning(self, *_args) -> None:
+            pass
+
+        def info(self, *_args) -> None:
+            pass
+
+    monkeypatch.setattr(resolver_module, "resolve_core_tags", should_not_resolve)
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+
+    outcome = asyncio.run(
+        resolver.resolve_detailed(
+            llm_content="unknown_character, 1girl, solo",
+            user_prompt="森亚露露卡",
+            fixed_character=False,
+        )
+    )
+
+    assert outcome.text == "unknown_character, 1girl, solo"
+    assert outcome.status == "not_requested"

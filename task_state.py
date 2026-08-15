@@ -341,7 +341,7 @@ class TaskRecorder:
             f"- 角色：{', '.join(characters) if characters else '无'}",
             f"- 联网搜索：{_bool(config, 'prompt_builder_web_search_enabled', True)}",
             f"- 深度思考：{_bool(config, 'prompt_builder_deep_thinking_enabled', True)} / {_str(config, 'prompt_builder_reasoning_effort', 'high')}",
-            f"- Danbooru 核心 tag 查询：{_bool(config, 'danbooru_core_tag_lookup_enabled', True)}",
+            f"- Danbooru 联网角色校正：{_bool(config, 'danbooru_core_tag_lookup_enabled', False)}",
             f"- 图生图：{_bool(config, 'img2img_enabled', False)}",
             f"- 发送到聊天：{_bool(config, 'send_result_to_chat', True)} / 最多 {_int(config, 'max_send_images', 1)} 张",
             f"- ComfyUI：{_str(config, 'comfyui_base_url', 'http://127.0.0.1:8188')}",

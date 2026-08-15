@@ -60,6 +60,36 @@ def test_default_portrait_adds_white_background_without_overriding_closeup() -> 
     assert "simple background" in closeup
     assert "white background" in closeup
 
+    no_humans = apply_default_portrait_tags("soles, feet", include_full_body=False)
+    assert "full body" not in no_humans
+    assert "simple background" in no_humans
+
+
+def test_default_portrait_respects_partial_body_and_body_part_framing() -> None:
+    for framing in (
+        "lower body",
+        "head out of frame",
+        "cropped torso",
+        "feet focus",
+        "hand focus",
+        "face focus",
+        "mouth focus",
+        "hair focus",
+        "leg focus",
+        "thigh focus",
+        "navel focus",
+        "breast focus",
+        "ass focus",
+        "eye focus",
+    ):
+        result = apply_default_portrait_tags(f"1girl, {framing}")
+        assert "full body" not in result, framing
+        assert "simple background" in result, framing
+        assert "white background" in result, framing
+
+    # Character focus describes who is prominent, not how the body is cropped.
+    assert "full body" in apply_default_portrait_tags("1girl, female focus")
+
 
 def test_final_prompt_enforces_default_portrait_but_preserves_explicit_scene() -> None:
     config = {
@@ -86,6 +116,32 @@ def test_final_prompt_enforces_default_portrait_but_preserves_explicit_scene() -
     assert "full body" in default_result.content_tags
     assert "white background" not in explicit_result.content_tags
     assert "beach" in explicit_result.content_tags
+
+
+def test_named_character_lower_body_prompt_does_not_gain_full_body() -> None:
+    result = build_final_prompt(
+        user_prompt="丰川祥子，但只露出下半身双足",
+        llm_content="lower body, feet, soles, black pantyhose",
+        config={
+            "chiyo_preset_enabled": False,
+            "quality_prefix": "",
+            "default_artist_tags": "",
+            "style_tags": "",
+        },
+        required_count_tags=("1girl", "solo"),
+        required_core_tags=("toyokawa_sakiko_(bang_dream!)",),
+        background_mode=DEFAULT_PORTRAIT,
+        nltags=(
+            "Only Toyokawa Sakiko's lower body and both feet are visible; "
+            "her upper body and face are outside the frame."
+        ),
+    )
+
+    assert "lower body" in result.final_prompt
+    assert "toyokawa sakiko (bang dream!)" in result.final_prompt
+    assert "full body" not in result.final_prompt
+    assert "simple background" in result.final_prompt
+    assert "white background" in result.final_prompt
 
 
 def test_custom_template_still_receives_mandatory_llm_background_protocol() -> None:

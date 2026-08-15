@@ -4,7 +4,11 @@
 
 普通 `/anm` 会让聊天模型把自然语言自由发展为完整画面，并整理成 Danbooru tags：
 
+用户提示词可用第一个 `#` 追加手动提示词，例如 `/anm 蓝色连衣裙女孩#masterpiece, backlighting`。`#` 后内容不会参与中文语义分析、角色识别或 LLM 优化，而会在提交 ComfyUI 前原样插入程序生成的 Danbooru tags 与 `Nltags:` 之间；没有 `Nltags:` 时追加到末尾。
+
 聊天模型会先把自然语言拆成少量语义锚点，区分画面中的目标角色与只提供服装的角色/变体来源，并为作品、服装、动作、道具等提出候选。插件随后一次调用本地 `danbooru-tags` 批量校验：精确命中才成为 hard tag，模糊结果只作候选，缺失概念改写到 Nltags。已确认的服装来源角色会再用有限帖子样本提取高频服装共现，因此 Oblivionis、Mortis 等变体不需要逐个写入插件代码。旧的命名角色联网校正仍作为回退；Donmai 不可用时会自动回退到 Safebooru 只读 DAPI。
+
+第一阶段语义规划 LLM 的 system prompt 可以通过 `danbooru_semantic_system_prompt` 修改。该配置只影响查询候选规划，不会替换第二阶段的 `prompt_builder_template`；留空时使用插件内置默认值。
 
 ## 默认自由创作
 

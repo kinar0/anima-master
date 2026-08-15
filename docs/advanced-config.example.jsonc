@@ -69,6 +69,9 @@
   // 留空时使用当前聊天会话的主模型；填入后，专门用这个 Provider 来做提示词优化。
   "prompt_builder_provider_id": "",
 
+  // LLM1 只负责提出本地 Danbooru 查询候选；留空时使用插件内置系统提示词。
+  "danbooru_semantic_system_prompt": "You extract semantic lookup anchors for a local Danbooru index. Return valid JSON only. Never claim that a candidate is verified.",
+
   // 提示词优化模型的输出控制。
   "prompt_builder_max_tokens": 1000,
   "prompt_builder_max_content_tags": 65,
@@ -83,8 +86,8 @@
   "prompt_builder_deep_thinking_enabled": true,
   "prompt_builder_reasoning_effort": "high",
 
-  // 是否对疑似角色名做少量 Danbooru / Safebooru 核心 tag 校正。
-  "danbooru_core_tag_lookup_enabled": true,
+  // 旧的联网角色核心 tag 校正，默认关闭；本地语义校验不受影响。
+  "danbooru_core_tag_lookup_enabled": false,
   // LLM 仅规划语义候选，本地 danbooru-tags 一次批量确认 hard tags。
   "danbooru_semantic_lookup_enabled": true,
   // 留空时读取 COMFYUI_GOOD_ANIMA_SKILLS_DIR 或 Codex 默认技能目录。
@@ -155,7 +158,7 @@
   // 发送与权限。
   "send_result_to_chat": true,
   "max_send_images": 1,
-  // 同时控制“正在绘画中”提示，以及群聊完成后 At 申请人并告知今日剩余次数。
+  // 同时控制动态绘图进度提示，以及群聊完成后 At 申请人并告知今日剩余次数。
   "notify_drawing_and_at_sender": false,
   "admin_only": false,
   "allowed_sender_ids": [],

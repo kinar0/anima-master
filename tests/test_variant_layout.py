@@ -10,6 +10,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_presets import DEFAULT_QUALITY_TAGS  # noqa: E402
+from danbooru_semantic import DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT  # noqa: E402
 from prompt_templates import (  # noqa: E402
     DEFAULT_LLM_PROMPT_TEMPLATE,
 )
@@ -55,6 +56,12 @@ def test_normal_variant_is_the_public_default() -> None:
         == DEFAULT_LLM_PROMPT_TEMPLATE
     )
     assert (
+        schema["anima_master_prompting"]["items"][
+            "danbooru_semantic_system_prompt"
+        ]["default"]
+        == DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
+    )
+    assert (
         schema["anima_master_prompting"]["items"]["prompt_builder_max_content_tags"][
             "default"
         ]
@@ -67,10 +74,16 @@ def test_advanced_example_uses_the_builtin_template() -> None:
         encoding="utf-8"
     )
     match = re.search(r'"prompt_builder_template"\s*:\s*("(?:\\.|[^"\\])*")', example)
+    semantic_match = re.search(
+        r'"danbooru_semantic_system_prompt"\s*:\s*("(?:\\.|[^"\\])*")',
+        example,
+    )
 
     assert match is not None
     assert '"custom_workflow_enabled": false' in example
     assert json.loads(match.group(1)) == DEFAULT_LLM_PROMPT_TEMPLATE
+    assert semantic_match is not None
+    assert json.loads(semantic_match.group(1)) == DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
 
 
 def test_builtin_template_prioritizes_one_pass_visual_quality() -> None:

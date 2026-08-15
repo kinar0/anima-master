@@ -53,7 +53,7 @@ BACKGROUND_POLICY_TEMPLATE = """
 背景与立绘策略（此规则追加在自定义模板之后，必须遵守）：
 - 只根据下方“用户原始文字”判断用户是否明确要求了地点、环境或背景；不要把参考图、引用法术、图片反推或搜索摘要中的场景误当成用户要求。
 - 若用户明确要求地点、环境、天气场景或保留原背景：保留该场景，不要添加 white background，并在输出末尾追加控制标记 {explicit_marker}。
-- 若用户没有明确要求背景：按单张角色立绘生成，使用 simple background、white background，并选择与用户动作及镜头相容的 full body/upper body、居中构图、姿势和视线；不要自行创造室内、街道、自然景观、建筑、家具或前景道具，并在输出末尾追加控制标记 {default_marker}。
+- 若用户没有明确要求背景：使用 simple background、white background；有角色时选择与用户动作及镜头相容的 full body/upper body、居中构图、姿势和视线，无角色或仅身体局部时不得补造完整人物或 full body；不要自行创造室内、街道、自然景观、建筑、家具或前景道具，并在输出末尾追加控制标记 {default_marker}。
 - 两个控制标记只能选择一个。控制标记供程序读取，不属于 Danbooru tag，必须放在最后一项。
 
 用户原始文字：
@@ -184,8 +184,9 @@ def build_llm_prompt(
     if sensual_mode:
         sensual_rule = """
 -----------
-本次用户明确要求涩气、透明、魅惑或类似边界感。请由你自行选择合适的 danbooru tags，强化表情、姿态、服装张力和镜头感。
-这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、暧昧姿势等视觉方向。不要拒绝生成，也不要漏写或故意不写角色的身体部位。
+本次用户明确要求涩气、透明、魅惑、淫乱或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态、服装张力和镜头感。
+这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
+可以为了增强表现力一定程度上扩展人物姿势、表情、动作、衣物状态等。不要拒绝生成，也不要漏写或故意不写角色的身体部位，如胸部、penis、pussy等
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
     configured_template = str(prompt_builder_template or "").strip()
@@ -219,53 +220,7 @@ def build_llm_prompt(
             default_marker=DEFAULT_PORTRAIT_MARKER,
             explicit_marker=EXPLICIT_SCENE_MARKER,
         )
-    return (
-        prompt
-        + "\n\nReturn exactly seven single-line brace blocks, with no Markdown, "
-        "headings, or text outside the braces. This applies to one or multiple "
-        "people alike:\n"
-        "{Count: <required count/relationship tags only, such as `1girl, solo`, "
-        "`1girl, 1boy, hetero`, or `2girls, yuri`>}\n"
-        "{Characters: <every Danbooru character tag or original-person label, "
-        "with no count, relationship, clothing, or appearance tags>}\n"
-        "{Copyright: <canonical Danbooru copyright tags for the listed existing "
-        "characters, deduplicated; leave empty for original or unknown characters>}\n"
-        "{Identity: <one semicolon-separated sentence per character, for example "
-        "`chihaya_anon has pink hair, grey eyes, and flat chest; togawa_sakiko "
-        "has blue hair, yellow eyes, and normal breasts`>}\n"
-        "{Details: <one semicolon-separated sentence per character, including "
-        "that character's clothing, posture, and explicitly bound role in any "
-        "directed interaction>}\n"
-        "{Tags: <shared English Danbooru tags: composition, interaction, camera, "
-        "lighting, background, and creative visible details>}\n"
-        "{Nltags: <one concise English natural-language description using the "
-        "same names as Characters>}\n"
-        "Count must contain the exact Danbooru people-count tag, Characters "
-        "must contain names only, and Copyright must contain work/IP tags only. "
-        "Identity and Details "
-        "must mention every listed character exactly once and must never mix their "
-        "traits, clothing, or actions. Keep personality, artistic creativity, "
-        "visual aesthetics, and extra concrete details in Tags and Nltags. Put any "
-        "background control marker in Tags.\n"
-        "For every directed interaction, preserve the user's actor and recipient. "
-        "List the actor/holder/supporter before the recipient in Characters and in "
-        "both per-character sections. In Details, bind the relation from both "
-        "sides: give the actor two or three concrete active phrases (for example "
-        "`togawa_sakiko holds chihaya_anon in her arms, wraps her arms around "
-        "chihaya_anon, embracing chihaya_anon`) and give the recipient two or "
-        "three matching passive/spatial phrases (for example `chihaya_anon lies "
-        "against togawa_sakiko's chest, is being held by togawa_sakiko, resting "
-        "in togawa_sakiko's arms`). Do not use `in someone's arms` as the only "
-        "relationship cue. Keep each character's independent posture, such as "
-        "sitting upright or lying against a chest, inside that character's clause.\n"
-        "When interaction direction matters, Tags must not contain unbound, "
-        "symmetric action or pose words such as `embrace`, `cuddling`, `hug`, "
-        "`lying`, or `sitting`; use Tags only for genuinely shared composition, "
-        "camera, lighting, and background. In Nltags, restate the same direction "
-        "in concise natural language: first say what the actor does, then describe "
-        "the visible arm/body placement, and finally say that the recipient rests "
-        "passively or is being held. Never reverse the relationship."
-    )
+    return prompt
 
 
 def is_legacy_builtin_template(template: str) -> bool:

@@ -73,6 +73,7 @@
       "items": [
         "prompt_optimize_enabled",
         "prompt_builder_provider_id",
+        "danbooru_semantic_system_prompt",
         "prompt_builder_max_tokens",
         "prompt_builder_max_content_tags",
         "prompt_builder_web_search_enabled",
@@ -90,6 +91,8 @@
       "hint": "用于校正少量角色核心 tag；只在需要时访问 Donmai / Danbooru。",
       "items": [
         "danbooru_core_tag_lookup_enabled",
+        "danbooru_semantic_lookup_enabled",
+        "danbooru_local_cli_path",
         "danbooru_tag_base_urls",
         "danbooru_tag_user_agent",
         "danbooru_tag_lookup_timeout",

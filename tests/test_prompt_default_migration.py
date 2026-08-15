@@ -33,3 +33,22 @@ def test_custom_prompt_template_and_limit_are_preserved() -> None:
 
     assert migrated["prompt_builder_template"] == "我的自定义模板：{theme}"
     assert migrated["prompt_builder_max_content_tags"] == 72
+
+
+def test_duplicate_remote_lookup_switches_migrate_to_effective_state() -> None:
+    cases = (
+        (True, False, False),
+        (False, True, False),
+        (True, True, True),
+    )
+    for old_core, old_remote, expected in cases:
+        migrated = migrate_prompt_defaults(
+            {
+                "prompt_builder_template": "custom template",
+                "danbooru_core_tag_lookup_enabled": old_core,
+                "danbooru_remote_lookup_enabled": old_remote,
+            }
+        )
+
+        assert migrated["danbooru_core_tag_lookup_enabled"] is expected
+        assert "danbooru_remote_lookup_enabled" not in migrated

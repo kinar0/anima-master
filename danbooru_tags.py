@@ -477,21 +477,29 @@ def _http_get_json(
 ) -> Any:
     if requests is None:
         return None
-    response = requests.get(
-        url,
-        params=params,
-        timeout=timeout,
-        headers={
-            "User-Agent": user_agent,
-            "Accept": "application/json,text/plain,*/*",
-        },
-    )
-    if response.status_code != 200:
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=timeout,
+            headers={
+                "User-Agent": user_agent,
+                "Accept": "application/json,text/plain,*/*",
+            },
+        )
+        if response.status_code != 200:
+            return None
+        content_type = response.headers.get("content-type", "")
+        if "json" not in content_type and not response.text.lstrip().startswith(
+            ("[", "{")
+        ):
+            return None
+        return response.json()
+    except (requests.exceptions.RequestException, ValueError):
+        # One Donmai endpoint being slow or returning malformed JSON is an
+        # expected source-level failure.  Let the caller try the next endpoint
+        # and the read-only Safebooru DAPI fallback within the total budget.
         return None
-    content_type = response.headers.get("content-type", "")
-    if "json" not in content_type and not response.text.lstrip().startswith(("[", "{")):
-        return None
-    return response.json()
 
 
 def _fetch_donmai_tag(

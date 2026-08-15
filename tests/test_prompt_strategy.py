@@ -30,6 +30,43 @@ def _shorten(text: str, limit: int = 600) -> str:
     return text[:limit]
 
 
+def test_semantic_planner_uses_configured_system_prompt() -> None:
+    class _Response:
+        completion_text = '{"anchors":[]}'
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response()
+
+    config = {"danbooru_semantic_system_prompt": "custom LLM1 system prompt"}
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=object(),
+        researcher=object(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    asyncio.run(
+        pipeline._generate_semantic_plan_with_llm(
+            provider_id="provider",
+            user_prompt="test",
+        )
+    )
+
+    assert context.calls[0]["system_prompt"] == "custom LLM1 system prompt"
+
+
 class _Logger:
     def info(self, *args, **kwargs):
         pass
@@ -228,7 +265,7 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
                     "{Copyright: bang_dream!}\n"
                     "{Identity: togawa_sakiko has blue_hair}\n"
                     "{Details: togawa_sakiko wears black_pantyhose}\n"
-                    "{Tags: full_body, white_background}\n"
+                    "{Tags: full_body, sitting, hugging, white_background}\n"
                     "{Nltags: togawa_sakiko wears black_pantyhose.}"
                 ),
             ]
@@ -283,6 +320,21 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
     assert "bang dream!" in result.final_prompt
     assert "_" not in result.final_prompt
     assert ", Nltags:" in result.final_prompt
+    ordered = (
+        "1girl",
+        "togawa sakiko",
+        "bang dream!",
+        "togawa sakiko has blue hair",
+        "togawa sakiko wears black pantyhose",
+        "full body",
+        "Nltags: togawa sakiko wears black pantyhose.",
+    )
+    positions = [result.final_prompt.index(fragment) for fragment in ordered]
+    assert positions == sorted(positions)
+    assert "has blue hair" not in result.final_prompt.split("Nltags:", 1)[1]
+    assert "sitting" in result.final_prompt
+    assert "hugging" in result.final_prompt
+    assert result.summary["removed_unbound_directional_tags"] == []
 
 
 def test_semantic_outfit_source_is_kept_separate_from_target_character() -> None:
@@ -660,20 +712,16 @@ def test_extract_structured_prompt_preserves_every_count_block_tag() -> None:
     assert roster_tags == ("2girls", "yuri", "female_focus", "group_hug")
 
 
-def test_llm_prompt_requires_bidirectional_directed_interaction_binding() -> None:
+def test_llm_prompt_uses_configured_seven_field_template_without_english_suffix() -> None:
     prompt = build_llm_prompt(
         "一张白色的大床，穿红黑礼服的丰川祥子抱着穿黑色风衣的千早爱音",
         original_theme="一张白色的大床，穿红黑礼服的丰川祥子抱着穿黑色风衣的千早爱音",
     )
 
-    assert "Return exactly seven single-line brace blocks" in prompt
+    assert "只输出七个单行花括号字段" in prompt
     assert "{Copyright:" in prompt
-    assert "List the actor/holder/supporter before the recipient" in prompt
-    assert "wraps her arms around" in prompt
-    assert "is being held by" in prompt
-    assert "Do not use `in someone's arms` as the only relationship cue" in prompt
-    assert "Tags must not contain unbound" in prompt
-    assert "recipient rests passively or is being held" in prompt
+    assert "Return exactly seven single-line brace blocks" not in prompt
+    assert "List the actor/holder/supporter before the recipient" not in prompt
 
 
 def test_structured_prompt_preserves_actor_first_bidirectional_details() -> None:
@@ -728,6 +776,88 @@ def test_structured_prompt_rejects_a_relationship_without_count_tag() -> None:
     assert characters == ()
     assert scene.startswith("{Count:")
     assert nltags == ""
+
+
+def test_characterless_structured_prompt_accepts_no_humans_count() -> None:
+    roster_tags, copyright_tags, characters, scene, nltags = extract_structured_prompt(
+        "{Count: no_humans}\n"
+        "{Characters:}\n"
+        "{Copyright:}\n"
+        "{Identity:}\n"
+        "{Details:}\n"
+        "{Tags: black_pantyhose, soles, feet, background_mode_default_portrait}\n"
+        "{Nltags: exactly two feet are visible with their soles facing upward.}"
+    )
+
+    assert roster_tags == ("no_humans",)
+    assert copyright_tags == ()
+    assert characters == ()
+    assert "black_pantyhose" in scene
+    assert nltags == "exactly two feet are visible with their soles facing upward."
+
+
+def test_characterless_pipeline_keeps_tags_without_chinese_fallback() -> None:
+    class _Response:
+        completion_text = (
+            "{Count: no_humans}\n"
+            "{Characters:}\n"
+            "{Copyright:}\n"
+            "{Identity:}\n"
+            "{Details:}\n"
+            "{Tags: black_pantyhose, soles, feet, background_mode_default_portrait}\n"
+            "{Nltags: exactly two feet are visible with their soles facing upward.}"
+        )
+
+    class _Context:
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **_kwargs):
+            return _Response()
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        async def resolve_detailed(self, **_kwargs):
+            raise AssertionError(
+                "valid no-humans structure must bypass character resolution"
+            )
+
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    result = asyncio.run(pipeline.build(event, "无角色, 只有两只踮起的黑丝足底"))
+
+    assert "no humans" in result.final_prompt
+    assert "black pantyhose" in result.final_prompt
+    assert "soles" in result.final_prompt
+    assert "Nltags: exactly two feet" in result.final_prompt
+    assert "无角色" not in result.final_prompt
+    assert "full body" not in result.final_prompt
+    assert result.summary["structured_prompt_mode"] is True
+    assert result.summary["structured_character_mode"] is False
 
 
 def test_structured_prompt_rejects_character_only_mentioned_in_anothers_details() -> None:

@@ -8,12 +8,27 @@ DEFAULT_PORTRAIT_MARKER = "background_mode_default_portrait"
 EXPLICIT_SCENE_MARKER = "background_mode_explicit_scene"
 
 _FRAMING_TAGS = {
+    "ass focus",
     "bust",
+    "breast focus",
     "close-up",
     "cowboy shot",
+    "cropped torso",
+    "eye focus",
     "face",
+    "face focus",
+    "feet focus",
+    "foot focus",
+    "hair focus",
+    "hand focus",
+    "head out of frame",
     "headshot",
+    "leg focus",
+    "lower body",
+    "mouth focus",
+    "navel focus",
     "portrait",
+    "thigh focus",
     "upper body",
 }
 
@@ -50,7 +65,9 @@ def extract_background_mode(text: str) -> tuple[str, str]:
     return cleaned, ""
 
 
-def apply_default_portrait_tags(text: str) -> str:
+def apply_default_portrait_tags(
+    text: str, *, include_full_body: bool = True
+) -> str:
     """Ensure a clean white-background character illustration tag set.
 
     Args:
@@ -63,7 +80,11 @@ def apply_default_portrait_tags(text: str) -> str:
     tags = [part.strip() for part in str(text or "").split(",") if part.strip()]
     normalized = {tag.lower().replace("_", " ") for tag in tags}
     additions: list[str] = []
-    if not normalized.intersection(_FRAMING_TAGS) and "full body" not in normalized:
+    if (
+        include_full_body
+        and not normalized.intersection(_FRAMING_TAGS)
+        and "full body" not in normalized
+    ):
         additions.append("full body")
     if "centered" not in normalized:
         additions.append("centered")

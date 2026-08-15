@@ -2,7 +2,29 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+import re
 from typing import Any
+
+
+def split_manual_prompt_suffix(user_prompt: str) -> tuple[str, str]:
+    """Split the first ``#`` suffix from text that prompt processing may inspect."""
+    prompt, separator, manual_suffix = str(user_prompt or "").partition("#")
+    if not separator:
+        return prompt.strip(), ""
+    return prompt.strip(), manual_suffix.strip()
+
+
+def insert_manual_prompt_suffix(final_prompt: str, manual_suffix: str) -> str:
+    """Insert a user-supplied suffix after tags and immediately before Nltags."""
+    prompt = str(final_prompt or "").strip()
+    suffix = str(manual_suffix or "").strip().strip(",")
+    if not prompt or not suffix:
+        return prompt
+    nltags_match = re.search(r",\s*Nltags\s*:", prompt, flags=re.IGNORECASE)
+    if nltags_match is None:
+        return f"{prompt.rstrip(' ,')}, {suffix}"
+    tag_text = prompt[: nltags_match.start()].rstrip(" ,")
+    return f"{tag_text}, {suffix}{prompt[nltags_match.start():]}"
 
 
 class GenerationTaskRunner:
@@ -101,7 +123,10 @@ class GenerationTaskRunner:
         """
         started_at = datetime.now()
         original_prompt = str(prompt or "").strip()
-        reference_requested = self._wants_reference_image(original_prompt)
+        prompt_before_suffix, manual_suffix = split_manual_prompt_suffix(
+            original_prompt
+        )
+        reference_requested = self._wants_reference_image(prompt_before_suffix)
         explicit_size = width is not None or height is not None
         requested_width = width if width is not None else self._int("width", 1024)
         requested_height = height if height is not None else self._int("height", 1536)
@@ -135,7 +160,7 @@ class GenerationTaskRunner:
             )
             self._persist_task(task)
             return ready
-        prompt = original_prompt
+        prompt = prompt_before_suffix
         if not prompt:
             payload = {
                 "ok": False,
@@ -176,9 +201,16 @@ class GenerationTaskRunner:
                 event,
                 prompt,
                 multi_person=multi_person,
-                original_user_prompt=original_prompt,
+                original_user_prompt=prompt_before_suffix,
             )
             prompt_summary = dict(self._prompt_summary())
+            prompt = insert_manual_prompt_suffix(prompt, manual_suffix)
+            prompt_summary.update(
+                {
+                    "manual_prompt_suffix": bool(manual_suffix),
+                    "manual_prompt_suffix_chars": len(manual_suffix),
+                }
+            )
         self._task_recorder.mark_prompt_built(task, prompt_summary)
         if prompt_summary.get("model_refused_generation"):
             payload = {

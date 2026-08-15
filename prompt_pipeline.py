@@ -9,6 +9,7 @@ from typing import Any
 try:
     from .danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
     from .danbooru_semantic import (
+        DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         SemanticAnchor,
         SemanticLookupResult,
         build_semantic_plan_prompt,
@@ -53,6 +54,7 @@ try:
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
     from danbooru_semantic import (
+        DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         SemanticAnchor,
         SemanticLookupResult,
         build_semantic_plan_prompt,
@@ -263,7 +265,10 @@ def extract_structured_prompt(
         for item in blocks["copyright"].split(",")
         if item.strip()
     )
-    if not has_count_tag or not roster:
+    has_no_humans = any(
+        item.lower().replace("_", " ") == "no humans" for item in roster_tags
+    )
+    if not has_count_tag or (not roster and not has_no_humans):
         return (), (), (), raw, ""
 
     def sentence_for(name: str, section: str) -> str:
@@ -621,8 +626,8 @@ class PromptPipeline:
             chat_provider_id=provider_id,
             prompt=build_semantic_plan_prompt(user_prompt),
             system_prompt=(
-                "You extract semantic lookup anchors for a local Danbooru index. "
-                "Return valid JSON only. Never claim that a candidate is verified."
+                self._str("danbooru_semantic_system_prompt", "").strip()
+                or DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
             ),
             max_tokens=min(self._int("prompt_builder_max_tokens", 700), 550),
         )
@@ -1709,7 +1714,11 @@ class PromptPipeline:
         ) = (
             extract_structured_prompt(llm_content)
         )
-        if not structured_characters and "_(" not in llm_content:
+        structured_prompt_mode = bool(structured_characters) or any(
+            tag.lower().replace("_", " ") == "no humans"
+            for tag in structured_roster_tags
+        )
+        if not structured_prompt_mode and "_(" not in llm_content:
             strict_format_prompt = (
                 llm_prompt
                 + "\n\nYour previous response was invalid. Return exactly the seven "
@@ -1736,7 +1745,11 @@ class PromptPipeline:
                     structured_scene,
                     structured_nltags,
                 ) = extract_structured_prompt(retry_content)
-                if structured_characters:
+                retry_structured_prompt_mode = bool(structured_characters) or any(
+                    tag.lower().replace("_", " ") == "no humans"
+                    for tag in structured_roster_tags
+                )
+                if retry_structured_prompt_mode:
                     llm_content = retry_content
                     summary["structured_format_retry"] = True
                 else:
@@ -1746,19 +1759,25 @@ class PromptPipeline:
                     "[comfyui_agent] structured prompt format retry failed: %s", exc
                 )
                 summary["structured_format_retry"] = False
+        structured_prompt_mode = bool(structured_characters) or any(
+            tag.lower().replace("_", " ") == "no humans"
+            for tag in structured_roster_tags
+        )
         structured_character_mode = bool(structured_characters)
         structured_required_character_tags: list[str] = []
-        if structured_character_mode:
-            structured_scene, removed_unbound_tags = filter_unbound_directional_tags(
-                structured_scene
-            )
+        structured_identity_blocks: tuple[str, ...] = ()
+        structured_detail_blocks: tuple[str, ...] = ()
+        if structured_prompt_mode:
+            # Details already carries ownership-aware prose, but that is not a
+            # reason to discard useful Danbooru action/pose tags from Tags.
+            # Preserve the structured Tags block and let only the regular exact
+            # deduplication/conflict cleaner process it.
+            removed_unbound_tags: tuple[str, ...] = ()
             if semantic_result.outfit_source_tags:
                 structured_scene = keep_only_verified_outfit_tags(
                     structured_scene,
                     semantic_result.outfit_profile_tags,
                 )
-            rendered_characters: list[str] = []
-            structured_narrative_parts: list[str] = []
             resolution_statuses: list[dict[str, Any]] = []
             used_fixed_names: set[str] = set()
             for character in structured_characters:
@@ -1790,20 +1809,6 @@ class PromptPipeline:
                 for identity_tag in identity_tags:
                     if identity_tag and identity_tag not in structured_required_character_tags:
                         structured_required_character_tags.append(identity_tag)
-                for narrative_part in (
-                    character.identity_tags,
-                    character.detail_tags,
-                ):
-                    if narrative_part and narrative_part not in structured_narrative_parts:
-                        structured_narrative_parts.append(narrative_part)
-                # Identity/Details are natural-language clauses.  Keep only
-                # canonical character anchors in the Danbooru tag stream and
-                # move those clauses to Nltags below, otherwise comma splitting
-                # produces duplicates such as both `black thighhighs` and a
-                # sentence ending in `with black thighhighs`.
-                rendered = ", ".join(identity_tags).strip(" ,")
-                if rendered:
-                    rendered_characters.append(rendered)
                 resolution_statuses.append(
                     {
                         "name": character.name,
@@ -1812,18 +1817,24 @@ class PromptPipeline:
                         "identity_tags": list(identity_tags),
                     }
                 )
-            llm_content = ", ".join(
-                part
-                for part in (
-                    *structured_roster_tags,
-                    *required_profile_tags,
-                    *semantic_required_tags,
-                    *structured_copyright_tags,
-                    *rendered_characters,
-                    structured_scene,
+            structured_identity_blocks = tuple(
+                dict.fromkeys(
+                    character.identity_tags
+                    for character in structured_characters
+                    if character.identity_tags
                 )
-                if part
             )
+            structured_detail_blocks = tuple(
+                dict.fromkeys(
+                    character.detail_tags
+                    for character in structured_characters
+                    if character.detail_tags
+                )
+            )
+            # Only the seventh block's Danbooru tag section goes through the
+            # tag cleaner.  The other structured fields are protected sections
+            # assembled in their declared order by prompt_builder.
+            llm_content = structured_scene
             nltags = normalize_structured_nltags(
                 structured_nltags,
                 tuple(character.name for character in structured_characters),
@@ -1833,18 +1844,14 @@ class PromptPipeline:
                     nltags,
                     semantic_result.outfit_source_tags,
                 )
-            elif structured_narrative_parts:
-                narrative_text = ". ".join(structured_narrative_parts)
-                nltags = ". ".join(
-                    part for part in (narrative_text, nltags) if part
-                )
             if (
                 semantic_result.missing_descriptions
                 and not semantic_result.outfit_source_tags
             ):
                 missing_text = ". ".join(semantic_result.missing_descriptions)
                 nltags = ". ".join(part for part in (missing_text, nltags) if part)
-            summary["structured_character_mode"] = True
+            summary["structured_character_mode"] = structured_character_mode
+            summary["structured_prompt_mode"] = True
             summary["structured_character_count"] = len(structured_characters)
             summary["structured_roster_tags"] = list(structured_roster_tags)
             summary["structured_copyright_tags"] = list(
@@ -1889,7 +1896,7 @@ class PromptPipeline:
                 background_mode = DEFAULT_PORTRAIT
                 background_mode_source = "missing_marker_default"
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
-        if structured_character_mode:
+        if structured_prompt_mode:
             character_resolution = DanbooruResolveOutcome(text=llm_content)
         else:
             character_resolution = await self._danbooru_resolver.resolve_detailed(
@@ -1897,7 +1904,7 @@ class PromptPipeline:
                 user_prompt=prompt,
                 fixed_character=use_fixed_character,
             )
-        if not structured_character_mode and not use_fixed_character and (
+        if not structured_prompt_mode and not use_fixed_character and (
             character_resolution.status == "unresolved"
             or (character_resolution.explicit_request and not required_core_tags)
         ):
@@ -1964,10 +1971,18 @@ class PromptPipeline:
             config=prompt_config,
             required_count_tags=required_count_tags,
             required_core_tags=required_core_tags,
+            structured_character_tags=tuple(structured_required_character_tags),
+            structured_copyright_tags=structured_copyright_tags,
+            structured_identity_blocks=structured_identity_blocks,
+            structured_detail_blocks=structured_detail_blocks,
+            structured_tag_tags=tuple(
+                dict.fromkeys((*required_profile_tags, *semantic_required_tags))
+            ),
+            preserve_structured_order=structured_prompt_mode,
             constraint_plan=constraint_plan,
             background_mode=background_mode,
             nltags=nltags,
-            suppress_fixed_character=structured_character_mode,
+            suppress_fixed_character=structured_prompt_mode,
             force_multi_character=structured_character_mode,
         )
         initial_input_tag_count = len(split_tags(llm_content))

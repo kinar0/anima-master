@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import threading
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,8 @@ class ComfyUIAgentPlugin(Star):
         self._multi_generation_semaphore = asyncio.Semaphore(
             max(1, self._int("multi_max_concurrent_generations", 1))
         )
+        self._generation_queue_lock = threading.Lock()
+        self._unfinished_generation_requests = 0
         self._daily_usage = DailyUsageLimiter(
             plugin_data_path / "daily_generation_usage.json", logger
         )
@@ -173,6 +176,23 @@ class ComfyUIAgentPlugin(Star):
         if isinstance(values, str):
             values = [values]
         return {str(item).strip() for item in values or [] if str(item).strip()}
+
+    def _enter_generation_queue(self) -> int:
+        """Register a request and return the unfinished requests ahead of it."""
+        with self._generation_queue_lock:
+            ahead = self._unfinished_generation_requests
+            self._unfinished_generation_requests += 1
+            return ahead
+
+    def _leave_generation_queue(self) -> None:
+        """Remove a completed, failed, or cancelled request from the count."""
+        with self._generation_queue_lock:
+            if self._unfinished_generation_requests <= 0:
+                logger.warning(
+                    "[comfyui_agent] generation queue count was already empty"
+                )
+                return
+            self._unfinished_generation_requests -= 1
 
     def _reserve_generation_call(self, event: AstrMessageEvent) -> str:
         """Reserve one daily call and return an optional rejection message."""
@@ -293,22 +313,30 @@ class ComfyUIAgentPlugin(Star):
         if quota_error:
             await event.send(event.plain_result(quota_error))
             return quota_error
-        if self._bool("notify_drawing_and_at_sender", False):
-            try:
-                await event.send(event.plain_result("正在绘画中，请等待。"))
-            except Exception as exc:
-                logger.warning(
-                    "[comfyui_agent] failed to send drawing progress notice: %s",
-                    str(exc)[:500],
-                )
-        usage_summary = (
-            dict(self._generation_usage_summary.get())
-            if hasattr(self, "_generation_usage_summary")
-            else {}
-        )
-        if multi_person:
-            await self._multi_generation_semaphore.acquire()
+        requests_ahead = self._enter_generation_queue()
+        multi_semaphore_acquired = False
         try:
+            if self._bool("notify_drawing_and_at_sender", False):
+                notice = (
+                    "正在绘画中"
+                    if requests_ahead == 0
+                    else f"正在绘画中，前面还有{requests_ahead}人"
+                )
+                try:
+                    await event.send(event.plain_result(notice))
+                except Exception as exc:
+                    logger.warning(
+                        "[comfyui_agent] failed to send drawing progress notice: %s",
+                        str(exc)[:500],
+                    )
+            usage_summary = (
+                dict(self._generation_usage_summary.get())
+                if hasattr(self, "_generation_usage_summary")
+                else {}
+            )
+            if multi_person:
+                await self._multi_generation_semaphore.acquire()
+                multi_semaphore_acquired = True
             payload = await self._generate_payload(
                 event,
                 prompt,
@@ -370,8 +398,9 @@ class ComfyUIAgentPlugin(Star):
             )
             return result
         finally:
-            if multi_person:
+            if multi_semaphore_acquired:
                 self._multi_generation_semaphore.release()
+            self._leave_generation_queue()
 
     async def _edit(self, event: AstrMessageEvent, prompt: str) -> str:
         return await self._action_handler.edit(event, prompt)

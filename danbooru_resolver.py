@@ -325,7 +325,10 @@ class DanbooruResolver:
         Returns:
             Resolved text, canonical identity anchors, and resolution status.
         """
-        if not llm_content or not self._bool("danbooru_core_tag_lookup_enabled", True):
+        if (
+            not llm_content
+            or not self._bool("danbooru_core_tag_lookup_enabled", False)
+        ):
             return DanbooruResolveOutcome(text=llm_content)
         requested = character_resolution_requested(
             llm_content,

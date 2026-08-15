@@ -17,7 +17,7 @@ RESET_TO_DEFAULTS_KEY = "reset_to_defaults"
 
 
 def migrate_prompt_defaults(config: Any) -> dict[str, Any]:
-    """Replace previous built-in prompt defaults with the current defaults.
+    """Replace previous built-in defaults and obsolete compatibility keys.
 
     Args:
         config: Flat plugin configuration mapping.
@@ -26,6 +26,16 @@ def migrate_prompt_defaults(config: Any) -> dict[str, Any]:
         Configuration copy with only legacy built-in prompt fields migrated.
     """
     result = dict(config or {})
+    if "danbooru_remote_lookup_enabled" in result:
+        # For one release the legacy remote resolver had two serial switches.
+        # Collapse their effective state into the original switch so an update
+        # can neither unexpectedly enable networking nor discard an explicit
+        # opt-in.  The removed key is then omitted when config is persisted.
+        remote_enabled = bool(result.pop("danbooru_remote_lookup_enabled"))
+        core_enabled = bool(result.get("danbooru_core_tag_lookup_enabled", True))
+        result["danbooru_core_tag_lookup_enabled"] = (
+            core_enabled and remote_enabled
+        )
     configured_template = str(result.get("prompt_builder_template") or "").strip()
     if configured_template and not is_legacy_builtin_template(configured_template):
         return result

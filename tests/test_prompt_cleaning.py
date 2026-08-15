@@ -98,6 +98,82 @@ def test_nltags_is_appended_after_cleaned_tags_without_tag_processing() -> None:
     assert result.final_prompt.count("Nltags:") == 1
 
 
+def test_structured_sections_keep_seven_block_order_and_hard_tags() -> None:
+    config = _config()
+    config["prompt_builder_max_content_tags"] = 1
+    result = build_final_prompt(
+        user_prompt="structured request",
+        llm_content="full_body, white_background",
+        config=config,
+        required_count_tags=("1girl", "solo"),
+        required_core_tags=("togawa_sakiko", "bang_dream!", "blue_hair"),
+        structured_character_tags=("togawa_sakiko",),
+        structured_copyright_tags=("bang_dream!",),
+        structured_identity_blocks=("togawa_sakiko has blue_hair",),
+        structured_detail_blocks=("togawa_sakiko wears black_pantyhose",),
+        structured_tag_tags=("blue_hair", "black_pantyhose"),
+        preserve_structured_order=True,
+        nltags="togawa_sakiko stands against a white wall.",
+    )
+
+    assert (
+        "1girl, solo, togawa sakiko, bang dream!, "
+        "@configured artist, "
+        "togawa sakiko has blue hair, "
+        "togawa sakiko wears black pantyhose, "
+        "blue hair, black pantyhose, full body, "
+        "Nltags: togawa sakiko stands against a white wall."
+    ) in result.final_prompt
+    assert result.final_prompt.count("blue hair") == 2
+    assert result.final_prompt.count("black pantyhose") == 2
+    assert result.final_prompt.count("Nltags:") == 1
+    assert "has blue hair" not in result.final_prompt.split("Nltags:", 1)[1]
+
+
+def test_structured_tags_do_not_drop_appearance_or_pose_categories() -> None:
+    result = build_final_prompt(
+        user_prompt="structured request",
+        llm_content=(
+            "blue_hair, yellow_eyes, long_hair, animal_ears, tail, "
+            "sitting, lying, hugging"
+        ),
+        config=_config(),
+        required_count_tags=("1girl", "solo"),
+        required_core_tags=("togawa_sakiko",),
+        structured_character_tags=("togawa_sakiko",),
+        structured_identity_blocks=("togawa_sakiko has blue hair",),
+        structured_detail_blocks=("togawa_sakiko is sitting and hugging a friend",),
+        preserve_structured_order=True,
+    )
+
+    content_tags = result.content_tags.replace("_", " ")
+    for tag in (
+        "blue hair",
+        "yellow eyes",
+        "long hair",
+        "animal ears",
+        "tail",
+        "sitting",
+        "lying",
+        "hugging",
+    ):
+        assert tag in content_tags
+
+
+def test_existing_hard_tags_and_nltags_prevent_chinese_fallback() -> None:
+    result = build_final_prompt(
+        user_prompt="无角色, 只有两只踮起的黑丝足底",
+        llm_content="",
+        config=_config(),
+        required_core_tags=("black_pantyhose", "thighhighs"),
+        nltags="exactly two feet visible. bottom of the feet / soles.",
+    )
+
+    assert "black pantyhose" in result.final_prompt
+    assert "Nltags: exactly two feet visible" in result.final_prompt
+    assert "无角色" not in result.final_prompt
+
+
 def test_final_prompt_uses_spaces_for_danbooru_word_separators() -> None:
     result = build_final_prompt(
         user_prompt="character",

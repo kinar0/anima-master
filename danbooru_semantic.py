@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 
 
+DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT = (
+    "You extract semantic lookup anchors for a local Danbooru index. "
+    "Return valid JSON only. Never claim that a candidate is verified."
+)
+
+
 _ALLOWED_GROUPS = {
     "character",
     "series",

@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from datetime import date
 from pathlib import Path
 import sys
+import threading
 
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
@@ -12,6 +13,11 @@ if str(PLUGIN_DIR) not in sys.path:
 
 from main import ComfyUIAgentPlugin  # noqa: E402
 from usage_limiter import DailyUsageLimiter  # noqa: E402
+
+
+def _init_generation_queue(plugin: ComfyUIAgentPlugin) -> None:
+    plugin._generation_queue_lock = threading.Lock()
+    plugin._unfinished_generation_requests = 0
 
 
 def test_generate_notifies_user_when_prompt_optimization_degrades() -> None:
@@ -48,6 +54,7 @@ def test_generate_notifies_user_when_prompt_optimization_degrades() -> None:
     plugin._generation_task = _Task()
     plugin._reserve_generation_call = lambda _event: ""
     plugin.config = {}
+    _init_generation_queue(plugin)
     event = _Event()
 
     result = asyncio.run(plugin._generate(event, "画一个女孩"))
@@ -71,6 +78,7 @@ def test_generate_sends_daily_limit_rejection_without_starting_generation() -> N
     plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
     plugin._reserve_generation_call = lambda _event: "你今天的生图次数已用完（3/3）。请明天再试。"
     plugin.config = {"notify_drawing_and_at_sender": True}
+    _init_generation_queue(plugin)
 
     async def should_not_generate(*_args, **_kwargs):
         raise AssertionError("quota rejection must happen before generation")
@@ -106,12 +114,133 @@ def test_generate_sends_progress_notice_after_quota_acceptance() -> None:
     plugin._generation_task = type(
         "_Task", (), {"record_delivery": lambda self, *_args: None}
     )()
+    _init_generation_queue(plugin)
     event = _Event()
 
     result = asyncio.run(plugin._generate(event, "画一个女孩"))
 
     assert result == "sent"
-    assert event.messages == ["正在绘画中，请等待。"]
+    assert event.messages == ["正在绘画中"]
+
+
+def test_generate_reports_unfinished_requests_ahead_and_cleans_up() -> None:
+    class _Event:
+        def __init__(self) -> None:
+            self.messages: list[str] = []
+
+        def plain_result(self, text: str) -> str:
+            return text
+
+        async def send(self, result: str) -> None:
+            self.messages.append(result)
+
+    async def run() -> None:
+        plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
+        plugin.config = {"notify_drawing_and_at_sender": True}
+        plugin._reserve_generation_call = lambda _event: ""
+        plugin._generation_task = type(
+            "_Task", (), {"record_delivery": lambda self, *_args: None}
+        )()
+        _init_generation_queue(plugin)
+
+        first_started = asyncio.Event()
+        release_first = asyncio.Event()
+
+        async def generate_payload(_event, prompt, **_kwargs):
+            if prompt == "first":
+                first_started.set()
+                await release_first.wait()
+            return {"ok": True, "task_id": prompt, "delivery": {}}
+
+        plugin._generate_payload = generate_payload
+        plugin._send_payload = lambda *_args, **_kwargs: asyncio.sleep(
+            0, result="sent"
+        )
+        first_event = _Event()
+        second_event = _Event()
+
+        first = asyncio.create_task(plugin._generate(first_event, "first"))
+        await first_started.wait()
+        second = asyncio.create_task(plugin._generate(second_event, "second"))
+        await asyncio.sleep(0)
+
+        assert first_event.messages == ["正在绘画中"]
+        assert second_event.messages == ["正在绘画中，前面还有1人"]
+        assert plugin._unfinished_generation_requests == 2
+
+        release_first.set()
+        assert await asyncio.gather(first, second) == ["sent", "sent"]
+        assert plugin._unfinished_generation_requests == 0
+
+    asyncio.run(run())
+
+
+def test_generation_queue_count_is_released_after_exception() -> None:
+    class _Event:
+        def plain_result(self, text: str) -> str:
+            return text
+
+        async def send(self, _result: str) -> None:
+            return None
+
+    async def run() -> None:
+        plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
+        plugin.config = {"notify_drawing_and_at_sender": False}
+        plugin._reserve_generation_call = lambda _event: ""
+        _init_generation_queue(plugin)
+
+        async def fail(*_args, **_kwargs):
+            raise RuntimeError("generation failed")
+
+        plugin._generate_payload = fail
+
+        try:
+            await plugin._generate(_Event(), "fail")
+        except RuntimeError as exc:
+            assert str(exc) == "generation failed"
+        else:
+            raise AssertionError("generation exception should propagate")
+
+        assert plugin._unfinished_generation_requests == 0
+
+    asyncio.run(run())
+
+
+def test_generation_queue_count_is_released_after_cancellation() -> None:
+    class _Event:
+        def plain_result(self, text: str) -> str:
+            return text
+
+        async def send(self, _result: str) -> None:
+            return None
+
+    async def run() -> None:
+        plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
+        plugin.config = {"notify_drawing_and_at_sender": False}
+        plugin._reserve_generation_call = lambda _event: ""
+        _init_generation_queue(plugin)
+        started = asyncio.Event()
+
+        async def wait_forever(*_args, **_kwargs):
+            started.set()
+            await asyncio.Event().wait()
+
+        plugin._generate_payload = wait_forever
+        task = asyncio.create_task(plugin._generate(_Event(), "cancelled"))
+        await started.wait()
+        assert plugin._unfinished_generation_requests == 1
+
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+        else:
+            raise AssertionError("cancelled generation should stay cancelled")
+
+        assert plugin._unfinished_generation_requests == 0
+
+    asyncio.run(run())
 
 
 def test_blacklist_wins_and_whitelist_bypasses_legacy_allowlist(tmp_path: Path) -> None:

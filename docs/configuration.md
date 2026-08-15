@@ -86,7 +86,7 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 - `prompt_builder_web_search_enabled`：允许在需要时联网搜索。
 - `prompt_builder_search_query_template`：搜索查询模板。
-- `danbooru_core_tag_lookup_enabled`：校正少量疑似角色核心 tag。Donmai 不可用时会自动回退到 Safebooru 只读 DAPI。
+- `danbooru_core_tag_lookup_enabled`：是否启用旧的联网角色核心 tag 校正，默认关闭；关闭时仍保留 LLM 候选与本地 `danbooru-tags` 语义校验，也会继续使用已经持久化的服装档案。
 - `danbooru_tag_base_urls`：优先使用的 Donmai tag API 地址。
 
 联网搜索需要 AstrBot 全局 Tavily key。搜索失败会自动降级，不会中断生图。
@@ -115,7 +115,7 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 - `send_result_to_chat`：是否把图片发回聊天。
 - `max_send_images`：最多发送几张。
-- `notify_drawing_and_at_sender`：同一个开关控制两项行为：接受生图请求后发送“正在绘画中，请等待”；图片完成后在群聊中 At 原申请人并告知今日剩余次数。不限额和白名单用户显示“今日剩余次数：不限”；私聊不会 At。
+- `notify_drawing_and_at_sender`：同一个开关控制两项行为：接受生图请求后发送动态绘图进度；前方没有未完成申请时显示“正在绘画中”，否则显示“正在绘画中，前面还有X人”（X 不包括申请人自己）；图片完成后在群聊中 At 原申请人并告知今日剩余次数。不限额和白名单用户显示“今日剩余次数：不限”；私聊不会 At。
 - `admin_only`：是否仅管理员可用。
 - `allowed_sender_ids`：允许使用的用户 ID 列表。
 - `daily_generation_limit`：每个 QQ 号每天最多发起的生图次数；`0` 表示不限制。一次多人请求及其候选重试只计一次，请求被接受后即占用次数。
