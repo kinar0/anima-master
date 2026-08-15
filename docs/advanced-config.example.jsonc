@@ -85,6 +85,10 @@
 
   // 是否对疑似角色名做少量 Danbooru / Safebooru 核心 tag 校正。
   "danbooru_core_tag_lookup_enabled": true,
+  // LLM 仅规划语义候选，本地 danbooru-tags 一次批量确认 hard tags。
+  "danbooru_semantic_lookup_enabled": true,
+  // 留空时读取 COMFYUI_GOOD_ANIMA_SKILLS_DIR 或 Codex 默认技能目录。
+  "danbooru_local_cli_path": "",
   "danbooru_tag_base_urls": "https://safebooru.donmai.us,https://danbooru.donmai.us",
   "danbooru_tag_user_agent": "AstrBotAnimaMaster/0.14",
   "danbooru_tag_lookup_timeout": 6.0,

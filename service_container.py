@@ -215,6 +215,7 @@ def build_services(
     danbooru_resolver = DanbooruResolver(
         logger=logger,
         cache=danbooru_tag_cache,
+        profile_cache_path=paths.plugin_data / "danbooru_outfit_profiles.json",
         get_bool=get_bool,
         get_int=get_int,
         get_float=get_float,

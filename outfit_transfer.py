@@ -62,6 +62,12 @@ _DIRECT_SOURCE_RE = re.compile(
     r"(?:穿上|换成|换上|套用|应用)(?P<subject>[\u4e00-\u9fffA-Za-z0-9·_\-]{1,32})的(?:衣服|服装)",
     re.S,
 )
+_WEARING_SOURCE_RE = re.compile(
+    r"(?:穿着|穿上|换成|换上|套着|wearing|cosplaying(?:\s+as)?)\s*"
+    r"(?P<subject>[\u4e00-\u9fffA-Za-z0-9_.'!:+\-]{1,32}?)"
+    r"(?:的)?(?:衣服|服装|演出服|outfit|costume)",
+    re.I | re.S,
+)
 _CHARACTER_SOURCE_RE = re.compile(
     r"(?:角色|人物)(?P<subject>[\u4e00-\u9fffA-Za-z0-9·_\-]{1,32})",
     re.S,
@@ -91,6 +97,8 @@ _OUTFIT_HINTS = (
     "apron",
     "apron dress",
     "uniform",
+    "lolita",
+    "gothic lolita",
     "robe",
     "cloak",
     "cape",
@@ -150,6 +158,7 @@ _OUTFIT_HINTS = (
     "shoe",
     "mary janes",
     "laurel",
+    "mask",
     "cross motif",
     "church motif",
     "embroider",
@@ -267,11 +276,11 @@ def detect_outfit_transfer(
     """Detect the "source outfit -> target character" task pattern."""
     text = str(prompt or "").strip()
     directive = _directive_text(text)
-    if not fixed_character_name:
-        return OutfitTransferPlan(directive_prompt=directive)
     if _NEGATIVE_TARGET_RE.search(directive):
         return OutfitTransferPlan(directive_prompt=directive)
     if not any(marker in directive for marker in OUTFIT_MARKERS):
+        return OutfitTransferPlan(directive_prompt=directive)
+    if not fixed_character_name and not _WEARING_SOURCE_RE.search(directive):
         return OutfitTransferPlan(directive_prompt=directive)
     source_subject = _extract_source_subject(directive, fixed_character_name)
     source_from_reference = any(marker in directive for marker in REFERENCE_MARKERS)
@@ -334,6 +343,20 @@ def filter_outfit_tags(text: str, max_tags: int = 48) -> str:
     return ", ".join(kept)
 
 
+def keep_only_verified_outfit_tags(
+    text: str, verified_outfit_tags: tuple[str, ...]
+) -> str:
+    """Drop LLM-invented clothing while retaining verified outfit evidence."""
+    allowed = {normalize_tag_key(tag) for tag in verified_outfit_tags}
+    kept: list[str] = []
+    for tag in split_tags(text):
+        key = normalize_tag_key(tag)
+        if _looks_like_outfit_tag(key) and key not in allowed:
+            continue
+        kept.append(tag)
+    return ", ".join(kept)
+
+
 def build_outfit_summary_prompt(
     plan: OutfitTransferPlan,
     *,
@@ -391,6 +414,22 @@ def _directive_text(text: str) -> str:
 
 def _extract_source_subject(directive: str, fixed_character_name: str) -> str:
     text = str(directive or "").strip()
+    wearing_source = _WEARING_SOURCE_RE.search(text)
+    if wearing_source:
+        subject = _clean_subject(wearing_source.group("subject"))
+        if subject and subject not in _PRONOUN_SUBJECTS:
+            return subject
+    if fixed_character_name:
+        wearing_match = re.search(
+            rf"{re.escape(fixed_character_name)}(?:正)?(?:穿着|穿上|换上|套着)"
+            r"(?P<subject>[\u4e00-\u9fffA-Za-z0-9·_\-]{1,32}?)(?:的)?(?:衣服|服装)",
+            text,
+            flags=re.S,
+        )
+        if wearing_match:
+            subject = _clean_subject(wearing_match.group("subject"))
+            if subject and subject not in _PRONOUN_SUBJECTS:
+                return subject
     for pattern in (_SEARCH_SOURCE_RE, _DIRECT_SOURCE_RE, _CHARACTER_SOURCE_RE):
         match = pattern.search(text)
         if not match:

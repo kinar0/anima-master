@@ -12,11 +12,13 @@ from prompt_pipeline import (  # noqa: E402
     PromptPipeline,
     extract_structured_prompt,
     filter_unbound_directional_tags,
+    minimal_verified_outfit_nltags,
     normalize_structured_nltags,
 )
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
 from prompt_templates import build_llm_prompt  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
+from danbooru_semantic import SemanticLookupResult  # noqa: E402
 from task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
@@ -277,33 +279,46 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
 
     assert result.summary["structured_format_retry"] is True
     assert result.summary["structured_copyright_tags"] == ["bang_dream!"]
+    assert "1girl, solo, togawa sakiko" in result.final_prompt
     assert "bang dream!" in result.final_prompt
     assert "_" not in result.final_prompt
     assert ", Nltags:" in result.final_prompt
 
 
-def test_oblivionis_profile_is_forced_when_llm_returns_plain_sakiko() -> None:
+def test_semantic_outfit_source_is_kept_separate_from_target_character() -> None:
     class _Response:
         completion_text = (
             "{Count: 1girl, solo}\n"
-            "{Characters: togawa_sakiko}\n"
+            "{Characters: chihaya_anon}\n"
             "{Copyright: bang_dream!}\n"
-            "{Identity: togawa_sakiko has blue hair and yellow eyes}\n"
-            "{Details: togawa_sakiko wears a stage costume}\n"
+            "{Identity: chihaya_anon has pink hair and grey eyes}\n"
+            "{Details: chihaya_anon wears a stage costume}\n"
             "{Tags: full body, white background, background_mode_default_portrait}\n"
-            "{Nltags: togawa_sakiko wears an Oblivionis stage costume.}"
+            "{Nltags: chihaya_anon wears an Oblivionis stage costume.}"
         )
 
     class _Context:
         def __init__(self):
             self.calls = []
+            self.outputs = [
+                '{"anchors":[{"id":"target","role":"target_character",'
+                '"group":"character","source_text":"千早爱音",'
+                '"description":"Chihaya Anon",'
+                '"candidates":["chihaya_anon"]},{"id":"source",'
+                '"role":"outfit_source","group":"character",'
+                '"source_text":"oblivionis","description":"Oblivionis outfit",'
+                '"candidates":["oblivionis_(bang_dream!)"]}]}',
+                _Response.completion_text,
+            ]
 
         async def get_current_chat_provider_id(self, _umo):
             return "provider"
 
         async def llm_generate(self, **kwargs):
             self.calls.append(kwargs)
-            return _Response()
+            response = _Response()
+            response.completion_text = self.outputs.pop(0)
+            return response
 
     class _Plan:
         use_web_search = False
@@ -317,21 +332,29 @@ def test_oblivionis_profile_is_forced_when_llm_returns_plain_sakiko() -> None:
 
     class _Resolver:
         def required_core_tags_for_prompt(self, _prompt):
-            return ("oblivionis_(bang_dream!)",)
+            return ()
 
         def required_profile_tags_for_prompt(self, _prompt):
-            return (
-                "oblivionis_(bang_dream!)",
-                "bang_dream!",
-                "red_dress",
-                "puffy_sleeves",
-                "black_mask",
-            )
+            return ()
 
         def profile_hints_for_prompt(self, _prompt):
-            return {
-                "Oblivionis 服装来源": "source: oblivionis_(bang_dream!)"
-            }
+            return {}
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_semantic_anchors(self, anchors):
+            return SemanticLookupResult(
+                confirmed_tags=(
+                    "chihaya_anon",
+                    "oblivionis_(bang_dream!)",
+                    "bang_dream!",
+                ),
+                outfit_source_tags=("oblivionis_(bang_dream!)",),
+                outfit_profile_tags=("red_dress", "puffy_sleeves", "black_mask"),
+                anchors=anchors,
+                status="resolved",
+            )
 
         async def resolve_detailed(self, *, llm_content, **_kwargs):
             return DanbooruResolveOutcome(
@@ -357,12 +380,12 @@ def test_oblivionis_profile_is_forced_when_llm_returns_plain_sakiko() -> None:
     )
 
     result = asyncio.run(
-        pipeline.build(event, "穿着oblivionis服装的丰川祥子")
+        pipeline.build(event, "穿着oblivionis服装的千早爱音")
     )
 
-    assert "source: oblivionis_(bang_dream!)" in context.calls[0]["prompt"]
+    assert "costume/cosplay source anchors" in context.calls[1]["prompt"]
     for tag in (
-        "togawa sakiko",
+        "chihaya anon",
         "oblivionis (bang dream!)",
         "bang dream!",
         "red dress",
@@ -370,30 +393,23 @@ def test_oblivionis_profile_is_forced_when_llm_returns_plain_sakiko() -> None:
         "black mask",
     ):
         assert tag in result.final_prompt
+    assert result.final_prompt.index("chihaya anon") < result.final_prompt.index(
+        "oblivionis (bang dream!)"
+    )
+    assert "togawa sakiko" not in result.final_prompt
 
-    _Response.completion_text = _Response.completion_text.replace(
-        "togawa_sakiko", "chihaya_anon"
-    )
-    anon_context = _Context()
-    anon_pipeline = PromptPipeline(
-        context=anon_context,
-        config={},
-        logger=_Logger(),
-        danbooru_resolver=_Resolver(),
-        researcher=_Researcher(),
-        get_bool=lambda _key, default: default,
-        get_int=lambda _key, default: default,
-        get_float=lambda _key, default: default,
-        get_str=lambda _key, default: default,
-        shorten=_shorten,
-    )
-    anon_result = asyncio.run(
-        anon_pipeline.build(event, "穿着oblivionis服装的千早爱音")
+
+def test_verified_outfit_nltags_drop_guessed_clothing_prose() -> None:
+    result = minimal_verified_outfit_nltags(
+        "wakaba mutsumi wears a black gothic dress with white lace. "
+        "wakaba mutsumi and togawa sakiko stand side by side.",
+        ("oblivionis_(bang_dream!)",),
     )
 
-    assert "chihaya anon" in anon_result.final_prompt
-    assert "oblivionis (bang dream!)" in anon_result.final_prompt
-    assert "togawa sakiko" not in anon_result.final_prompt
+    assert result == (
+        "Costume based on the character Oblivionis. "
+        "wakaba mutsumi and togawa sakiko stand side by side."
+    )
 
 
 def test_named_character_uses_evidence_candidate_and_stable_anchors():
@@ -627,6 +643,21 @@ def test_extract_structured_prompt_keeps_character_scopes() -> None:
     assert characters[0].detail_tags == "togawa_sakiko cosplays Hatsune Miku"
     assert scene == "standing together, concert stage"
     assert nltags == "Togawa Sakiko and Chihaya Anon pose together."
+
+
+def test_extract_structured_prompt_preserves_every_count_block_tag() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: 2girls, yuri, female_focus, group_hug}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
+        "{Details: togawa_sakiko stands; chihaya_anon stands}\n"
+        "{Tags: concert stage}\n"
+        "{Nltags: Togawa Sakiko and Chihaya Anon stand together.}"
+    )
+
+    assert characters
+    assert roster_tags == ("2girls", "yuri", "female_focus", "group_hug")
 
 
 def test_llm_prompt_requires_bidirectional_directed_interaction_binding() -> None:

@@ -232,30 +232,54 @@ def test_common_scoped_free_tags_do_not_request_character_resolution() -> None:
     )
 
 
-def test_oblivionis_alias_resolves_direct_name_without_network(monkeypatch) -> None:
-    monkeypatch.setattr(tags_module, "_best_character", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        tags_module, "_fetch_stable_identity_tags", lambda *args, **kwargs: ()
-    )
-
-    result = resolve_core_tags(
-        "oblivionis",
-        user_prompt="oblivionis",
-        allow_insert=True,
-    )
-
-    assert result.status == "resolved"
-    assert result.canonical_tag == "oblivionis_(bang_dream!)"
-    assert result.text == "oblivionis_(bang_dream!)"
+def test_variant_profiles_are_not_hardcoded_per_character() -> None:
     assert tags_module.required_profile_tags_for_prompt(
         "穿着Oblivionis服装的丰川祥子"
-    ) == (
-        "oblivionis_(bang_dream!)",
-        "bang_dream!",
-        "red_dress",
-        "puffy_sleeves",
+    ) == ()
+
+
+def test_variant_outfit_profile_recovers_specific_low_frequency_slots() -> None:
+    posts: list[str] = []
+    for index in range(20):
+        tags = {"example_variant"}
+        if index < 14:
+            tags.update(("shirt", "red_shirt"))
+        if index < 12:
+            tags.update(("ribbon", "hair_ribbon", "black_ribbon"))
+        if index < 10:
+            tags.add("gloves")
+        if index < 8:
+            tags.add("black_gloves")
+        if index < 7:
+            tags.add("skirt")
+        if index < 6:
+            tags.update(("black_skirt", "short_sleeves"))
+        if index < 5:
+            tags.update(("puffy_sleeves", "puffy_short_sleeves"))
+        if index < 4:
+            tags.update(("mask", "masquerade_mask", "black_mask"))
+        if index < 3:
+            tags.update(("brooch", "pantyhose", "black_pantyhose", "boots", "black_boots"))
+        posts.append(" ".join(tags))
+
+    result = tags_module._select_variant_outfit_profile(posts)
+
+    assert result == (
+        "red_shirt",
+        "black_skirt",
+        "puffy_short_sleeves",
+        "black_gloves",
+        "black_ribbon",
+        "hair_ribbon",
         "black_mask",
+        "masquerade_mask",
+        "brooch",
+        "black_pantyhose",
+        "black_boots",
     )
+    assert tags_module.required_profile_tags_for_prompt(
+        "穿着Mortis服装的若叶睦"
+    ) == ()
 
 
 def test_empty_lookup_cache_expires_quickly(monkeypatch) -> None:

@@ -50,6 +50,7 @@ class PromptBuildResult:
     raw_mode: bool
     used_fixed_character: bool
     used_default_style: bool
+    required_count_tags: tuple[str, ...] = ()
     required_core_tags: tuple[str, ...] = ()
     character_name: str = ""
     used_sensual_mode: bool = False
@@ -65,6 +66,7 @@ def build_final_prompt(
     user_prompt: str,
     llm_content: str,
     config: dict[str, Any],
+    required_count_tags: tuple[str, ...] = (),
     required_core_tags: tuple[str, ...] = (),
     constraint_plan: PromptConstraintPlan | None = None,
     narrative_blocks: tuple[str, ...] = (),
@@ -83,6 +85,7 @@ def build_final_prompt(
             raw_mode=True,
             used_fixed_character=False,
             used_default_style=False,
+            required_count_tags=(),
             required_core_tags=(),
             character_name="",
             used_sensual_mode=False,
@@ -154,6 +157,8 @@ def build_final_prompt(
     if background_mode == DEFAULT_PORTRAIT:
         content = apply_default_portrait_tags(content)
     parts = [quality]
+    if required_count_tags:
+        parts.append(", ".join(required_count_tags))
     if required_core_tags:
         parts.append(", ".join(required_core_tags))
     if constraint_result.weighted_style_tags:
@@ -185,6 +190,7 @@ def build_final_prompt(
         raw_mode=False,
         used_fixed_character=use_character,
         used_default_style=use_style,
+        required_count_tags=tuple(required_count_tags),
         required_core_tags=tuple(required_core_tags),
         character_name=character_name,
         used_sensual_mode=use_sensual,

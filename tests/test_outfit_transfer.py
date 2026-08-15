@@ -11,6 +11,7 @@ from outfit_transfer import (
     build_outfit_transfer_context,
     detect_outfit_transfer,
     filter_outfit_tags,
+    keep_only_verified_outfit_tags,
 )
 
 
@@ -55,3 +56,40 @@ def test_outfit_transfer_context_filters_reference_tags():
     assert "blue hair" not in context.outfit_summary
     assert "red eyes" not in context.outfit_summary
     assert "hair" in context.forbidden_identity_features
+
+
+def test_named_target_wearing_variant_extracts_only_variant_source() -> None:
+    plan = detect_outfit_transfer("若叶睦穿着mortis的衣服", "若叶睦")
+
+    assert plan.enabled is True
+    assert plan.target_character == "若叶睦"
+    assert plan.source_subject == "mortis"
+
+
+def test_variant_outfit_before_multiple_targets_is_detected_without_fixed_target() -> None:
+    plan = detect_outfit_transfer(
+        "穿着oblivionis服装的若叶睦和丰川祥子",
+        "",
+    )
+
+    assert plan.enabled is True
+    assert plan.source_subject == "oblivionis"
+
+
+def test_unverified_llm_outfit_tags_are_removed() -> None:
+    filtered = keep_only_verified_outfit_tags(
+        "full body, black dress, gothic lolita, white lace, feather hair ornament, "
+        "floor length dress, black mask, standing",
+        (),
+    )
+
+    assert filtered == "full body, standing"
+
+
+def test_only_post_verified_outfit_tags_survive() -> None:
+    filtered = keep_only_verified_outfit_tags(
+        "black dress, puffy sleeves, white lace, black mask, standing",
+        ("black_dress", "puffy_sleeves", "black_mask"),
+    )
+
+    assert filtered == "black dress, puffy sleeves, black mask, standing"

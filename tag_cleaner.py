@@ -7,13 +7,13 @@ DEFAULT_MAX_CONTENT_TAGS = 65
 QUALITY_BLOCKLIST = {
     "masterpiece",
     "best quality",
-    "score_7",
-    "score_6",
-    "score_5",
-    "score_4",
-    "score_3",
-    "score_2",
-    "score_1",
+    "score 7",
+    "score 6",
+    "score 5",
+    "score 4",
+    "score 3",
+    "score 2",
+    "score 1",
     "safe",
     "worst quality",
     "low quality",
@@ -190,7 +190,9 @@ ARTIST_FUNCTION_RE = re.compile(
 def split_tags(text: str) -> list[str]:
     """Split mixed LLM output into tag-like fragments."""
     cleaned = str(text or "")
-    cleaned = re.sub(r"```.*?```", lambda m: m.group(0).strip("`"), cleaned, flags=re.S)
+    # LLMs sometimes wrap the whole stream in a Markdown fence.  Remove the
+    # fence and its optional language label, not the tag content inside it.
+    cleaned = re.sub(r"```(?:[a-z0-9_+.-]+)?[ \t]*(?:\r?\n)?", "", cleaned, flags=re.I)
     cleaned = cleaned.replace("，", ",").replace("、", ",").replace(";", ",")
     cleaned = cleaned.replace("\n", ",")
     cleaned = re.sub(
@@ -214,6 +216,9 @@ def normalize_tag_key(tag: str) -> str:
     ):
         value = value[1:-1].strip()
     value = re.sub(r":\s*[\d.]+$", "", value)
+    # ComfyUI-facing output renders Danbooru underscores as spaces.  Treat the
+    # two spellings as identical before deduplication as well.
+    value = value.replace("_", " ")
     value = re.sub(r"\s+", " ", value)
     return value
 
@@ -260,6 +265,7 @@ def normalize_anima_artist_tag(tag: str) -> str:
 
 def canonical_tag_text(tag: str) -> str:
     """Return the canonical spelling for a few high-impact tags."""
+    tag = re.sub(r"^and\s+", "", str(tag or "").strip(), flags=re.I)
     artist_tag = normalize_anima_artist_tag(tag)
     if artist_tag.startswith("@"):
         return artist_tag
@@ -318,7 +324,10 @@ def clean_content_tags(
     cleaned: list[str] = []
     artist_re = re.compile(r"^@\S+")
     protected = {normalize_tag_key(tag) for tag in protected_core_tags}
-    parenthesized_core_re = re.compile(r"^[a-z0-9_.'-]+_\([a-z0-9_.' -]{2,60}\)$", re.I)
+    parenthesized_core_re = re.compile(
+        r"^[a-z0-9.'!:+-]+(?: [a-z0-9.'!:+-]+)* \([a-z0-9.'! :+\-]{2,60}\)$",
+        re.I,
+    )
     for tag in tags:
         tag = canonical_tag_text(tag)
         key = normalize_tag_key(tag)
@@ -334,7 +343,11 @@ def clean_content_tags(
             continue
         if not allow_multi_character and key in MULTI_CHARACTER_BLOCKLIST:
             continue
-        if protected and parenthesized_core_re.fullmatch(key) and key not in protected:
+        if (
+            protected
+            and parenthesized_core_re.fullmatch(key)
+            and key not in protected
+        ):
             continue
         if artist_re.match(tag.strip()):
             continue
@@ -346,6 +359,15 @@ def clean_content_tags(
     semantic_keys = [
         normalize_tag_key(_strip_wrapping_brackets(tag)) for tag in cleaned
     ]
+    specificity_roots = ("shirt", "skirt", "dress", "thighhighs", "stockings")
+    specific_roots = {
+        root
+        for root in specificity_roots
+        if any(
+            key != root and key.endswith(" " + root)
+            for key in semantic_keys
+        )
+    }
     full_nudity_key = "nude" if "nude" in semantic_keys else "naked"
     has_full_nudity = full_nudity_key in semantic_keys
     has_specific_mist = "morning mist" in semantic_keys
@@ -356,6 +378,8 @@ def clean_content_tags(
     group_counts: dict[str, int] = {}
     semantic_cleaned: list[str] = []
     for tag, key in zip(cleaned, semantic_keys, strict=True):
+        if key in specific_roots:
+            continue
         if key in NON_VISUAL_TAGS:
             continue
         if has_full_nudity and key in {"nude", "naked", "topless", "bottomless"}:

@@ -23,10 +23,6 @@ DEFAULT_SAFEBOORU_DAPI_URL = "https://safebooru.org/index.php"
 DEFAULT_USER_AGENT = "AstrBotComfyUIAgent/0.13"
 
 KNOWN_CORE_ALIASES: dict[str, tuple[str, ...]] = {
-    "oblivionis": (
-        "oblivionis_(bang_dream!)",
-        "oblivionis",
-    ),
     "忍野忍": ("oshino_shinobu", "shinobu_oshino"),
     "洛茜": ("rossi_(arknights)", "rossi_(arknights:endfield)", "rossi"),
     "妃咲": ("kisaki_(blue_archive)", "kisaki", "hisaki_(blue_archive)", "hisaki"),
@@ -39,8 +35,6 @@ KNOWN_CORE_ALIASES: dict[str, tuple[str, ...]] = {
     "suzuran": ("suzuran_(arknights)", "suzuran"),
 }
 KNOWN_CANONICAL_CORE_TAGS: dict[str, str] = {
-    "oblivionis": "oblivionis_(bang_dream!)",
-    "oblivionis_(bang_dream!)": "oblivionis_(bang_dream!)",
     "shinobu_oshino": "oshino_shinobu",
     "rossi": "rossi_(arknights)",
     "rossi_(arknights:endfield)": "rossi_(arknights)",
@@ -50,44 +44,19 @@ KNOWN_CANONICAL_CORE_TAGS: dict[str, str] = {
     "suzuran": "suzuran_(arknights)",
 }
 
-KNOWN_CHARACTER_PROFILE_TAGS: dict[str, tuple[str, ...]] = {
-    "oblivionis_(bang_dream!)": (
-        "oblivionis_(bang_dream!)",
-        "bang_dream!",
-        "red_dress",
-        "puffy_sleeves",
-        "black_mask",
-    ),
-}
-
-
 def _contains_alias(text: str, alias: str) -> bool:
     """Return whether text contains an alias, case-insensitively for ASCII."""
     return str(alias or "").lower() in str(text or "").lower()
 
 
 def required_profile_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
-    """Return deterministic character-variant tags requested by the user."""
-    if _contains_alias(user_prompt, "oblivionis"):
-        return KNOWN_CHARACTER_PROFILE_TAGS["oblivionis_(bang_dream!)"]
+    """Compatibility hook; variant profiles now come from semantic lookup."""
     return ()
 
 
 def profile_hints_for_prompt(user_prompt: str) -> dict[str, str]:
-    """Return LLM-facing context for locally known character variants."""
-    if not _contains_alias(user_prompt, "oblivionis"):
-        return {}
-    return {
-        "Oblivionis 服装来源": (
-            "Keep the user's actual target character as the only roster "
-            "identity. Treat oblivionis_(bang_dream!) as a costume/cosplay "
-            "source anchor, analogous to kasane_teto_(cosplay), not as a "
-            "replacement target or an additional visible person. "
-            "copyright tag: bang_dream!; required visible outfit anchors: "
-            "red_dress, puffy_sleeves, black_mask. Treat this as Togawa "
-            "Sakiko's Oblivionis stage persona/outfit, not a generic red dress."
-        )
-    }
+    """Compatibility hook; local semantic evidence now supplies LLM context."""
+    return {}
 
 GENERAL_TAG_WORDS = {
     "arms",
@@ -208,6 +177,213 @@ _STABLE_IDENTITY_PATTERNS = (
         r"^(?:amber|black|blue|brown|gold|golden|green|grey|gray|orange|pink|purple|red|yellow)_eyes$"
     ),
 )
+
+_OUTFIT_PROFILE_TERMS = (
+    "apron",
+    "belt",
+    "blouse",
+    "bodice",
+    "bonnet",
+    "boots",
+    "bow",
+    "brooch",
+    "cape",
+    "choker",
+    "cloak",
+    "coat",
+    "corset",
+    "collar",
+    "corset",
+    "costume",
+    "dress",
+    "footwear",
+    "frill",
+    "gloves",
+    "gown",
+    "hat",
+    "headdress",
+    "jacket",
+    "lace",
+    "mask",
+    "necktie",
+    "necklace",
+    "pantyhose",
+    "pendant",
+    "ribbon",
+    "robe",
+    "shirt",
+    "shoes",
+    "skirt",
+    "sleeves",
+    "socks",
+    "stockings",
+    "thighhighs",
+    "uniform",
+    "veil",
+)
+
+_OUTFIT_GARMENT_ROOTS = {
+    "blouse",
+    "bodice",
+    "coat",
+    "dress",
+    "gown",
+    "jacket",
+    "pants",
+    "shirt",
+    "shorts",
+    "skirt",
+    "uniform",
+}
+_OUTFIT_COLOR_WORDS = {
+    "black",
+    "blue",
+    "brown",
+    "gold",
+    "green",
+    "grey",
+    "gray",
+    "orange",
+    "pink",
+    "purple",
+    "red",
+    "silver",
+    "white",
+    "yellow",
+}
+
+
+def _outfit_slot_rank(tag: str) -> int:
+    parts = set(tag.split("_"))
+    if parts & {"shirt", "blouse", "bodice", "corset", "jacket", "coat", "dress", "gown", "uniform"}:
+        return 0
+    if parts & {"skirt", "shorts", "pants"}:
+        return 1
+    if "sleeves" in parts or "sleeve" in parts:
+        return 2
+    if "gloves" in parts or "glove" in parts:
+        return 3
+    if "ribbon" in parts or parts & {"hat", "headdress", "bonnet"}:
+        return 4
+    if "mask" in parts or "veil" in parts:
+        return 5
+    if parts & {"brooch", "necktie", "choker", "necklace", "pendant", "bow"}:
+        return 6
+    if parts & {"pantyhose", "stockings", "thighhighs", "socks"}:
+        return 7
+    if parts & {"boots", "shoes", "footwear"}:
+        return 8
+    return 9
+
+
+def _select_variant_outfit_profile(post_tag_strings: list[str]) -> tuple[str, ...]:
+    """Select a coherent recurring outfit from a variant's post sample."""
+    post_sets = [set(tags.split()) for tags in post_tag_strings if tags.strip()]
+    if len(post_sets) < 3:
+        return ()
+
+    def is_outfit_tag(tag: str) -> bool:
+        parts = tag.split("_")
+        return any(term in parts for term in _OUTFIT_PROFILE_TERMS) or any(
+            term in tag for term in ("thighhigh", "pantyhose", "sleeve")
+        )
+
+    all_counts = Counter(tag for tags in post_sets for tag in tags if is_outfit_tag(tag))
+    anchor_floor = max(3, (len(post_sets) * 35 + 99) // 100)
+    anchors = [
+        tag
+        for tag, count in all_counts.items()
+        if count >= anchor_floor
+        and len(tag.split("_")) >= 2
+        and tag.split("_")[-1] in _OUTFIT_GARMENT_ROOTS
+    ]
+    anchor = max(anchors, key=lambda tag: (all_counts[tag], len(tag)), default="")
+    focused = [tags for tags in post_sets if anchor in tags] if anchor else post_sets
+    if len(focused) < 3:
+        focused = post_sets
+
+    counts = Counter(tag for tags in focused for tag in tags if is_outfit_tag(tag))
+    floor = max(3, (len(focused) * 10 + 99) // 100)
+    selected = {tag for tag, count in counts.items() if count >= floor}
+
+    # Prefer one dominant color per garment/accessory root while allowing a
+    # complementary form tag such as `masquerade_mask` beside `black_mask`.
+    for root in (
+        "shirt",
+        "corset",
+        "dress",
+        "skirt",
+        "gloves",
+        "ribbon",
+        "mask",
+        "pantyhose",
+        "stockings",
+        "thighhighs",
+        "boots",
+        "shoes",
+    ):
+        colored = [
+            tag
+            for tag in selected
+            if tag.endswith("_" + root) and tag.split("_", 1)[0] in _OUTFIT_COLOR_WORDS
+        ]
+        if len(colored) > 1:
+            winner = max(colored, key=lambda tag: counts[tag])
+            selected.difference_update(tag for tag in colored if tag != winner)
+
+    # A dominant separate top+bottom outfit should not also be described as a
+    # dress merely because some uploaders tagged the whole silhouette that way.
+    anchor_root = anchor.split("_")[-1] if anchor else ""
+    if anchor_root in {"shirt", "blouse", "bodice", "jacket", "coat"}:
+        best_skirt = max(
+            (counts[tag] for tag in selected if tag.split("_")[-1] == "skirt"),
+            default=0,
+        )
+        best_dress = max(
+            (counts[tag] for tag in selected if tag.split("_")[-1] in {"dress", "gown"}),
+            default=0,
+        )
+        if best_skirt >= best_dress:
+            selected = {
+                tag for tag in selected if tag.split("_")[-1] not in {"dress", "gown"}
+            }
+    elif anchor_root in {"dress", "gown"}:
+        selected = {
+            tag
+            for tag in selected
+            if tag.split("_")[-1] not in {"shirt", "blouse", "skirt"}
+            or tag == anchor
+        }
+
+    # Resolve contradictory sleeve lengths, then let a sufficiently common
+    # composite (`puffy_short_sleeves`) replace its generic component tags.
+    short_score = max(
+        (counts[tag] for tag in selected if "short_sleeves" in tag), default=0
+    )
+    long_score = max(
+        (counts[tag] for tag in selected if "long_sleeves" in tag), default=0
+    )
+    if short_score > long_score:
+        selected = {tag for tag in selected if "long_sleeves" not in tag}
+    elif long_score > short_score:
+        selected = {tag for tag in selected if "short_sleeves" not in tag}
+
+    for generic in tuple(selected):
+        generic_parts = set(generic.split("_"))
+        if any(
+            generic != specific
+            and generic_parts < set(specific.split("_"))
+            and counts[specific] * 2 >= counts[generic]
+            for specific in selected
+        ):
+            selected.discard(generic)
+
+    return tuple(
+        sorted(
+            selected,
+            key=lambda tag: (_outfit_slot_rank(tag), -counts[tag], tag),
+        )[:14]
+    )
 
 
 def required_core_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
@@ -517,6 +693,84 @@ def _fetch_stable_identity_tags(
     )[:10]
     cache[cache_key] = (time.monotonic(), stable)
     return stable
+
+
+def fetch_variant_outfit_tags(
+    canonical_tag: str,
+    *,
+    timeout: float,
+    user_agent: str,
+    cache: dict[str, Any],
+    donmai_base_urls: tuple[str, ...] = DEFAULT_DONMAI_BASE_URLS,
+) -> tuple[str, ...]:
+    """Infer recurring visible outfit tags for a verified variant/persona.
+
+    The local tag index validates the source tag but contains no post
+    co-occurrence data.  This bounded read-only post sample supplies that
+    missing relationship without any per-character profile table.
+    """
+    cache_key = f"outfit-profile-v3:{_normalize_query(canonical_tag)}"
+    cached = cache.get(cache_key)
+    if isinstance(cached, tuple) and len(cached) == 2:
+        cached_at, cached_tags = cached
+        ttl = 86400.0 if cached_tags else 600.0
+        if time.monotonic() - float(cached_at) < ttl:
+            return tuple(cached_tags)
+    if requests is None:
+        return ()
+    post_tag_strings: list[str] = []
+    for base_url in donmai_base_urls:
+        try:
+            response = requests.get(
+                f"{base_url.rstrip('/')}/posts.json",
+                params={"tags": canonical_tag, "limit": 100},
+                timeout=timeout,
+                headers={"User-Agent": user_agent, "Accept": "application/json"},
+            )
+            if response.status_code != 200:
+                continue
+            payload = response.json()
+            if isinstance(payload, list):
+                post_tag_strings = [
+                    str(post.get("tag_string_general") or "")
+                    for post in payload
+                    if isinstance(post, dict)
+                ]
+            if len(post_tag_strings) >= 3:
+                break
+        except Exception:
+            continue
+    if len(post_tag_strings) < 3:
+        try:
+            response = requests.get(
+                DEFAULT_SAFEBOORU_DAPI_URL,
+                params={
+                    "page": "dapi",
+                    "s": "post",
+                    "q": "index",
+                    "tags": canonical_tag,
+                    "limit": 100,
+                },
+                timeout=timeout,
+                headers={
+                    "User-Agent": user_agent,
+                    "Accept": "application/xml,text/xml,*/*",
+                },
+            )
+            if response.status_code == 200:
+                root = ET.fromstring(response.text)
+                post_tag_strings = [
+                    str(post.attrib.get("tags") or "")
+                    for post in root.findall("post")
+                ]
+        except Exception:
+            post_tag_strings = []
+    if len(post_tag_strings) < 3:
+        cache[cache_key] = (time.monotonic(), ())
+        return ()
+    outfit_tags = _select_variant_outfit_profile(post_tag_strings)
+    cache[cache_key] = (time.monotonic(), outfit_tags)
+    return outfit_tags
 
 
 def _fetch_tag_records(

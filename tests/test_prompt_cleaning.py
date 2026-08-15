@@ -8,7 +8,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_builder import build_final_prompt  # noqa: E402
-from tag_cleaner import clean_content_tags  # noqa: E402
+from tag_cleaner import clean_content_tags, join_prompt_parts  # noqa: E402
 
 
 def _config() -> dict:
@@ -151,6 +151,82 @@ def test_content_cleaner_removes_high_confidence_semantic_conflicts() -> None:
     assert "punis" not in cleaned
     assert "sheer fabric" in cleaned
     assert "translucent fabric" not in cleaned
+
+
+def test_dangling_english_conjunction_is_removed_from_tag_fragment() -> None:
+    result = build_final_prompt(
+        user_prompt="测试角色",
+        llm_content="and large breasts, full body",
+        config=_config(),
+    )
+
+    assert "and large breasts" not in result.final_prompt
+    assert "large breasts, full body" in result.final_prompt
+
+
+def test_specific_clothing_tags_replace_low_information_roots() -> None:
+    cleaned = clean_content_tags(
+        "shirt, grey shirt, skirt, pleated skirt, thighhighs, black thighhighs",
+        strip_character_tags=False,
+    )
+
+    assert cleaned == "grey shirt, pleated skirt, black thighhighs"
+
+
+def test_underscore_and_space_spellings_are_deduplicated() -> None:
+    assert join_prompt_parts(["black_thighhighs, black thighhighs"]) == (
+        "black thighhighs"
+    )
+
+
+def test_action_or_accessory_suffix_does_not_replace_garment_root() -> None:
+    cleaned = clean_content_tags(
+        "dress, dress bow, skirt, skirt lift, shirt, shirt tug",
+        strip_character_tags=False,
+    )
+
+    assert cleaned == "dress, dress bow, skirt, skirt lift, shirt, shirt tug"
+
+
+def test_scoped_core_filter_handles_copyright_punctuation() -> None:
+    cleaned = clean_content_tags(
+        "oblivionis_(bang_dream!), wrong_variant_(bang_dream!), "
+        "another wrong (bang dream!), black dress",
+        strip_character_tags=False,
+        protected_core_tags=("oblivionis_(bang_dream!)",),
+    )
+
+    assert cleaned == "oblivionis_(bang_dream!), black dress"
+
+
+def test_markdown_fence_language_does_not_become_a_tag() -> None:
+    cleaned = clean_content_tags(
+        "```danbooru\nblack_dress, red_bow\n```",
+        strip_character_tags=False,
+    )
+
+    assert cleaned == "black_dress, red_bow"
+
+
+def test_all_structured_count_tags_bypass_content_cleaning() -> None:
+    examples = (
+        ("1girl", "solo"),
+        ("1girl", "1boy"),
+        ("2girls", "yuri"),
+        ("3girls", "multiple girls"),
+    )
+    for count_tags in examples:
+        result = build_final_prompt(
+            user_prompt="character",
+            llm_content=", ".join((*count_tags, "standing")),
+            config=_config(),
+            required_count_tags=count_tags,
+            required_core_tags=("togawa_sakiko_(bang_dream!)",),
+        )
+
+        assert result.required_count_tags == count_tags
+        final_head = result.final_prompt.split("togawa sakiko", 1)[0]
+        assert all(tag.replace("_", " ") in final_head for tag in count_tags)
 
 
 def test_content_cleaner_removes_viewer_gaze_when_eyes_are_closed() -> None:

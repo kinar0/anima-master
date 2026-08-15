@@ -8,6 +8,12 @@ from typing import Any
 
 try:
     from .danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
+    from .danbooru_semantic import (
+        SemanticAnchor,
+        SemanticLookupResult,
+        build_semantic_plan_prompt,
+        parse_semantic_plan,
+    )
     from .multi_person_prompt import (
         build_multi_person_plan_prompt,
         parse_multi_person_plan,
@@ -19,6 +25,7 @@ try:
         detect_outfit_transfer,
         extract_reference_tag_text,
         filter_outfit_tags,
+        keep_only_verified_outfit_tags,
         preferred_search_prompt,
     )
     from .prompt_background import (
@@ -45,6 +52,12 @@ try:
     from .tag_cleaner import clean_content_tags, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
+    from danbooru_semantic import (
+        SemanticAnchor,
+        SemanticLookupResult,
+        build_semantic_plan_prompt,
+        parse_semantic_plan,
+    )
     from multi_person_prompt import (
         build_multi_person_plan_prompt,
         parse_multi_person_plan,
@@ -56,6 +69,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         detect_outfit_transfer,
         extract_reference_tag_text,
         filter_outfit_tags,
+        keep_only_verified_outfit_tags,
         preferred_search_prompt,
     )
     from prompt_background import (
@@ -228,12 +242,17 @@ def extract_structured_prompt(
     roster_tags: list[str] = []
     has_count_tag = False
     for item in (item.strip() for item in blocks["count"].split(",") if item.strip()):
-        normalized = item.lower()
-        if re.fullmatch(r"(?:[1-9]\+?(?:girls?|boys?)|multiple (?:girls|boys|people))", normalized):
-            roster_tags.append(item)
+        # Count is a structured hard-tag block.  Once it contains a valid
+        # people-count anchor, preserve every tag in the block; the content
+        # cleaner must not silently discard relationship/focus/count metadata.
+        roster_tags.append(item)
+        normalized = item.lower().replace("_", " ")
+        if re.fullmatch(
+            r"(?:[1-9]\d*\+? ?(?:girls?|boys?|people|persons?|others?)|"
+            r"multiple (?:girls|boys|people)|no humans)",
+            normalized,
+        ):
             has_count_tag = True
-        elif normalized in {"solo", "duo", "hetero", "yuri", "yaoi"}:
-            roster_tags.append(item)
     roster = [
         item.strip()
         for item in blocks["characters"].split(",")
@@ -333,6 +352,30 @@ def normalize_structured_nltags(
         prefix = ", ".join(missing)
         result = f"{prefix}. {result}".strip() if result else prefix
     return result
+
+
+_OUTFIT_NARRATIVE_RE = re.compile(
+    r"\b(?:wears?|wearing|costume|outfit|clothing|dress|gown|skirt|shirt|"
+    r"sleeves?|lace|frills?|ruffles?|ornament|mask|ribbon|bow|stockings?|"
+    r"thighhighs?|pantyhose|boots?|shoes?|gothic lolita)\b",
+    re.I,
+)
+
+
+def minimal_verified_outfit_nltags(
+    nltags: str, source_tags: tuple[str, ...]
+) -> str:
+    """Keep a verified costume cue without retaining guessed outfit prose."""
+    source = str(source_tags[0] if source_tags else "costume").split("_(", 1)[0]
+    source_label = source.replace("_", " ").strip().title() or "Costume"
+    parts = [f"Costume based on the character {source_label}."]
+    for sentence in re.split(r"(?<=[.!?])\s+", " ".join(str(nltags or "").split())):
+        sentence = sentence.strip()
+        if not sentence or _OUTFIT_NARRATIVE_RE.search(sentence):
+            continue
+        if sentence not in parts:
+            parts.append(sentence)
+    return " ".join(parts)
 
 
 class PromptPipeline:
@@ -569,6 +612,21 @@ class PromptPipeline:
             if candidate not in candidates:
                 candidates.append(candidate)
         return tuple(candidates[:6])
+
+    async def _generate_semantic_plan_with_llm(
+        self, *, provider_id: str, user_prompt: str
+    ) -> str:
+        """Propose bounded lookup anchors; the local index remains authoritative."""
+        response = await self.context.llm_generate(
+            chat_provider_id=provider_id,
+            prompt=build_semantic_plan_prompt(user_prompt),
+            system_prompt=(
+                "You extract semantic lookup anchors for a local Danbooru index. "
+                "Return valid JSON only. Never claim that a candidate is verified."
+            ),
+            max_tokens=min(self._int("prompt_builder_max_tokens", 700), 550),
+        )
+        return str(getattr(response, "completion_text", "") or "").strip()
 
     async def _generate_constraint_plan_with_llm(
         self,
@@ -1341,6 +1399,9 @@ class PromptPipeline:
         )
         fixed_character = selected_fixed_character(prompt, prompt_config)
         fixed_character_name = fixed_character[0] if fixed_character else ""
+        use_fixed_character = fixed_character is not None
+        use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
 
         provider_id = await self._current_chat_provider_id(event)
         if not provider_id:
@@ -1358,14 +1419,111 @@ class PromptPipeline:
             )
             return PromptPipelineResult(prompt, summary)
 
-        use_fixed_character = fixed_character is not None
-        use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
-        outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
+        semantic_result = SemanticLookupResult()
+        semantic_plan_raw = ""
+        cached_source_getter = getattr(
+            self._danbooru_resolver, "cached_outfit_source", None
+        )
+        if (
+            outfit_plan.enabled
+            and outfit_plan.source_subject
+            and callable(cached_source_getter)
+        ):
+            cached_result = cached_source_getter(outfit_plan.source_subject)
+            if cached_result is not None:
+                semantic_result = cached_result
+        semantic_available = getattr(
+            self._danbooru_resolver, "semantic_lookup_available", None
+        )
+        semantic_resolve = getattr(
+            self._danbooru_resolver, "resolve_semantic_anchors", None
+        )
+        if (
+            semantic_result.status != "profile_cache"
+            and
+            callable(semantic_available)
+            and semantic_available()
+            and callable(semantic_resolve)
+        ):
+            try:
+                semantic_plan_raw = await self._generate_semantic_plan_with_llm(
+                    provider_id=provider_id,
+                    user_prompt=prompt,
+                )
+                semantic_anchors = parse_semantic_plan(semantic_plan_raw, prompt)
+                if outfit_plan.enabled and outfit_plan.source_subject:
+                    source_text = outfit_plan.source_subject.strip()
+                    source_candidates: list[str] = []
+                    if re.fullmatch(
+                        r"[A-Za-z0-9_.'():!\- ]{2,80}", source_text
+                    ):
+                        source_candidates.append(
+                            re.sub(r"\s+", "_", source_text.lower())
+                        )
+                    source_key = source_text.lower()
+                    for anchor in semantic_anchors:
+                        if source_key not in (
+                            anchor.source_text + " " + anchor.description
+                        ).lower():
+                            continue
+                        for candidate in anchor.candidates:
+                            if candidate not in source_candidates:
+                                source_candidates.append(candidate)
+                    if source_candidates:
+                        semantic_anchors = (
+                            *semantic_anchors,
+                            SemanticAnchor(
+                                anchor_id="host_outfit_source",
+                                role="outfit_source",
+                                group="character",
+                                source_text=source_text,
+                                description=f"{source_text} costume source",
+                                candidates=tuple(source_candidates[:3]),
+                            ),
+                        )
+                semantic_result = await semantic_resolve(semantic_anchors)
+            except Exception as exc:
+                self.logger.warning(
+                    "[comfyui_agent] generalized Danbooru semantic lookup failed: %s",
+                    exc,
+                )
+                semantic_result = SemanticLookupResult(status="tool_failed")
+        semantic_required_tags = tuple(
+            dict.fromkeys(
+                (
+                    *semantic_result.confirmed_tags,
+                    *semantic_result.outfit_profile_tags,
+                )
+            )
+        )
+        semantic_context = semantic_result.prompt_context()
+        summary.update(
+            {
+                "danbooru_semantic_status": semantic_result.status,
+                "danbooru_semantic_confirmed_tags": list(
+                    semantic_result.confirmed_tags
+                ),
+                "danbooru_semantic_outfit_sources": list(
+                    semantic_result.outfit_source_tags
+                ),
+                "danbooru_semantic_outfit_tags": list(
+                    semantic_result.outfit_profile_tags
+                ),
+                "danbooru_semantic_missing": list(
+                    semantic_result.missing_descriptions
+                ),
+                "danbooru_semantic_candidates": list(
+                    semantic_result.candidate_tags
+                ),
+            }
+        )
+
         required_core_tags = (
             self._danbooru_resolver.required_core_tags_for_prompt(prompt)
             if not use_fixed_character
             else ()
         )
+        required_count_tags: tuple[str, ...] = ()
         self.logger.info(
             "[comfyui_agent] prompt builder input fixed_characters=%s sensual=%s required_core_tags=%s prompt=%s",
             ",".join(local_character_hints) or "none",
@@ -1424,11 +1582,14 @@ class PromptPipeline:
             outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
             if outfit_summary:
                 outfit_summary_source = "reference_filter"
-        if outfit_plan.enabled and not outfit_summary and search_context:
+        if not outfit_summary and semantic_result.outfit_profile_tags:
+            outfit_summary = ", ".join(semantic_result.outfit_profile_tags)
+            outfit_summary_source = "danbooru_source_posts"
+        if not outfit_summary and outfit_plan.enabled and search_context:
             summary_prompt = build_outfit_summary_prompt(
                 outfit_plan,
                 original_prompt=prompt,
-                source_context=search_context,
+                source_context=search_context or semantic_context,
             )
             try:
                 raw_outfit_summary = await self._generate_outfit_summary_with_llm(
@@ -1438,7 +1599,11 @@ class PromptPipeline:
                 )
                 outfit_summary = filter_outfit_tags(raw_outfit_summary, max_tags=48)
                 if outfit_summary:
-                    outfit_summary_source = "search_summary"
+                    outfit_summary_source = (
+                        "search_summary"
+                        if search_context
+                        else "validated_source_llm_summary"
+                    )
                 if self._bool("debug_prompt_enabled", False):
                     self.logger.info(
                         "[comfyui_agent] outfit summary LLM output:\n%s",
@@ -1447,6 +1612,21 @@ class PromptPipeline:
             except Exception as exc:
                 self.logger.warning(
                     "[comfyui_agent] outfit summary build failed: %s", exc
+                )
+        if (
+            outfit_summary
+            and outfit_plan.source_subject
+            and semantic_result.outfit_source_tags
+            and outfit_summary_source == "danbooru_source_posts"
+        ):
+            remember_outfit = getattr(
+                self._danbooru_resolver, "remember_outfit_summary", None
+            )
+            if callable(remember_outfit):
+                remember_outfit(
+                    outfit_plan.source_subject,
+                    semantic_result.outfit_source_tags,
+                    tuple(split_tags(outfit_summary)),
                 )
         llm_prompt = build_llm_prompt(
             prompt,
@@ -1466,6 +1646,7 @@ class PromptPipeline:
                 for part in (
                     build_outfit_transfer_block(outfit_plan, outfit_summary),
                     profile_outfit_rule,
+                    semantic_context,
                 )
                 if part
             ),
@@ -1566,11 +1747,18 @@ class PromptPipeline:
                 )
                 summary["structured_format_retry"] = False
         structured_character_mode = bool(structured_characters)
+        structured_required_character_tags: list[str] = []
         if structured_character_mode:
             structured_scene, removed_unbound_tags = filter_unbound_directional_tags(
                 structured_scene
             )
+            if semantic_result.outfit_source_tags:
+                structured_scene = keep_only_verified_outfit_tags(
+                    structured_scene,
+                    semantic_result.outfit_profile_tags,
+                )
             rendered_characters: list[str] = []
+            structured_narrative_parts: list[str] = []
             resolution_statuses: list[dict[str, Any]] = []
             used_fixed_names: set[str] = set()
             for character in structured_characters:
@@ -1599,21 +1787,21 @@ class PromptPipeline:
                     )[:1]
                     status = resolution.status
                     canonical_tag = resolution.canonical_tag
-                declared_identity_tags = clean_content_tags(
+                for identity_tag in identity_tags:
+                    if identity_tag and identity_tag not in structured_required_character_tags:
+                        structured_required_character_tags.append(identity_tag)
+                for narrative_part in (
                     character.identity_tags,
-                    max_tags=12,
-                    strip_character_tags=False,
-                    allow_multi_character=True,
-                )
-                detail_tags = clean_content_tags(
                     character.detail_tags,
-                    max_tags=24,
-                    strip_character_tags=False,
-                    allow_multi_character=True,
-                )
-                rendered = ", ".join(
-                    (*identity_tags, declared_identity_tags, detail_tags)
-                ).strip(" ,")
+                ):
+                    if narrative_part and narrative_part not in structured_narrative_parts:
+                        structured_narrative_parts.append(narrative_part)
+                # Identity/Details are natural-language clauses.  Keep only
+                # canonical character anchors in the Danbooru tag stream and
+                # move those clauses to Nltags below, otherwise comma splitting
+                # produces duplicates such as both `black thighhighs` and a
+                # sentence ending in `with black thighhighs`.
+                rendered = ", ".join(identity_tags).strip(" ,")
                 if rendered:
                     rendered_characters.append(rendered)
                 resolution_statuses.append(
@@ -1629,6 +1817,7 @@ class PromptPipeline:
                 for part in (
                     *structured_roster_tags,
                     *required_profile_tags,
+                    *semantic_required_tags,
                     *structured_copyright_tags,
                     *rendered_characters,
                     structured_scene,
@@ -1639,6 +1828,22 @@ class PromptPipeline:
                 structured_nltags,
                 tuple(character.name for character in structured_characters),
             )
+            if semantic_result.outfit_source_tags:
+                nltags = minimal_verified_outfit_nltags(
+                    nltags,
+                    semantic_result.outfit_source_tags,
+                )
+            elif structured_narrative_parts:
+                narrative_text = ". ".join(structured_narrative_parts)
+                nltags = ". ".join(
+                    part for part in (narrative_text, nltags) if part
+                )
+            if (
+                semantic_result.missing_descriptions
+                and not semantic_result.outfit_source_tags
+            ):
+                missing_text = ". ".join(semantic_result.missing_descriptions)
+                nltags = ". ".join(part for part in (missing_text, nltags) if part)
             summary["structured_character_mode"] = True
             summary["structured_character_count"] = len(structured_characters)
             summary["structured_roster_tags"] = list(structured_roster_tags)
@@ -1653,9 +1858,20 @@ class PromptPipeline:
             summary["local_character_hints"] = list(local_character_hints)
             use_fixed_character = False
             fixed_character_name = ""
-            required_core_tags = ()
+            required_core_tags = tuple(
+                dict.fromkeys(
+                    (
+                        *structured_required_character_tags,
+                        *semantic_required_tags,
+                    )
+                )
+            )
+            required_count_tags = structured_roster_tags
         else:
             llm_content, nltags = extract_nltags(llm_content)
+            if semantic_result.missing_descriptions:
+                missing_text = ". ".join(semantic_result.missing_descriptions)
+                nltags = ". ".join(part for part in (missing_text, nltags) if part)
             llm_content = re.sub(
                 r"\{\s*(?:Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:[^}]*\}",
                 "",
@@ -1705,6 +1921,10 @@ class PromptPipeline:
                     candidate_hints=candidate_hints,
                 )
         llm_content = character_resolution.text
+        if outfit_summary:
+            llm_content = ", ".join(
+                part for part in (llm_content, outfit_summary) if part
+            )
         if character_resolution.identity_tags:
             required_core_tags = tuple(
                 dict.fromkeys(
@@ -1714,6 +1934,10 @@ class PromptPipeline:
         elif required_profile_tags:
             required_core_tags = tuple(
                 dict.fromkeys((*required_core_tags, *required_profile_tags))
+            )
+        if semantic_required_tags:
+            required_core_tags = tuple(
+                dict.fromkeys((*required_core_tags, *semantic_required_tags))
             )
         low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
         constraint_raw = ""
@@ -1738,6 +1962,7 @@ class PromptPipeline:
             user_prompt=prompt,
             llm_content=llm_content,
             config=prompt_config,
+            required_count_tags=required_count_tags,
             required_core_tags=required_core_tags,
             constraint_plan=constraint_plan,
             background_mode=background_mode,
@@ -1749,7 +1974,7 @@ class PromptPipeline:
         content_tag_count = len(split_tags(built.content_tags))
         removed_tag_count = max(0, initial_input_tag_count - content_tag_count)
         self.logger.info(
-            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s low_cfg_harness=%s constraint=%s weighted_style=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
+            "[comfyui_agent] prompt built raw=%s web_search=%s deep_thinking=%s character=%s sensual=%s fixed_character=%s default_style=%s low_cfg_harness=%s constraint=%s weighted_style=%s required_count_tags=%s required_core_tags=%s content_tags=%s content_chars=%s final_chars=%s final_head=%s",
             built.raw_mode,
             bool(search_context),
             research_plan.use_deep_thinking,
@@ -1760,6 +1985,7 @@ class PromptPipeline:
             low_cfg_harness,
             built.constraint_mode,
             ",".join(built.weighted_style_tags) or "none",
+            ",".join(built.required_count_tags) or "none",
             ",".join(built.required_core_tags) or "none",
             content_tag_count,
             len(built.content_tags),
@@ -1785,6 +2011,7 @@ class PromptPipeline:
                 "constraint_tags": list(built.constraint_tags),
                 "removed_constraint_tags": list(built.removed_constraint_tags),
                 "constraint_reason": built.constraint_reason,
+                "required_count_tags": list(built.required_count_tags),
                 "required_core_tags": list(built.required_core_tags),
                 "required_profile_tags": list(required_profile_tags),
                 "named_character_detected": character_resolution.status
