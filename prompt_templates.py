@@ -7,8 +7,10 @@ try:
         DEFAULT_PORTRAIT_MARKER,
         EXPLICIT_SCENE_MARKER,
     )
+    from .prompt_keyword_rules import MatchedPromptRule, build_keyword_rule_block
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_background import DEFAULT_PORTRAIT_MARKER, EXPLICIT_SCENE_MARKER
+    from prompt_keyword_rules import MatchedPromptRule, build_keyword_rule_block
 
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 
@@ -23,7 +25,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
   `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
   `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
-- `Count` 必须含准确的人数 Danbooru tag；`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- `Count` 必须含准确的人数 Danbooru tag；一名扶她与一名女性必须写 `futa with female`，禁止写成 `2girls, futanari`（后者会被 Anima 理解为三人）；一名扶她与一名男性使用 `futa with male`。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
 - 不要输出 masterpiece、best quality、score 等质量前缀。
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
@@ -62,6 +64,7 @@ BACKGROUND_POLICY_TEMPLATE = """
 
 
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    "e847b2ef55b0d19ff1db7ca92285966b39419e7a81a7a8e839d53ce7f44fd731",
     "1ca427c3208fc3d59f66d0a4c033a6ce19745d7df1858c96d009cc5a3460fa1c",
     "f63d42fcc21ae1d9dcc5a94c63c787f4e7d699e6c76fb3da90a1a46a2a0978f8",
     "95d7bfecaa58255d97685577e7ad2ddeac595b6237d3dd623407f077646bd2cc",
@@ -86,6 +89,7 @@ def build_llm_prompt(
     outfit_transfer_rule: str = "",
     original_theme: str = "",
     fixed_character_hints: dict[str, str] | None = None,
+    keyword_prompt_rules: tuple[MatchedPromptRule, ...] = (),
 ) -> str:
     """Build the prompt sent to the chat LLM for Danbooru tag generation.
 
@@ -101,6 +105,8 @@ def build_llm_prompt(
         original_theme: User text before reference-image or quoted-spell expansion.
         fixed_character_hints: Locally saved character identity hints found in
             the user request. Values may mix tags and natural language.
+        keyword_prompt_rules: Configured hard instructions triggered by the
+            user's original text.
 
     Returns:
         Complete instruction text for the prompt-building LLM.
@@ -214,6 +220,7 @@ def build_llm_prompt(
         # must still reach the LLM, so append it without requiring users to
         # migrate their stored template.
         prompt += f"\n\n-----------\n角色辅助信息：\n{character_rule}"
+    prompt += build_keyword_rule_block(tuple(keyword_prompt_rules))
     if mode == "txt2img":
         prompt += BACKGROUND_POLICY_TEMPLATE.format(
             original_theme=str(original_theme or theme).strip(),

@@ -27,6 +27,7 @@ ALLOWED_SIZES = [
 
 def test_parse_empty_anm_as_help():
     assert parse_hard_route("/anm") == ("help", "")
+    assert parse_hard_route("/anm help") == ("help", "")
 
 
 def test_parse_status_and_debug_status():
@@ -63,18 +64,17 @@ def test_parse_artist_and_character_commands():
     )
 
 
-def test_help_text_uses_catalog_visibility():
+def test_help_text_is_compact_and_fixed():
     text = help_text(img2img_enabled=False)
 
-    assert "/anm 生图 <描述>" in text
+    assert "/anm <描述>" in text
     assert "/anm 多人 <描述>" in text
     assert "/anm 无优化 <tags>" in text
-    assert "/anm 创建画师组" in text
-    assert "/anm 切换画师组" in text
-    assert "/anm 添加角色" in text
-    assert "--尺寸 1216x832" in text
-    assert "--自由发挥" not in text
-    assert "/anm 改图" not in text
+    assert "/anm 改图 <要求>" in text
+    assert "/anm 解析法术" in text
+    assert "/anm 反推" in text
+    assert "/anm 1216x832" in text
+    assert text == help_text(img2img_enabled=True)
 
 
 def test_parse_generation_size_aliases_choose_closest_allowed_ratio():

@@ -25,6 +25,7 @@ try:
         strip_raw_prefix,
         wants_sensual_mode,
     )
+    from .prompt_keyword_rules import match_keyword_prompt_rules
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt
     from .tag_cleaner import split_tags
@@ -49,6 +50,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         strip_raw_prefix,
         wants_sensual_mode,
     )
+    from prompt_keyword_rules import match_keyword_prompt_rules
     from prompt_research import PromptResearcher
     from prompt_templates import build_llm_prompt
     from tag_cleaner import split_tags
@@ -277,6 +279,10 @@ class PromptPipeline:
         fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
         use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        keyword_rules = match_keyword_prompt_rules(prompt, prompt_config)
+        summary["keyword_prompt_rule_markers"] = [
+            rule.marker for rule in keyword_rules
+        ]
         outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
         required_core_tags = (
             self._danbooru_resolver.required_core_tags_for_prompt(prompt)
@@ -352,6 +358,7 @@ class PromptPipeline:
             outfit_transfer_rule=build_outfit_transfer_block(
                 outfit_plan, outfit_summary
             ),
+            keyword_prompt_rules=keyword_rules,
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(

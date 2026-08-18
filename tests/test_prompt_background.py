@@ -15,7 +15,10 @@ from prompt_background import (  # noqa: E402
     DEFAULT_PORTRAIT,
     EXPLICIT_SCENE,
     apply_default_portrait_tags,
+    enforce_user_background_intent,
     extract_background_mode,
+    strip_unrequested_default_background_tags,
+    user_requests_explicit_background,
 )
 from prompt_builder import build_final_prompt  # noqa: E402
 from prompt_pipeline import extract_nltags  # noqa: E402
@@ -36,6 +39,43 @@ def test_background_marker_is_removed_before_tag_processing() -> None:
 
     assert mode == EXPLICIT_SCENE
     assert "background_mode" not in tags
+
+
+def test_user_explicit_indoor_background_overrides_default_portrait() -> None:
+    assert user_requests_explicit_background("画一个女孩，日式室内背景") is True
+    assert user_requests_explicit_background("画一个女孩，不要复杂背景") is False
+
+    cleaned = strip_unrequested_default_background_tags(
+        "1girl, japanese interior, simple background, white background",
+        "画一个女孩，日式室内背景",
+    )
+
+    assert cleaned == "1girl, japanese interior"
+
+    cleaned, mode, overridden = enforce_user_background_intent(
+        "1girl, japanese interior, simple background, white background",
+        DEFAULT_PORTRAIT,
+        "画一个女孩，日式室内背景",
+    )
+    assert cleaned == "1girl, japanese interior"
+    assert mode == EXPLICIT_SCENE
+    assert overridden is True
+
+
+def test_explicit_white_background_is_not_stripped() -> None:
+    assert user_requests_explicit_background("白色背景的女孩") is True
+    assert strip_unrequested_default_background_tags(
+        "1girl, simple background, white background", "白色背景的女孩"
+    ) == "1girl, white background"
+
+    cleaned, mode, overridden = enforce_user_background_intent(
+        "1girl, japanese interior, simple background, white background",
+        DEFAULT_PORTRAIT,
+        "不要纯白背景，要日式室内背景",
+    )
+    assert cleaned == "1girl, japanese interior"
+    assert mode == EXPLICIT_SCENE
+    assert overridden is True
 
 
 def test_nltags_is_separated_before_background_and_tag_processing() -> None:

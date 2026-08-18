@@ -1,0 +1,211 @@
+{
+  "4": {
+    "inputs": {
+      "filename_prefix": "2026-08-16/0816165441",
+      "images": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "保存图像"
+    }
+  },
+  "5": {
+    "inputs": {
+      "samples": [
+        "13",
+        0
+      ],
+      "vae": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE解码"
+    }
+  },
+  "6": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "加载VAE"
+    }
+  },
+  "7": {
+    "inputs": {
+      "lora_stack": [
+        "8",
+        0
+      ],
+      "model": [
+        "12",
+        0
+      ],
+      "optional_clip": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "easy loraStackApply",
+    "_meta": {
+      "title": "应用LoRA堆"
+    }
+  },
+  "8": {
+    "inputs": {
+      "toggle": true,
+      "mode": "simple",
+      "num_loras": 3,
+      "lora_1_name": "画风\\chosen粉里透红anima.safetensors",
+      "lora_1_strength": 0.8,
+      "lora_1_model_strength": 1,
+      "lora_1_clip_strength": 1,
+      "lora_2_name": "画风\\anima-highres-aesthetic-boost.safetensors",
+      "lora_2_strength": 1,
+      "lora_2_model_strength": 1,
+      "lora_2_clip_strength": 1,
+      "lora_3_name": "anima_StS_Foreshortening_Slider.safetensors",
+      "lora_3_strength": 0.8,
+      "lora_3_model_strength": 1,
+      "lora_3_clip_strength": 1,
+      "lora_4_name": "anima_covered_nipples_slider.safetensors",
+      "lora_4_strength": 0.8,
+      "lora_4_model_strength": 1,
+      "lora_4_clip_strength": 1,
+      "lora_5_name": "anima_StS_Foreshortening_Slider.safetensors",
+      "lora_5_strength": 1,
+      "lora_5_model_strength": 1,
+      "lora_5_clip_strength": 1,
+      "lora_6_name": "None",
+      "lora_6_strength": 1,
+      "lora_6_model_strength": 1,
+      "lora_6_clip_strength": 1,
+      "lora_7_name": "None",
+      "lora_7_strength": 1,
+      "lora_7_model_strength": 1,
+      "lora_7_clip_strength": 1,
+      "lora_8_name": "None",
+      "lora_8_strength": 1,
+      "lora_8_model_strength": 1,
+      "lora_8_clip_strength": 1,
+      "lora_9_name": "None",
+      "lora_9_strength": 1,
+      "lora_9_model_strength": 1,
+      "lora_9_clip_strength": 1,
+      "lora_10_name": "None",
+      "lora_10_strength": 1,
+      "lora_10_model_strength": 1,
+      "lora_10_clip_strength": 1
+    },
+    "class_type": "easy loraStack",
+    "_meta": {
+      "title": "简易Lora堆"
+    }
+  },
+  "10": {
+    "inputs": {
+      "text": "worst quality, low quality, blurry, jpeg artifacts, bad anatomy, \nwatermark, censored, artist name, copyright name, bar censor, \n(bad hands:1.5), missing fingers, (extra fingers:1.5), (bad feet:1.5), extra limbs, extra toes, \n(missing limb:1.5), (handjob:1.5), fellatio, (hand on penis:1.5), \nmale, dark-skinned male, 3d, mature female, cum, cum in pussy, hetero, halo, manga, comic, (looking at viewer:1.5), ",
+      "clip": [
+        "7",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "12": {
+    "inputs": {
+      "unet_name": "anima_aestheticV11.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "UNet加载器"
+    }
+  },
+  "13": {
+    "inputs": {
+      "seed": 48323344662789,
+      "steps": 35,
+      "cfg": 6,
+      "sampler_name": "euler_ancestral",
+      "scheduler": "normal",
+      "denoise": 1,
+      "model": [
+        "7",
+        0
+      ],
+      "positive": [
+        "15",
+        0
+      ],
+      "negative": [
+        "10",
+        0
+      ],
+      "latent_image": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "K采样器"
+    }
+  },
+  "14": {
+    "inputs": {
+      "width": 1024,
+      "height": 1352,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "空Latent图像"
+    }
+  },
+  "15": {
+    "inputs": {
+      "text": "masterpiece, best quality, score 7, score 8, score 9, \n2girls, nsfw, explict, \nchihaya anon, togawa sakiko, bang dream!, \n@suerte, blue archive style, @natonyanya, (@isemori:1.1), @rionsanuma, @mimonel, \nchihaya anon has pink hair and flat chest., \ntogawa sakiko has blue hair., \nfrom behind, looking back, turning head, lens flare, (holding own hair:1.5), holding hair, blurry forground, looking at another, hanaoka school summer uniform, brown sweater vest, white shirt, green skirt., (half-closed eyes:0.3), \nchihaya anon is in the middle scene.,  togawa sakiko is in the foreground.,\nchihaya anon holds a hair tie in her mouth, her hands holding own hair showing off her neck, looks back over shoulder at togawa sakiko with a soft, affectionate smile., \ntogawa sakiko sits on a chair, facing away from viewer., (togawa sakiko is looking at chihaya anon.:1.5), \nthe background is a classroom, sunset light pouring through the windows, quiet after-class atmosphere, nostalgic and youthful mood., \nboth girls wear haneoka school summer uniform, brown sweater vest and white shirt and green skirt., ",
+      "clip": [
+        "7",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP文本编码"
+    }
+  },
+  "16": {
+    "inputs": {
+      "clip_name": "qwen_3_06b_base.safetensors",
+      "type": "stable_diffusion",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "加载CLIP"
+    }
+  },
+  "18": {
+    "inputs": {
+      "anything": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "easy cleanGpuUsed",
+    "_meta": {
+      "title": "清理显存占用"
+    }
+  }
+}

@@ -1,14 +1,72 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
+from datetime import datetime
 from pathlib import Path
 
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from agent_tools.comfyui_workflows import custom_t2i_workflow  # noqa: E402
+from agent_tools.comfyui_workflows import (  # noqa: E402
+    anima_t2i_workflow,
+    custom_t2i_workflow,
+    t2i_filename_prefix,
+)
+
+
+def test_t2i_filename_prefix_renders_windows_safe_date_path() -> None:
+    assert t2i_filename_prefix(datetime(2026, 8, 16, 20, 27, 6)) == (
+        "astrbot/anm/2026-08-16/0816202706"
+    )
+
+
+def test_default_t2i_workflow_uses_dated_output_prefix() -> None:
+    result = anima_t2i_workflow({}, "positive", "negative", 832, 1216, 30, 5.0, 42)
+
+    assert re.fullmatch(
+        r"astrbot/anm/\d{4}-\d{2}-\d{2}/\d{10}",
+        result["9"]["inputs"]["filename_prefix"],
+    )
+
+
+def test_custom_t2i_workflow_uses_dated_output_prefix(tmp_path: Path) -> None:
+    path = tmp_path / "workflow.json"
+    path.write_text(
+        json.dumps(
+            {
+                "1": {"class_type": "CLIPTextEncode", "inputs": {"text": "positive"}},
+                "2": {"class_type": "CLIPTextEncode", "inputs": {"text": "negative"}},
+                "3": {
+                    "class_type": "KSampler",
+                    "inputs": {"positive": ["1", 0], "negative": ["2", 0]},
+                },
+                "4": {
+                    "class_type": "SaveImage",
+                    "inputs": {"images": ["5", 0], "filename_prefix": "ComfyUI"},
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = custom_t2i_workflow(
+        {"custom_workflow_path": str(path)},
+        "new positive",
+        "new negative",
+        832,
+        1216,
+        30,
+        5.0,
+        42,
+    )
+
+    assert re.fullmatch(
+        r"astrbot/anm/\d{4}-\d{2}-\d{2}/\d{10}",
+        result["4"]["inputs"]["filename_prefix"],
+    )
 
 
 def test_custom_workflow_applies_generation_parameters(tmp_path: Path) -> None:

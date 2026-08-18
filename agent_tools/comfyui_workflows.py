@@ -2,12 +2,19 @@ from __future__ import annotations
 
 import copy
 import json
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 DEFAULT_NEGATIVE_PROMPT = (
     "worst quality, low quality, score_1, score_2, score_3, artist name"
 )
+
+
+def t2i_filename_prefix(now: datetime | None = None) -> str:
+    """Build a Windows-safe dated ComfyUI output prefix."""
+    timestamp = now or datetime.now()
+    return f"astrbot/{timestamp:%Y-%m-%d}/{timestamp:%m%d%H%M%S}"
 
 
 def anima_t2i_workflow(
@@ -79,7 +86,10 @@ def anima_t2i_workflow(
         },
         "9": {
             "class_type": "SaveImage",
-            "inputs": {"images": ["8", 0], "filename_prefix": "astrbot/anm"},
+            "inputs": {
+                "images": ["8", 0],
+                "filename_prefix": t2i_filename_prefix(),
+            },
         },
     }
 
@@ -315,6 +325,7 @@ def _apply_custom_workflow_inputs(
     for node_id in negative_ids:
         _set_node_input(workflow_body, node_id, "text", negative_prompt)
 
+    filename_prefix = t2i_filename_prefix()
     for node in workflow_body.values():
         if not isinstance(node, dict):
             continue
@@ -323,7 +334,7 @@ def _apply_custom_workflow_inputs(
         if not isinstance(inputs, dict):
             continue
         if class_type == "SaveImage" and "filename_prefix" in inputs:
-            inputs["filename_prefix"] = "astrbot/anm"
+            inputs["filename_prefix"] = filename_prefix
         override_parameters = bool(
             config.get("custom_workflow_override_parameters", False)
         )

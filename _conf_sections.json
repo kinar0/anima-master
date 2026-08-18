@@ -112,7 +112,9 @@
         "active_style_preset",
         "style_tags",
         "sensual_mode_enabled",
-        "sensual_mode_markers"
+        "sensual_mode_markers",
+        "keyword_prompt_rules_enabled",
+        "keyword_prompt_rules"
       ]
     },
     {

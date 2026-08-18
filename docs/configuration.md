@@ -100,6 +100,17 @@ vae_name = ComfyUI 中的 VAE 文件名
 - `active_style_preset`：当前启用的画风；留空时使用 `style_tags`。
 - `sensual_mode_enabled`：涩气表现力优化。
 - `sensual_mode_markers`：触发涩气表现力优化的关键词。
+- `keyword_prompt_rules_enabled`：启用关键词强制规则。
+- `keyword_prompt_rules`：命中用户原始文字后，向 LLM 追加高优先级硬性指令。
+
+关键词强制规则每行使用以下格式，多个触发词用 `|` 分隔：
+
+```text
+黑丝|丝袜 => 必须在 Tags 中明确加入 black pantyhose；不要使用近义词代替
+雨天|下雨 => 必须加入 rain、wet clothes，并把场景设置为雨中
+```
+
+同一行命中任一触发词即生效；多行可以同时生效。检测仅针对用户原始文字，参考图反推内容或搜索摘要不会误触发。格式错误的行会被忽略。
 
 固定角色格式：
 

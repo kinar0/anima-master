@@ -180,27 +180,22 @@ def keyword_action_pairs() -> list[tuple[str, str]]:
 
 
 def build_help_text(img2img_enabled: bool = False) -> str:
-    """Build the chat-visible Anima command help text."""
-    lines = ["Anima 指令表："]
-    for entry in COMMAND_ENTRIES:
-        if not entry.show_in_help or not entry.help_line:
-            continue
-        if entry.requires_img2img and not img2img_enabled:
-            continue
-        if entry.help_line not in lines:
-            lines.append(entry.help_line)
-    lines.extend(
-        [
-            "  可在 anm 后写“宽x高 描述”，如“anm 1216x832 白色礼服少女”",
-            "  也可在描述开头写“竖图/横图/方图/宽屏”",
-            "  也可在末尾写“--尺寸 1216x832”指定本次尺寸",
-            "  自然语言生图默认由 LLM 自主拓展主题并丰富完整画面",
-            "",
-            "也可以把“anm”换成“comfyui / anima”。",
-            "例：/anm 生图 白色礼服，立绘",
-        ]
+    """Build the compact fixed Anima help text.
+
+    ``img2img_enabled`` remains in the signature for compatibility. The help
+    stays fixed and marks image editing as a capability that may need enabling.
+    """
+    return "\n".join(
+        (
+            "Anima 绘图助手",
+            "生图：/anm <描述>; /anm 宽x高 <描述>; /anm <描述>#（自动追加的英语提示词）",
+            "原样 tags：/anm 无优化 <tags>",
+            "引用图片：/anm 改图 <要求>｜/anm 解析法术｜/anm 反推（暂未开启）",
+            "示例：/anm 1216x832 白色礼服少女#sitting on a chair",
+            "状态：/anm 状态｜排查：/anm 诊断",
+            "画师组：/anm 切换画师组 <名称>：切换当前画师组；/anm 创建画师组 <名称>=<tags>：保存并启用画师组 /anm 查看画师组：查看信息"
+        )
     )
-    return "\n".join(lines)
 
 
 def natural_action_for(verb: str) -> str:

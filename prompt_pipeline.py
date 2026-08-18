@@ -31,6 +31,8 @@ try:
     )
     from .prompt_background import (
         DEFAULT_PORTRAIT,
+        EXPLICIT_SCENE,
+        enforce_user_background_intent,
         extract_background_mode,
     )
     from .prompt_builder import (
@@ -47,6 +49,10 @@ try:
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
+    )
+    from .prompt_keyword_rules import (
+        build_keyword_rule_block,
+        match_keyword_prompt_rules,
     )
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt
@@ -76,6 +82,8 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from prompt_background import (
         DEFAULT_PORTRAIT,
+        EXPLICIT_SCENE,
+        enforce_user_background_intent,
         extract_background_mode,
     )
     from prompt_builder import (
@@ -92,6 +100,10 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         selected_fixed_character,
         strip_raw_prefix,
         wants_sensual_mode,
+    )
+    from prompt_keyword_rules import (
+        build_keyword_rule_block,
+        match_keyword_prompt_rules,
     )
     from prompt_research import PromptResearcher
     from prompt_templates import build_llm_prompt
@@ -202,6 +214,44 @@ def is_chinese_model_refusal(text: str) -> bool:
     return any(re.search(pattern, response) for pattern in refusal_patterns)
 
 
+def normalize_anima_count_tags(
+    tags: tuple[str, ...] | list[str], character_count: int
+) -> tuple[str, ...]:
+    """Remove count combinations that make Anima infer an extra futa person."""
+    values = tuple(str(tag).strip() for tag in tags if str(tag).strip())
+    if character_count != 2:
+        return values
+
+    normalized = tuple(tag.lower().replace("_", " ") for tag in values)
+    futa_indexes = {
+        index
+        for index, tag in enumerate(normalized)
+        if tag in {"futa", "futanari", "1futa", "1futanari", "1 futa", "1 futanari"}
+    }
+    female_indexes = {
+        index
+        for index, tag in enumerate(normalized)
+        if tag in {"1girl", "1 girl", "2girls", "2 girls"}
+    }
+    if not futa_indexes or not female_indexes:
+        return tuple(
+            "futa with female"
+            if tag in {"female with futa", "female with futanari"}
+            else value
+            for value, tag in zip(values, normalized, strict=True)
+        )
+
+    replacement_index = min(futa_indexes | female_indexes)
+    consumed = futa_indexes | female_indexes
+    result: list[str] = []
+    for index, value in enumerate(values):
+        if index == replacement_index:
+            result.append("futa with female")
+        elif index not in consumed:
+            result.append(value)
+    return tuple(dict.fromkeys(result))
+
+
 def extract_structured_prompt(
     text: str,
 ) -> tuple[
@@ -241,25 +291,27 @@ def extract_structured_prompt(
         "nltags",
     }:
         return (), (), (), raw, ""
-    roster_tags: list[str] = []
-    has_count_tag = False
-    for item in (item.strip() for item in blocks["count"].split(",") if item.strip()):
-        # Count is a structured hard-tag block.  Once it contains a valid
-        # people-count anchor, preserve every tag in the block; the content
-        # cleaner must not silently discard relationship/focus/count metadata.
-        roster_tags.append(item)
-        normalized = item.lower().replace("_", " ")
-        if re.fullmatch(
-            r"(?:[1-9]\d*\+? ?(?:girls?|boys?|people|persons?|others?)|"
-            r"multiple (?:girls|boys|people)|no humans)",
-            normalized,
-        ):
-            has_count_tag = True
     roster = [
         item.strip()
         for item in blocks["characters"].split(",")
         if item.strip()
     ]
+    raw_roster_tags = tuple(
+        item.strip() for item in blocks["count"].split(",") if item.strip()
+    )
+    roster_tags = list(normalize_anima_count_tags(raw_roster_tags, len(roster)))
+    has_count_tag = False
+    for item in roster_tags:
+        # Count is a structured hard-tag block.  Once it contains a valid
+        # people-count anchor, preserve every tag in the block; the content
+        # cleaner must not silently discard relationship/focus/count metadata.
+        normalized = item.lower().replace("_", " ")
+        if re.fullmatch(
+            r"(?:[1-9]\d*\+? ?(?:girls?|boys?|people|persons?|others?)|"
+            r"multiple (?:girls|boys|people)|no humans|futa with (?:female|male))",
+            normalized,
+        ):
+            has_count_tag = True
     copyright_tags = tuple(
         item.strip()
         for item in blocks["copyright"].split(",")
@@ -506,18 +558,22 @@ class PromptPipeline:
                 "按用户是否明确要求场景，在最后输出且只输出一个背景控制标记。"
                 "Follow the user prompt's seven-brace-block response format exactly. "
                 "Count must contain the exact Danbooru people-count tag, while "
+                "one futa plus one female must use `futa with female`, never "
+                "`2girls, futanari`; one futa plus one male uses `futa with male`. "
                 "Characters contains names only; never omit Count or merge it into "
                 "Characters."
                 f"{character_rule}"
                 f"{creative_rule}"
             ),
             "max_tokens": self._int("prompt_builder_max_tokens", 700),
+            "thinking": {
+                "type": "enabled" if use_deep_thinking else "disabled"
+            },
         }
         if use_deep_thinking:
             kwargs["reasoning_effort"] = (
                 self._str("prompt_builder_reasoning_effort", "high") or "high"
             )
-            kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
@@ -538,12 +594,14 @@ class PromptPipeline:
                 "不要解释，不要 Markdown，不要输出质量词、画师词或角色身份词。"
             ),
             "max_tokens": min(self._int("prompt_builder_max_tokens", 700), 500),
+            "thinking": {
+                "type": "enabled" if use_deep_thinking else "disabled"
+            },
         }
         if use_deep_thinking:
             kwargs["reasoning_effort"] = (
                 self._str("prompt_builder_reasoning_effort", "high") or "high"
             )
-            kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
@@ -589,6 +647,7 @@ class PromptPipeline:
                 "not authoritative answers."
             ),
             max_tokens=350,
+            thinking={"type": "disabled"},
         )
         raw = str(getattr(response, "completion_text", "") or "").strip()
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
@@ -630,6 +689,7 @@ class PromptPipeline:
                 or DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
             ),
             max_tokens=min(self._int("prompt_builder_max_tokens", 700), 550),
+            thinking={"type": "disabled"},
         )
         return str(getattr(response, "completion_text", "") or "").strip()
 
@@ -656,6 +716,7 @@ class PromptPipeline:
                 "Return only valid JSON. Do not output Markdown or explanations."
             ),
             max_tokens=450,
+            thinking={"type": "disabled"},
         )
         return str(getattr(response, "completion_text", "") or "").strip()
 
@@ -685,12 +746,14 @@ class PromptPipeline:
                 "Keep every character's identity and attributes in its own block."
             ),
             "max_tokens": min(self._int("prompt_builder_max_tokens", 700), 900),
+            "thinking": {
+                "type": "enabled" if use_deep_thinking else "disabled"
+            },
         }
         if use_deep_thinking:
             kwargs["reasoning_effort"] = (
                 self._str("prompt_builder_reasoning_effort", "high") or "high"
             )
-            kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
         return str(getattr(response, "completion_text", "") or "").strip()
 
@@ -729,6 +792,13 @@ class PromptPipeline:
             fixed_characters=mentioned_fixed_characters,
             original_user_prompt=original_user_prompt,
         )
+        keyword_rules = match_keyword_prompt_rules(
+            original_user_prompt or prompt, prompt_config
+        )
+        plan_prompt += build_keyword_rule_block(keyword_rules)
+        summary["keyword_prompt_rule_markers"] = [
+            rule.marker for rule in keyword_rules
+        ]
         raw_plan = ""
         plan = None
         planner_error = "invalid_plan"
@@ -855,7 +925,14 @@ class PromptPipeline:
                 normalized_configured_tags = {
                     tag.lower().replace(" ", "") for tag in configured_tags
                 }
-                if "1girl" in normalized_configured_tags:
+                if normalized_configured_tags & {
+                    "futa",
+                    "futanari",
+                    "1futa",
+                    "1futanari",
+                }:
+                    fixed_genders.append("futa")
+                elif "1girl" in normalized_configured_tags:
                     fixed_genders.append("girl")
                 elif "1boy" in normalized_configured_tags:
                     fixed_genders.append("boy")
@@ -1075,18 +1152,33 @@ class PromptPipeline:
         if len(fixed_genders) == character_count:
             girl_count = fixed_genders.count("girl")
             boy_count = fixed_genders.count("boy")
-            deterministic_count_tags = tuple(
-                tag
-                for tag in (
-                    f"{girl_count}girls" if girl_count else "",
-                    f"{boy_count}boys" if boy_count else "",
+            futa_count = fixed_genders.count("futa")
+            if character_count == 2 and futa_count == 1 and girl_count == 1:
+                deterministic_count_tags = ("futa with female",)
+            elif character_count == 2 and futa_count == 1 and boy_count == 1:
+                deterministic_count_tags = ("futa with male",)
+            elif not futa_count:
+                deterministic_count_tags = tuple(
+                    tag
+                    for tag in (
+                        f"{girl_count}girls" if girl_count else "",
+                        f"{boy_count}boys" if boy_count else "",
+                    )
+                    if tag
                 )
-                if tag
-            )
         if not deterministic_count_tags:
+            normalized_plan_count_tags = normalize_anima_count_tags(
+                plan.count_tags, character_count
+            )
+            relationship_count_tags = tuple(
+                tag
+                for tag in normalized_plan_count_tags
+                if tag.lower().replace("_", " ")
+                in {"futa with female", "futa with male"}
+            )
             deterministic_count_tags = tuple(
                 tag
-                for tag in plan.count_tags
+                for tag in normalized_plan_count_tags
                 if (
                     (
                         match := re.fullmatch(
@@ -1097,7 +1189,7 @@ class PromptPipeline:
                     )
                     and int(match.group(1)) == character_count
                 )
-            )[:1] or (f"{character_count}people",)
+            )[:1] or relationship_count_tags[:1] or (f"{character_count}people",)
         filtered_common_tags = tuple(
             tag
             for tag in plan.common_tags
@@ -1113,7 +1205,16 @@ class PromptPipeline:
                 flags=re.IGNORECASE,
             )
         )
-        if plan.background_mode == DEFAULT_PORTRAIT:
+        background_request = str(original_user_prompt or prompt).strip()
+        filtered_background_tags, effective_background_mode, background_overridden = (
+            enforce_user_background_intent(
+                ", ".join(filtered_common_tags),
+                plan.background_mode,
+                background_request,
+            )
+        )
+        filtered_common_tags = tuple(split_tags(filtered_background_tags))
+        if effective_background_mode == DEFAULT_PORTRAIT:
             filtered_common_tags = tuple(
                 dict.fromkeys(
                     (
@@ -1283,7 +1384,12 @@ class PromptPipeline:
                 "emphasized_anchor_count": emphasized_anchor_count,
                 "grouped_contact": grouped_contact,
                 "spatial_mode": spatial_mode,
-                "background_mode": plan.background_mode,
+                "background_mode": effective_background_mode,
+                "background_mode_source": (
+                    "user_prompt_override"
+                    if background_overridden
+                    else "llm_plan"
+                ),
                 "explicit_position_requested": explicit_position_requested,
                 "interaction_aliases_normalized": (
                     tuple(normalized_interactions) != plan.interactions
@@ -1406,6 +1512,12 @@ class PromptPipeline:
         fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
         use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        keyword_rules = match_keyword_prompt_rules(
+            background_intent_prompt, prompt_config
+        )
+        summary["keyword_prompt_rule_markers"] = [
+            rule.marker for rule in keyword_rules
+        ]
         outfit_plan = detect_outfit_transfer(prompt, fixed_character_name)
 
         provider_id = await self._current_chat_provider_id(event)
@@ -1656,6 +1768,7 @@ class PromptPipeline:
                 if part
             ),
             original_theme=background_intent_prompt,
+            keyword_prompt_rules=keyword_rules,
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
@@ -1895,6 +2008,13 @@ class PromptPipeline:
             else:
                 background_mode = DEFAULT_PORTRAIT
                 background_mode_source = "missing_marker_default"
+            llm_content, background_mode, background_overridden = (
+                enforce_user_background_intent(
+                    llm_content, background_mode, background_intent_prompt
+                )
+            )
+            if background_overridden:
+                background_mode_source = "user_prompt_override"
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         if structured_prompt_mode:
             character_resolution = DanbooruResolveOutcome(text=llm_content)

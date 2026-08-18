@@ -65,6 +65,63 @@ def test_semantic_planner_uses_configured_system_prompt() -> None:
     )
 
     assert context.calls[0]["system_prompt"] == "custom LLM1 system prompt"
+    assert context.calls[0]["max_tokens"] == 550
+    assert context.calls[0]["thinking"] == {"type": "disabled"}
+
+
+def test_prompt_builder_controls_thinking_and_output_budget() -> None:
+    class _Response:
+        completion_text = "{Count: 1girl}"
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response()
+
+    config = {
+        "prompt_builder_max_tokens": 640,
+        "prompt_builder_reasoning_effort": "high",
+    }
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context,
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=object(),
+        researcher=object(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda _key, default: default,
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=_shorten,
+    )
+
+    asyncio.run(
+        pipeline._generate_prompt_tags_with_llm(
+            provider_id="provider",
+            llm_prompt="test",
+            use_deep_thinking=False,
+            fixed_character=False,
+        )
+    )
+    asyncio.run(
+        pipeline._generate_prompt_tags_with_llm(
+            provider_id="provider",
+            llm_prompt="test",
+            use_deep_thinking=True,
+            fixed_character=False,
+        )
+    )
+
+    assert context.calls[0]["max_tokens"] == 640
+    assert context.calls[0]["thinking"] == {"type": "disabled"}
+    assert "reasoning_effort" not in context.calls[0]
+    assert context.calls[1]["max_tokens"] == 640
+    assert context.calls[1]["thinking"] == {"type": "enabled"}
+    assert context.calls[1]["reasoning_effort"] == "high"
 
 
 class _Logger:
@@ -710,6 +767,36 @@ def test_extract_structured_prompt_preserves_every_count_block_tag() -> None:
 
     assert characters
     assert roster_tags == ("2girls", "yuri", "female_focus", "group_hug")
+
+
+def test_extract_structured_prompt_normalizes_futa_and_female_count() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: 2girls, futanari}\n"
+        "{Characters: futa_character, female_character}\n"
+        "{Copyright:}\n"
+        "{Identity: futa_character has silver hair; female_character has black hair}\n"
+        "{Details: futa_character stands; female_character kneels}\n"
+        "{Tags: full body, simple background}\n"
+        "{Nltags: futa_character stands beside female_character.}"
+    )
+
+    assert characters
+    assert roster_tags == ("futa with female",)
+
+
+def test_extract_structured_prompt_accepts_canonical_futa_pair_count() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: futa with female}\n"
+        "{Characters: futa_character, female_character}\n"
+        "{Copyright:}\n"
+        "{Identity: futa_character has silver hair; female_character has black hair}\n"
+        "{Details: futa_character stands; female_character kneels}\n"
+        "{Tags: full body, simple background}\n"
+        "{Nltags: futa_character stands beside female_character.}"
+    )
+
+    assert characters
+    assert roster_tags == ("futa with female",)
 
 
 def test_llm_prompt_uses_configured_seven_field_template_without_english_suffix() -> None:
