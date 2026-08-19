@@ -208,10 +208,12 @@ _OUTFIT_PROFILE_TERMS = (
     "necktie",
     "necklace",
     "pantyhose",
+    "pants",
     "pendant",
     "ribbon",
     "robe",
     "shirt",
+    "shorts",
     "shoes",
     "skirt",
     "sleeves",
@@ -226,6 +228,7 @@ _OUTFIT_GARMENT_ROOTS = {
     "blouse",
     "bodice",
     "coat",
+    "corset",
     "dress",
     "gown",
     "jacket",
@@ -276,11 +279,46 @@ def _outfit_slot_rank(tag: str) -> int:
     return 9
 
 
-def _select_variant_outfit_profile(post_tag_strings: list[str]) -> tuple[str, ...]:
-    """Select a coherent recurring outfit from a variant's post sample."""
+@dataclass(frozen=True)
+class VariantOutfitProfile:
+    """One evidence-backed outfit cluster inferred from a character variant."""
+
+    tags: tuple[str, ...] = ()
+    sample_mode: str = "none"
+    total_posts: int = 0
+    selected_posts: int = 0
+    focused_posts: int = 0
+    anchor_tag: str = ""
+    tag_counts: tuple[tuple[str, int], ...] = ()
+
+
+def _outfit_anchor_priority(tag: str) -> int:
+    root = tag.split("_")[-1]
+    if root in {"uniform", "corset"}:
+        return 4
+    if root in {"dress", "gown", "jacket", "coat", "bodice"}:
+        return 3
+    if root in {"shirt", "blouse"}:
+        return 2
+    if root in {"skirt", "shorts", "pants"}:
+        return 1
+    return 0
+
+
+def _build_variant_outfit_profile(
+    post_tag_strings: list[str],
+    *,
+    sample_mode: str = "unscoped",
+    total_posts: int | None = None,
+) -> VariantOutfitProfile:
+    """Select a coherent recurring outfit and retain its extraction evidence."""
     post_sets = [set(tags.split()) for tags in post_tag_strings if tags.strip()]
     if len(post_sets) < 3:
-        return ()
+        return VariantOutfitProfile(
+            sample_mode=sample_mode,
+            total_posts=total_posts if total_posts is not None else len(post_sets),
+            selected_posts=len(post_sets),
+        )
 
     def is_outfit_tag(tag: str) -> bool:
         parts = tag.split("_")
@@ -289,7 +327,8 @@ def _select_variant_outfit_profile(post_tag_strings: list[str]) -> tuple[str, ..
         )
 
     all_counts = Counter(tag for tags in post_sets for tag in tags if is_outfit_tag(tag))
-    anchor_floor = max(3, (len(post_sets) * 35 + 99) // 100)
+    max_anchor_count = max(all_counts.values(), default=0)
+    anchor_floor = max(3, (max_anchor_count * 35 + 99) // 100)
     anchors = [
         tag
         for tag, count in all_counts.items()
@@ -297,14 +336,37 @@ def _select_variant_outfit_profile(post_tag_strings: list[str]) -> tuple[str, ..
         and len(tag.split("_")) >= 2
         and tag.split("_")[-1] in _OUTFIT_GARMENT_ROOTS
     ]
-    anchor = max(anchors, key=lambda tag: (all_counts[tag], len(tag)), default="")
+    anchor = max(
+        anchors,
+        key=lambda tag: (
+            _outfit_anchor_priority(tag),
+            all_counts[tag],
+            len(tag),
+        ),
+        default="",
+    )
     focused = [tags for tags in post_sets if anchor in tags] if anchor else post_sets
     if len(focused) < 3:
         focused = post_sets
 
     counts = Counter(tag for tags in focused for tag in tags if is_outfit_tag(tag))
-    floor = max(3, (len(focused) * 10 + 99) // 100)
+    # Once posts are character-pure and anchor-focused, a component appearing
+    # in roughly 8% of the cluster is useful evidence.  Keep an absolute floor
+    # of two posts so a single mistag cannot enter the persistent profile.
+    floor = max(2, (len(focused) * 8 + 99) // 100)
     selected = {tag for tag, count in counts.items() if count >= floor}
+
+    # A weakly occurring primary garment usually represents an alternate
+    # costume, even inside character-pure posts.  Require 20% support for
+    # competing tops/bottoms while retaining low-frequency accessories such as
+    # masks and jewelry that are commonly under-tagged.
+    selected = {
+        tag
+        for tag in selected
+        if tag == anchor
+        or tag.split("_")[-1] not in _OUTFIT_GARMENT_ROOTS
+        or counts[tag] * 5 >= len(focused)
+    }
 
     # Prefer one dominant color per garment/accessory root while allowing a
     # complementary form tag such as `masquerade_mask` beside `black_mask`.
@@ -378,12 +440,26 @@ def _select_variant_outfit_profile(post_tag_strings: list[str]) -> tuple[str, ..
         ):
             selected.discard(generic)
 
-    return tuple(
+    tags = tuple(
         sorted(
             selected,
             key=lambda tag: (_outfit_slot_rank(tag), -counts[tag], tag),
         )[:14]
     )
+    return VariantOutfitProfile(
+        tags=tags,
+        sample_mode=sample_mode,
+        total_posts=total_posts if total_posts is not None else len(post_sets),
+        selected_posts=len(post_sets),
+        focused_posts=len(focused),
+        anchor_tag=anchor,
+        tag_counts=tuple((tag, counts[tag]) for tag in tags),
+    )
+
+
+def _select_variant_outfit_profile(post_tag_strings: list[str]) -> tuple[str, ...]:
+    """Compatibility wrapper returning only the selected outfit tags."""
+    return _build_variant_outfit_profile(post_tag_strings).tags
 
 
 def required_core_tags_for_prompt(user_prompt: str) -> tuple[str, ...]:
@@ -703,35 +779,46 @@ def _fetch_stable_identity_tags(
     return stable
 
 
-def fetch_variant_outfit_tags(
+def fetch_variant_outfit_profile(
     canonical_tag: str,
     *,
+    outfit_kind: str = "default",
     timeout: float,
     user_agent: str,
     cache: dict[str, Any],
     donmai_base_urls: tuple[str, ...] = DEFAULT_DONMAI_BASE_URLS,
-) -> tuple[str, ...]:
+) -> VariantOutfitProfile:
     """Infer recurring visible outfit tags for a verified variant/persona.
 
     The local tag index validates the source tag but contains no post
     co-occurrence data.  This bounded read-only post sample supplies that
     missing relationship without any per-character profile table.
     """
-    cache_key = f"outfit-profile-v3:{_normalize_query(canonical_tag)}"
+    canonical_key = _normalize_query(canonical_tag)
+    kind = "stage" if str(outfit_kind).strip().lower() == "stage" else "default"
+    cache_key = f"outfit-profile-v4:{canonical_key}:{kind}"
     cached = cache.get(cache_key)
     if isinstance(cached, tuple) and len(cached) == 2:
-        cached_at, cached_tags = cached
-        ttl = 86400.0 if cached_tags else 600.0
+        cached_at, cached_profile = cached
+        ttl = 86400.0 if getattr(cached_profile, "tags", ()) else 600.0
         if time.monotonic() - float(cached_at) < ttl:
-            return tuple(cached_tags)
+            if isinstance(cached_profile, VariantOutfitProfile):
+                return cached_profile
     if requests is None:
-        return ()
-    post_tag_strings: list[str] = []
+        return VariantOutfitProfile()
+    post_samples: list[tuple[str, str]] = []
     for base_url in donmai_base_urls:
         try:
             response = requests.get(
                 f"{base_url.rstrip('/')}/posts.json",
-                params={"tags": canonical_tag, "limit": 100},
+                    params={
+                        "tags": (
+                            f"{canonical_tag} instrument"
+                            if kind == "stage"
+                            else canonical_tag
+                        ),
+                        "limit": 100,
+                    },
                 timeout=timeout,
                 headers={"User-Agent": user_agent, "Accept": "application/json"},
             )
@@ -739,16 +826,19 @@ def fetch_variant_outfit_tags(
                 continue
             payload = response.json()
             if isinstance(payload, list):
-                post_tag_strings = [
-                    str(post.get("tag_string_general") or "")
+                post_samples = [
+                    (
+                        str(post.get("tag_string_general") or ""),
+                        str(post.get("tag_string_character") or ""),
+                    )
                     for post in payload
                     if isinstance(post, dict)
                 ]
-            if len(post_tag_strings) >= 3:
+            if len(post_samples) >= 3:
                 break
         except Exception:
             continue
-    if len(post_tag_strings) < 3:
+    if len(post_samples) < 3:
         try:
             response = requests.get(
                 DEFAULT_SAFEBOORU_DAPI_URL,
@@ -767,18 +857,156 @@ def fetch_variant_outfit_tags(
             )
             if response.status_code == 200:
                 root = ET.fromstring(response.text)
-                post_tag_strings = [
-                    str(post.attrib.get("tags") or "")
+                post_samples = [
+                    (str(post.attrib.get("tags") or ""), "")
                     for post in root.findall("post")
                 ]
         except Exception:
-            post_tag_strings = []
-    if len(post_tag_strings) < 3:
-        cache[cache_key] = (time.monotonic(), ())
-        return ()
-    outfit_tags = _select_variant_outfit_profile(post_tag_strings)
-    cache[cache_key] = (time.monotonic(), outfit_tags)
-    return outfit_tags
+            post_samples = []
+    if len(post_samples) < 3:
+        empty = VariantOutfitProfile(total_posts=len(post_samples))
+        cache[cache_key] = (time.monotonic(), empty)
+        return empty
+
+    character_sets = [
+        frozenset(characters.split())
+        for _general, characters in post_samples
+        if canonical_key in characters.split()
+    ]
+    signature_counts = Counter(character_sets)
+    pure_signature = min(
+        (
+            signature
+            for signature, count in signature_counts.items()
+            if count >= 3
+        ),
+        key=lambda signature: (
+            len(signature),
+            -signature_counts[signature],
+            sorted(signature),
+        ),
+        default=frozenset(),
+    )
+    single_character = [
+        general
+        for general, characters in post_samples
+        if pure_signature and frozenset(characters.split()) == pure_signature
+    ]
+    if kind == "stage":
+        single_character = [
+            general
+            for general in single_character
+            if not {
+                "school_uniform",
+                "haneoka_school_uniform",
+            }
+            & set(general.split())
+        ]
+    if len(single_character) >= 3:
+        selected = single_character
+        sample_mode = (
+            "stage_single_character" if kind == "stage" else "single_character"
+        )
+    else:
+        if kind == "stage":
+            empty = VariantOutfitProfile(
+                sample_mode="stage_evidence_insufficient",
+                total_posts=len(post_samples),
+                selected_posts=len(single_character),
+            )
+            cache[cache_key] = (time.monotonic(), empty)
+            return empty
+        solo = [
+            general
+            for general, _characters in post_samples
+            if {"solo", "1girl", "1boy"} & set(general.split())
+        ]
+        if len(solo) >= 3:
+            selected = solo
+            sample_mode = "solo_fallback"
+        else:
+            selected = [general for general, _characters in post_samples]
+            sample_mode = "unscoped_fallback"
+    profile = _build_variant_outfit_profile(
+        selected,
+        sample_mode=sample_mode,
+        total_posts=len(post_samples),
+    )
+    if (
+        sample_mode in {"single_character", "stage_single_character"}
+        and pure_signature
+        and profile.anchor_tag
+        and requests is not None
+    ):
+        refined_samples: list[str] = []
+        for base_url in donmai_base_urls:
+            try:
+                response = requests.get(
+                    f"{base_url.rstrip('/')}/posts.json",
+                    params={
+                        "tags": f"{canonical_tag} {profile.anchor_tag}",
+                        "limit": 100,
+                    },
+                    timeout=timeout,
+                    headers={"User-Agent": user_agent, "Accept": "application/json"},
+                )
+                if response.status_code != 200:
+                    continue
+                payload = response.json()
+                if isinstance(payload, list):
+                    refined_samples = [
+                        str(post.get("tag_string_general") or "")
+                        for post in payload
+                        if isinstance(post, dict)
+                        and frozenset(
+                            str(post.get("tag_string_character") or "").split()
+                        )
+                        == pure_signature
+                        and not (
+                            kind == "stage"
+                            and {
+                                "school_uniform",
+                                "haneoka_school_uniform",
+                            }
+                            & set(str(post.get("tag_string_general") or "").split())
+                        )
+                    ]
+                if len(refined_samples) >= 3:
+                    break
+            except Exception:
+                continue
+        if len(refined_samples) > profile.focused_posts:
+            profile = _build_variant_outfit_profile(
+                refined_samples,
+                sample_mode=(
+                    "stage_single_character_anchor"
+                    if kind == "stage"
+                    else "single_character_anchor"
+                ),
+                total_posts=len(post_samples),
+            )
+    cache[cache_key] = (time.monotonic(), profile)
+    return profile
+
+
+def fetch_variant_outfit_tags(
+    canonical_tag: str,
+    *,
+    timeout: float,
+    user_agent: str,
+    cache: dict[str, Any],
+    outfit_kind: str = "default",
+    donmai_base_urls: tuple[str, ...] = DEFAULT_DONMAI_BASE_URLS,
+) -> tuple[str, ...]:
+    """Compatibility wrapper returning tags from the evidence-backed profile."""
+    return fetch_variant_outfit_profile(
+        canonical_tag,
+        outfit_kind=outfit_kind,
+        timeout=timeout,
+        user_agent=user_agent,
+        cache=cache,
+        donmai_base_urls=donmai_base_urls,
+    ).tags
 
 
 def _fetch_tag_records(

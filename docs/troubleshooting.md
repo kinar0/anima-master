@@ -53,3 +53,34 @@
 联网搜索需要 AstrBot 全局 Tavily key。
 
 搜索失败会自动降级，不会中断生图。
+
+## 生图提示“LLM 返回为空”/“empty_llm_response”
+
+提示词构建 LLM 返回空内容时，插件**不会**再把你的中文原文直接丢给 ComfyUI，
+而是先做一次“关闭深度思考”的降级重试；若仍为空，则中止本次生成并返回
+`empty_llm_response`。这是为了防止中文原文被当作 Danbooru 标签导致生图失败。
+
+常见成因：
+
+- **深度思考占满 token 预算**：开启深度思考时，思考模型可能把全部
+  `prompt_builder_max_tokens`（默认 1000）消耗在思考链上，没有留下可见输出。
+  插件现在会自动关闭深度思考重试一次。
+- **思考链卡在 `Count` 决策上**：实测日志里思考模型会反复核算
+  `Count` 与 `Characters` 是否一致（例如“如果我们写 Characters: ... 就重复了”），
+  在输出阶段前耗尽 token 而被截断。为此内置模板把 `Count` 改成“一步查表”
+  决策（`Count` 人数直接等于 `Characters` 项数，扶她计入女生人数），并禁止
+  反复核算；系统提示词同步强化了这一规则。
+- **回复内容不在 `completion_text` 字段**：部分提供商会把可见回答放在
+  `reasoning_content`、`content`、`messages` 等字段。插件已兼容这些常见字段。
+- **上游服务波动**：LLM 服务超时、限流或异常返回空串。可稍后重试。
+
+处理建议：
+
+- 适当调大 `prompt_builder_max_tokens`（如 1500-2000），给深度思考留出输出余量。
+- 检查所选模型是否支持深度思考；不支持时建议关闭
+  `prompt_builder_deep_thinking_enabled`。
+- 即使 LLM 输出的 `Count` 与 `Characters` 不一致，单人结构化路径也会用
+  角色清单的长度做确定性兜底，把错误人数 tag 替换为 `Npeople` 后继续，
+  不会再把错误的 `2girls, futanari` 折叠成缺少人数锚点的 `futa with female`。
+- 若问题持续，把日志中 `prompt builder LLM returned empty content` 附近的内容
+  提供给作者排查。

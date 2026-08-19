@@ -86,6 +86,28 @@ def test_advanced_example_uses_the_builtin_template() -> None:
     assert json.loads(semantic_match.group(1)) == DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
 
 
+def test_wardrobe_plugin_page_and_mapping_config_are_packaged() -> None:
+    schema = json.loads((PLUGIN_DIR / "_conf_schema.json").read_text(encoding="utf-8"))
+    tag_lookup = schema["anima_master_tag_lookup"]["items"]
+    page_root = PLUGIN_DIR / "pages" / "wardrobe"
+    chinese_i18n = json.loads(
+        (PLUGIN_DIR / ".astrbot-plugin" / "i18n" / "zh-CN.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert tag_lookup["danbooru_named_outfit_mappings"]["default"] == [
+        "月之森校服=tsukinomori_school_uniform"
+    ]
+    assert tag_lookup["danbooru_term_mappings"]["default"] == []
+    assert (page_root / "index.html").is_file()
+    assert (page_root / "style.css").is_file()
+    app_script = (page_root / "app.js").read_text(encoding="utf-8")
+    assert 'bridge.apiGet("wardrobe")' in app_script
+    assert 'bridge.apiPost("wardrobe/save"' in app_script
+    assert chinese_i18n["pages"]["wardrobe"]["title"] == "服装词库"
+
+
 def test_builtin_template_prioritizes_one_pass_visual_quality() -> None:
     assert "一幅完整、协调、具有视觉吸引力的画面" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "可以自由决定服装细节、姿态、构图、镜头、光影" in (

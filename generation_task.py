@@ -221,9 +221,20 @@ class GenerationTaskRunner:
             self._task_recorder.mark_failure(task, payload["error"])
             self._persist_task(task)
             return payload
-        if multi_person and (
-            not prompt or prompt_summary.get("multi_person_plan_failed")
+        if (
+            prompt_summary.get("skipped_reason") == "empty_llm_response"
+            or not str(prompt or "").strip()
         ):
+            payload = {
+                "ok": False,
+                "error": "empty_llm_response",
+                "task_id": task["task_id"],
+                "llm_error": str(prompt_summary.get("llm_error") or ""),
+            }
+            self._task_recorder.mark_failure(task, payload["error"])
+            self._persist_task(task)
+            return payload
+        if multi_person and prompt_summary.get("multi_person_plan_failed"):
             payload = {
                 "ok": False,
                 "error": "multi_person_plan_failed",

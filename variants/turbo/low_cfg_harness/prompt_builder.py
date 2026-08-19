@@ -9,6 +9,7 @@ try:
         active_artist_tags,
         active_style_tags,
         apply_config_preset,
+        extract_artist_preset_switch,
         selected_fixed_character,
         strip_raw_prefix,
         wants_default_style,
@@ -23,6 +24,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         active_artist_tags,
         active_style_tags,
         apply_config_preset,
+        extract_artist_preset_switch,
         selected_fixed_character,
         strip_raw_prefix,
         wants_default_style,
@@ -57,6 +59,17 @@ def build_final_prompt(
     constraint_plan: PromptConstraintPlan | None = None,
 ) -> PromptBuildResult:
     config = apply_config_preset(config)
+    preset_index = config.pop("_artist_preset_index", None)
+    if preset_index is None:
+        preset_index, user_prompt, switch_error = extract_artist_preset_switch(
+            user_prompt, config
+        )
+        if switch_error is not None:
+            # Fall back to the currently enabled artist tags; the caller is
+            # responsible for surfacing the switch error to the user.
+            preset_index = None
+    else:
+        preset_index = int(preset_index)
     raw_mode, raw_prompt = strip_raw_prefix(user_prompt)
     if raw_mode:
         final = join_prompt_parts([raw_prompt])
@@ -78,7 +91,7 @@ def build_final_prompt(
 
     fixed_character = selected_fixed_character(user_prompt, config)
     use_character = fixed_character is not None
-    artist = active_artist_tags(config)
+    artist = active_artist_tags(config, preset_index)
     style_tags = active_style_tags(config).strip()
     use_style = wants_default_style(user_prompt, bool(artist.strip() or style_tags))
     use_sensual = wants_sensual_mode(user_prompt, config)

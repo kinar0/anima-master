@@ -93,6 +93,8 @@
         "danbooru_core_tag_lookup_enabled",
         "danbooru_semantic_lookup_enabled",
         "danbooru_local_cli_path",
+        "danbooru_named_outfit_mappings",
+        "danbooru_term_mappings",
         "danbooru_tag_base_urls",
         "danbooru_tag_user_agent",
         "danbooru_tag_lookup_timeout",

@@ -9,6 +9,7 @@ from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.event.filter import EventMessageType
 from astrbot.api.star import Context, Star
+from astrbot.api.web import error_response, json_response, request
 from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
@@ -27,6 +28,7 @@ try:
         resolve_chiyo_profile,
     )
     from .service_container import build_services
+    from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from command_router import parse_hard_route
@@ -43,6 +45,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         resolve_chiyo_profile,
     )
     from service_container import build_services
+    from danbooru_resolver import WardrobeValidationError
     from usage_limiter import DailyUsageLimiter
 
 
@@ -76,6 +79,9 @@ class ComfyUIAgentPlugin(Star):
         ):
             config.save_config(replace_config=group_config(raw_config, schema_path))
         self.config = apply_config_preset(raw_config)
+        self._config_store = config
+        self._schema_path = schema_path
+        self._wardrobe_lock = asyncio.Lock()
         self._multi_generation_semaphore = asyncio.Semaphore(
             max(1, self._int("multi_max_concurrent_generations", 1))
         )
@@ -118,6 +124,65 @@ class ComfyUIAgentPlugin(Star):
         self._generation_task = self._services.generation_task
         self._action_handler = self._services.action_handler
         self._llm_tool_bridge = self._services.llm_tool_bridge
+        context.register_web_api(
+            "/astrbot_plugin_anima_master/wardrobe",
+            self.get_wardrobe,
+            ["GET"],
+            "查看 Anima 服装词库",
+        )
+        context.register_web_api(
+            "/astrbot_plugin_anima_master/wardrobe/save",
+            self.save_wardrobe,
+            ["POST"],
+            "保存 Anima 服装词库",
+        )
+
+    @staticmethod
+    def _ensure_dashboard_user() -> None:
+        if not getattr(request, "username", None):
+            raise PermissionError("需要登录 AstrBot WebUI 后才能编辑服装词库。")
+
+    async def get_wardrobe(self):
+        """Return all editable wardrobe collections to the Plugin Page."""
+        try:
+            self._ensure_dashboard_user()
+            return json_response(self._services.danbooru_resolver.wardrobe_snapshot())
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except Exception:
+            logger.exception("服装词库：读取失败")
+            return error_response(
+                "读取服装词库失败，请查看 AstrBot 日志。", status_code=500
+            )
+
+    async def save_wardrobe(self):
+        """Validate, persist, and hot-apply edits from the Plugin Page."""
+        try:
+            self._ensure_dashboard_user()
+            payload = await request.json(default={})
+            async with self._wardrobe_lock:
+                result = self._services.danbooru_resolver.save_wardrobe(payload)
+                resolver_config = self._services.danbooru_resolver._config
+                for key in (
+                    "danbooru_named_outfit_mappings",
+                    "danbooru_term_mappings",
+                ):
+                    self.config[key] = list(resolver_config.get(key, []))
+                if self._config_store is not None:
+                    self._config_store.save_config(
+                        replace_config=group_config(self.config, self._schema_path)
+                    )
+            return json_response({**result, "saved": True})
+        except WardrobeValidationError as exc:
+            status = 409 if "刷新后重试" in str(exc) else 400
+            return error_response(str(exc), status_code=status)
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except Exception:
+            logger.exception("服装词库：保存失败")
+            return error_response(
+                "保存服装词库失败，请查看 AstrBot 日志。", status_code=500
+            )
 
     async def initialize(self):
         img2img_enabled = self._bool("img2img_enabled", False)

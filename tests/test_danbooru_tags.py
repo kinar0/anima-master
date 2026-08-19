@@ -393,6 +393,139 @@ def test_variant_outfit_profile_recovers_specific_low_frequency_slots() -> None:
     ) == ()
 
 
+def test_variant_outfit_fetch_uses_single_character_signature(monkeypatch) -> None:
+    pure_posts = []
+    for index in range(6):
+        tags = {"1girl", "solo", "black_corset"}
+        if index < 5:
+            tags.add("red_shorts")
+        if index < 4:
+            tags.update(("red_thighhighs", "bead_necklace"))
+        if index < 3:
+            tags.add("see-through_sleeves")
+        pure_posts.append(
+            {
+                "tag_string_general": " ".join(tags),
+                "tag_string_character": (
+                    "amoris_(bang_dream!) yuutenji_nyamu"
+                ),
+            }
+        )
+    contaminated_posts = [
+        {
+            "tag_string_general": (
+                "5girls red_shirt black_skirt hair_ribbon black_dress"
+            ),
+            "tag_string_character": (
+                "amoris_(bang_dream!) yuutenji_nyamu "
+                "mortis_(bang_dream!) wakaba_mutsumi"
+            ),
+        }
+        for _index in range(12)
+    ]
+
+    class _Response:
+        status_code = 200
+
+        def json(self):
+            return [*pure_posts, *contaminated_posts]
+
+    monkeypatch.setattr(
+        tags_module.requests,
+        "get",
+        lambda *_args, **_kwargs: _Response(),
+    )
+
+    profile = tags_module.fetch_variant_outfit_profile(
+        "amoris_(bang_dream!)",
+        timeout=2.0,
+        user_agent="test",
+        cache={},
+        donmai_base_urls=("https://example.invalid",),
+    )
+
+    assert profile.sample_mode == "single_character"
+    assert profile.total_posts == 18
+    assert profile.selected_posts == 6
+    assert profile.anchor_tag == "black_corset"
+    assert profile.tags == (
+        "black_corset",
+        "red_shorts",
+        "see-through_sleeves",
+        "bead_necklace",
+        "red_thighhighs",
+    )
+    assert "red_shirt" not in profile.tags
+    assert "black_skirt" not in profile.tags
+
+
+def test_variant_outfit_fetch_refines_small_pure_cluster_by_anchor(monkeypatch) -> None:
+    signature = "amoris_(bang_dream!) yuutenji_nyamu"
+    initial = [
+        {
+            "tag_string_general": "1girl solo black_corset red_shorts",
+            "tag_string_character": signature,
+        }
+        for _index in range(4)
+    ] + [
+        {
+            "tag_string_general": "5girls red_shirt black_skirt hair_ribbon",
+            "tag_string_character": (
+                signature + " mortis_(bang_dream!) wakaba_mutsumi"
+            ),
+        }
+        for _index in range(8)
+    ]
+    refined = []
+    for index in range(10):
+        tags = {"1girl", "solo", "black_corset", "red_shorts"}
+        if index < 6:
+            tags.add("bead_necklace")
+        if index < 2:
+            tags.update(("black_mask", "masquerade_mask"))
+        refined.append(
+            {
+                "tag_string_general": " ".join(tags),
+                "tag_string_character": signature,
+            }
+        )
+
+    class _Response:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    def fake_get(_url, *, params, **_kwargs):
+        payload = refined if " " in params["tags"] else initial
+        return _Response(payload)
+
+    monkeypatch.setattr(tags_module.requests, "get", fake_get)
+
+    profile = tags_module.fetch_variant_outfit_profile(
+        "amoris_(bang_dream!)",
+        timeout=2.0,
+        user_agent="test",
+        cache={},
+        donmai_base_urls=("https://example.invalid",),
+    )
+
+    assert profile.sample_mode == "single_character_anchor"
+    assert profile.selected_posts == 10
+    assert profile.tags == (
+        "black_corset",
+        "red_shorts",
+        "black_mask",
+        "masquerade_mask",
+        "bead_necklace",
+    )
+    assert "red_shirt" not in profile.tags
+    assert "black_skirt" not in profile.tags
+
+
 def test_empty_lookup_cache_expires_quickly(monkeypatch) -> None:
     clock = [100.0]
     calls: list[str] = []

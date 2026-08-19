@@ -92,6 +92,10 @@
   "danbooru_semantic_lookup_enabled": true,
   // 留空时读取 COMFYUI_GOOD_ANIMA_SKILLS_DIR 或 Codex 默认技能目录。
   "danbooru_local_cli_path": "",
+  "danbooru_named_outfit_mappings": [
+    "月之森校服=tsukinomori_school_uniform"
+  ],
+  "danbooru_term_mappings": [],
   "danbooru_tag_base_urls": "https://safebooru.donmai.us,https://danbooru.donmai.us",
   "danbooru_tag_user_agent": "AstrBotAnimaMaster/0.14",
   "danbooru_tag_lookup_timeout": 6.0,
@@ -188,7 +192,7 @@
   "startup_poll_interval": 3,
 
   // 主提示词模板。留空会使用插件内置模板。
-  "prompt_builder_template": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字：\n  `{{Count: 2girls, yuri}}`\n  `{{Characters: chihaya_anon, togawa_sakiko}}`\n  `{{Copyright: bang_dream!}}`\n  `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`\n  `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`\n  `{{Tags: full body, composition, lighting, background, creative visual details}}`\n  `{{Nltags: chihaya_anon and togawa_sakiko ...}}`\n- `Count` 必须含准确的人数 Danbooru tag；一名扶她与一名女性必须写 `futa with female`，禁止写成 `2girls, futanari`（后者会被 Anima 理解为三人）；一名扶她与一名男性使用 `futa with male`。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n用户原始要求：\n{theme}",
+  "prompt_builder_template": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字：\n  `{{Count: 2girls, yuri}}`\n  `{{Characters: chihaya_anon, togawa_sakiko}}`\n  `{{Copyright: bang_dream!}}`\n  `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`\n  `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`\n  `{{Tags: full body, composition, lighting, background, creative visual details}}`\n  `{{Nltags: chihaya_anon and togawa_sakiko ...}}`\n- `Count` 必须与 `Characters` 完全一致，按以下规则一步确定，禁止反复核算或自我怀疑：先在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；不要在 `Count` 里写两个数字相同的人数 tag。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n{character_rule}\n{search_block}\n{outfit_transfer_rule}\n{reference_rule}\n{img2img_rule}\n{sensual_rule}\n\n用户原始要求：\n{theme}",
 
   // 调试项默认关闭。只在排查问题时再开。
   "debug_prompt_enabled": false,

@@ -20,6 +20,7 @@ try:
     from .prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from .prompt_presets import (
         apply_config_preset,
+        extract_artist_preset_switch,
         looks_like_danbooru_tags,
         selected_fixed_character,
         strip_raw_prefix,
@@ -45,6 +46,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from prompt_constraints import build_constraint_plan_prompt, parse_constraint_plan
     from prompt_presets import (
         apply_config_preset,
+        extract_artist_preset_switch,
         looks_like_danbooru_tags,
         selected_fixed_character,
         strip_raw_prefix,
@@ -54,6 +56,75 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from prompt_research import PromptResearcher
     from prompt_templates import build_llm_prompt
     from tag_cleaner import split_tags
+
+
+def _extract_completion_text(response: Any) -> str:
+    """Extract LLM completion text across provider response shapes.
+
+    Reasoning models often leave ``completion_text`` empty while the visible
+    answer lives in a dedicated field (``reasoning_content`` and friends), or
+    the token budget is consumed by the chain of thought entirely.
+
+    Args:
+        response: Object returned by AstrBot ``llm_generate``.
+
+    Returns:
+        Stripped completion text, or an empty string when unavailable.
+    """
+    candidates = (
+        "completion_text",
+        "text",
+        "content",
+        "completion",
+        "answer",
+        "response",
+        "output",
+        "result",
+        "reasoning_content",
+        "reasoning",
+        "thinking_content",
+        "message",
+    )
+    for name in candidates:
+        try:
+            value = getattr(response, name, None)
+        except AttributeError:
+            continue
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        if isinstance(value, list) and value:
+            parts: list[str] = []
+            for item in value:
+                if isinstance(item, str) and item.strip():
+                    parts.append(item.strip())
+                    continue
+                if isinstance(item, dict):
+                    for key in ("text", "content", "message"):
+                        chunk = item.get(key)
+                        if isinstance(chunk, str) and chunk.strip():
+                            parts.append(chunk.strip())
+                elif hasattr(item, "content"):
+                    chunk = getattr(item, "content", None)
+                    if isinstance(chunk, str) and chunk.strip():
+                        parts.append(chunk.strip())
+            if parts:
+                return "\n".join(parts).strip()
+    for name in ("messages", "chain", "choices"):
+        try:
+            chain = getattr(response, name, None)
+        except AttributeError:
+            continue
+        if not isinstance(chain, (list, tuple)) or not chain:
+            continue
+        for item in chain:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+            if isinstance(item, dict):
+                message = item.get("message") or item
+                content = message.get("content") if isinstance(message, dict) else None
+                if isinstance(content, str) and content.strip():
+                    return content.strip()
+    return ""
 
 
 @dataclass(frozen=True)
@@ -173,7 +244,7 @@ class PromptPipeline:
             )
             kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
-        return str(getattr(response, "completion_text", "") or "").strip()
+        return _extract_completion_text(response)
 
     async def _generate_outfit_summary_with_llm(
         self,
@@ -199,7 +270,7 @@ class PromptPipeline:
             )
             kwargs["thinking"] = {"type": "enabled"}
         response = await self.context.llm_generate(**kwargs)
-        return str(getattr(response, "completion_text", "") or "").strip()
+        return _extract_completion_text(response)
 
     async def _generate_constraint_plan_with_llm(
         self,
@@ -217,7 +288,7 @@ class PromptPipeline:
             "max_tokens": 450,
         }
         response = await self.context.llm_generate(**kwargs)
-        return str(getattr(response, "completion_text", "") or "").strip()
+        return _extract_completion_text(response)
 
     async def build(
         self, event: Any, user_prompt: str, mode: str = "txt2img"
@@ -238,6 +309,13 @@ class PromptPipeline:
             "mode": mode,
             "original_prompt_head": self._shorten(prompt, 600),
         }
+        preset_config = apply_config_preset(dict(self.config))
+        preset_index, prompt, switch_error = extract_artist_preset_switch(
+            prompt, preset_config
+        )
+        if switch_error is not None:
+            preset_index = None
+            summary["artist_preset_switch_error"] = switch_error
         if not self._bool("prompt_optimize_enabled", True):
             summary.update(
                 {
@@ -274,7 +352,9 @@ class PromptPipeline:
             )
             return PromptPipelineResult(prompt, summary)
 
-        prompt_config = apply_config_preset(dict(self.config))
+        prompt_config = preset_config
+        if preset_index is not None:
+            prompt_config["_artist_preset_index"] = preset_index
         fixed_character = selected_fixed_character(prompt, prompt_config)
         fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
@@ -405,6 +485,44 @@ class PromptPipeline:
             self.logger.info(
                 "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
             )
+        # An empty completion is not a usable prompt. Retry once without deep
+        # thinking, then abort instead of sending raw user text to ComfyUI.
+        if not str(llm_content or "").strip() and research_plan.use_deep_thinking:
+            self.logger.warning(
+                "[comfyui_agent] prompt builder LLM returned empty content, "
+                "retrying without deep thinking"
+            )
+            try:
+                llm_content = await self._generate_prompt_tags_with_llm(
+                    provider_id=provider_id,
+                    llm_prompt=llm_prompt,
+                    use_deep_thinking=False,
+                    fixed_character=use_fixed_character,
+                    character_name=fixed_character_name,
+                )
+            except Exception as retry_exc:
+                self.logger.warning(
+                    "[comfyui_agent] prompt builder LLM retry failed: %s", retry_exc
+                )
+                llm_error = str(retry_exc)
+                llm_content = ""
+        if not str(llm_content or "").strip():
+            if not llm_error:
+                llm_error = "empty_llm_response"
+            self.logger.warning(
+                "[comfyui_agent] prompt builder LLM returned empty content; "
+                "aborting generation instead of sending raw user text"
+            )
+            summary.update(
+                {
+                    "llm_failed": True,
+                    "llm_error": llm_error,
+                    "skipped_reason": "empty_llm_response",
+                    "final_prompt_head": "",
+                    "final_prompt_chars": 0,
+                }
+            )
+            return PromptPipelineResult("", summary)
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         llm_content = await self._danbooru_resolver.resolve(
             llm_content=llm_content,

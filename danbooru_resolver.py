@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -13,7 +15,7 @@ try:
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
         character_resolution_requested,
-        fetch_variant_outfit_tags,
+        fetch_variant_outfit_profile,
         profile_hints_for_prompt,
         required_core_tags_for_prompt,
         required_profile_tags_for_prompt,
@@ -30,7 +32,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
         character_resolution_requested,
-        fetch_variant_outfit_tags,
+        fetch_variant_outfit_profile,
         profile_hints_for_prompt,
         required_core_tags_for_prompt,
         required_profile_tags_for_prompt,
@@ -57,6 +59,10 @@ class DanbooruResolveOutcome:
     explicit_request: bool = False
 
 
+class WardrobeValidationError(ValueError):
+    """Raised when a visual wardrobe editor payload is unsafe or stale."""
+
+
 class DanbooruResolver:
     """Configuration-aware resolver for Danbooru character core tags."""
 
@@ -69,6 +75,7 @@ class DanbooruResolver:
         get_int: Callable[[str, int], int],
         get_float: Callable[[str, float], float],
         get_str: Callable[[str, str], str],
+        config: dict[str, Any] | None = None,
         profile_cache_path: Path | None = None,
     ):
         """Store Danbooru lookup dependencies.
@@ -87,6 +94,7 @@ class DanbooruResolver:
         self._int = get_int
         self._float = get_float
         self._str = get_str
+        self._config = dict(config or {})
         self._profile_cache_path = profile_cache_path
         self._profile_cache_data: dict[str, Any] | None = None
 
@@ -164,14 +172,319 @@ class DanbooruResolver:
             status="profile_cache",
         )
 
+    def outfit_source_refresh_needed(self, source_text: str) -> bool:
+        """Refresh only absent, legacy, or week-old character outfit evidence."""
+        key = self._profile_alias_key(source_text)
+        profile = self._profile_data().get("profiles", {}).get(key)
+        if not isinstance(profile, dict):
+            return True
+        evidence = profile.get("evidence")
+        if not isinstance(evidence, dict) or evidence.get("algorithm_version") != 4:
+            return True
+        try:
+            updated_at = float(evidence.get("updated_at") or 0.0)
+        except (TypeError, ValueError):
+            return True
+        return time.time() - updated_at >= 7 * 86400
+
+    def cached_named_outfits_for_prompt(
+        self, user_prompt: str
+    ) -> SemanticLookupResult | None:
+        """Return every persisted independent outfit-set explicitly named in a request."""
+        text = str(user_prompt or "").lower()
+        matched: list[str] = [
+            tag
+            for alias, tag in self._configured_named_outfits().items()
+            if alias.lower() in text
+        ]
+        for alias, profile in self._profile_data().get("profiles", {}).items():
+            if not isinstance(profile, dict) or profile.get("kind") != "named_outfit":
+                continue
+            profile_tags = tuple(
+                str(tag).strip().lower()
+                for tag in profile.get("outfit_tags", [])
+                if str(tag).strip()
+            )
+            # Legacy planners could persist the generic alias 校服 ->
+            # school_uniform as though it were an independently named set. Ignore
+            # that poisoned entry so it cannot match every later school request.
+            if set(profile_tags).issubset({"school_uniform", "uniform"}):
+                continue
+            aliases = tuple(
+                dict.fromkeys(
+                    (
+                        str(alias).lower(),
+                        *(
+                            str(value).strip().lower()
+                            for value in profile.get("aliases", [])
+                            if str(value).strip()
+                        ),
+                    )
+                )
+            )
+            if not any(value in text for value in aliases):
+                continue
+            for tag in profile.get("outfit_tags", []):
+                value = str(tag).strip()
+                if value and value not in matched:
+                    matched.append(value)
+        if not matched:
+            return None
+        return SemanticLookupResult(
+            confirmed_tags=tuple(matched),
+            named_outfit_tags=tuple(matched),
+            status="profile_cache",
+        )
+
+    def _configured_named_outfits(self) -> dict[str, str]:
+        """Parse user-defined alias=canonical_tag mappings from plugin config."""
+        return self._configured_mappings("danbooru_named_outfit_mappings")
+
+    def _configured_mappings(self, key: str) -> dict[str, str]:
+        """Parse a bounded config mapping list into normalized aliases and tags."""
+        configured = self._config.get(key, [])
+        pairs: list[tuple[Any, Any]] = []
+        if isinstance(configured, dict):
+            pairs.extend(configured.items())
+        elif isinstance(configured, (list, tuple)):
+            for item in configured:
+                match = re.fullmatch(
+                    r"\s*(.+?)\s*(?:=>|=|＝|→|：|:)\s*(.+?)\s*",
+                    str(item or ""),
+                )
+                if match:
+                    pairs.append((match.group(1), match.group(2)))
+        mappings: dict[str, str] = {}
+        for raw_alias, raw_tag in pairs:
+            alias = str(raw_alias or "").strip().lower()
+            tag = str(raw_tag or "").strip().lower().replace(" ", "_")
+            if not alias or len(alias) > 80:
+                continue
+            if not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", tag):
+                continue
+            mappings[alias] = tag
+        return mappings
+
+    def cached_term_mappings_for_prompt(
+        self, user_prompt: str
+    ) -> SemanticLookupResult | None:
+        """Return user-trusted noun translations explicitly present in a request."""
+        text = str(user_prompt or "").lower()
+        matched = tuple(
+            dict.fromkeys(
+                tag
+                for alias, tag in self._configured_mappings(
+                    "danbooru_term_mappings"
+                ).items()
+                if alias in text
+            )
+        )
+        if not matched:
+            return None
+        return SemanticLookupResult(
+            confirmed_tags=matched,
+            status="profile_cache",
+        )
+
+    @staticmethod
+    def _clean_tag_list(value: Any, *, limit: int = 80) -> list[str]:
+        if not isinstance(value, list) or len(value) > limit:
+            raise WardrobeValidationError("Tag 列表格式无效或数量过多。")
+        cleaned: list[str] = []
+        for item in value:
+            tag = str(item or "").strip().lower().replace(" ", "_")
+            if not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", tag):
+                raise WardrobeValidationError(f"无效的 canonical tag：{item}")
+            if tag not in cleaned:
+                cleaned.append(tag)
+        return cleaned
+
+    @staticmethod
+    def _clean_alias(value: Any, *, label: str = "名称") -> str:
+        alias = re.sub(r"\s+", " ", str(value or "").strip())
+        if not alias or len(alias) > 80 or any(ord(char) < 32 for char in alias):
+            raise WardrobeValidationError(f"{label}为空、过长或含控制字符。")
+        return alias
+
+    def wardrobe_snapshot(self) -> dict[str, Any]:
+        """Return editable outfit profiles, named sets, and noun translations."""
+        profiles = self._profile_data().get("profiles", {})
+        outfits: list[dict[str, Any]] = []
+        learned_sets: list[dict[str, Any]] = []
+        for key, raw in profiles.items():
+            if not isinstance(raw, dict):
+                continue
+            kind = str(raw.get("kind") or "character_outfit")
+            aliases = [
+                str(item).strip()
+                for item in raw.get("aliases", [])
+                if str(item).strip()
+            ]
+            tags = [
+                str(item).strip()
+                for item in raw.get("outfit_tags", [])
+                if str(item).strip()
+            ]
+            if kind == "named_outfit":
+                canonical = tags[0] if tags else ""
+                for alias in aliases or [str(key)]:
+                    learned_sets.append(
+                        {
+                            "alias": alias,
+                            "tag": canonical,
+                            "origin": "learned",
+                            "profileKey": str(key),
+                        }
+                    )
+                continue
+            if not raw.get("source_tags") and not tags:
+                continue
+            evidence = raw.get("evidence") if isinstance(raw.get("evidence"), dict) else {}
+            outfits.append(
+                {
+                    "key": str(key),
+                    "aliases": aliases or [str(key)],
+                    "sourceTags": [
+                        str(item).strip()
+                        for item in raw.get("source_tags", [])
+                        if str(item).strip()
+                    ],
+                    "tags": tags,
+                    "qualifier": "stage" if raw.get("qualifier") == "stage" else "default",
+                    "evidence": {
+                        "sampleMode": str(evidence.get("sample_mode") or ""),
+                        "sampleCount": int(evidence.get("focused_posts") or 0),
+                        "updatedAt": float(evidence.get("updated_at") or 0),
+                    },
+                }
+            )
+        configured_sets = [
+            {"alias": alias, "tag": tag, "origin": "configured", "profileKey": ""}
+            for alias, tag in self._configured_named_outfits().items()
+        ]
+        terms = [
+            {"alias": alias, "tag": tag}
+            for alias, tag in self._configured_mappings("danbooru_term_mappings").items()
+        ]
+        payload = {
+            "outfits": sorted(outfits, key=lambda item: item["key"]),
+            "outfitSets": sorted(
+                configured_sets + learned_sets,
+                key=lambda item: (item["alias"], item["origin"]),
+            ),
+            "terms": sorted(terms, key=lambda item: item["alias"]),
+        }
+        revision = hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        return {**payload, "revision": revision}
+
+    def save_wardrobe(self, payload: Any) -> dict[str, Any]:
+        """Validate and atomically replace editable wardrobe collections."""
+        if not isinstance(payload, dict):
+            raise WardrobeValidationError("请求正文必须是 JSON 对象。")
+        current = self.wardrobe_snapshot()
+        if payload.get("baseRevision") != current["revision"]:
+            raise WardrobeValidationError("服装词库已发生变化，请刷新后重试。")
+        raw_outfits = payload.get("outfits")
+        raw_sets = payload.get("outfitSets")
+        raw_terms = payload.get("terms")
+        if not all(isinstance(value, list) for value in (raw_outfits, raw_sets, raw_terms)):
+            raise WardrobeValidationError("服装词库列表格式无效。")
+        if len(raw_outfits) > 300 or len(raw_sets) > 500 or len(raw_terms) > 500:
+            raise WardrobeValidationError("服装词库条目数量过多。")
+
+        old_profiles = self._profile_data().get("profiles", {})
+        new_profiles: dict[str, Any] = {}
+        seen_keys: set[str] = set()
+        for item in raw_outfits:
+            if not isinstance(item, dict):
+                raise WardrobeValidationError("服装档案条目格式无效。")
+            key = self._profile_alias_key(self._clean_alias(item.get("key"), label="档案名称"))
+            if key in seen_keys:
+                raise WardrobeValidationError(f"重复的服装档案：{key}")
+            seen_keys.add(key)
+            aliases = [self._clean_alias(value, label="档案别名") for value in item.get("aliases", [])]
+            source_tags = self._clean_tag_list(item.get("sourceTags", []), limit=20)
+            tags = self._clean_tag_list(item.get("tags", []), limit=80)
+            qualifier = "stage" if item.get("qualifier") == "stage" else "default"
+            old = old_profiles.get(key) if isinstance(old_profiles.get(key), dict) else {}
+            record: dict[str, Any] = {
+                "kind": "character_outfit",
+                "qualifier": qualifier,
+                "aliases": list(dict.fromkeys(aliases or [key])),
+                "source_tags": source_tags,
+                "copyright_tags": list(old.get("copyright_tags", [])),
+                "outfit_tags": tags,
+            }
+            if isinstance(old.get("evidence"), dict):
+                record["evidence"] = old["evidence"]
+            new_profiles[key] = record
+
+        configured_sets: list[str] = []
+        learned_by_key: dict[str, dict[str, Any]] = {}
+        seen_set_aliases: set[str] = set()
+        for item in raw_sets:
+            if not isinstance(item, dict):
+                raise WardrobeValidationError("服装套组条目格式无效。")
+            alias = self._clean_alias(item.get("alias"), label="套组名称")
+            tag = self._clean_tag_list([item.get("tag")], limit=1)[0]
+            alias_key = alias.lower()
+            if alias_key in seen_set_aliases:
+                raise WardrobeValidationError(f"重复的服装套组名称：{alias}")
+            seen_set_aliases.add(alias_key)
+            if item.get("origin") == "learned" and item.get("profileKey"):
+                profile_key = self._profile_alias_key(item.get("profileKey"))
+                learned = learned_by_key.setdefault(
+                    profile_key,
+                    {
+                        "kind": "named_outfit",
+                        "aliases": [],
+                        "source_tags": [],
+                        "copyright_tags": [],
+                        "outfit_tags": [tag],
+                    },
+                )
+                if learned["outfit_tags"] != [tag]:
+                    raise WardrobeValidationError("同一学习套组的 canonical tag 不一致。")
+                learned["aliases"].append(alias)
+            else:
+                configured_sets.append(f"{alias}={tag}")
+        new_profiles.update(learned_by_key)
+
+        term_entries: list[str] = []
+        seen_terms: set[str] = set()
+        for item in raw_terms:
+            if not isinstance(item, dict):
+                raise WardrobeValidationError("名词翻译条目格式无效。")
+            alias = self._clean_alias(item.get("alias"), label="名词")
+            tag = self._clean_tag_list([item.get("tag")], limit=1)[0]
+            if alias.lower() in seen_terms:
+                raise WardrobeValidationError(f"重复的名词：{alias}")
+            seen_terms.add(alias.lower())
+            term_entries.append(f"{alias}={tag}")
+
+        self._config["danbooru_named_outfit_mappings"] = configured_sets
+        self._config["danbooru_term_mappings"] = term_entries
+        self._profile_cache_data = {"version": 3, "profiles": new_profiles}
+        self._save_profile_data()
+        return self.wardrobe_snapshot()
+
     def remember_outfit_summary(
         self,
         source_text: str,
         source_tags: tuple[str, ...],
         outfit_tags: tuple[str, ...],
+        evidence: dict[str, Any] | None = None,
+        qualifier: str = "default",
     ) -> None:
         """Persist a validated source and its reusable outfit summary."""
-        key = self._profile_alias_key(source_text)
+        qualifier_key = "stage" if qualifier == "stage" else "default"
+        key = self._profile_alias_key(
+            source_text
+            if qualifier_key == "default"
+            else f"{source_text}::{qualifier_key}"
+        )
         if not key or not source_tags:
             return
         copyright_tags: list[str] = []
@@ -181,10 +494,51 @@ class DanbooruResolver:
                 copyright_tags.append(scoped.group(1))
         profiles = self._profile_data().setdefault("profiles", {})
         profiles[key] = {
+            "kind": "character_outfit",
+            "qualifier": qualifier_key,
+            "aliases": [
+                source_text,
+                *(
+                    [f"{source_text}的演出服", f"{source_text} stage outfit"]
+                    if qualifier_key == "stage"
+                    else []
+                ),
+            ],
             "source_tags": list(dict.fromkeys(source_tags)),
             "copyright_tags": copyright_tags,
             "outfit_tags": list(dict.fromkeys(outfit_tags)),
         }
+        if evidence:
+            profiles[key]["evidence"] = {
+                **evidence,
+                "algorithm_version": 4,
+                "updated_at": time.time(),
+            }
+        self._save_profile_data()
+
+    def remember_named_outfit(self, alias: str, canonical_tag: str) -> None:
+        """Persist one screened Danbooru tag representing a complete named outfit set."""
+        key = self._profile_alias_key(alias)
+        tag = str(canonical_tag or "").strip().lower()
+        if (
+            not key
+            or not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", tag)
+            or tag in {"school_uniform", "uniform"}
+        ):
+            return
+        profiles = self._profile_data().setdefault("profiles", {})
+        new_profile = {
+            "kind": "named_outfit",
+            "aliases": list(
+                dict.fromkeys((key, tag, tag.replace("_", " ")))
+            ),
+            "source_tags": [],
+            "copyright_tags": [],
+            "outfit_tags": [tag],
+        }
+        if profiles.get(key) == new_profile:
+            return
+        profiles[key] = new_profile
         self._save_profile_data()
 
     def required_core_tags_for_prompt(self, user_prompt: str) -> tuple[str, ...]:
@@ -230,8 +584,10 @@ class DanbooruResolver:
     ) -> SemanticLookupResult:
         """Run one local batch lookup and expand verified outfit sources."""
         cli_path = self._local_cli_path()
-        if cli_path is None or not anchors:
+        if cli_path is None:
             return SemanticLookupResult(anchors=anchors, status="not_available")
+        if not anchors:
+            return SemanticLookupResult(anchors=anchors, status="empty_plan")
         timeout = max(
             1.0,
             min(self._float("danbooru_tag_lookup_timeout", 6.0), 20.0),
@@ -242,6 +598,26 @@ class DanbooruResolver:
             cli_path=cli_path,
             timeout=timeout,
         )
+        if result.status == "resolved" and result.named_outfit_tags:
+            for anchor in anchors:
+                if anchor.role not in {"outfit", "clothing"}:
+                    continue
+                candidate_keys = {
+                    re.sub(r"\s+", "_", candidate.strip().lower())
+                    for candidate in anchor.candidates
+                }
+                tag = next(
+                    (
+                        item
+                        for item in result.named_outfit_tags
+                        if item.lower() in candidate_keys
+                    ),
+                    "",
+                )
+                if not tag and len(result.named_outfit_tags) == 1:
+                    tag = result.named_outfit_tags[0]
+                if tag:
+                    self.remember_named_outfit(anchor.source_text, tag)
         if result.status != "resolved" or not result.outfit_source_tags:
             return result
         user_agent = (
@@ -249,33 +625,90 @@ class DanbooruResolver:
             or DEFAULT_USER_AGENT
         )
         profiles: list[str] = []
+        scoped_profiles: list[tuple[str, str, tuple[str, ...], str]] = []
+        source_anchors = [
+            anchor for anchor in anchors if anchor.role == "outfit_source"
+        ]
+        used_anchor_ids: set[str] = set()
         for source_tag in result.outfit_source_tags[:2]:
-            tags = await asyncio.to_thread(
-                fetch_variant_outfit_tags,
+            source_key = source_tag.lower()
+            source_anchor = next(
+                (
+                    anchor
+                    for anchor in source_anchors
+                    if anchor.anchor_id not in used_anchor_ids
+                    and any(
+                        candidate.lower() == source_key
+                        for candidate in anchor.candidates
+                    )
+                ),
+                None,
+            )
+            if source_anchor is None:
+                source_anchor = next(
+                    (
+                        anchor
+                        for anchor in source_anchors
+                        if anchor.anchor_id not in used_anchor_ids
+                    ),
+                    None,
+                )
+            if source_anchor is not None:
+                used_anchor_ids.add(source_anchor.anchor_id)
+            source_alias = (
+                source_anchor.source_text
+                if source_anchor is not None
+                else source_tag.split("_(", 1)[0].replace("_", " ")
+            )
+            qualifier_text = (
+                f"{source_anchor.source_text} {source_anchor.description}"
+                if source_anchor is not None
+                else ""
+            )
+            qualifier = (
+                "stage"
+                if re.search(
+                    r"(?:演出服|舞台服|stage outfit|performance outfit|concert outfit)",
+                    qualifier_text,
+                    flags=re.I,
+                )
+                else "default"
+            )
+            profile = await asyncio.to_thread(
+                fetch_variant_outfit_profile,
                 source_tag,
+                outfit_kind=qualifier,
                 timeout=min(2.5, timeout),
                 user_agent=user_agent,
                 cache=self._cache,
                 donmai_base_urls=self._base_urls(),
             )
-            for tag in tags:
+            for tag in profile.tags:
                 if tag not in profiles:
                     profiles.append(tag)
-        resolved = replace(result, outfit_profile_tags=tuple(profiles[:24]))
-        source_alias = next(
-            (
-                anchor.source_text
-                for anchor in anchors
-                if anchor.role == "outfit_source" and anchor.source_text
-            ),
-            "",
-        )
-        if source_alias:
+            scoped_profiles.append(
+                (source_alias, source_tag, profile.tags, qualifier)
+            )
+            profile_evidence = {
+                "sample_mode": profile.sample_mode,
+                "total_posts": profile.total_posts,
+                "selected_posts": profile.selected_posts,
+                "focused_posts": profile.focused_posts,
+                "anchor_tag": profile.anchor_tag,
+                "tag_counts": dict(profile.tag_counts),
+            }
             self.remember_outfit_summary(
                 source_alias,
-                resolved.outfit_source_tags,
-                resolved.outfit_profile_tags,
+                (source_tag,),
+                profile.tags,
+                profile_evidence,
+                qualifier,
             )
+        resolved = replace(
+            result,
+            outfit_profile_tags=tuple(profiles[:48]),
+            source_outfit_profiles=tuple(scoped_profiles),
+        )
         return resolved
 
     async def resolve(

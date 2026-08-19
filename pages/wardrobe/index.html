@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>服装词库</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+    <div class="app-shell">
+      <header class="hero">
+        <div class="hero-copy">
+          <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+          <p class="eyebrow">ANIMA / WARDROBE LIBRARY</p>
+          <h1>服装词库</h1>
+          <p class="lead">管理角色服装档案、独立服装套组，以及中文名词到 Danbooru tag 的翻译。</p>
+        </div>
+        <div class="hero-actions">
+          <div id="connection" class="connection"><i></i><span>正在连接</span></div>
+          <button id="refresh-button" class="button ghost" type="button">刷新</button>
+          <button id="save-button" class="button primary" type="button" disabled>保存更改</button>
+        </div>
+      </header>
+
+      <section class="overview" aria-label="词库概览">
+        <article><span>服装档案</span><strong id="outfit-count">0</strong><small>按角色或来源维护</small></article>
+        <article><span>服装套组</span><strong id="set-count">0</strong><small>完整 canonical anchors</small></article>
+        <article><span>名词翻译</span><strong id="term-count">0</strong><small>中文到 Danbooru tags</small></article>
+        <article class="revision-card"><span>数据状态</span><strong id="data-status">同步中</strong><small id="revision-label">revision —</small></article>
+      </section>
+
+      <main class="library">
+        <div class="library-toolbar">
+          <nav class="tabs" aria-label="词库分类">
+            <button class="tab is-active" data-tab="outfits" type="button"><span>服装档案</span><b id="outfit-badge">0</b></button>
+            <button class="tab" data-tab="outfitSets" type="button"><span>服装套组</span><b id="set-badge">0</b></button>
+            <button class="tab" data-tab="terms" type="button"><span>名词翻译</span><b id="term-badge">0</b></button>
+          </nav>
+          <div class="toolbar-actions">
+            <label class="search"><span aria-hidden="true">⌕</span><input id="search-input" type="search" placeholder="搜索名称、别名或 tag" autocomplete="off" /></label>
+            <button id="add-button" class="button soft" type="button">＋ 新增条目</button>
+          </div>
+        </div>
+
+        <section class="section-intro">
+          <div><p id="section-kicker">OUTFIT PROFILES</p><h2 id="section-title">服装档案</h2></div>
+          <p id="section-description">从角色或服装来源帖子中整理出的可见服饰结构。修改后会直接影响服装迁移。</p>
+        </section>
+
+        <div id="list" class="entry-list"></div>
+        <div id="empty-state" class="empty-state" hidden>
+          <div>✦</div><h3>这里还没有条目</h3><p>新增一条映射，或换一个搜索关键词。</p>
+        </div>
+      </main>
+    </div>
+
+    <div id="dirty-bar" class="dirty-bar" hidden>
+      <span><i></i>有尚未保存的修改</span>
+      <div><button id="discard-button" type="button">放弃</button><button id="dirty-save-button" type="button">立即保存</button></div>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

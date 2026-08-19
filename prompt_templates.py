@@ -25,7 +25,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
   `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
   `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
-- `Count` 必须含准确的人数 Danbooru tag；一名扶她与一名女性必须写 `futa with female`，禁止写成 `2girls, futanari`（后者会被 Anima 理解为三人）；一名扶她与一名男性使用 `futa with male`。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- `Count` 必须与 `Characters` 完全一致，按以下规则一步确定，禁止反复核算或自我怀疑：先在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；不要在 `Count` 里写两个数字相同的人数 tag。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
 - 不要输出 masterpiece、best quality、score 等质量前缀。
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
@@ -75,6 +75,7 @@ LEGACY_BUILTIN_TEMPLATE_HASHES = {
     "f066ab9668b1fec8e9814bab7b98c97640d733fc4adafca35a731636d6a62c88",
     "b0c2da43cb583bc70db1218aa8183e46657668a981cff1c1e912782c067a437a",
     "7d27e4693a6cb355eb4c30e5e268b029402b0c2860bb1f9acba4d86d701c7c62",
+    "32b76edf4da983b6a80a727deb6a592a13a7d880a3ece4df40831c671aaf502b",
 }
 
 

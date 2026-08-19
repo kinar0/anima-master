@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -504,13 +505,82 @@ def active_artist_preset_name(config: dict[str, Any]) -> str:
     return ""
 
 
-def active_artist_tags(config: dict[str, Any]) -> str:
-    """Return artist tags currently used for prompt composition."""
+def artist_preset_list(config: dict[str, Any]) -> list[tuple[str, str]]:
+    """Return ordered artist entries matching the display list order.
+
+    The default artist tags (when non-empty) come first, followed by saved
+    presets sorted by name. This mirrors the ``/anm 查看画师组`` listing and
+    is used to resolve the ``-sN`` switch where N is 1-based.
+    """
+    entries: list[tuple[str, str]] = []
+    default_tags = str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS).strip()
+    if default_tags:
+        entries.append(("默认", default_tags))
+    presets = artist_presets(config)
+    entries.extend((name, presets[name]) for name in sorted(presets))
+    return entries
+
+
+def active_artist_tags(
+    config: dict[str, Any], preset_index: int | None = None
+) -> str:
+    """Return artist tags currently used for prompt composition.
+
+    When ``preset_index`` (1-based) is given, return the Nth artist string
+    from the display-ordered artist list instead of the enabled preset.
+    Out-of-range indexes resolve to an empty string.
+    """
+    if preset_index is not None:
+        entries = artist_preset_list(config)
+        if 1 <= preset_index <= len(entries):
+            return entries[preset_index - 1][1]
+        return ""
     presets = artist_presets(config)
     name = str(config.get("active_artist_preset") or "").strip()
     if name and name in presets:
         return presets[name]
     return str(config.get("default_artist_tags") or DEFAULT_ARTIST_TAGS)
+
+
+_ARTIST_PRESET_SWITCH_RE = re.compile(
+    r"(?<!\S)-[sS](?P<index>\d+)(?=$|\s|[，,；;:：])"
+)
+
+
+def extract_artist_preset_switch(
+    prompt: str, config: dict[str, Any]
+) -> tuple[int | None, str, str | None]:
+    """Extract a ``-sN`` / ``-SN`` artist preset switch from prompt text.
+
+    The switch is detected as a standalone token (leading word boundary) and
+    cleaned away from the prompt, mirroring the existing size-switch handling.
+
+    Returns:
+        Tuple of (1-based preset index, cleaned prompt, user-facing error).
+    """
+    text = str(prompt or "").strip()
+    match = _ARTIST_PRESET_SWITCH_RE.search(text)
+    if not match:
+        return None, text, None
+    raw_index = match.group("index")
+    index = int(raw_index)
+    cleaned = (text[: match.start()] + " " + text[match.end() :]).strip()
+    cleaned = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", cleaned)
+    cleaned = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    if index < 1:
+        return None, cleaned, f"画师组序号 {raw_index} 无效，应为正整数。"
+    entries = artist_preset_list(config)
+    if not entries:
+        return None, cleaned, "当前没有可用的画师串（默认画师 tags 未配置且无已保存画师组）。"
+    if index > len(entries):
+        names = "、".join(name for name, _ in entries)
+        return (
+            None,
+            cleaned,
+            f"画师组序号 {index} 越界：当前共 {len(entries)} 个画师串（{names}）。",
+        )
+    return index, cleaned, None
 
 
 def style_presets(config: dict[str, Any]) -> dict[str, str]:

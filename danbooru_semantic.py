@@ -40,6 +40,7 @@ _ALLOWED_ROLES = {
     "pose",
     "action",
     "clothing",
+    "outfit",
     "accessory",
     "prop",
     "scene",
@@ -66,36 +67,96 @@ class SemanticLookupResult:
     confirmed_tags: tuple[str, ...] = ()
     outfit_source_tags: tuple[str, ...] = ()
     outfit_profile_tags: tuple[str, ...] = ()
+    named_outfit_tags: tuple[str, ...] = ()
+    source_outfit_profiles: tuple[
+        tuple[str, str, tuple[str, ...], str], ...
+    ] = ()
     missing_descriptions: tuple[str, ...] = ()
     candidate_tags: tuple[str, ...] = ()
     anchors: tuple[SemanticAnchor, ...] = ()
     status: str = "not_available"
 
-    def prompt_context(self) -> str:
+    def prompt_context(
+        self,
+        *,
+        include_outfit_source_anchor: bool = True,
+        effective_outfit_tags: tuple[str, ...] = (),
+        removed_outfit_tags: tuple[str, ...] = (),
+    ) -> str:
         """Render verified evidence for the final prompt-writing LLM."""
-        if self.status == "not_available" or not self.anchors:
+        if self.status == "not_available" or (
+            not self.anchors
+            and not self.confirmed_tags
+            and not self.outfit_source_tags
+            and not self.outfit_profile_tags
+            and not self.named_outfit_tags
+            and not self.source_outfit_profiles
+            and not effective_outfit_tags
+        ):
             return ""
         lines = [
             "Local Danbooru validation (authoritative for hard tags):",
             "Use confirmed tags exactly. Do not transliterate missing concepts into invented tags.",
         ]
-        if self.confirmed_tags:
-            lines.append("confirmed hard tags: " + ", ".join(self.confirmed_tags))
+        confirmed = tuple(
+            tag
+            for tag in self.confirmed_tags
+            if include_outfit_source_anchor or tag not in self.outfit_source_tags
+        )
+        if confirmed:
+            lines.append("confirmed hard tags: " + ", ".join(confirmed))
         if self.outfit_source_tags:
-            lines.append(
-                "costume/cosplay source anchors (not extra visible people): "
-                + ", ".join(self.outfit_source_tags)
-            )
-            if not self.outfit_profile_tags:
+            if include_outfit_source_anchor:
                 lines.append(
-                    "The source anchor must still appear in Tags. It is sufficient "
-                    "on its own: do not invent or infer clothing attributes when no "
-                    "post-derived outfit profile is available."
+                    "costume/cosplay source anchors (not extra visible people): "
+                    + ", ".join(self.outfit_source_tags)
                 )
-        if self.outfit_profile_tags:
+                if not self.outfit_profile_tags:
+                    lines.append(
+                        "The source anchor must still appear in Tags. It is sufficient "
+                        "on its own: do not invent or infer clothing attributes when no "
+                        "post-derived outfit profile is available."
+                    )
+            else:
+                lines.append(
+                    "costume source identity (context only; do not emit as a hard tag): "
+                    + ", ".join(self.outfit_source_tags)
+                )
+        visible_outfit_tags = effective_outfit_tags or self.outfit_profile_tags
+        if visible_outfit_tags:
             lines.append(
-                "visible outfit tags extracted from source posts: "
-                + ", ".join(self.outfit_profile_tags)
+                "authoritative visible outfit tags for this request: "
+                + ", ".join(visible_outfit_tags)
+            )
+            lines.append(
+                "Do not add clothing outside this authoritative list. Explicit user "
+                "changes have already been applied to it."
+            )
+        if self.source_outfit_profiles:
+            lines.append("Character-scoped outfit-source profiles (never mix them):")
+            for alias, source_tag, tags, qualifier in self.source_outfit_profiles:
+                label = f"{alias} [{qualifier}]" if qualifier != "default" else alias
+                lines.append(
+                    f"- {label} / {source_tag}: " + ", ".join(tags)
+                )
+        if self.named_outfit_tags:
+            lines.append(
+                "user-requested named outfit-set hard tags: "
+                + ", ".join(self.named_outfit_tags)
+            )
+            lines.append(
+                "Keep each named outfit set on the character explicitly wearing it."
+            )
+            lines.append(
+                "A named outfit-set tag is complete on its own. Do not infer or add "
+                "component garments such as shirt, jacket, skirt, pleated_skirt, "
+                "necktie, hosiery, or shoes unless the user explicitly modifies them "
+                "or an authoritative visible outfit profile lists them."
+            )
+        if removed_outfit_tags:
+            lines.append(
+                "outfit tags explicitly replaced or removed by the user; never restore: "
+                + ", ".join(removed_outfit_tags)
             )
         if self.missing_descriptions:
             lines.append(
@@ -103,6 +164,16 @@ class SemanticLookupResult:
                 + "; ".join(self.missing_descriptions)
             )
         return "\n".join(lines)
+
+    def outfit_tags_for_source(self, source_text: str) -> tuple[str, ...]:
+        """Return only the profile belonging to one requested costume source."""
+        key = re.sub(r"\s+", " ", str(source_text or "").strip().lower())
+        for alias, source_tag, tags, _qualifier in self.source_outfit_profiles:
+            alias_key = re.sub(r"\s+", " ", alias.strip().lower())
+            tag_key = source_tag.split("_(", 1)[0].replace("_", " ").lower()
+            if key and (key in alias_key or alias_key in key or key == tag_key):
+                return tags
+        return ()
 
 
 def build_semantic_plan_prompt(user_prompt: str) -> str:
@@ -119,12 +190,19 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         '"description":"short English visible meaning",'
         '"candidates":["canonical_tag_guess"]}]}\n'
         "Allowed roles: target_character, outfit_source, copyright, appearance, "
-        "expression, pose, action, clothing, accessory, prop, scene, lighting. "
+        "expression, pose, action, clothing, outfit, accessory, prop, scene, lighting. "
         "Allowed groups are the same except target_character/outfit_source use "
         "character and copyright uses series. Use at most 12 anchors and at most "
         "3 candidates per anchor. Candidates are untrusted lookup hints, not "
         "answers. Use lowercase Danbooru spelling with underscores. Do not turn "
-        "an outfit_source into a visible target character. Omit ordinary prose "
+        "an outfit_source into a visible target character. Use role outfit for a "
+        "complete independently named clothing set such as a specific school uniform, "
+        "ceremonial outfit, or named costume; use clothing for individual garments. "
+        "For a proper-name outfit such as XX school uniform, source_text must retain "
+        "the complete proper name from the request and candidates must target that "
+        "specific set; never shorten it to school_uniform or replace it with another "
+        "school's uniform. "
+        "Omit ordinary prose "
         "that does not need a hard tag.\n\n"
         f"User request: {user_prompt}"
     )
@@ -151,6 +229,18 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
         role = str(item.get("role") or "").strip().lower()
         group = str(item.get("group") or "").strip().lower()
         source_text = str(item.get("source_text") or "").strip()
+        if role == "outfit" and source_text in {"校服", "制服"}:
+            # Some planners preserve the outfit role but discard the proper-name
+            # modifier. Recover the complete phrase after an explicit wear verb so
+            # 月之森校服 cannot later be cached globally under the alias "校服".
+            specialized = re.search(
+                r"(?:穿着|身穿|身着|换上|换成)\s*[\"“']?"
+                r"([^，。；;、\s\"”']{2,24}(?:校服|制服))",
+                user_prompt,
+                flags=re.I,
+            )
+            if specialized:
+                source_text = specialized.group(1)
         description = re.sub(r"\s+", " ", str(item.get("description") or "").strip())
         if role not in _ALLOWED_ROLES or group not in _ALLOWED_GROUPS:
             continue
@@ -320,6 +410,38 @@ def lookup_semantic_anchors(
     inferred_series_tags: list[str] = []
     candidates: list[str] = []
     fallback_candidates: dict[int, tuple[str, int]] = {}
+    named_outfit_by_anchor: dict[int, str] = {}
+
+    def is_specific_school_uniform(anchor: SemanticAnchor) -> bool:
+        source = re.sub(r"[\s\"“”'‘’]+", "", anchor.source_text).lower()
+        if not re.search(r"(?:校服|制服|schooluniform)$", source, flags=re.I):
+            return False
+        modifier = re.sub(
+            r"(?:校服|制服|schooluniform)$", "", source, flags=re.I
+        ).strip()
+        return len(modifier) >= 2
+
+    def outfit_tag_has_required_specificity(
+        anchor: SemanticAnchor, tag: str
+    ) -> bool:
+        tag_key = re.sub(r"[^a-z0-9]+", "_", tag.lower()).strip("_")
+        if is_specific_school_uniform(anchor) and tag_key in {
+            "school_uniform",
+            "uniform",
+        }:
+            return False
+        return True
+
+    def is_named_outfit_anchor(anchor: SemanticAnchor, tag: str) -> bool:
+        tag_key = re.sub(r"[^a-z0-9]+", "_", tag.lower()).strip("_")
+        return outfit_tag_has_required_specificity(anchor, tag) and (
+            anchor.role == "outfit" or bool(
+            anchor.role == "clothing"
+            and tag_key.endswith("_uniform")
+            and re.search(r"(?:校服|制服|uniform)", anchor.source_text, flags=re.I)
+            )
+        )
+
     for query_id, result in results.items():
         mapping = query_map.get(str(query_id))
         if not isinstance(result, dict):
@@ -340,9 +462,21 @@ def lookup_semantic_anchors(
                 anchor_index not in confirmed_by_anchor
                 or candidate_index == 0
             ):
-                tag = str(records[0].get("tag") or "").strip()
+                tag = next(
+                    (
+                        str(record.get("tag") or "").strip()
+                        for record in records
+                        if outfit_tag_has_required_specificity(
+                            anchors[anchor_index],
+                            str(record.get("tag") or "").strip(),
+                        )
+                    ),
+                    "",
+                )
                 if tag:
                     confirmed_by_anchor[anchor_index] = tag
+                    if is_named_outfit_anchor(anchors[anchor_index], tag):
+                        named_outfit_by_anchor[anchor_index] = tag
         raw_candidates = result.get("candidate_tags")
         if isinstance(raw_candidates, dict):
             for values in raw_candidates.values():
@@ -354,19 +488,40 @@ def lookup_semantic_anchors(
                     tag = str(record.get("tag") or "").strip()
                     if tag and tag not in candidates:
                         candidates.append(tag)
-                    if not tag or not is_fallback:
-                        continue
                     anchor = anchors[anchor_index]
-                    if anchor.group != "character":
-                        continue
-                    query_key = re.sub(r"[^a-z0-9]+", "_", query_phrase.lower()).strip("_")
-                    tag_key = tag.lower()
-                    if tag_key != query_key and not tag_key.startswith(query_key + "_("):
-                        continue
+                    tag_key = re.sub(r"[^a-z0-9]+", "_", tag.lower()).strip("_")
+                    query_key = re.sub(
+                        r"[^a-z0-9]+", "_", query_phrase.lower()
+                    ).strip("_")
                     try:
                         count = int(record.get("count") or 0)
                     except (TypeError, ValueError):
                         count = 0
+                    match_layer = str(record.get("match_layer") or "").strip()
+                    source_category = str(
+                        record.get("source_category") or record.get("category") or ""
+                    ).strip()
+                    # The local index classifies many canonical clothing-set tags as
+                    # general tags.  They therefore arrive as candidates even when
+                    # their spelling exactly matches the planner's explicit lookup.
+                    # Promote only a high-evidence, user-requested complete ensemble;
+                    # ordinary garments and fuzzy candidates remain non-authoritative.
+                    if (
+                        is_named_outfit_anchor(anchor, tag)
+                        and tag_key == query_key
+                        and match_layer == "group_general_fallback"
+                        and source_category == "general"
+                        and count >= 10
+                    ):
+                        confirmed_by_anchor[anchor_index] = tag
+                        named_outfit_by_anchor[anchor_index] = tag
+                        continue
+                    if not tag or not is_fallback:
+                        continue
+                    if anchor.group != "character":
+                        continue
+                    if tag_key != query_key and not tag_key.startswith(query_key + "_("):
+                        continue
                     previous = fallback_candidates.get(anchor_index)
                     if previous is None or count > previous[1]:
                         fallback_candidates[anchor_index] = (tag, count)
@@ -445,6 +600,7 @@ def lookup_semantic_anchors(
         "outfit_source": 1,
         "copyright": 2,
         "clothing": 3,
+        "outfit": 3,
         "appearance": 4,
         "accessory": 5,
         "prop": 6,
@@ -480,8 +636,48 @@ def lookup_semantic_anchors(
     return SemanticLookupResult(
         confirmed_tags=tuple(confirmed_tags),
         outfit_source_tags=tuple(source_tags),
+        named_outfit_tags=tuple(
+            dict.fromkeys(named_outfit_by_anchor.values())
+        ),
         missing_descriptions=tuple(missing),
         candidate_tags=tuple(candidates[:12]),
         anchors=anchors,
         status="resolved",
+    )
+
+
+def merge_semantic_results(
+    *results: SemanticLookupResult | None,
+) -> SemanticLookupResult:
+    """Merge cache and request lookup evidence without letting either shadow the other."""
+    present = tuple(result for result in results if result is not None)
+    if not present:
+        return SemanticLookupResult()
+
+    def merged(field: str) -> tuple[Any, ...]:
+        return tuple(
+            dict.fromkeys(
+                item
+                for result in present
+                for item in getattr(result, field, ())
+            )
+        )
+
+    statuses = tuple(result.status for result in present if result.status)
+    if "resolved" in statuses:
+        status = "resolved"
+    elif "profile_cache" in statuses:
+        status = "profile_cache"
+    else:
+        status = statuses[-1] if statuses else "not_available"
+    return SemanticLookupResult(
+        confirmed_tags=merged("confirmed_tags"),
+        outfit_source_tags=merged("outfit_source_tags"),
+        outfit_profile_tags=merged("outfit_profile_tags"),
+        named_outfit_tags=merged("named_outfit_tags"),
+        source_outfit_profiles=merged("source_outfit_profiles"),
+        missing_descriptions=merged("missing_descriptions"),
+        candidate_tags=merged("candidate_tags"),
+        anchors=merged("anchors"),
+        status=status,
     )

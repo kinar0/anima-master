@@ -139,6 +139,16 @@ MULTI_CHARACTER_BLOCKLIST = {
     "clone",
     "duplicate",
     "twins",
+    # Futa pair tags encode a two-person relationship, not a lone futa
+    # identity.  They must be dropped from single-character content streams
+    # exactly like `2girls`, while `futanari` / `1futanari` (a lone futa)
+    # stay in the identity path and are never filtered here.
+    "futa with female",
+    "futa with male",
+    "female with futa",
+    "female with futanari",
+    "male with futa",
+    "male with futanari",
 }
 
 NON_VISUAL_TAGS = {

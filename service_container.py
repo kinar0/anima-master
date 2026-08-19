@@ -220,6 +220,7 @@ def build_services(
         get_int=get_int,
         get_float=get_float,
         get_str=get_str,
+        config=config,
     )
     prompt_researcher = PromptResearcher(
         context=context,

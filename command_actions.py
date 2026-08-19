@@ -19,7 +19,9 @@ try:
     from .prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
+        apply_config_preset,
         artist_presets,
+        extract_artist_preset_switch,
         fixed_character_tags,
         merge_tag_text,
     )
@@ -38,7 +40,9 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
+        apply_config_preset,
         artist_presets,
+        extract_artist_preset_switch,
         fixed_character_tags,
         merge_tag_text,
     )
@@ -395,6 +399,11 @@ class CommandActionHandler:
         if action == "generate":
             if not prompt:
                 return "请在后面写完整 prompt 或 tags。"
+            _, _, preset_error = extract_artist_preset_switch(
+                prompt, apply_config_preset(dict(self.config))
+            )
+            if preset_error:
+                return preset_error
             prompt, size, size_error = parse_generation_size(
                 prompt,
                 allowed_sizes(self.config, DEFAULT_GENERATION_SIZES),
@@ -417,6 +426,11 @@ class CommandActionHandler:
                     "/anm 多人 左边若叶睦抱着吉他，右边千早爱音牵着她的手"
                 )
             sizes = allowed_sizes(self.config, DEFAULT_GENERATION_SIZES)
+            _, _, preset_error = extract_artist_preset_switch(
+                prompt, apply_config_preset(dict(self.config))
+            )
+            if preset_error:
+                return preset_error
             prompt, size, size_error = parse_generation_size(prompt, sizes)
             if size_error:
                 return size_error

@@ -157,7 +157,7 @@ Return JSON only with this exact shape:
 
 Rules:
 - Include exactly 2 to 4 character objects.
-- count_tags must agree with the number and genders requested by the user. For one futa and one female, use only "futa with female" instead of "2girls" plus "futanari", because Anima interprets the latter as three people. For one futa and one male, use "futa with male".
+- count_tags must agree with the number and genders requested by the user. Anima counts a futa inside the girls count: one female plus one futa is ["2girls", "futa with female"], two females plus one futa is ["3girls", "futa with female"], a lone futa is ["1girl", "futanari"], and one futa plus one male is ["futa with male"]. Never write "futanari" without a matching girls count.
 - common_tags contain only shared scene, framing, camera, lighting, atmosphere, and count tags.
 - background_mode must be explicit_scene only when the user explicitly requests a location, environment, weather scene, or background. Otherwise it must be default_portrait and common_tags must use full body, centered, simple background, and white background without inventing a location.
 - relationship_tag is one short Danbooru-style relationship or action tag and appears immediately after the count tags in the final prompt.

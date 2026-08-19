@@ -1,5 +1,7 @@
 name: astrbot_plugin_anima_master
 display_name: Anima 绘图大师（本地定制版）
 desc: 将 AstrBot 连接到本地 ComfyUI / Anima 工作流，提供生图、提示词优化、法术解析和图片反推能力。
+short_desc: 本地 Anima 生图、提示词与服装词库管理。
 version: "0.8.0+local"
 author: Local customization based on YayiMiko
+astrbot_version: ">=4.24.2"

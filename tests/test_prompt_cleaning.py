@@ -51,6 +51,34 @@ def test_explicit_multi_character_request_keeps_multi_character_tags() -> None:
     assert "holding hands" in result.content_tags
 
 
+def test_single_character_cleaning_drops_futa_pair_tags_but_keeps_futanari() -> None:
+    result = build_final_prompt(
+        user_prompt="单角色",
+        llm_content=(
+            "2girls, futa with female, futanari, silver hair, standing"
+        ),
+        config=_config(),
+    )
+
+    # A futa pair tag is a two-person relationship anchor and must not leak
+    # into a single-character stream; a lone `futanari` identity stays.
+    assert "futa with female" not in result.content_tags
+    assert "2girls" not in result.content_tags
+    assert "futanari" in result.content_tags
+    assert "silver hair" in result.content_tags
+
+
+def test_multi_character_cleaning_keeps_futa_pair_tags() -> None:
+    result = build_final_prompt(
+        user_prompt="一名扶她和一名女性，双人",
+        llm_content="futa with female, 2girls, silver hair, black hair",
+        config=_config(),
+    )
+
+    assert "futa with female" in result.content_tags
+    assert "2girls" in result.content_tags
+
+
 def test_content_cleaning_uses_default_content_tag_limit() -> None:
     tags = ", ".join(f"visual detail {index}" for index in range(150))
 

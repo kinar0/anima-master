@@ -254,6 +254,484 @@ class OutfitTransferContext:
     forbidden_identity_features: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class UserOutfitPatch:
+    """One explicit, request-scoped change to a source outfit."""
+
+    subject: str
+    operation: str
+    slot: str
+    value: str = ""
+    evidence: str = ""
+
+
+@dataclass(frozen=True)
+class EffectiveOutfitPlan:
+    """Source outfit after applying explicit user changes for this request."""
+
+    subject: str = ""
+    base_tags: tuple[str, ...] = ()
+    effective_tags: tuple[str, ...] = ()
+    removed_tags: tuple[str, ...] = ()
+    added_tags: tuple[str, ...] = ()
+    forbidden_slots: tuple[str, ...] = ()
+    patches: tuple[UserOutfitPatch, ...] = ()
+
+    @property
+    def modified(self) -> bool:
+        return bool(self.patches)
+
+    @property
+    def has_destructive_override(self) -> bool:
+        return any(patch.operation in {"remove", "replace"} for patch in self.patches)
+
+
+_COLOR_WORDS = {
+    "粉红色": "pink",
+    "粉色": "pink",
+    "红色": "red",
+    "白色": "white",
+    "黑色": "black",
+    "蓝色": "blue",
+    "绿色": "green",
+    "黄色": "yellow",
+    "紫色": "purple",
+    "灰色": "grey",
+    "棕色": "brown",
+    "褐色": "brown",
+    "金色": "gold",
+    "银色": "silver",
+}
+
+_GARMENT_SLOTS = {
+    "上衣": "upper_body.primary",
+    "衬衫": "upper_body.primary",
+    "shirt": "upper_body.primary",
+    "裙子": "lower_body.skirt",
+    "短裙": "lower_body.skirt",
+    "长裙": "lower_body.skirt",
+    "半身裙": "lower_body.skirt",
+    "skirt": "lower_body.skirt",
+    "连衣裙": "one_piece.dress",
+    "礼服": "one_piece.dress",
+    "dress": "one_piece.dress",
+    "外套": "outerwear",
+    "夹克": "outerwear",
+    "大衣": "outerwear",
+    "jacket": "outerwear",
+    "coat": "outerwear",
+    "面具": "face_accessory.mask",
+    "面罩": "face_accessory.mask",
+    "mask": "face_accessory.mask",
+    "手套": "handwear",
+    "gloves": "handwear",
+    "丝袜": "legwear",
+    "连裤袜": "legwear",
+    "裤袜": "legwear",
+    "pantyhose": "legwear",
+    "长筒袜": "legwear",
+    "stockings": "legwear",
+    "鞋": "footwear",
+    "靴子": "footwear",
+    "boots": "footwear",
+}
+
+_COLOR_TAG_WORDS = tuple(
+    dict.fromkeys((*_COLOR_WORDS.values(), "orange", "beige", "navy"))
+)
+
+
+def outfit_tag_slot(tag: str) -> str:
+    """Return the mutable garment slot occupied by one outfit tag."""
+    key = normalize_tag_key(tag)
+    if not key:
+        return ""
+    if "dress" in key or "gown" in key:
+        return "one_piece.dress"
+    if "skirt" in key:
+        return "lower_body.skirt"
+    if any(word in key for word in ("shorts", "pants", "trousers")):
+        return "lower_body.pants"
+    if any(word in key for word in ("panties", "underwear")):
+        return "lower_body.underwear"
+    if any(word in key for word in ("pantyhose", "stocking", "thighhigh", "sock")):
+        return "legwear"
+    if any(word in key for word in ("shirt", "blouse", "top", "bodice")):
+        return "upper_body.primary"
+    if "corset" in key:
+        return "upper_body.corset"
+    if any(word in key for word in ("jacket", "coat", "cloak", "cape")):
+        return "outerwear"
+    if "mask" in key:
+        return "face_accessory.mask"
+    if "glove" in key:
+        return "handwear"
+    if any(word in key for word in ("boot", "shoe", "heel", "mary jane")):
+        return "footwear"
+    if any(word in key for word in ("hair ribbon", "hair ornament", "hairpin", "headdress")):
+        return "hair_accessory"
+    if "ribbon" in key or "bow" in key:
+        return "accessory.ribbon"
+    return ""
+
+
+def _tag_matches_slot(tag: str, slot: str) -> bool:
+    actual = outfit_tag_slot(tag)
+    if slot == "lower_body.all":
+        return actual.startswith("lower_body.") or actual == "legwear"
+    return actual == slot
+
+
+def _character_aliases(name: str) -> tuple[str, ...]:
+    text = str(name or "").strip()
+    aliases = [text] if text else []
+    chinese = re.sub(r"[^\u3400-\u9fff]", "", text)
+    if len(chinese) >= 3:
+        aliases.append(chinese[-2:])
+    return tuple(dict.fromkeys(alias for alias in aliases if alias))
+
+
+def _clause_targets_character(
+    clause: str, target_character: str, known_character_names: tuple[str, ...]
+) -> bool:
+    mentioned: set[str] = set()
+    for name in known_character_names:
+        if any(alias in clause for alias in _character_aliases(name)):
+            mentioned.add(name)
+    if not mentioned:
+        return True
+    return target_character in mentioned
+
+
+def parse_user_outfit_patches(
+    user_prompt: str,
+    target_character: str,
+    *,
+    known_character_names: tuple[str, ...] = (),
+) -> tuple[UserOutfitPatch, ...]:
+    """Extract explicit outfit changes while retaining their source evidence."""
+    if not target_character:
+        return ()
+    names = tuple(dict.fromkeys((*known_character_names, target_character)))
+    garment_pattern = "|".join(
+        sorted((re.escape(name) for name in _GARMENT_SLOTS), key=len, reverse=True)
+    )
+    color_pattern = "|".join(
+        sorted((re.escape(name) for name in _COLOR_WORDS), key=len, reverse=True)
+    )
+    color_after_re = re.compile(
+        rf"(?P<garment>{garment_pattern})(?:的)?(?:颜色)?\s*"
+        rf"(?:改成|换成|变成|设为|是|为)\s*(?P<color>{color_pattern})"
+    )
+    color_before_re = re.compile(
+        rf"(?P<color>{color_pattern})(?:的)?(?P<garment>{garment_pattern})"
+    )
+    remove_re = re.compile(
+        rf"(?:没穿|没有穿|不穿|未穿|脱掉(?:了)?|去掉(?:了)?|不要)\s*(?:着)?(?:任何)?"
+        rf"(?P<garment>{garment_pattern})"
+    )
+    add_re = re.compile(
+        rf"(?:加上|加一件|添加|搭配|再穿|外面穿|戴上)\s*"
+        rf"(?:一件|一条|一个|一双)?\s*(?P<color>{color_pattern})?"
+        rf"(?:的)?(?P<garment>{garment_pattern})"
+    )
+    patches: list[UserOutfitPatch] = []
+    for raw_clause in re.split(r"[，,。；;！？!?\n]+", _directive_text(user_prompt)):
+        clause = raw_clause.strip()
+        if not clause or not _clause_targets_character(clause, target_character, names):
+            continue
+        if re.search(r"下半身(?:什么|任何东西)?都没穿|下半身什么也没穿", clause):
+            patches.append(
+                UserOutfitPatch(
+                    subject=target_character,
+                    operation="remove",
+                    slot="lower_body.all",
+                    value="bottomless",
+                    evidence=clause,
+                )
+            )
+            continue
+        remove_match = remove_re.search(clause)
+        if remove_match:
+            patches.append(
+                UserOutfitPatch(
+                    subject=target_character,
+                    operation="remove",
+                    slot=_GARMENT_SLOTS[remove_match.group("garment")],
+                    evidence=clause,
+                )
+            )
+            continue
+        add_match = add_re.search(clause)
+        if add_match:
+            color_text = add_match.group("color") or ""
+            patches.append(
+                UserOutfitPatch(
+                    subject=target_character,
+                    operation="add",
+                    slot=_GARMENT_SLOTS[add_match.group("garment")],
+                    value=_COLOR_WORDS.get(color_text, ""),
+                    evidence=clause,
+                )
+            )
+            continue
+        color_match = color_after_re.search(clause) or color_before_re.search(clause)
+        if color_match:
+            patches.append(
+                UserOutfitPatch(
+                    subject=target_character,
+                    operation="replace",
+                    slot=_GARMENT_SLOTS[color_match.group("garment")],
+                    value=_COLOR_WORDS[color_match.group("color")],
+                    evidence=clause,
+                )
+            )
+    unique: list[UserOutfitPatch] = []
+    seen: set[tuple[str, str, str]] = set()
+    for patch in patches:
+        key = (patch.operation, patch.slot, patch.value)
+        if key not in seen:
+            seen.add(key)
+            unique.append(patch)
+    return tuple(unique)
+
+
+def _replace_tag_color(tag: str, color: str) -> str:
+    words = normalize_tag_key(tag).split()
+    remaining = [word for word in words if word not in _COLOR_TAG_WORDS]
+    return "_".join((color, *remaining)) if remaining else color
+
+
+def _default_tag_for_patch(patch: UserOutfitPatch) -> str:
+    noun = {
+        "upper_body.primary": "shirt",
+        "lower_body.skirt": "skirt",
+        "one_piece.dress": "dress",
+        "outerwear": "jacket",
+        "face_accessory.mask": "mask",
+        "handwear": "gloves",
+        "legwear": "pantyhose",
+        "footwear": "boots",
+    }.get(patch.slot, "")
+    return "_".join(part for part in (patch.value, noun) if part)
+
+
+def build_effective_outfit_plan(
+    plan: OutfitTransferPlan,
+    *,
+    user_prompt: str,
+    base_tags: tuple[str, ...],
+    known_character_names: tuple[str, ...] = (),
+) -> EffectiveOutfitPlan:
+    """Apply explicit user patches to a verified source-outfit profile."""
+    normalized_base = tuple(dict.fromkeys(tag for tag in base_tags if str(tag).strip()))
+    patches = parse_user_outfit_patches(
+        user_prompt,
+        plan.target_character,
+        known_character_names=known_character_names,
+    )
+    effective = list(normalized_base)
+    removed: list[str] = []
+    added: list[str] = []
+    forbidden_slots: list[str] = []
+    for patch in patches:
+        matching = [tag for tag in effective if _tag_matches_slot(tag, patch.slot)]
+        if patch.operation in {"remove", "replace"}:
+            for tag in matching:
+                effective.remove(tag)
+                if tag not in removed:
+                    removed.append(tag)
+            if patch.slot not in forbidden_slots:
+                forbidden_slots.append(patch.slot)
+        if patch.operation == "replace":
+            color_targets = matching or (_default_tag_for_patch(patch),)
+            for tag in color_targets:
+                replacement = _replace_tag_color(tag, patch.value)
+                if replacement and replacement not in effective:
+                    effective.append(replacement)
+                    added.append(replacement)
+        elif patch.operation == "add":
+            addition = _default_tag_for_patch(patch)
+            if addition and addition not in effective:
+                effective.append(addition)
+                added.append(addition)
+        elif patch.operation == "remove" and patch.value == "bottomless":
+            if "bottomless" not in effective:
+                effective.append("bottomless")
+                added.append("bottomless")
+    return EffectiveOutfitPlan(
+        subject=plan.target_character,
+        base_tags=normalized_base,
+        effective_tags=tuple(effective),
+        removed_tags=tuple(removed),
+        added_tags=tuple(dict.fromkeys(added)),
+        forbidden_slots=tuple(forbidden_slots),
+        patches=patches,
+    )
+
+
+def bind_explicit_outfit_patch_target(
+    plan: OutfitTransferPlan,
+    *,
+    user_prompt: str,
+    known_character_names: tuple[str, ...] = (),
+    fallback_character: str = "",
+) -> OutfitTransferPlan:
+    """Attach standalone clothing changes to their explicitly named character."""
+    if plan.target_character:
+        return plan
+    directive = _directive_text(user_prompt)
+    for name in known_character_names:
+        aliases = _character_aliases(name)
+        if not any(alias in directive for alias in aliases):
+            continue
+        if parse_user_outfit_patches(
+            directive,
+            name,
+            known_character_names=known_character_names,
+        ):
+            return OutfitTransferPlan(
+                enabled=plan.enabled,
+                source_subject=plan.source_subject,
+                target_character=name,
+                source_from_reference=plan.source_from_reference,
+                source_from_search=plan.source_from_search,
+                directive_prompt=plan.directive_prompt,
+            )
+    explicit = re.search(
+        r"(?P<target>[\u3400-\u9fffA-Za-z0-9·_\-]{1,24}?)(?:的)?"
+        r"(?:下半身)?(?:没穿|没有穿|不穿|未穿|脱掉(?:了)?|去掉(?:了)?|不要)",
+        directive,
+    )
+    target = explicit.group("target") if explicit else fallback_character
+    target = re.sub(r"^(?:请画|画出|画|让)", "", str(target or "")).strip()
+    if not target:
+        return plan
+    candidate = OutfitTransferPlan(
+        enabled=plan.enabled,
+        source_subject=plan.source_subject,
+        target_character=target,
+        source_from_reference=plan.source_from_reference,
+        source_from_search=plan.source_from_search,
+        directive_prompt=plan.directive_prompt,
+    )
+    if not parse_user_outfit_patches(
+        directive,
+        target,
+        known_character_names=known_character_names,
+    ):
+        return plan
+    return candidate
+
+
+def rewrite_target_outfit_detail(
+    detail: str, effective_plan: EffectiveOutfitPlan
+) -> str:
+    """Rewrite conflicting clothing prose only inside the target's Details block."""
+    result = str(detail or "").strip()
+    if not result or not effective_plan.modified:
+        return result
+    slot_nouns = {
+        "upper_body.primary": ("shirt", "blouse", "top"),
+        "lower_body.skirt": ("skirt",),
+        "one_piece.dress": ("dress", "gown"),
+        "outerwear": ("jacket", "coat", "cloak", "cape"),
+        "face_accessory.mask": ("mask",),
+        "handwear": ("gloves?",),
+        "legwear": ("pantyhose", "stockings?", "thighhighs?"),
+        "footwear": ("boots?", "shoes?"),
+    }
+    color_words = "|".join(_COLOR_TAG_WORDS)
+    constraints: list[str] = []
+    for patch in effective_plan.patches:
+        nouns = slot_nouns.get(patch.slot, ())
+        if patch.operation == "replace" and nouns:
+            noun_pattern = "|".join(nouns)
+            result = re.sub(
+                rf"\b(?:{color_words})\s+(?P<noun>{noun_pattern})\b",
+                lambda match: f"{patch.value} {match.group('noun')}",
+                result,
+                flags=re.I,
+            )
+            noun = re.sub(r"[?\\]", "", nouns[0])
+            constraint = f"{patch.value} {noun}"
+            if constraint.lower() not in result.lower():
+                constraints.append(constraint)
+        elif patch.operation == "remove":
+            if patch.slot == "lower_body.all":
+                constraints.append("nothing worn on the lower body")
+                continue
+            if nouns:
+                noun_pattern = "|".join(nouns)
+                result = re.sub(
+                    rf"\bwears?\s+(?:an?\s+|the\s+)?(?:{color_words}\s+)?(?:{noun_pattern})\b",
+                    lambda match: "wears no " + re.sub(
+                        r"^(?:wears?\s+)(?:an?\s+|the\s+)?(?:"
+                        + color_words
+                        + r"\s+)?",
+                        "",
+                        match.group(0),
+                        flags=re.I,
+                    ),
+                    result,
+                    flags=re.I,
+                )
+                result = re.sub(
+                    rf"(?:,\s*|\s+and\s+)(?:an?\s+|the\s+)?"
+                    rf"(?:[a-z]+\s+){{0,2}}(?:{noun_pattern})\b",
+                    "",
+                    result,
+                    flags=re.I,
+                )
+                noun = re.sub(r"[?\\]", "", nouns[0])
+                constraint = f"no {noun}"
+                if constraint.lower() not in result.lower():
+                    constraints.append(constraint)
+    if constraints:
+        subject = result.split(None, 1)[0] if result else "the target character"
+        clause = f"{subject} has " + " and ".join(dict.fromkeys(constraints))
+        if clause.lower() not in result.lower():
+            result = f"{result}; {clause}".strip("; ")
+    return result
+
+
+def build_outfit_constraint_narrative(
+    effective_plan: EffectiveOutfitPlan,
+    *,
+    subject: str,
+    source_tags: tuple[str, ...] = (),
+) -> str:
+    """Render explicit user outfit patches without implying extra nudity."""
+    if not effective_plan.modified:
+        return ""
+    display_subject = str(subject or effective_plan.subject or "the target character")
+    source = str(source_tags[0] if source_tags else "source costume").split("_(", 1)[0]
+    source_label = source.replace("_", " ").strip()
+    statements: list[str] = []
+    slot_noun = {
+        "upper_body.primary": "shirt",
+        "lower_body.skirt": "skirt",
+        "one_piece.dress": "dress",
+        "outerwear": "outerwear",
+        "face_accessory.mask": "mask",
+        "handwear": "gloves",
+        "legwear": "legwear",
+        "footwear": "footwear",
+    }
+    for patch in effective_plan.patches:
+        noun = slot_noun.get(patch.slot, "clothing")
+        if patch.operation == "replace":
+            statements.append(
+                f"{display_subject} wears a {patch.value} {noun} as part of the "
+                f"customized {source_label}-inspired outfit."
+            )
+        elif patch.operation == "remove" and patch.slot == "lower_body.all":
+            statements.append(f"{display_subject} wears nothing on the lower body.")
+        elif patch.operation == "remove":
+            statements.append(f"{display_subject} wears no {noun}.")
+    return " ".join(dict.fromkeys(statements))
+
+
 def build_outfit_transfer_context(
     plan: OutfitTransferPlan, *, prompt: str
 ) -> OutfitTransferContext:
@@ -271,7 +749,9 @@ def build_outfit_transfer_context(
 
 
 def detect_outfit_transfer(
-    prompt: str, fixed_character_name: str = ""
+    prompt: str,
+    fixed_character_name: str = "",
+    fixed_character_names: tuple[str, ...] = (),
 ) -> OutfitTransferPlan:
     """Detect the "source outfit -> target character" task pattern."""
     text = str(prompt or "").strip()
@@ -280,9 +760,23 @@ def detect_outfit_transfer(
         return OutfitTransferPlan(directive_prompt=directive)
     if not any(marker in directive for marker in OUTFIT_MARKERS):
         return OutfitTransferPlan(directive_prompt=directive)
-    if not fixed_character_name and not _WEARING_SOURCE_RE.search(directive):
+    if (
+        not fixed_character_name
+        and not fixed_character_names
+        and not _WEARING_SOURCE_RE.search(directive)
+    ):
         return OutfitTransferPlan(directive_prompt=directive)
-    source_subject = _extract_source_subject(directive, fixed_character_name)
+    known_targets = tuple(
+        dict.fromkeys(
+            name
+            for name in (*fixed_character_names, fixed_character_name)
+            if str(name).strip()
+        )
+    )
+    target_character = _extract_target_character(
+        directive, known_targets, fixed_character_name
+    )
+    source_subject = _extract_source_subject(directive, target_character)
     source_from_reference = any(marker in directive for marker in REFERENCE_MARKERS)
     source_from_search = any(marker in directive for marker in SEARCH_MARKERS)
     if not source_subject and not source_from_reference and not source_from_search:
@@ -290,7 +784,7 @@ def detect_outfit_transfer(
     return OutfitTransferPlan(
         enabled=True,
         source_subject=source_subject,
-        target_character=fixed_character_name,
+        target_character=target_character,
         source_from_reference=source_from_reference,
         source_from_search=source_from_search,
         directive_prompt=directive,
@@ -344,14 +838,20 @@ def filter_outfit_tags(text: str, max_tags: int = 48) -> str:
 
 
 def keep_only_verified_outfit_tags(
-    text: str, verified_outfit_tags: tuple[str, ...]
+    text: str,
+    verified_outfit_tags: tuple[str, ...],
+    forbidden_slots: tuple[str, ...] = (),
+    *,
+    strict_allowlist: bool = True,
 ) -> str:
     """Drop LLM-invented clothing while retaining verified outfit evidence."""
     allowed = {normalize_tag_key(tag) for tag in verified_outfit_tags}
     kept: list[str] = []
     for tag in split_tags(text):
         key = normalize_tag_key(tag)
-        if _looks_like_outfit_tag(key) and key not in allowed:
+        if any(_tag_matches_slot(key, slot) for slot in forbidden_slots) and key not in allowed:
+            continue
+        if strict_allowlist and _looks_like_outfit_tag(key) and key not in allowed:
             continue
         kept.append(tag)
     return ", ".join(kept)
@@ -382,18 +882,26 @@ def build_outfit_summary_prompt(
     )
 
 
-def build_outfit_transfer_block(plan: OutfitTransferPlan, outfit_summary: str) -> str:
+def build_outfit_transfer_block(
+    plan: OutfitTransferPlan,
+    outfit_summary: str,
+    effective_plan: EffectiveOutfitPlan | None = None,
+) -> str:
     """Render the prompt-template block for outfit transfer tasks."""
-    if not plan.enabled:
+    effective_plan = effective_plan or EffectiveOutfitPlan()
+    if not plan.enabled and not effective_plan.modified:
         return ""
-    lines = [
-        "-----------",
-        "本次是“来源角色/来源参考 -> 目标固定角色”的服装迁移任务。",
-        f"最终主体必须是固定角色“{plan.target_character or '目标角色'}”。",
-        "来源对象只用于提供服装结构、材质、配色和装饰；不要复制来源对象的角色身份、发色、瞳色、种族、耳朵、尾巴、角、翅膀、年龄感和体型。",
-        "请优先让目标角色穿上来源服装，并保留目标角色自己的身份设定。",
-        "如果资料不足，可以补齐服装细节，但不要擅自换成别的服装主题。",
-    ]
+    lines = ["-----------"]
+    if plan.enabled:
+        lines.extend(
+            [
+                "本次是“来源角色/来源参考 -> 目标固定角色”的服装迁移任务。",
+                f"最终主体必须是固定角色“{plan.target_character or '目标角色'}”。",
+                "来源对象只用于提供服装结构、材质、配色和装饰；不要复制来源对象的角色身份、发色、瞳色、种族、耳朵、尾巴、角、翅膀、年龄感和体型。",
+                "请优先让目标角色穿上来源服装，并保留目标角色自己的身份设定。",
+                "如果资料不足，可以补齐服装细节，但不要擅自换成别的服装主题。",
+            ]
+        )
     if plan.source_subject:
         lines.append(f"来源对象：{plan.source_subject}")
     if outfit_summary:
@@ -404,6 +912,37 @@ def build_outfit_transfer_block(plan: OutfitTransferPlan, outfit_summary: str) -
                 "请优先围绕这份服装摘要生成最终内容 tags，而不是重新发散到来源对象的整套角色设定。",
             ]
         )
+    if effective_plan.modified:
+        if plan.enabled:
+            lines.extend(
+                [
+                    "用户对来源服装作了本次请求级修改；用户修改的优先级高于来源服装摘要。",
+                    "本次唯一有效的服装 tags：",
+                    ", ".join(effective_plan.effective_tags),
+                ]
+            )
+        else:
+            lines.append(
+                "用户明确规定了角色的衣着缺失或修改；只约束被点名的服装槽位，其他衣着不受影响。"
+            )
+        for patch in effective_plan.patches:
+            value = f" -> {patch.value}" if patch.value else ""
+            lines.append(
+                f"用户明确修改：{patch.subject} {patch.operation} {patch.slot}{value}；原文证据：{patch.evidence}"
+            )
+        if effective_plan.removed_tags:
+            lines.append(
+                "已被用户覆盖或删除、禁止恢复的来源 tags："
+                + ", ".join(effective_plan.removed_tags)
+            )
+        if plan.enabled:
+            lines.append(
+                "不要因为来源角色的默认造型而恢复已删除项，也不要添加本次有效服装列表以外的新服装。"
+            )
+        else:
+            lines.append(
+                "不得重新添加用户明确删除的衣物；除非用户同时明确说明，否则不要由此推断 bottomless、nude 或其他额外裸露状态。"
+            )
     return "\n".join(lines)
 
 
@@ -455,6 +994,41 @@ def _extract_source_subject(directive: str, fixed_character_name: str) -> str:
         ):
             return subject
     return ""
+
+
+def _extract_target_character(
+    directive: str,
+    known_targets: tuple[str, ...],
+    fallback: str,
+) -> str:
+    """Bind an outfit transfer to the named wearer instead of config order."""
+    text = str(directive or "")
+    for name in known_targets:
+        for alias in _character_aliases(name):
+            if re.search(
+                rf"{re.escape(alias)}\s*[（(]?\s*(?:正)?(?:穿着|穿上|换上|套着)",
+                text,
+            ):
+                return name
+    for name in known_targets:
+        for alias in _character_aliases(name):
+            if re.search(
+                rf"(?:应用到|穿到|给|为)\s*{re.escape(alias)}|"
+                rf"{re.escape(alias)}(?:身上|身穿)",
+                text,
+            ):
+                return name
+    explicit_wearer = re.search(
+        r"(?P<target>[\u3400-\u9fffA-Za-z0-9·_\-]{1,32})\s*[（(]?\s*"
+        r"(?:正)?(?:穿着|穿上|换上|套着)",
+        text,
+    )
+    if explicit_wearer:
+        target = explicit_wearer.group("target")
+        target = re.sub(r"^(?:请画|画出|画|让)", "", target).strip()
+        if target:
+            return target
+    return fallback or (known_targets[0] if len(known_targets) == 1 else "")
 
 
 def _clean_subject(subject: str) -> str:

@@ -8,10 +8,14 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from outfit_transfer import (
+    build_effective_outfit_plan,
+    build_outfit_constraint_narrative,
     build_outfit_transfer_context,
+    bind_explicit_outfit_patch_target,
     detect_outfit_transfer,
     filter_outfit_tags,
     keep_only_verified_outfit_tags,
+    rewrite_target_outfit_detail,
 )
 
 
@@ -93,3 +97,162 @@ def test_only_post_verified_outfit_tags_survive() -> None:
     )
 
     assert filtered == "black dress, puffy sleeves, black mask, standing"
+
+
+def test_named_wearer_wins_over_unrelated_selected_fixed_character() -> None:
+    plan = detect_outfit_transfer(
+        "丰川祥子穿着oblivionis的衣服，千早爱音穿校服",
+        "千早爱音",
+        ("丰川祥子", "千早爱音"),
+    )
+
+    assert plan.enabled is True
+    assert plan.source_subject == "oblivionis"
+    assert plan.target_character == "丰川祥子"
+
+
+def test_explicit_pink_shirt_replaces_cached_red_shirt() -> None:
+    prompt = "丰川祥子穿着oblivionis的衣服，但上衣是粉色的"
+    transfer = detect_outfit_transfer(
+        prompt,
+        "丰川祥子",
+        ("丰川祥子",),
+    )
+    effective = build_effective_outfit_plan(
+        transfer,
+        user_prompt=prompt,
+        base_tags=(
+            "red_shirt",
+            "black_corset",
+            "black_skirt",
+            "black_mask",
+        ),
+        known_character_names=("丰川祥子",),
+    )
+
+    assert effective.has_destructive_override is True
+    assert "red_shirt" in effective.removed_tags
+    assert "red_shirt" not in effective.effective_tags
+    assert "pink_shirt" in effective.effective_tags
+    assert "black_corset" in effective.effective_tags
+    assert "black_skirt" in effective.effective_tags
+
+    filtered = keep_only_verified_outfit_tags(
+        "red shirt, pink shirt, blue jacket, black skirt, standing",
+        effective.effective_tags,
+        effective.forbidden_slots,
+    )
+    assert filtered == "pink shirt, black skirt, standing"
+
+    detail = rewrite_target_outfit_detail(
+        "togawa_sakiko wears a red shirt and black corset",
+        effective,
+    )
+    assert "pink shirt" in detail
+    assert "red shirt" not in detail
+
+
+def test_no_skirt_removes_only_skirt_layer_without_implying_bottomless() -> None:
+    prompt = "丰川祥子穿着oblivionis的衣服，但丰川祥子下半身没穿裙子"
+    transfer = detect_outfit_transfer(
+        prompt,
+        "丰川祥子",
+        ("丰川祥子",),
+    )
+    effective = build_effective_outfit_plan(
+        transfer,
+        user_prompt=prompt,
+        base_tags=(
+            "red_shirt",
+            "black_corset",
+            "black_skirt",
+            "black_pantyhose",
+            "black_boots",
+        ),
+        known_character_names=("丰川祥子",),
+    )
+
+    assert effective.removed_tags == ("black_skirt",)
+    assert "black_skirt" not in effective.effective_tags
+    assert "black_pantyhose" in effective.effective_tags
+    assert "black_boots" in effective.effective_tags
+    assert "bottomless" not in effective.effective_tags
+
+    narrative = build_outfit_constraint_narrative(
+        effective,
+        subject="togawa sakiko",
+        source_tags=("oblivionis_(bang_dream!)",),
+    )
+    assert narrative == "togawa sakiko wears no skirt."
+    detail = rewrite_target_outfit_detail(
+        "togawa_sakiko wears a red shirt and black skirt",
+        effective,
+    )
+    assert "black skirt" not in detail
+    assert "no skirt" in detail
+
+
+def test_outfit_patch_does_not_leak_to_another_named_character() -> None:
+    prompt = (
+        "丰川祥子穿着oblivionis的衣服，"
+        "千早爱音下半身没穿裙子"
+    )
+    transfer = detect_outfit_transfer(
+        prompt,
+        "千早爱音",
+        ("丰川祥子", "千早爱音"),
+    )
+    effective = build_effective_outfit_plan(
+        transfer,
+        user_prompt=prompt,
+        base_tags=("red_shirt", "black_skirt"),
+        known_character_names=("丰川祥子", "千早爱音"),
+    )
+
+    assert transfer.target_character == "丰川祥子"
+    assert effective.patches == ()
+    assert effective.effective_tags == ("red_shirt", "black_skirt")
+
+
+def test_explicit_outerwear_addition_does_not_replace_inner_shirt() -> None:
+    prompt = "丰川祥子穿着oblivionis的衣服，再穿一件白色外套"
+    transfer = detect_outfit_transfer(prompt, "丰川祥子", ("丰川祥子",))
+    effective = build_effective_outfit_plan(
+        transfer,
+        user_prompt=prompt,
+        base_tags=("red_shirt", "black_skirt"),
+        known_character_names=("丰川祥子",),
+    )
+
+    assert effective.has_destructive_override is False
+    assert effective.removed_tags == ()
+    assert effective.added_tags == ("white_jacket",)
+    assert effective.effective_tags == (
+        "red_shirt",
+        "black_skirt",
+        "white_jacket",
+    )
+
+
+def test_standalone_no_skirt_binds_target_without_enabling_strict_allowlist() -> None:
+    prompt = "丰川祥子下半身没穿裙子"
+    transfer = bind_explicit_outfit_patch_target(
+        detect_outfit_transfer(prompt),
+        user_prompt=prompt,
+    )
+    effective = build_effective_outfit_plan(
+        transfer,
+        user_prompt=prompt,
+        base_tags=(),
+    )
+
+    assert transfer.enabled is False
+    assert transfer.target_character == "丰川祥子"
+    assert effective.forbidden_slots == ("lower_body.skirt",)
+    filtered = keep_only_verified_outfit_tags(
+        "red shirt, black skirt, blue jacket, standing",
+        effective.effective_tags,
+        effective.forbidden_slots,
+        strict_allowlist=False,
+    )
+    assert filtered == "red shirt, blue jacket, standing"

@@ -521,6 +521,367 @@ def test_verified_outfit_nltags_drop_guessed_clothing_prose() -> None:
     )
 
 
+def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
+    class _Response:
+        completion_text = (
+            "{Count: 1girl, solo}\n"
+            "{Characters: togawa_sakiko}\n"
+            "{Copyright: bang_dream!}\n"
+            "{Identity: togawa_sakiko has blue hair and yellow eyes}\n"
+            "{Details: togawa_sakiko wears a red shirt and black skirt}\n"
+            "{Tags: red_shirt, blue_jacket, standing, "
+            "background_mode_default_portrait}\n"
+            "{Nltags: togawa_sakiko wears a red shirt.}"
+        )
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response()
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_outfit_source(self, source):
+            assert source == "oblivionis"
+            return SemanticLookupResult(
+                confirmed_tags=("oblivionis_(bang_dream!)", "bang_dream!"),
+                outfit_source_tags=("oblivionis_(bang_dream!)",),
+                outfit_profile_tags=(
+                    "red_shirt",
+                    "black_corset",
+                    "black_skirt",
+                    "black_mask",
+                    "black_pantyhose",
+                ),
+                status="profile_cache",
+            )
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
+
+    context = _Context()
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    pipeline = PromptPipeline(
+        context=context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+
+    result = asyncio.run(
+        pipeline.build(
+            event,
+            "丰川祥子穿着oblivionis的衣服，但上衣是粉色的",
+        )
+    )
+
+    assert "pink shirt" in result.final_prompt
+    assert "red shirt" not in result.final_prompt
+    assert "blue jacket" not in result.final_prompt
+    assert "black skirt" in result.final_prompt
+    assert "oblivionis (bang dream!)" not in result.final_prompt
+    assert result.summary["outfit_transfer_target"] == "丰川祥子"
+    assert result.summary["outfit_removed_tags"] == ["red_shirt"]
+    assert result.summary["outfit_added_tags"] == ["pink_shirt"]
+    assert result.summary["outfit_source_anchor_emitted"] is False
+    assert "pink_shirt" in context.calls[0]["prompt"]
+    assert "never restore" in context.calls[0]["prompt"]
+
+    no_skirt_context = _Context()
+    no_skirt_pipeline = PromptPipeline(
+        context=no_skirt_context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    no_skirt = asyncio.run(
+        no_skirt_pipeline.build(
+            event,
+            "丰川祥子穿着oblivionis的衣服，但丰川祥子下半身没穿裙子",
+        )
+    )
+
+    assert "black skirt" not in no_skirt.final_prompt
+    assert "black pantyhose" in no_skirt.final_prompt
+    assert "bottomless" not in no_skirt.final_prompt
+    assert "togawa sakiko wears no skirt" in no_skirt.final_prompt
+    assert "oblivionis (bang dream!)" not in no_skirt.final_prompt
+    assert no_skirt.summary["outfit_removed_tags"] == ["black_skirt"]
+
+    standalone_context = _Context()
+    standalone_pipeline = PromptPipeline(
+        context=standalone_context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    standalone = asyncio.run(
+        standalone_pipeline.build(event, "丰川祥子下半身没穿裙子")
+    )
+
+    assert "black skirt" not in standalone.final_prompt
+    assert "red shirt" in standalone.final_prompt
+    assert "blue jacket" in standalone.final_prompt
+    assert "bottomless" not in standalone.final_prompt
+    assert "togawa sakiko wears no skirt" in standalone.final_prompt
+    assert standalone.summary["outfit_transfer"] is False
+
+
+def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [
+                '{"anchors":[{"id":"uniform","role":"outfit",'
+                '"group":"outfit","source_text":"羽丘校服",'
+                '"description":"Haneoka school uniform",'
+                '"candidates":["haneoka_school_uniform"]},'
+                '{"id":"duplicate_source","role":"outfit",'
+                '"group":"outfit","source_text":"oblivionis",'
+                '"description":"outfit belonging to oblivionis",'
+                '"candidates":["oblivionis_outfit"]}]}',
+                (
+                    "{Count: 2girls}\n"
+                    "{Characters: togawa_sakiko, chihaya_anon}\n"
+                    "{Copyright: bang_dream!}\n"
+                    "{Identity: togawa_sakiko has blue hair; "
+                    "chihaya_anon has pink hair}\n"
+                    "{Details: togawa_sakiko wears a red shirt; "
+                    "chihaya_anon wears haneoka school uniform}\n"
+                    "{Tags: red_shirt, haneoka_school_uniform, standing, "
+                    "background_mode_default_portrait}\n"
+                    "{Nltags: Both characters stand together.}"
+                ),
+            ]
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **_kwargs):
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def __init__(self):
+            self.semantic_calls = 0
+
+        def required_core_tags_for_prompt(self, _prompt):
+            return ("togawa_sakiko", "chihaya_anon")
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_outfit_source(self, _source):
+            return SemanticLookupResult(
+                confirmed_tags=("oblivionis_(bang_dream!)", "bang_dream!"),
+                outfit_source_tags=("oblivionis_(bang_dream!)",),
+                outfit_profile_tags=("red_shirt",),
+                status="profile_cache",
+            )
+
+        def cached_named_outfits_for_prompt(self, _prompt):
+            return None
+
+        def outfit_source_refresh_needed(self, _source):
+            return False
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_semantic_anchors(self, anchors):
+            self.semantic_calls += 1
+            assert any(
+                anchor.role == "outfit"
+                and anchor.source_text == "羽丘校服"
+                for anchor in anchors
+            )
+            assert sum(
+                "oblivionis" in anchor.source_text.lower()
+                for anchor in anchors
+            ) == 0
+            return SemanticLookupResult(
+                confirmed_tags=("haneoka_school_uniform",),
+                named_outfit_tags=("haneoka_school_uniform",),
+                status="resolved",
+            )
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content)
+
+    resolver = _Resolver()
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=resolver,
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(
+        pipeline.build(
+            event,
+            "丰川祥子穿着oblivionis的衣服，千早爱音穿着羽丘校服",
+        )
+    )
+
+    assert resolver.semantic_calls == 1
+    assert "red shirt" in result.final_prompt
+    assert "haneoka school uniform" in result.final_prompt
+    assert result.summary["danbooru_semantic_named_outfit_tags"] == [
+        "haneoka_school_uniform"
+    ]
+
+
+def test_cached_named_outfit_is_hard_tag_and_filters_invented_garments() -> None:
+    class _Response:
+        completion_text = (
+            "{Count: 2girls}\n"
+            "{Characters: wakaba_mutsumi, nagasaki_soyo}\n"
+            "{Copyright: bang_dream!}\n"
+            "{Identity: wakaba_mutsumi has green hair; "
+            "nagasaki_soyo has brown hair}\n"
+            "{Details: wakaba_mutsumi wears tsukinomori school uniform; "
+            "nagasaki_soyo wears tsukinomori school uniform}\n"
+            "{Tags: tsukinomori_school_uniform, pleated_skirt, white_shirt, "
+            "hypnosis, dark_bedroom, background_mode_explicit_scene}\n"
+            "{Nltags: Both characters wear Tsukinomori school uniforms.}"
+        )
+
+    class _Context:
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **_kwargs):
+            return _Response()
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ("wakaba_mutsumi", "nagasaki_soyo")
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_named_outfits_for_prompt(self, _prompt):
+            return SemanticLookupResult(
+                confirmed_tags=("tsukinomori_school_uniform",),
+                named_outfit_tags=("tsukinomori_school_uniform",),
+                status="profile_cache",
+            )
+
+        def semantic_lookup_available(self):
+            return False
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content)
+
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(
+        pipeline.build(event, "若叶睦和长崎素世穿着月之森校服，背景为昏暗卧室")
+    )
+
+    assert "tsukinomori school uniform" in result.final_prompt
+    assert "pleated skirt" not in result.final_prompt
+    assert "white shirt" not in result.final_prompt
+    assert "hypnosis" in result.final_prompt
+
+
 def test_named_character_uses_evidence_candidate_and_stable_anchors():
     class _Response:
         def __init__(self, text: str):
@@ -781,7 +1142,9 @@ def test_extract_structured_prompt_normalizes_futa_and_female_count() -> None:
     )
 
     assert characters
-    assert roster_tags == ("futa with female",)
+    # Anima counts the futa inside the girls count, so one female plus one
+    # futa keeps the `2girls` anchor instead of collapsing to a bare pair tag.
+    assert roster_tags == ("2girls", "futa with female")
 
 
 def test_extract_structured_prompt_accepts_canonical_futa_pair_count() -> None:
@@ -796,7 +1159,69 @@ def test_extract_structured_prompt_accepts_canonical_futa_pair_count() -> None:
     )
 
     assert characters
-    assert roster_tags == ("futa with female",)
+    assert roster_tags == ("2girls", "futa with female")
+
+
+def test_extract_structured_prompt_counts_futa_inside_girls_roster() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: 3girls, futa with female}\n"
+        "{Characters: futa_character, female_a, female_b}\n"
+        "{Copyright:}\n"
+        "{Identity: futa_character has silver hair; female_a has black hair; female_b has brown hair}\n"
+        "{Details: futa_character stands; female_a kneels; female_b sits}\n"
+        "{Tags: full body, simple background}\n"
+        "{Nltags: futa_character stands beside female_a and female_b.}"
+    )
+
+    assert characters
+    assert roster_tags == ("3girls", "futa with female")
+
+
+def test_extract_structured_prompt_keeps_lone_futa_as_one_girl() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: 1girl, futanari}\n"
+        "{Characters: futa_character}\n"
+        "{Copyright:}\n"
+        "{Identity: futa_character has silver hair}\n"
+        "{Details: futa_character stands}\n"
+        "{Tags: full body, simple background}\n"
+        "{Nltags: futa_character stands alone.}"
+    )
+
+    assert characters
+    assert roster_tags == ("1girl", "futanari")
+
+
+def test_extract_structured_prompt_keeps_futa_with_male_pair() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: futa with male}\n"
+        "{Characters: futa_character, male_character}\n"
+        "{Copyright:}\n"
+        "{Identity: futa_character has silver hair; male_character has black hair}\n"
+        "{Details: futa_character stands; male_character sits}\n"
+        "{Tags: full body, simple background}\n"
+        "{Nltags: futa_character stands beside male_character.}"
+    )
+
+    assert characters
+    assert roster_tags == ("futa with male",)
+
+
+def test_extract_structured_prompt_mixed_genders_keep_singular_boy() -> None:
+    roster_tags, _, characters, _, _ = extract_structured_prompt(
+        "{Count: 2girls, 1boy, futanari}\n"
+        "{Characters: futa_character, female_character, male_character}\n"
+        "{Copyright:}\n"
+        "{Identity: futa_character has silver hair; female_character has black hair; male_character has brown hair}\n"
+        "{Details: futa_character stands; female_character sits; male_character kneels}\n"
+        "{Tags: full body, simple background}\n"
+        "{Nltags: futa_character stands beside female_character and male_character.}"
+    )
+
+    assert characters
+    # The roster has three people: 1 female + 1 futa + 1 boy.  The `2girls`
+    # count already includes the futa, and the lone boy keeps the singular form.
+    assert roster_tags == ("2girls", "1boy", "futa with female")
 
 
 def test_llm_prompt_uses_configured_seven_field_template_without_english_suffix() -> None:
