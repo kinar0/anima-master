@@ -152,6 +152,18 @@ codex 在本地对 **Anima（astrbot_plugin_anima_master）** 插件的定制主
 2. **生成队列与用量控制**：引入 `usage_limiter.py` 限额机制，精化 `main.py` 的生成队列与投递逻辑。
 3. **ComfyUI 工作流**：运行时与工作流定义、启动/状态相关模块的配合调整。
 4. **测试配套**：为每项功能同步补充了大量单元测试。
-5. **深度思考参数传递的实现有bug**Codex说明这是astrbot源码中含有的问题，需要修改
+5. **深度思考参数传递的实现有bug**Codex说明这是astrbot源码中含有的问题，需要修改：“AstrBot 的插件接口明确承诺支持 OpenAI-compatible **kwargs，见 [context.py (line 195)](C:/Users/69493/.astrbot_launcher/instances/1617d9a4-b150-48c1-a04e-cc719eaf7a73/core/astrbot/core/star/context.py:195)，但 OpenAI Provider 原先接收到参数后，没有把它们放进最终 payload。这确实属于核心 Provider 适配层的漏传，而不是插件没找到开关。”修改目标是“日常提示词优化明确发送 thinking: disabled；关键词触发深度思考时仍会重新开启：[prompt_pipeline.py (line 568)](C:/Users/69493/.astrbot_launcher/instances/1617d9a4-b150-48c1-a04e-cc719eaf7a73/core/data/plugins/astrbot_plugin_anima_master/prompt_pipeline.py:568)
+AstrBot 现在仅透传 max_tokens、thinking、reasoning_effort，没有放开其他参数：[openai_source.py (line 995)](C:/Users/69493/.astrbot_launcher/instances/1617d9a4-b150-48c1-a04e-cc719eaf7a73/core/astrbot/core/provider/sources/openai_source.py:995)”需要注意astrbot源码的修改不在此branch中。
+修改后的文件993-1002行：
+model = model or self.get_model()
+
+        payloads = {"messages": context_query, "model": model}
+        for key in ("max_tokens", "thinking", "reasoning_effort"):
+            if key in kwargs:
+                payloads[key] = kwargs[key]
+
+        self._finally_convert_payload(payloads)
+
+        return payloads, context_query
 
 整体提交风格以 `chore:`（快照/检查点）与 `feat:`（功能）交替出现，共 10 次提交、涉及 90+ 个文件的持续定制开发。最近一次 `0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底，从模板、提示词、解析清洗三层降低模型在 Count 决策上耗尽 token 的概率。
