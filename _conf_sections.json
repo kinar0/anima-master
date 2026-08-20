@@ -23,6 +23,8 @@
         "storage_retention_days",
         "manifest_max_records",
         "poll_interval",
+        "readiness_cache_seconds",
+        "readiness_retry_delay_seconds",
         "auto_start",
         "startup_command",
         "startup_workdir",

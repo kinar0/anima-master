@@ -3,7 +3,7 @@
 > 数据来源：仓库 git 提交历史
 > 分支：`codex/local-anima-custom`
 > 提交作者：`Local AstrBot Customization <local-astrbot@localhost>`
-> 提交总数：10 次
+> 提交总数：11 次
 
 ## 提交概览
 
@@ -19,6 +19,7 @@
 | 2026-08-16 01:51 | `e170475` | feat: refine prompt pipeline and generation queue |
 | 2026-08-18 18:20 | `5921c14` | checkpoint: save current prompt and workflow changes |
 | 2026-08-19 21:24 | `0f6829a` | feat: 更新了大量内容，包括插件自己的标签学习管理页面和人数检测、网络连接等等 |
+| 2026-08-21 | （本次提交） | fix: 防止 ComfyUI API 短暂超时被误报为未启动 |
 
 ## 各提交详细改动
 
@@ -144,6 +145,16 @@
 
 **E. 已清理**：`_head_test_command_router.py`（原 +3）内容是 git 报错文本 `fatal: ambiguous argument ';'`，经查证仅存在于 `0f6829a` 且为新增（`A`），全项目无任何代码引用，是终端命令重定向误创建的意外文件；已用 `git rm` 删除（待下次提交生效）。
 
+### 11. 本次提交 — ComfyUI 短暂 API 超时容错
+
+- 背景：ComfyUI 进程仍在运行时，插件偶发报告“ComfyUI 未启动或无法连接”；数分钟后无需任何操作又能继续生成。历史任务记录已捕捉到根因：`/object_info` 请求触发 `ReadTimeout`，但原逻辑把所有状态检查失败统一映射为 `comfyui_offline`，并丢失原始诊断。
+- `comfyui_startup.py`：状态检查遇到 `api_read_timeout` 时等待后重试一次；若仍超时，则在默认 300 秒内复用最近一次已完整验证的模型能力，避免 API 短暂忙碌直接阻止生成。真实端口拒绝、HTTP 错误等非瞬态故障不走缓存。
+- `agent_tools/comfyui_status.py`：将轻量 `/system_stats` 连通性与较重的 `/object_info` 能力查询拆开；后者超时时仍保留 `comfyui_api_reachable=true`，以区分“服务仍可达但繁忙”和“进程不可达”。
+- `generation_task.py`：失败任务持久化连接问题、提示和原始异常，后续可直接在任务 JSON 中定位。
+- `comfyui_runtime.py`：面向用户的提示将 `api_read_timeout` 表达为“ComfyUI API 暂时无响应”，不再误称为未启动。
+- 配置：新增 `readiness_cache_seconds`（默认 300，可设 0 关闭）和 `readiness_retry_delay_seconds`（默认 2）。
+- 测试：新增 `tests/test_comfyui_readiness.py`，覆盖最近成功状态缓存与 `/object_info` 超时仍保留 API 可达性；相关测试通过（7 passed）。
+
 ## 总结
 
 codex 在本地对 **Anima（astrbot_plugin_anima_master）** 插件的定制主要围绕以下方向：
@@ -153,4 +164,4 @@ codex 在本地对 **Anima（astrbot_plugin_anima_master）** 插件的定制主
 3. **ComfyUI 工作流**：运行时与工作流定义、启动/状态相关模块的配合调整。
 4. **测试配套**：为每项功能同步补充了大量单元测试。
 
-整体提交风格以 `chore:`（快照/检查点）与 `feat:`（功能）交替出现，共 10 次提交、涉及 90+ 个文件的持续定制开发。最近一次 `0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底，从模板、提示词、解析清洗三层降低模型在 Count 决策上耗尽 token 的概率。
+整体提交风格以 `chore:`（快照/检查点）与 `feat:`（功能）交替出现，共 11 次提交、涉及 90+ 个文件的持续定制开发。最近一次 `0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底，从模板、提示词、解析清洗三层降低模型在 Count 决策上耗尽 token 的概率；其后本次提交补足了 ComfyUI API 短暂超时的容错和可诊断性。

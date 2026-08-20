@@ -4,6 +4,7 @@ import asyncio
 import os
 import subprocess
 import sys
+import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,8 @@ class ComfyUIStartupManager:
         self._str = get_str
         self._run_status = run_status
         self._lock = asyncio.Lock()
+        self._last_ready_status: dict[str, Any] = {}
+        self._last_ready_at = 0.0
 
     def is_auto_start_allowed(self, event: Any) -> bool:
         """Return whether the sender may trigger same-machine auto-start.
@@ -79,6 +82,56 @@ class ComfyUIStartupManager:
             and payload.get("clip_available")
             and payload.get("vae_available")
         )
+
+    def _remember_ready(self, status: dict[str, Any]) -> None:
+        """Keep the last fully validated capability check for brief API stalls."""
+        self._last_ready_status = dict(status)
+        self._last_ready_at = time.monotonic()
+
+    def _cached_ready_status(self) -> dict[str, Any] | None:
+        """Return a recent validated status while ComfyUI's API is temporarily busy."""
+        max_age = max(0, self._int("readiness_cache_seconds", 300))
+        if (
+            not self._last_ready_status
+            or max_age <= 0
+            or time.monotonic() - self._last_ready_at > max_age
+        ):
+            return None
+        cached = dict(self._last_ready_status)
+        cached["readiness_source"] = "recent_validated_cache"
+        cached["readiness_cache_age_seconds"] = round(
+            time.monotonic() - self._last_ready_at, 1
+        )
+        return cached
+
+    @staticmethod
+    def _is_transient_api_timeout(status: dict[str, Any]) -> bool:
+        return str(status.get("connection_issue") or "") == "api_read_timeout"
+
+    async def _check_ready(self) -> tuple[bool, dict[str, Any]]:
+        """Check readiness, retrying a busy API before using a recent validation."""
+        status = await self._run_status()
+        if self.is_ready(status):
+            self._remember_ready(status)
+            return True, status
+        if not self._is_transient_api_timeout(status):
+            return False, status
+
+        retry_delay = max(0, self._int("readiness_retry_delay_seconds", 2))
+        if retry_delay:
+            await asyncio.sleep(retry_delay)
+        status = await self._run_status()
+        if self.is_ready(status):
+            self._remember_ready(status)
+            return True, status
+        if self._is_transient_api_timeout(status):
+            cached = self._cached_ready_status()
+            if cached:
+                self.logger.warning(
+                    "[comfyui_agent] ComfyUI capability check timed out; using a recent validated status"
+                )
+                return True, cached
+        return False, status
 
     async def start_comfyui_process(self) -> dict[str, Any]:
         """Start ComfyUI on the same machine as AstrBot.
@@ -161,8 +214,8 @@ class ComfyUIStartupManager:
         Returns:
             Readiness payload used by generation tasks.
         """
-        status = await self._run_status()
-        if self.is_ready(status):
+        ready, status = await self._check_ready()
+        if ready:
             return {"ok": True, "status": status}
         if not self._bool("auto_start", False):
             return {"ok": False, "error": "comfyui_offline", "status": status}
@@ -170,8 +223,8 @@ class ComfyUIStartupManager:
             return {"ok": False, "error": "auto_start_not_permitted", "status": status}
 
         async with self._lock:
-            status = await self._run_status()
-            if self.is_ready(status):
+            ready, status = await self._check_ready()
+            if ready:
                 return {"ok": True, "status": status}
 
             launched = await self.start_comfyui_process()
@@ -184,8 +237,8 @@ class ComfyUIStartupManager:
             last_status: dict[str, Any] = {}
             while asyncio.get_running_loop().time() < deadline:
                 await asyncio.sleep(poll_interval)
-                last_status = await self._run_status()
-                if self.is_ready(last_status):
+                ready, last_status = await self._check_ready()
+                if ready:
                     self.logger.info("[comfyui_agent] auto_start ready")
                     return {"ok": True, "status": last_status}
             return {

@@ -104,6 +104,18 @@
         "hint": "示例：2",
         "collapsed": true
       },
+      "readiness_cache_seconds": {
+        "description": "连接检查缓存（秒）",
+        "type": "int",
+        "default": 300,
+        "hint": "ComfyUI API 短暂忙碌时复用最近一次已验证的模型能力；设为 0 可关闭。"
+      },
+      "readiness_retry_delay_seconds": {
+        "description": "连接检查重试等待（秒）",
+        "type": "int",
+        "default": 2,
+        "hint": "API 读取超时时，等待后重试一次。"
+      },
       "auto_start": {
         "description": "由 AstrBot 启动 ComfyUI",
         "type": "bool",

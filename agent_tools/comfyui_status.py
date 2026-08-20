@@ -86,7 +86,6 @@ def build_status_payload(
     try:
         client = ComfyUIHttpClient(config)
         stats = client.get_json("/system_stats", timeout=10)
-        object_info = client.get_json("/object_info", timeout=20)
         devices = stats.get("devices", []) if isinstance(stats, dict) else []
         device = devices[0] if devices else {}
         payload.update(
@@ -95,6 +94,12 @@ def build_status_payload(
                 "gpu": device.get("name"),
                 "vram_total_mb": int(device.get("vram_total", 0) / 1024 / 1024),
                 "vram_free_mb": int(device.get("vram_free", 0) / 1024 / 1024),
+                "comfyui_api_reachable": True,
+            }
+        )
+        object_info = client.get_json("/object_info", timeout=20)
+        payload.update(
+            {
                 "unet_available": config.get("unet_name")
                 in _available_models(object_info, "UNETLoader", "unet_name"),
                 "clip_available": config.get("clip_name")
@@ -107,7 +112,6 @@ def build_status_payload(
                 ),
                 "upscale_available": "ImageScaleBy" in object_info,
                 "remove_bg_available": "BiRefNetRMBG" in object_info,
-                "comfyui_api_reachable": True,
             }
         )
     except Exception as exc:
@@ -116,7 +120,10 @@ def build_status_payload(
             {
                 "ok": False,
                 "error": f"{type(exc).__name__}: {exc}",
-                "comfyui_api_reachable": False,
+                # /system_stats may already have succeeded. Preserve that
+                # distinction so a slow /object_info is not reported as a
+                # stopped ComfyUI process.
+                "comfyui_api_reachable": bool(payload["comfyui_api_reachable"]),
                 "connection_issue": issue,
                 "connection_hint": hint,
             }
