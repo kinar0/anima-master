@@ -282,6 +282,158 @@ def test_named_outfit_profile_survives_recreation_and_matches_english_alias() ->
     assert cached.named_outfit_tags == ("haneoka_school_uniform",)
 
 
+def test_named_outfit_learning_merges_same_canonical_set_and_ui_shows_one_row() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_named_outfit("羽丘校服", "haneoka_school_uniform")
+        resolver.remember_named_outfit("羽丘学园校服", "haneoka_school_uniform")
+        resolver.remember_named_outfit("羽丘校服", "haneoka_school_uniform")
+
+        snapshot = resolver.wardrobe_snapshot()
+        resolver.save_wardrobe(
+            {
+                "baseRevision": snapshot["revision"],
+                "outfits": snapshot["outfits"],
+                "outfitSets": snapshot["outfitSets"],
+                "terms": snapshot["terms"],
+            }
+        )
+        persisted = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+
+    learned = [
+        item for item in snapshot["outfitSets"] if item["origin"] == "learned"
+    ]
+    stored = [
+        item for item in persisted.values() if item.get("kind") == "named_outfit"
+    ]
+    assert learned == [
+        {
+            "alias": "羽丘校服",
+            "aliases": [
+                "羽丘校服",
+                "羽丘学园校服",
+                "haneoka school uniform",
+            ],
+            "tag": "haneoka_school_uniform",
+            "origin": "learned",
+            "profileKey": "羽丘校服",
+        }
+    ]
+    assert len(stored) == 1
+    assert "羽丘学园校服" in stored[0]["aliases"]
+    assert "haneoka school uniform" in stored[0]["aliases"]
+    assert "haneoka_school_uniform" not in stored[0]["aliases"]
+
+
+def test_configured_named_outfit_ui_groups_chinese_and_english_aliases() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={
+            "danbooru_named_outfit_mappings": [
+                "羽丘校服=haneoka_school_uniform"
+            ]
+        },
+    )
+
+    snapshot = resolver.wardrobe_snapshot()
+    outfit_set = snapshot["outfitSets"][0]
+    english_before_save = resolver.cached_named_outfits_for_prompt(
+        "chihaya anon wears haneoka school uniform"
+    )
+    resolver.save_wardrobe(
+        {
+            "baseRevision": snapshot["revision"],
+            "outfits": [],
+            "outfitSets": snapshot["outfitSets"],
+            "terms": [],
+        }
+    )
+    english = resolver.cached_named_outfits_for_prompt(
+        "chihaya anon wears haneoka school uniform"
+    )
+
+    assert outfit_set["tag"] == "haneoka_school_uniform"
+    assert outfit_set["aliases"] == [
+        "羽丘校服",
+        "haneoka school uniform",
+    ]
+    assert "haneoka_school_uniform" not in outfit_set["aliases"]
+    assert english_before_save is not None
+    assert english_before_save.named_outfit_tags == ("haneoka_school_uniform",)
+    assert resolver._config["danbooru_named_outfit_mappings"] == [
+        "羽丘校服=haneoka_school_uniform",
+        "haneoka school uniform=haneoka_school_uniform",
+    ]
+    assert english is not None
+    assert english.named_outfit_tags == ("haneoka_school_uniform",)
+
+
+def test_wardrobe_snapshot_collapses_legacy_named_outfit_duplicates() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "version": 3,
+                    "profiles": {
+                        "羽丘校服": {
+                            "kind": "named_outfit",
+                            "aliases": ["羽丘校服", "haneoka_school_uniform"],
+                            "outfit_tags": ["haneoka_school_uniform"],
+                        },
+                        "羽丘学园校服": {
+                            "kind": "named_outfit",
+                            "aliases": ["羽丘学园校服", "haneoka school uniform"],
+                            "outfit_tags": ["haneoka_school_uniform"],
+                        },
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+
+        snapshot = resolver.wardrobe_snapshot()
+
+    assert len(snapshot["outfitSets"]) == 1
+    assert snapshot["outfitSets"][0]["tag"] == "haneoka_school_uniform"
+
+
 def test_generic_school_uniform_is_neither_persisted_nor_loaded_as_named_set() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):

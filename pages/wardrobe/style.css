@@ -38,6 +38,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { min-height: 100%; }
 body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.55; }
 button, input, textarea, select { color: inherit; font: inherit; }

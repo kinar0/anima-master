@@ -3,7 +3,7 @@
 > 数据来源：仓库 git 提交历史
 > 分支：`codex/local-anima-custom`
 > 提交作者：`Local AstrBot Customization <local-astrbot@localhost>`
-> 提交总数：11 次
+> 提交总数：13 次（含本次提交）
 
 ## 提交概览
 
@@ -19,7 +19,9 @@
 | 2026-08-16 01:51 | `e170475` | feat: refine prompt pipeline and generation queue |
 | 2026-08-18 18:20 | `5921c14` | checkpoint: save current prompt and workflow changes |
 | 2026-08-19 21:24 | `0f6829a` | feat: 更新了大量内容，包括插件自己的标签学习管理页面和人数检测、网络连接等等 |
-| 2026-08-21 | （本次提交） | fix: 防止 ComfyUI API 短暂超时被误报为未启动 |
+| 2026-08-19 21:42 | `f3b06db` | docs: 记录 LLM 空内容修复与其他 zoo 会话改动，清理误创建文件 |
+| 2026-08-21 03:35 | `b886ca2` | fix: 防止 ComfyUI API 短暂超时被误报为未启动 |
+| 2026-08-21 | （本次提交） | fix: 统一服装套组 canonical tag 与中英文别名并修复 UI 状态 |
 
 ## 各提交详细改动
 
@@ -145,7 +147,12 @@
 
 **E. 已清理**：`_head_test_command_router.py`（原 +3）内容是 git 报错文本 `fatal: ambiguous argument ';'`，经查证仅存在于 `0f6829a` 且为新增（`A`），全项目无任何代码引用，是终端命令重定向误创建的意外文件；已用 `git rm` 删除（待下次提交生效）。
 
-### 11. 本次提交 — ComfyUI 短暂 API 超时容错
+### 11. `f3b06db` — 修改记录补全与意外文件清理
+
+- 补全 `0f6829a` 中 LLM 空内容、Count/futa 规则、服装词库、服装迁移与画师组切换等主题记录。
+- 删除终端重定向误创建且无代码引用的 `_head_test_command_router.py`。
+
+### 12. `b886ca2` — ComfyUI 短暂 API 超时容错
 
 - 背景：ComfyUI 进程仍在运行时，插件偶发报告“ComfyUI 未启动或无法连接”；数分钟后无需任何操作又能继续生成。历史任务记录已捕捉到根因：`/object_info` 请求触发 `ReadTimeout`，但原逻辑把所有状态检查失败统一映射为 `comfyui_offline`，并丢失原始诊断。
 - `comfyui_startup.py`：状态检查遇到 `api_read_timeout` 时等待后重试一次；若仍超时，则在默认 300 秒内复用最近一次已完整验证的模型能力，避免 API 短暂忙碌直接阻止生成。真实端口拒绝、HTTP 错误等非瞬态故障不走缓存。
@@ -154,6 +161,15 @@
 - `comfyui_runtime.py`：面向用户的提示将 `api_read_timeout` 表达为“ComfyUI API 暂时无响应”，不再误称为未启动。
 - 配置：新增 `readiness_cache_seconds`（默认 300，可设 0 关闭）和 `readiness_retry_delay_seconds`（默认 2）。
 - 测试：新增 `tests/test_comfyui_readiness.py`，覆盖最近成功状态缓存与 `/object_info` 超时仍保留 API 可达性；相关测试通过（7 passed）。
+
+### 13. 本次提交 — 服装套组别名模型与 UI 状态修复
+
+- 修复服装词库页面的未保存提示：页面加载、保存或放弃修改后，`hidden` 不再被 `.dirty-bar` 的 `display: flex` 覆盖。
+- 服装套组改为以 canonical tag 唯一标识；相同套组重复自动学习时合并档案与别名，旧重复记录在页面中折叠，并在后续学习或保存时收敛。
+- canonical 下划线 tag 只保存在 tag 字段；别名列表分别保存中文名和空格英文名。运行时任一别名只注入一次 canonical hard tag。
+- 服装套组 UI 增加“触发别名（中文 / 英文）”多值编辑框，一条 canonical tag 对应多个可见、可编辑别名。
+- `wardrobe_snapshot()` 合并手动配置与自动学习的同 tag 条目，手动配置优先，同时保留可用别名。
+- 测试新增自动学习合并、旧数据折叠、中英文别名 UI 往返、重复 hard tag 去重和 `hidden` 样式检查；服装与提示词相关套件 `121 passed`。
 
 ## 总结
 
@@ -164,4 +180,4 @@ codex 在本地对 **Anima（astrbot_plugin_anima_master）** 插件的定制主
 3. **ComfyUI 工作流**：运行时与工作流定义、启动/状态相关模块的配合调整。
 4. **测试配套**：为每项功能同步补充了大量单元测试。
 
-整体提交风格以 `chore:`（快照/检查点）与 `feat:`（功能）交替出现，共 11 次提交、涉及 90+ 个文件的持续定制开发。最近一次 `0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底，从模板、提示词、解析清洗三层降低模型在 Count 决策上耗尽 token 的概率；其后本次提交补足了 ComfyUI API 短暂超时的容错和可诊断性。
+整体提交风格以 `chore:`（快照/检查点）、`feat:`（功能）与 `fix:`（缺陷修复）交替出现，共 13 次提交、涉及 90+ 个文件的持续定制开发。`0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底；后续提交补足了 ComfyUI API 短暂超时容错，并统一了服装套组 canonical tag 与中英文触发别名的存储和 UI 表现。

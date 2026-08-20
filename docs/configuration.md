@@ -91,6 +91,27 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 联网搜索需要 AstrBot 全局 Tavily key。搜索失败会自动降级，不会中断生图。
 
+## 服装词库页面
+
+重载插件后，可以从 AstrBot WebUI 的插件详情页进入“服装词库”。页面提供三个可搜索、可增删改的列表：
+
+- **服装档案**：按角色或服装来源保存经过帖子样本验证的可见服饰结构。
+- **服装套组**：保存独立命名的完整服装套组及其 canonical Danbooru tag。
+- **名词翻译**：把中文服装名词稳定映射到 canonical Danbooru tag。
+
+服装套组以 canonical tag 作为唯一身份，一个套组可以同时维护多个触发别名。例如：
+
+```text
+Canonical Tag: haneoka_school_uniform
+触发别名: 羽丘校服, haneoka school uniform
+```
+
+下划线形式 `haneoka_school_uniform` 只保存在 canonical tag 字段，不会重复写进别名列表；中文名和空格英文名会分别保存并参与匹配。相同 canonical tag 被多次自动学习时会合并为一个套组，新的中文或英文说法并入其别名列表。手动配置与自动学习命中同一 canonical tag 时，页面以手动配置为主并合并可用别名。
+
+页面保存使用 revision 检查，若生成期间词库已被其他请求更新，会要求刷新后重试，避免覆盖新数据。保存成功后配置与运行时缓存立即更新，不需要为每次词库编辑重载插件；只有安装或更新本页代码后需要先重载一次插件。
+
+配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。命名套组的多个别名会分别保存成 `别名=canonical_tag` 映射；推荐日常使用“服装词库”页面，减少格式错误。
+
 ## 角色与画风
 
 - `fixed_characters`：固定角色预设。

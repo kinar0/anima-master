@@ -10,6 +10,20 @@
 
 第一阶段语义规划 LLM 的 system prompt 可以通过 `danbooru_semantic_system_prompt` 修改。该配置只影响查询候选规划，不会替换第二阶段的 `prompt_builder_template`；留空时使用插件内置默认值。
 
+## 命名服装套组与别名
+
+经过本地校验的独立命名服装套组会作为 hard tag 保存。套组使用 canonical Danbooru tag 标识身份，同时保存可供用户输入匹配的中英文别名：
+
+```text
+haneoka_school_uniform
+├─ 羽丘校服
+└─ haneoka school uniform
+```
+
+用户输入任一别名时，最终提示词只注入一次 `haneoka_school_uniform`。下划线 canonical tag 不会再作为一条别名重复保存；它本身仍可直接匹配。多个自动学习结果得到相同 canonical tag 时会合并别名，不会复制出多个套组条目。
+
+命名套组命中后被视为完整服装 anchor。LLM 可以遵循用户明确提出的颜色、增删衣物等修改，但不能自行编造并追加未经验证的套组组成。用户没有要求修改时，应保留 canonical 套组而不展开猜测其中的上衣、裙子或配饰。
+
 ## 默认自由创作
 
 LLM 默认把简短主题发展成统一、完整的角色画面，并按主题需要补充服装、姿态、构图、背景、光影和特效。模板不再要求固定 Tag 数量，以最终画面协调、精致和好看为优先。

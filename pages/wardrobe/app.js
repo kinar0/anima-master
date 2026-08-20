@@ -5,8 +5,8 @@ const demoData = {
     { key: "千早爱音::stage", aliases: ["千早爱音的演出服"], sourceTags: ["chihaya_anon"], tags: ["blue_jacket", "cropped_jacket", "white_skirt", "black_choker"], qualifier: "stage", evidence: { sampleMode: "stage_single_character_anchor", sampleCount: 24 } },
   ],
   outfitSets: [
-    { alias: "月之森校服", tag: "tsukinomori_school_uniform", origin: "configured", profileKey: "" },
-    { alias: "羽丘校服", tag: "haneoka_school_uniform", origin: "learned", profileKey: "羽丘校服" },
+    { alias: "月之森校服", aliases: ["月之森校服", "tsukinomori school uniform"], tag: "tsukinomori_school_uniform", origin: "configured", profileKey: "" },
+    { alias: "羽丘校服", aliases: ["羽丘校服", "haneoka school uniform"], tag: "haneoka_school_uniform", origin: "learned", profileKey: "羽丘校服" },
   ],
   terms: [{ alias: "百褶裙", tag: "pleated_skirt" }, { alias: "舞会面具", tag: "masquerade_mask" }],
 };
@@ -61,7 +61,11 @@ function outfitEntry(item, index) {
 }
 function mappingEntry(item, index, isSet) {
   const card = node("article", "entry");
-  const left = inputField(isSet ? "套组名称 / 触发词" : "中文名词 / 触发词", item.alias, (value) => item.alias = value, { placeholder: isSet ? "月之森校服" : "百褶裙" });
+  const setAliases = item.aliases?.length ? item.aliases : [item.alias].filter(Boolean);
+  const left = isSet
+    ? inputField("触发别名（中文 / 英文）", setAliases.join(", "), (value) => { item.aliases = splitList(value); item.alias = item.aliases[0] || ""; }, { textarea: true, placeholder: "羽丘校服, haneoka school uniform" })
+    : inputField("中文名词 / 触发词", item.alias, (value) => item.alias = value, { placeholder: "百褶裙" });
+  if (isSet) left.append(chips(setAliases, "mint"));
   const right = inputField("Canonical Danbooru Tag", item.tag, (value) => item.tag = value, { placeholder: isSet ? "tsukinomori_school_uniform" : "pleated_skirt", className: "wide" }); right.append(chips(item.tag ? [item.tag] : []));
   const meta = node("div", "field-stack"); if (isSet) { const line = node("div", "meta-line"); line.append(node("span", `pill ${item.origin === "learned" ? "learned" : ""}`, item.origin === "learned" ? "自动学习" : "手动配置")); meta.append(line); } else meta.append(node("p", "mapping-note", "用户提示词出现左侧名词时，右侧 tag 会直接加入 hard tags。"));
   card.append(left, right, meta, deleteButton(index)); return card;
@@ -81,7 +85,7 @@ function hydrate(data) {
 }
 async function load() { setBusy(true); try { hydrate(await bridge.apiGet("wardrobe")); elements.connection.classList.add("is-ready"); elements.connection.querySelector("span").textContent = "已连接"; } catch (error) { showToast(`读取失败：${errorText(error)}`); elements.connection.querySelector("span").textContent = "连接失败"; } finally { setBusy(false); } }
 async function save() { if (!state.dirty || state.busy) return; setBusy(true); try { const result = await bridge.apiPost("wardrobe/save", { baseRevision: state.revision, outfits: state.outfits, outfitSets: state.outfitSets, terms: state.terms }); hydrate(result); showToast("服装词库已保存并立即生效。"); } catch (error) { showToast(`保存失败：${errorText(error)}`); } finally { setBusy(false); } }
-function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新服装档案", aliases: ["新别名"], sourceTags: [], tags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新服装套组", tag: "canonical_outfit_tag", origin: "configured", profileKey: "" }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
+function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新服装档案", aliases: ["新别名"], sourceTags: [], tags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新服装套组", aliases: ["新服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", origin: "configured", profileKey: "" }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
 
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; render(); }));
 elements.search.addEventListener("input", () => { state.search = elements.search.value.trim(); render(); }); elements.add.addEventListener("click", addEntry); elements.save.addEventListener("click", save); elements.dirtySave.addEventListener("click", save); elements.refresh.addEventListener("click", load); elements.discard.addEventListener("click", () => pristine && hydrate(pristine));
