@@ -52,7 +52,9 @@ def _timeout_status() -> dict:
 
 
 def test_recent_validated_status_survives_transient_api_timeout():
-    statuses = iter([_ready_status(), _timeout_status(), _timeout_status()])
+    statuses = iter(
+        [_ready_status(), _timeout_status(), _timeout_status(), _timeout_status()]
+    )
     logger = _Logger()
 
     async def run_status():
@@ -77,6 +79,37 @@ def test_recent_validated_status_survives_transient_api_timeout():
     assert result["ok"] is True
     assert result["status"]["readiness_source"] == "recent_validated_cache"
     assert logger.warnings
+
+
+def test_recent_validated_status_uses_lightweight_health_probe():
+    full_checks = 0
+    health_checks = 0
+
+    async def run_status():
+        nonlocal full_checks
+        full_checks += 1
+        return _ready_status()
+
+    async def run_health():
+        nonlocal health_checks
+        health_checks += 1
+        return {"ok": True, "comfyui_api_reachable": True}
+
+    manager = ComfyUIStartupManager(
+        root=Path("."),
+        config={"readiness_cache_seconds": 300},
+        logger=_Logger(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda key, default: 300 if key == "readiness_cache_seconds" else default,
+        get_str=lambda _key, default="": default,
+        run_status=run_status,
+        run_health=run_health,
+    )
+
+    assert asyncio.run(manager.ensure_ready(_Event()))["ok"] is True
+    assert asyncio.run(manager.ensure_ready(_Event()))["ok"] is True
+    assert full_checks == 1
+    assert health_checks == 1
 
 
 def test_status_retains_reachable_flag_when_object_info_times_out(monkeypatch):

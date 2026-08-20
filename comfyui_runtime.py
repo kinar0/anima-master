@@ -84,6 +84,7 @@ class ComfyUIRuntime:
             get_int=self._int,
             get_str=self._str,
             run_status=lambda: self.run_tool(["status"]),
+            run_health=lambda: self.run_tool(["status", "--quick"]),
         )
 
     async def run_python_tool(

@@ -3,7 +3,7 @@
 > 数据来源：仓库 git 提交历史
 > 分支：`codex/local-anima-custom`
 > 提交作者：`Local AstrBot Customization <local-astrbot@localhost>`
-> 提交总数：13 次（含本次提交）
+> 提交总数：14 次（含本次提交）
 
 ## 提交概览
 
@@ -22,6 +22,7 @@
 | 2026-08-19 21:42 | `f3b06db` | docs: 记录 LLM 空内容修复与其他 zoo 会话改动，清理误创建文件 |
 | 2026-08-21 03:35 | `b886ca2` | fix: 防止 ComfyUI API 短暂超时被误报为未启动 |
 | 2026-08-21 | （本次提交） | fix: 统一服装套组 canonical tag 与中英文别名并修复 UI 状态 |
+| 2026-08-21 | （本次提交） | fix: 使用轻量 ComfyUI 健康检查，避免重复读取节点清单 |
 
 ## 各提交详细改动
 
@@ -171,6 +172,14 @@
 - `wardrobe_snapshot()` 合并手动配置与自动学习的同 tag 条目，手动配置优先，同时保留可用别名。
 - 测试新增自动学习合并、旧数据折叠、中英文别名 UI 往返、重复 hard tag 去重和 `hidden` 样式检查；服装与提示词相关套件 `121 passed`。
 
+### 14. 本次提交 — 轻量 ComfyUI 健康检查
+
+- 复现与证据：用户在没有执行生成任务时仍收到“ComfyUI API 暂时无响应”。现场测得 `/system_stats` 约 0.63 秒、`/queue` 约 0.02 秒且队列为空，但 `/object_info` 返回约 3.7 MB，耗时约 17.96 秒；原来的 20 秒读取阈值会因轻微波动而超时。
+- `agent_tools/comfyui_agent.py`：`status` 增加 `--quick`，用于只探测 API 存活而不下载节点/模型清单。
+- `agent_tools/comfyui_status.py`：支持轻量状态模式；完整能力校验的 `/object_info` 超时提高到 60 秒，并明确其只用于首次配置/模型验证。
+- `comfyui_startup.py` / `comfyui_runtime.py`：首次完整验证成功后，后续生图调用轻量 `/system_stats` 健康检查并复用已验证的模型能力，避免每次生成重复读取数 MB 的 `/object_info`。
+- 测试：`tests/test_comfyui_readiness.py` 增加轻量健康检查用例；相关测试通过（8 passed）。
+
 ## 总结
 
 codex 在本地对 **Anima（astrbot_plugin_anima_master）** 插件的定制主要围绕以下方向：
@@ -180,4 +189,4 @@ codex 在本地对 **Anima（astrbot_plugin_anima_master）** 插件的定制主
 3. **ComfyUI 工作流**：运行时与工作流定义、启动/状态相关模块的配合调整。
 4. **测试配套**：为每项功能同步补充了大量单元测试。
 
-整体提交风格以 `chore:`（快照/检查点）、`feat:`（功能）与 `fix:`（缺陷修复）交替出现，共 13 次提交、涉及 90+ 个文件的持续定制开发。`0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底；后续提交补足了 ComfyUI API 短暂超时容错，并统一了服装套组 canonical tag 与中英文触发别名的存储和 UI 表现。
+整体提交风格以 `chore:`（快照/检查点）、`feat:`（功能）与 `fix:`（缺陷修复）交替出现，共 14 次提交、涉及 90+ 个文件的持续定制开发。`0f6829a` 除标签学习管理页面等新功能外，还针对用户反馈的 **LLM 空内容问题**完成了 Count 模板"一步查表"化、futa 计数规则统一与确定性 Count 兜底；后续提交补足了 ComfyUI API 短暂超时容错、轻量健康检查，并统一了服装套组 canonical tag 与中英文触发别名的存储和 UI 表现。

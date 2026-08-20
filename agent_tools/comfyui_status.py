@@ -56,7 +56,7 @@ def _connection_issue(error: Exception, mode: str) -> tuple[str, str]:
 
 
 def build_status_payload(
-    config: dict[str, Any], allowed_sizes: list[str]
+    config: dict[str, Any], allowed_sizes: list[str], *, include_capabilities: bool = True
 ) -> dict[str, Any]:
     """Return the JSON payload for the ComfyUI helper status command."""
     base_url = str(config.get("comfyui_base_url") or "").strip()
@@ -97,9 +97,15 @@ def build_status_payload(
                 "comfyui_api_reachable": True,
             }
         )
-        object_info = client.get_json("/object_info", timeout=20)
+        if not include_capabilities:
+            payload["capabilities_checked"] = False
+            return payload
+        # This response can be several MB with many custom nodes. It is a
+        # configuration validation, not a per-generation health probe.
+        object_info = client.get_json("/object_info", timeout=60)
         payload.update(
             {
+                "capabilities_checked": True,
                 "unet_available": config.get("unet_name")
                 in _available_models(object_info, "UNETLoader", "unet_name"),
                 "clip_available": config.get("clip_name")

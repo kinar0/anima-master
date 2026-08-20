@@ -23,6 +23,7 @@ class ComfyUIStartupManager:
         get_int: Callable[[str, int], int],
         get_str: Callable[[str, str], str],
         run_status: Callable[[], Awaitable[dict[str, Any]]],
+        run_health: Callable[[], Awaitable[dict[str, Any]]] | None = None,
     ):
         """Store dependencies for ComfyUI auto-start checks.
 
@@ -34,6 +35,8 @@ class ComfyUIStartupManager:
             get_int: Config integer accessor.
             get_str: Config string accessor.
             run_status: Async callback returning the ComfyUI status payload.
+            run_health: Optional async callback for a lightweight API health
+                probe. It avoids downloading the full node/model inventory.
         """
         self.root = Path(root)
         self.config = config
@@ -42,6 +45,7 @@ class ComfyUIStartupManager:
         self._int = get_int
         self._str = get_str
         self._run_status = run_status
+        self._run_health = run_health or run_status
         self._lock = asyncio.Lock()
         self._last_ready_status: dict[str, Any] = {}
         self._last_ready_at = 0.0
@@ -110,6 +114,20 @@ class ComfyUIStartupManager:
 
     async def _check_ready(self) -> tuple[bool, dict[str, Any]]:
         """Check readiness, retrying a busy API before using a recent validation."""
+        cached = self._cached_ready_status()
+        if cached:
+            health = await self._run_health()
+            if health.get("comfyui_api_reachable"):
+                cached.update(
+                    {
+                        "comfyui_api_reachable": True,
+                        "health_check": "ok",
+                    }
+                )
+                return True, cached
+            if not self._is_transient_api_timeout(health):
+                return False, health
+
         status = await self._run_status()
         if self.is_ready(status):
             self._remember_ready(status)

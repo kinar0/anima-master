@@ -148,7 +148,7 @@ def status(args) -> None:
         f"{width}x{height}"
         for width, height in allowed_sizes(config, DEFAULT_CONFIG["allowed_sizes"])
     ]
-    result(build_status_payload(config, size_options))
+    result(build_status_payload(config, size_options, include_capabilities=not args.quick))
 
 
 def recent(args) -> None:
@@ -229,6 +229,11 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("status")
+    p.add_argument(
+        "--quick",
+        action="store_true",
+        help="只检查 ComfyUI API 存活，不读取完整节点和模型列表",
+    )
     p.set_defaults(func=status)
 
     p = sub.add_parser("recent")
