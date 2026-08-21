@@ -10,4 +10,5 @@ build/
 outputs/
 *.log
 config.local.toml
+AGENTS.md
 /data/
