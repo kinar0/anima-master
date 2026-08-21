@@ -69,6 +69,7 @@ def test_help_text_is_compact_and_fixed():
 
     assert "/anm <描述>" in text
     assert "/anm 多人 <描述>" in text
+    assert "不常用兼容入口" in text
     assert "/anm 无优化 <tags>" in text
     assert "/anm 改图 <要求>" in text
     assert "/anm 解析法术" in text

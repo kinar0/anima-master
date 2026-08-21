@@ -605,6 +605,70 @@ def test_two_named_outfits_never_cross_character_details() -> None:
     assert "named_look_b" in b_detail and "named_look_a" not in b_detail
 
 
+def test_four_character_named_outfits_are_all_resolved_independently() -> None:
+    character_anchors = tuple(
+        SemanticAnchor(
+            f"character_{index}",
+            "target_character",
+            "character",
+            f"角色{index}",
+            f"Character {index}",
+            (f"character_{index}",),
+        )
+        for index in range(1, 5)
+    )
+    outfit_anchors = tuple(
+        SemanticAnchor(
+            f"outfit_{index}",
+            "outfit",
+            "outfit",
+            f"套装{index}",
+            f"Named outfit {index}",
+            (f"named_outfit_{index}",),
+        )
+        for index in range(1, 5)
+    )
+    plans = tuple(
+        SemanticCharacterPlan(
+            f"character_{index}",
+            SemanticWardrobe("named_outfit", f"outfit_{index}"),
+        )
+        for index in range(1, 5)
+    )
+    lookup = SemanticLookupResult(
+        anchor_tags=tuple(
+            (f"outfit_{index}", f"named_outfit_{index}")
+            for index in range(1, 5)
+        ),
+        anchor_outfit_profiles=tuple(
+            (f"outfit_{index}", f"named_outfit_{index}", (), "default")
+            for index in range(1, 5)
+        ),
+        status="resolved",
+    )
+
+    effective = build_character_effective_outfits(
+        (*character_anchors, *outfit_anchors),
+        plans,
+        lookup,
+        user_prompt="角色1穿套装1，角色2穿套装2，角色3穿套装3，角色4穿套装4",
+    )
+
+    assert len(effective) == 4
+    for index, item in enumerate(effective, start=1):
+        detail = controlled_character_outfit_detail(
+            f"character_{index} wears named outfit {5 - index}",
+            f"character_{index}",
+            item,
+        )
+        assert f"named_outfit_{index}" in detail
+        assert all(
+            f"named_outfit_{other}" not in detail
+            for other in range(1, 5)
+            if other != index
+        )
+
+
 def test_creative_wardrobe_keeps_pretty_garments_but_rejects_named_uniform_and_nudity() -> None:
     plan = build_character_effective_outfits(
         (
@@ -637,20 +701,24 @@ def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak(
         '{"anchors":['
         '{"id":"sakiko","role":"target_character","group":"character","source_text":"丰川祥子","description":"Sakiko","candidates":["togawa_sakiko"]},'
         '{"id":"anon","role":"target_character","group":"character","source_text":"千早爱音","description":"Anon","candidates":["chihaya_anon"]},'
-        '{"id":"haneoka","role":"outfit","group":"outfit","source_text":"羽丘冬季校服","description":"Haneoka winter uniform","candidates":["haneoka_school_uniform"]}],'
+        '{"id":"mutsumi","role":"target_character","group":"character","source_text":"若叶睦","description":"Mutsumi","candidates":["wakaba_mutsumi"]},'
+        '{"id":"haneoka","role":"outfit","group":"outfit","source_text":"羽丘冬季校服","description":"Haneoka winter uniform","candidates":["haneoka_school_uniform"]},'
+        '{"id":"funeral","role":"outfit","group":"outfit","source_text":"日式葬礼服装","description":"Japanese funeral attire","candidates":["japanese_funeral_outfit"]}],'
         '"character_plans":['
         '{"target_anchor_id":"sakiko","wardrobe":{"kind":"default_profile"},"directives":[{"operation":"remove","slots":["lower_body.all"],"source_text":"下半身什么都没穿"}]},'
-        '{"target_anchor_id":"anon","wardrobe":{"kind":"named_outfit","anchor_id":"haneoka"},"directives":[]}]}'
+        '{"target_anchor_id":"anon","wardrobe":{"kind":"named_outfit","anchor_id":"haneoka"},"directives":[]},'
+        '{"target_anchor_id":"mutsumi","wardrobe":{"kind":"named_outfit","anchor_id":"funeral"},"directives":[]}]}'
     )
     malicious_writer = (
-        "{Count: 2girls}\n"
-        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Count: 3girls}\n"
+        "{Characters: togawa_sakiko, chihaya_anon, wakaba_mutsumi}\n"
         "{Copyright: bang_dream!}\n"
-        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
+        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair; wakaba_mutsumi has green hair}\n"
         "{Details: togawa_sakiko wears haneoka winter school uniform and is bottomless; "
-        "chihaya_anon wears Hanasaki summer school uniform and is bottomless}\n"
-        "{Tags: haneoka_school_uniform, hanasaki_summer_school_uniform, bottomless, standing, background_mode_default_portrait}\n"
-        "{Nltags: Both characters wear Hanasaki uniforms and are bottomless.}"
+        "chihaya_anon wears Hanasaki summer school uniform and is bottomless; "
+        "wakaba_mutsumi wears a black veil and lace-trimmed black thighhighs with an Oblivionis stage costume and is nude}\n"
+        "{Tags: haneoka_school_uniform, hanasaki_summer_school_uniform, bottomless, black_veil, standing, background_mode_default_portrait}\n"
+        "{Nltags: All three characters wear Hanasaki uniforms and are bottomless.}"
     )
 
     class _Response:
@@ -681,7 +749,7 @@ def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak(
 
     class _Resolver:
         def required_core_tags_for_prompt(self, _prompt):
-            return ("togawa_sakiko", "chihaya_anon")
+            return ("togawa_sakiko", "chihaya_anon", "wakaba_mutsumi")
 
         def required_profile_tags_for_prompt(self, _prompt):
             return ()
@@ -694,10 +762,10 @@ def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak(
 
         async def resolve_semantic_anchors(self, anchors):
             return SemanticLookupResult(
-                confirmed_tags=("togawa_sakiko", "chihaya_anon", "haneoka_school_uniform", "bang_dream!"),
+                confirmed_tags=("togawa_sakiko", "chihaya_anon", "wakaba_mutsumi", "haneoka_school_uniform", "bang_dream!"),
                 named_outfit_tags=("haneoka_school_uniform",),
                 anchors=anchors,
-                anchor_tags=(("sakiko", "togawa_sakiko"), ("anon", "chihaya_anon"), ("haneoka", "haneoka_school_uniform")),
+                anchor_tags=(("sakiko", "togawa_sakiko"), ("anon", "chihaya_anon"), ("mutsumi", "wakaba_mutsumi"), ("haneoka", "haneoka_school_uniform")),
                 character_profiles=(("sakiko", "togawa_sakiko", ("red_shirt", "black_skirt", "black_pantyhose"), ("blue_hair",)),),
                 anchor_outfit_profiles=(("haneoka", "haneoka_school_uniform", (), "winter"),),
                 status="resolved",
@@ -723,7 +791,7 @@ def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak(
 
     result = asyncio.run(pipeline.build(
         event,
-        "丰川祥子穿默认服装且下半身什么都没穿，千早爱音穿羽丘冬季校服",
+        "丰川祥子穿默认服装且下半身什么都没穿，千早爱音穿羽丘冬季校服，若叶睦穿日式葬礼服装、黑色头纱并带魅惑要素",
     ))
 
     assert "togawa sakiko wears red shirt" in result.final_prompt
@@ -732,8 +800,14 @@ def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak(
     assert "Hanasaki" not in result.final_prompt and "hanasaki" not in result.final_prompt
     anon_tail = result.final_prompt.split("chihaya anon wears haneoka school uniform", 1)[1]
     assert "chihaya anon is bottomless" not in anon_tail
+    assert "wakaba mutsumi wears a black veil" in result.final_prompt
+    assert "lace-trimmed black thighhighs" in result.final_prompt
+    assert "Oblivionis" not in result.final_prompt
+    assert "wakaba mutsumi is nude" not in result.final_prompt
+    assert result.summary["structured_character_count"] == 3
     assert "- 丰川祥子: CREATIVE WARDROBE" not in context.calls[1]["prompt"]
     assert "- 千早爱音: CREATIVE WARDROBE" not in context.calls[1]["prompt"]
+    assert "- 若叶睦: CREATIVE WARDROBE" in context.calls[1]["prompt"]
 
 
 def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:

@@ -136,8 +136,8 @@
     },
     {
       "key": "anima_master_multi_person",
-      "description": "多人生成",
-      "hint": "只影响 /anm 多人：控制候选采样、视觉检查、降级发送和并发。",
+      "description": "多人生成（不常用兼容模式）",
+      "hint": "普通多人描述请直接使用 /anm；这里只影响不常用的 /anm 多人兼容入口。",
       "items": [
         "multi_candidate_count",
         "multi_verify_enabled",

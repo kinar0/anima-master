@@ -720,9 +720,9 @@
     }
   },
   "anima_master_multi_person": {
-    "description": "多人生成",
+    "description": "多人生成（不常用兼容模式）",
     "type": "object",
-    "hint": "只影响 /anm 多人：控制候选采样、视觉检查、降级发送和并发。",
+    "hint": "普通多人描述请直接使用 /anm；这里只影响不常用的 /anm 多人兼容入口。",
     "items": {
       "multi_candidate_count": {
         "description": "多人候选数量",
@@ -776,7 +776,7 @@
         "description": "多人生成并发上限",
         "type": "int",
         "default": 1,
-        "hint": "只限制 /anm 多人，避免多个候选组同时争用 ComfyUI。",
+        "hint": "只限制不常用的 /anm 多人兼容入口，避免多个候选组同时争用 ComfyUI。",
         "collapsed": true
       }
     }

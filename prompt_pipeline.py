@@ -846,7 +846,7 @@ def controlled_character_outfit_detail(
             flags=re.I,
         )
         result = re.sub(
-            r"\b[A-Z][A-Za-z'-]*(?:\s+[A-Z][A-Za-z'-]*){0,3}\s+"
+            r"\b[A-Z][A-Za-z'-]*(?:\s+[A-Za-z'-]+){0,3}\s+"
             r"(?:costume|outfit|uniform)\b",
             "",
             result,

@@ -42,7 +42,7 @@ COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
     CommandEntry(
         "multi_person",
         ("多人",),
-        "- /anm 多人 <描述>：按人物分组和互动关系生成 2–4 人画面",
+        "- /anm 多人 <描述>（不常用）：兼容旧的 2–4 人专用模式",
         True,
     ),
     CommandEntry(
@@ -189,6 +189,7 @@ def build_help_text(img2img_enabled: bool = False) -> str:
         (
             "Anima 绘图助手",
             "生图：/anm <描述>; /anm 宽x高 <描述>; /anm <描述>#（自动追加的英语提示词）",
+            "多人：直接用 /anm <多个角色的描述>；/anm 多人 <描述> 为不常用兼容入口",
             "原样 tags：/anm 无优化 <tags>",
             "引用图片：/anm 改图 <要求>｜/anm 解析法术｜/anm 反推（暂未开启）",
             "示例：/anm 1216x832 白色礼服少女#sitting on a chair",

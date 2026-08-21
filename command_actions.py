@@ -422,8 +422,8 @@ class CommandActionHandler:
         if action == "multi_person":
             if not prompt:
                 return (
-                    "请描述至少两个人物。例："
-                    "/anm 多人 左边若叶睦抱着吉他，右边千早爱音牵着她的手"
+                    "“/anm 多人”是不常用兼容入口；现在请优先直接使用 "
+                    "/anm <多个角色的描述>。如仍使用此入口，请描述至少两个人物。"
                 )
             sizes = allowed_sizes(self.config, DEFAULT_GENERATION_SIZES)
             _, _, preset_error = extract_artist_preset_switch(
