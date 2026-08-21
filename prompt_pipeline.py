@@ -13,6 +13,8 @@ try:
         SemanticAnchor,
         SemanticLookupResult,
         build_semantic_plan_prompt,
+        extract_parenthesized_character_aliases,
+        extract_parenthesized_copyright_aliases,
         merge_semantic_results,
         parse_semantic_plan,
     )
@@ -70,6 +72,8 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         SemanticAnchor,
         SemanticLookupResult,
         build_semantic_plan_prompt,
+        extract_parenthesized_character_aliases,
+        extract_parenthesized_copyright_aliases,
         merge_semantic_results,
         parse_semantic_plan,
     )
@@ -1782,7 +1786,15 @@ class PromptPipeline:
                     provider_id=provider_id,
                     user_prompt=prompt,
                 )
-                semantic_anchors = parse_semantic_plan(semantic_plan_raw, prompt)
+                semantic_anchors = tuple(
+                    dict.fromkeys(
+                        (
+                            *extract_parenthesized_copyright_aliases(prompt),
+                            *extract_parenthesized_character_aliases(prompt),
+                            *parse_semantic_plan(semantic_plan_raw, prompt),
+                        )
+                    )
+                )
                 if cached_named_result is not None:
                     cached_named_keys = {
                         tag.lower() for tag in cached_named_result.named_outfit_tags

@@ -16,6 +16,8 @@ import danbooru_resolver as resolver_module  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
     SemanticAnchor,
     SemanticLookupResult,
+    extract_parenthesized_character_aliases,
+    extract_parenthesized_copyright_aliases,
     lookup_semantic_anchors,
     merge_semantic_results,
     parse_semantic_plan,
@@ -34,6 +36,107 @@ def test_semantic_source_phrase_matches_ascii_case_insensitively() -> None:
     )
 
     assert plan and plan[0].role == "outfit_source"
+
+
+def test_parenthesized_english_alias_becomes_a_character_anchor() -> None:
+    anchors = extract_parenthesized_character_aliases(
+        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant），双手抱胸"
+    )
+
+    assert len(anchors) == 1
+    assert anchors[0].role == "target_character"
+    assert anchors[0].source_text == "revenant"
+    assert anchors[0].candidates == ("revenant",)
+
+
+def test_parenthesized_english_title_becomes_a_copyright_anchor() -> None:
+    anchors = extract_parenthesized_copyright_aliases(
+        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant）"
+    )
+
+    assert len(anchors) == 1
+    assert anchors[0].role == "copyright"
+    assert anchors[0].source_text == "Elden Ring Nightreign"
+    assert anchors[0].candidates == ("elden_ring_nightreign",)
+
+
+def test_parenthesized_english_title_preserves_danbooru_punctuation() -> None:
+    anchors = extract_parenthesized_copyright_aliases(
+        "《Re:从零开始的异世界生活》（Re:Zero kara Hajimeru Isekai Seikatsu）的蕾姆（rem）"
+    )
+
+    assert anchors[0].candidates == ("re:zero_kara_hajimeru_isekai_seikatsu",)
+
+
+def test_parenthesized_alias_does_not_treat_a_localized_title_as_a_character() -> None:
+    anchors = extract_parenthesized_character_aliases(
+        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant）"
+    )
+
+    assert [anchor.source_text for anchor in anchors] == ["revenant"]
+
+
+def test_character_alias_prefers_the_explicit_copyright_scope(monkeypatch) -> None:
+    anchors = (
+        SemanticAnchor(
+            anchor_id="alias",
+            role="target_character",
+            group="character",
+            source_text="revenant",
+            description="Explicit character alias",
+            candidates=("revenant",),
+        ),
+        SemanticAnchor(
+            anchor_id="work",
+            role="copyright",
+            group="series",
+            source_text="黑夜君临",
+            description="Elden Ring Nightreign",
+            candidates=("elden_ring_nightreign",),
+        ),
+    )
+    calls = []
+
+    def fake_batch(queries, **_kwargs):
+        calls.append(queries)
+        if len(calls) == 1:
+            return {
+                "results": {
+                    "a0_c0": {
+                        "candidate_tags": {
+                            "characters": [
+                                {"tag": "revenant_(apex_legends)", "count": 354},
+                                {"tag": "revenant_(elden_ring)", "count": 353},
+                            ]
+                        }
+                    },
+                    "a1_c0": {
+                        "confirmed_tags": {
+                            "series": [{"tag": "elden_ring_nightreign"}]
+                        }
+                    },
+                }
+            }
+        return {
+            "results": {
+                "fallback_0": {
+                    "confirmed_tags": {
+                        "characters": [{"tag": "revenant_(elden_ring)"}]
+                    }
+                },
+                "series_0": {"confirmed_tags": {"series": [{"tag": "elden_ring"}]}},
+            }
+        }
+
+    monkeypatch.setattr(semantic_module, "_run_cli_batch", fake_batch)
+
+    result = lookup_semantic_anchors(anchors, cli_path=PLUGIN_DIR / "unused.exe")
+
+    assert result.confirmed_tags == (
+        "revenant_(elden_ring)",
+        "elden_ring_nightreign",
+        "elden_ring",
+    )
 
 
 def test_semantic_plan_accepts_independently_named_outfit_role() -> None:

@@ -288,6 +288,87 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
     return tuple(anchors)
 
 
+def extract_parenthesized_character_aliases(user_prompt: str) -> tuple[SemanticAnchor, ...]:
+    """Extract explicit English character aliases paired with a Chinese label.
+
+    Args:
+        user_prompt: The original image request.
+
+    Returns:
+        Character lookup anchors that do not depend on an LLM recognizing the
+        parenthesized alias convention.
+    """
+    prompt = str(user_prompt or "")
+    matches: list[tuple[str, str]] = []
+    chinese_label = r"[\u4e00-\u9fff][\u4e00-\u9fffA-Za-z0-9 _.-]{1,40}"
+    english_alias = r"[A-Za-z][A-Za-z0-9 _.'-]{1,78}"
+    for match in re.finditer(
+        rf"(?P<label>{chinese_label})\s*[（(]\s*(?P<alias>{english_alias})\s*[）)]",
+        prompt,
+    ):
+        matches.append((match.group("label").strip(), match.group("alias").strip()))
+    for match in re.finditer(
+        rf"(?P<alias>{english_alias})\s*[（(]\s*(?P<label>{chinese_label})\s*[）)]",
+        prompt,
+    ):
+        matches.append((match.group("label").strip(), match.group("alias").strip()))
+
+    anchors: list[SemanticAnchor] = []
+    seen_aliases: set[str] = set()
+    for label, alias in matches:
+        candidate = re.sub(r"\s+", "_", alias.lower()).strip("_")
+        if not re.fullmatch(r"[a-z0-9_.'()-]{2,120}", candidate):
+            continue
+        if candidate in seen_aliases:
+            continue
+        seen_aliases.add(candidate)
+        anchors.append(
+            SemanticAnchor(
+                anchor_id=f"parenthesized_character_alias_{len(anchors) + 1}",
+                role="target_character",
+                group="character",
+                source_text=alias,
+                description=f"Explicit character alias for {label}",
+                candidates=(candidate,),
+            )
+        )
+    return tuple(anchors)
+
+
+def extract_parenthesized_copyright_aliases(user_prompt: str) -> tuple[SemanticAnchor, ...]:
+    """Extract explicit English work titles paired with a Chinese book-title mark.
+
+    Args:
+        user_prompt: The original image request.
+
+    Returns:
+        Copyright lookup anchors independent of the semantic-planning LLM.
+    """
+    anchors: list[SemanticAnchor] = []
+    prompt = str(user_prompt or "")
+    for match in re.finditer(
+        r"《(?P<title>[^》]{1,80})》\s*[（(]\s*"
+        r"(?P<alias>[A-Za-z][A-Za-z0-9 _.'!: -]{1,78})\s*[）)]",
+        prompt,
+    ):
+        title = match.group("title").strip()
+        alias = match.group("alias").strip()
+        candidate = re.sub(r"\s+", "_", alias.lower()).strip("_")
+        if not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", candidate):
+            continue
+        anchors.append(
+            SemanticAnchor(
+                anchor_id=f"parenthesized_copyright_alias_{len(anchors) + 1}",
+                role="copyright",
+                group="series",
+                source_text=alias,
+                description=f"Explicit work title for {title}",
+                candidates=(candidate,),
+            )
+        )
+    return tuple(anchors)
+
+
 def resolve_local_cli_path(configured_path: str = "") -> Path | None:
     """Resolve one explicit/well-known local CLI path without filesystem search."""
     candidates: list[Path] = []
@@ -414,7 +495,7 @@ def lookup_semantic_anchors(
     confirmed_by_anchor: dict[int, str] = {}
     inferred_series_tags: list[str] = []
     candidates: list[str] = []
-    fallback_candidates: dict[int, tuple[str, int]] = {}
+    fallback_candidates: dict[int, list[tuple[str, int]]] = {}
     named_outfit_by_anchor: dict[int, str] = {}
 
     def is_specific_school_uniform(anchor: SemanticAnchor) -> bool:
@@ -525,15 +606,43 @@ def lookup_semantic_anchors(
                         continue
                     if anchor.group != "character":
                         continue
-                    if tag_key != query_key and not tag_key.startswith(query_key + "_("):
+                    if tag_key != query_key and not tag.lower().startswith(
+                        query_key + "_("
+                    ):
                         continue
-                    previous = fallback_candidates.get(anchor_index)
-                    if previous is None or count > previous[1]:
-                        fallback_candidates[anchor_index] = (tag, count)
+                    values = fallback_candidates.setdefault(anchor_index, [])
+                    if (tag, count) not in values:
+                        values.append((tag, count))
+
+    confirmed_copyright_tags = {
+        tag
+        for index, tag in confirmed_by_anchor.items()
+        if anchors[index].role == "copyright"
+    }
+    selected_fallbacks: dict[int, tuple[str, int]] = {}
+    for index, values in fallback_candidates.items():
+        compatible = []
+        for tag, count in values:
+            scoped = re.fullmatch(r".+_\(([^)]+)\)", tag)
+            scope = scoped.group(1) if scoped else ""
+            if any(
+                copyright == scope
+                or copyright.startswith(scope + "_")
+                or scope.startswith(copyright + "_")
+                for copyright in confirmed_copyright_tags
+            ):
+                compatible.append((tag, count))
+        if confirmed_copyright_tags:
+            selected = compatible
+        elif len(values) == 1:
+            selected = values
+        else:
+            continue
+        selected_fallbacks[index] = max(selected, key=lambda item: item[1])
 
     unresolved_fallbacks = {
         index: value[0]
-        for index, value in fallback_candidates.items()
+        for index, value in selected_fallbacks.items()
         if index not in confirmed_by_anchor
     }
     fallback_queries = [
