@@ -223,6 +223,50 @@ def test_semantic_keep_only_filters_learned_profile_to_requested_layers() -> Non
     assert effective.has_destructive_override is True
 
 
+def test_semantic_recolor_all_rewrites_only_verified_colored_outfit_tags() -> None:
+    effective = build_effective_outfit_plan(
+        detect_outfit_transfer("复仇者穿着官方常服"),
+        user_prompt="复仇者的官方常服，改成全黑色调",
+        base_tags=(
+            "white_dress",
+            "wide_sleeves",
+            "white_veil",
+            "white_choker",
+            "blue_cape",
+        ),
+        semantic_patches=(
+            UserOutfitPatch(
+                subject="semantic_target",
+                operation="recolor_all",
+                slot="",
+                value="black",
+                evidence="改成全黑色调",
+            ),
+        ),
+    )
+
+    assert effective.effective_tags == (
+        "wide_sleeves",
+        "black_dress",
+        "black_veil",
+        "black_choker",
+        "black_cape",
+    )
+    assert effective.removed_tags == (
+        "white_dress",
+        "white_veil",
+        "white_choker",
+        "blue_cape",
+    )
+    assert effective.added_tags == (
+        "black_dress",
+        "black_veil",
+        "black_choker",
+        "black_cape",
+    )
+    assert effective.has_allowlist_override is True
+
+
 def test_outfit_patch_does_not_leak_to_another_named_character() -> None:
     prompt = (
         "丰川祥子穿着oblivionis的衣服，"

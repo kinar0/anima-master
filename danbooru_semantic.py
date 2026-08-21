@@ -240,10 +240,12 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "Omit ordinary prose "
         "that does not need a hard tag. outfit_directives are optional and are "
         "only for an explicit modification of a character's clothes. Allowed "
-        "operations are remove, replace_color, add, and keep_only. Allowed slots "
+        "operations are remove, replace_color, recolor_all, add, and keep_only. Allowed slots "
         "are upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, "
         "headwear, face_accessory.mask, handwear, legwear, and footwear. For "
-        "replace_color/add include a basic English color in color. keep_only means "
+        "replace_color/add include a basic English color in color. recolor_all "
+        "means the user explicitly requests that the entire known outfit use one "
+        "color; it requires color and must use an empty slots list. keep_only means "
         "the user explicitly says to retain only the listed clothing layers; never "
         "use it for a normal outfit request. source_text must be an exact substring "
         "of the user request. Do not emit tags in outfit_directives.\n\n"
@@ -326,7 +328,9 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
     return tuple(anchors)
 
 
-_OUTFIT_DIRECTIVE_OPERATIONS = {"remove", "replace_color", "add", "keep_only"}
+_OUTFIT_DIRECTIVE_OPERATIONS = {
+    "remove", "replace_color", "recolor_all", "add", "keep_only"
+}
 _OUTFIT_DIRECTIVE_SLOTS = {
     "upper_body.primary",
     "lower_body.skirt",
@@ -377,17 +381,19 @@ def parse_semantic_outfit_directives(
         color = str(item.get("color") or "").strip().lower()
         if (
             operation not in _OUTFIT_DIRECTIVE_OPERATIONS
-            or not slots
+            or (not slots and operation != "recolor_all")
             or any(slot not in _OUTFIT_DIRECTIVE_SLOTS for slot in slots)
             or not source_text
             or (source_text not in user_prompt and source_text.lower() not in user_prompt.lower())
         ):
             continue
+        if operation == "recolor_all" and slots:
+            continue
         if operation == "keep_only" and len(slots) > 4:
             continue
         if operation in {"remove", "replace_color", "add"} and len(slots) != 1:
             continue
-        if operation in {"replace_color", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
+        if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
             continue
         directive = SemanticOutfitDirective(operation, slots, color, source_text)
         if directive not in directives:

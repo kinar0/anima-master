@@ -64,6 +64,18 @@ def test_semantic_outfit_directive_rejects_unsourced_or_tag_level_claims() -> No
     assert directives == ()
 
 
+def test_semantic_plan_accepts_full_outfit_recolor_without_slots() -> None:
+    directives = parse_semantic_outfit_directives(
+        '{"outfit_directives":[{"operation":"recolor_all",'
+        '"slots":[],"color":"black","source_text":"改成全黑色调"}]}',
+        "复仇者的官方常服，改成全黑色调",
+    )
+
+    assert directives[0].operation == "recolor_all"
+    assert directives[0].slots == ()
+    assert directives[0].color == "black"
+
+
 def test_parenthesized_english_alias_becomes_a_character_anchor() -> None:
     anchors = extract_parenthesized_character_aliases(
         "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant），双手抱胸"

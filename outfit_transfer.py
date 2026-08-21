@@ -284,14 +284,17 @@ class EffectiveOutfitPlan:
     @property
     def has_destructive_override(self) -> bool:
         return any(
-            patch.operation in {"remove", "replace", "keep_only"}
+            patch.operation in {"remove", "replace", "recolor_all", "keep_only"}
             for patch in self.patches
         )
 
     @property
     def has_allowlist_override(self) -> bool:
         """Whether the request explicitly restricts clothing to listed layers."""
-        return any(patch.operation == "keep_only" for patch in self.patches)
+        return any(
+            patch.operation in {"keep_only", "recolor_all"}
+            for patch in self.patches
+        )
 
 
 _COLOR_WORDS = {
@@ -553,6 +556,21 @@ def build_effective_outfit_plan(
     added: list[str] = []
     forbidden_slots: list[str] = []
     for patch in patches:
+        if patch.operation == "recolor_all":
+            for tag in tuple(effective):
+                words = normalize_tag_key(tag).split()
+                if not any(word in _COLOR_TAG_WORDS for word in words):
+                    continue
+                replacement = _replace_tag_color(tag, patch.value)
+                if replacement == tag:
+                    continue
+                effective.remove(tag)
+                if tag not in removed:
+                    removed.append(tag)
+                if replacement not in effective:
+                    effective.append(replacement)
+                    added.append(replacement)
+            continue
         if patch.operation == "keep_only":
             allowed_slots = set(filter(None, patch.slot.split(",")))
             for tag in tuple(effective):
@@ -750,6 +768,10 @@ def build_outfit_constraint_narrative(
             statements.append(
                 f"{display_subject} wears a {patch.value} {noun} as part of the "
                 f"customized {source_label}-inspired outfit."
+            )
+        elif patch.operation == "recolor_all":
+            statements.append(
+                f"{display_subject}'s verified outfit uses a {patch.value} color scheme."
             )
         elif patch.operation == "remove" and patch.slot == "lower_body.all":
             statements.append(f"{display_subject} wears nothing on the lower body.")
