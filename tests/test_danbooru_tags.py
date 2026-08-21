@@ -526,6 +526,78 @@ def test_variant_outfit_fetch_refines_small_pure_cluster_by_anchor(monkeypatch) 
     assert "black_skirt" not in profile.tags
 
 
+def test_named_uniform_fetch_filters_summer_and_winter_profiles(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def posts(season: str):
+        seasonal = f"{season}_uniform"
+        sleeves = "short_sleeves" if season == "summer" else "long_sleeves"
+        outer = "sweater_vest" if season == "summer" else "grey_jacket"
+        return [
+            {
+                "tag_string_general": " ".join(
+                    (
+                        "1girl",
+                        "solo",
+                        "haneoka_school_uniform",
+                        seasonal,
+                        "white_shirt",
+                        outer,
+                        sleeves,
+                        "green_skirt",
+                    )
+                ),
+                "tag_string_character": "chihaya_anon",
+            }
+            for _index in range(8)
+        ]
+
+    class _Response:
+        status_code = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    def fake_get(_url, *, params, **_kwargs):
+        query = params["tags"]
+        calls.append(query)
+        return _Response(posts("summer" if "summer_uniform" in query else "winter"))
+
+    monkeypatch.setattr(tags_module.requests, "get", fake_get)
+    cache = {}
+
+    summer = tags_module.fetch_variant_outfit_profile(
+        "haneoka_school_uniform",
+        outfit_kind="summer",
+        timeout=2.0,
+        user_agent="test",
+        cache=cache,
+        donmai_base_urls=("https://example.invalid",),
+    )
+    winter = tags_module.fetch_variant_outfit_profile(
+        "haneoka_school_uniform",
+        outfit_kind="winter",
+        timeout=2.0,
+        user_agent="test",
+        cache=cache,
+        donmai_base_urls=("https://example.invalid",),
+    )
+
+    assert calls == [
+        "haneoka_school_uniform summer_uniform",
+        "haneoka_school_uniform winter_uniform",
+    ]
+    assert summer.sample_mode == "summer_filtered"
+    assert winter.sample_mode == "winter_filtered"
+    assert "summer_uniform" in summer.tags
+    assert "winter_uniform" in winter.tags
+    assert "grey_jacket" not in summer.tags
+    assert "sweater_vest" not in winter.tags
+
+
 def test_empty_lookup_cache_expires_quickly(monkeypatch) -> None:
     clock = [100.0]
     calls: list[str] = []

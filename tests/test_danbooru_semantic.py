@@ -328,6 +328,7 @@ def test_named_outfit_learning_merges_same_canonical_set_and_ui_shows_one_row() 
                 "haneoka school uniform",
             ],
             "tag": "haneoka_school_uniform",
+            "variant": "default",
             "origin": "learned",
             "profileKey": "羽丘校服",
         }
@@ -388,6 +389,185 @@ def test_configured_named_outfit_ui_groups_chinese_and_english_aliases() -> None
     ]
     assert english is not None
     assert english.named_outfit_tags == ("haneoka_school_uniform",)
+
+
+def test_seasonal_named_outfits_remain_separate_and_drop_poisoned_aliases() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "version": 3,
+                    "profiles": {
+                        "两只大猫爪子": {
+                            "kind": "named_outfit",
+                            "aliases": [
+                                "两只大猫爪子",
+                                "羽丘冬季校服",
+                                "haneoka school uniform",
+                            ],
+                            "outfit_tags": ["haneoka_school_uniform"],
+                        },
+                        "羽丘夏季校服": {
+                            "kind": "named_outfit",
+                            "variant": "summer",
+                            "aliases": ["羽丘夏季校服"],
+                            "outfit_tags": ["haneoka_school_uniform"],
+                        },
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+
+        snapshot = resolver.wardrobe_snapshot()
+        winter_item = next(
+            item for item in snapshot["outfitSets"] if item["variant"] == "winter"
+        )
+        winter_item["aliases"].append("羽丘冬季制服")
+        saved = resolver.save_wardrobe(
+            {
+                "baseRevision": snapshot["revision"],
+                "outfits": snapshot["outfits"],
+                "outfitSets": snapshot["outfitSets"],
+                "terms": snapshot["terms"],
+            }
+        )
+        saved_again = resolver.save_wardrobe(
+            {
+                "baseRevision": saved["revision"],
+                "outfits": saved["outfits"],
+                "outfitSets": saved["outfitSets"],
+                "terms": saved["terms"],
+            }
+        )
+        persisted = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+
+    variants = {item["variant"]: item for item in snapshot["outfitSets"]}
+    assert set(variants) == {"summer", "winter"}
+    assert variants["winter"]["aliases"] == [
+        "羽丘冬季校服",
+        "haneoka school winter uniform",
+        "羽丘冬季制服",
+    ]
+    assert "两只大猫爪子" not in variants["winter"]["aliases"]
+    assert "两只大猫爪子" not in persisted
+    assert persisted["羽丘冬季校服"]["variant"] == "winter"
+    assert persisted["羽丘夏季校服"]["variant"] == "summer"
+    assert saved["revision"] == saved_again["revision"]
+
+
+def test_seasonal_outfit_profiles_use_distinct_keys_and_cache_entries() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "羽丘夏季校服",
+            ("haneoka_school_uniform",),
+            ("summer_uniform", "white_shirt", "short_sleeves"),
+            qualifier="summer",
+        )
+        resolver.remember_outfit_summary(
+            "羽丘冬季校服",
+            ("haneoka_school_uniform",),
+            ("winter_uniform", "grey_jacket", "long_sleeves"),
+            qualifier="winter",
+        )
+        summer = resolver.cached_outfit_source("羽丘夏季校服")
+        winter = resolver.cached_outfit_source("羽丘冬季校服")
+        saved = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+
+    assert "羽丘夏季校服::summer" in saved
+    assert "羽丘冬季校服::winter" in saved
+    assert summer is not None
+    assert winter is not None
+    assert summer.outfit_profile_tags[0] == "summer_uniform"
+    assert winter.outfit_profile_tags[0] == "winter_uniform"
+
+
+def test_named_outfit_persistence_stays_bound_to_matching_anchor(monkeypatch) -> None:
+    anchors = (
+        SemanticAnchor(
+            "paws",
+            "clothing",
+            "clothing",
+            "两只大猫爪子",
+            "oversized cat paw gloves",
+            ("cat_paws",),
+        ),
+        SemanticAnchor(
+            "uniform",
+            "outfit",
+            "outfit",
+            "羽丘冬季校服",
+            "Haneoka winter school uniform",
+            ("haneoka_school_uniform",),
+        ),
+    )
+    result = SemanticLookupResult(
+        confirmed_tags=("cat_paws", "haneoka_school_uniform"),
+        named_outfit_tags=("haneoka_school_uniform",),
+        anchors=anchors,
+        status="resolved",
+    )
+    monkeypatch.setattr(
+        resolver_module, "lookup_semantic_anchors", lambda *_args, **_kwargs: result
+    )
+    monkeypatch.setattr(
+        resolver_module,
+        "fetch_variant_outfit_profile",
+        lambda *_args, **_kwargs: VariantOutfitProfile(),
+    )
+
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver._local_cli_path = lambda: PLUGIN_DIR / "unused.exe"
+    remembered: list[tuple[str, str, str | None]] = []
+    resolver.remember_named_outfit = (
+        lambda alias, tag, variant=None: remembered.append((alias, tag, variant))
+    )
+
+    asyncio.run(resolver.resolve_semantic_anchors(anchors))
+
+    assert remembered == [
+        ("羽丘冬季校服", "haneoka_school_uniform", "winter")
+    ]
 
 
 def test_wardrobe_snapshot_collapses_legacy_named_outfit_duplicates() -> None:
@@ -758,6 +938,79 @@ def test_multiple_outfit_sources_are_extracted_and_persisted_separately(
     assert "haneoka_school_uniform" not in saved["profiles"][
         "千早爱音::stage"
     ]["outfit_tags"]
+
+
+def test_winter_outfit_source_does_not_overwrite_default_profile(
+    monkeypatch,
+) -> None:
+    anchor = SemanticAnchor(
+        "anon_winter",
+        "outfit_source",
+        "character",
+        "千早爱音",
+        "千早爱音穿着羽丘冬季校服 / winter school uniform",
+        ("chihaya_anon",),
+    )
+    monkeypatch.setattr(
+        resolver_module,
+        "lookup_semantic_anchors",
+        lambda *_args, **_kwargs: SemanticLookupResult(
+            confirmed_tags=("chihaya_anon",),
+            outfit_source_tags=("chihaya_anon",),
+            anchors=(anchor,),
+            status="resolved",
+        ),
+    )
+
+    def fake_profile(_source_tag, *, outfit_kind, **_kwargs):
+        assert outfit_kind == "winter"
+        return VariantOutfitProfile(
+            tags=("winter_uniform", "blazer", "plaid_skirt"),
+            sample_mode="winter_single_character_anchor",
+            total_posts=40,
+            selected_posts=12,
+            focused_posts=8,
+            anchor_tag="winter_uniform",
+        )
+
+    monkeypatch.setattr(
+        resolver_module, "fetch_variant_outfit_profile", fake_profile
+    )
+
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "千早爱音",
+            ("chihaya_anon",),
+            ("summer_uniform", "short_sleeves", "plaid_skirt"),
+        )
+        monkeypatch.setattr(resolver, "_local_cli_path", lambda: Path("cli.exe"))
+        asyncio.run(resolver.resolve_semantic_anchors((anchor,)))
+        saved = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+
+    assert saved["千早爱音"]["outfit_tags"] == [
+        "summer_uniform",
+        "short_sleeves",
+        "plaid_skirt",
+    ]
+    assert saved["千早爱音::winter"]["outfit_tags"] == [
+        "winter_uniform",
+        "blazer",
+        "plaid_skirt",
+    ]
 
 
 def test_modified_cached_outfit_uses_effective_tags_without_hard_source_anchor() -> None:
