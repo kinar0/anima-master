@@ -83,6 +83,7 @@ class SemanticLookupResult:
         include_outfit_source_anchor: bool = True,
         effective_outfit_tags: tuple[str, ...] = (),
         removed_outfit_tags: tuple[str, ...] = (),
+        suppress_profile_outfit_tags: bool = False,
     ) -> str:
         """Render verified evidence for the final prompt-writing LLM."""
         if self.status == "not_available" or (
@@ -124,7 +125,11 @@ class SemanticLookupResult:
                     "costume source identity (context only; do not emit as a hard tag): "
                     + ", ".join(self.outfit_source_tags)
                 )
-        visible_outfit_tags = effective_outfit_tags or self.outfit_profile_tags
+        visible_outfit_tags = (
+            effective_outfit_tags
+            if suppress_profile_outfit_tags
+            else effective_outfit_tags or self.outfit_profile_tags
+        )
         if visible_outfit_tags:
             lines.append(
                 "authoritative visible outfit tags for this request: "

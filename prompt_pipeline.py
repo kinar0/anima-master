@@ -2056,6 +2056,14 @@ class PromptPipeline:
         profile_tags_for_request = (
             scoped_profile_tags or semantic_result.outfit_profile_tags
         )
+        official_default_requested = bool(
+            re.search(r"(?:官方常服|官方默认服装|原作(?:默认)?服装|默认服装|标准服装)", prompt, re.I)
+        )
+        casual_life_requested = bool(
+            re.search(r"(?:私服|居家服|日常便服|随意(?:的)?生活服|休闲穿搭|(?<!官方)常服)", prompt, re.I)
+        ) and not official_default_requested
+        if casual_life_requested:
+            profile_tags_for_request = ()
         semantic_visible_outfit_tags = tuple(
             tag
             for tag in profile_tags_for_request
@@ -2074,6 +2082,7 @@ class PromptPipeline:
                     *effective_outfit.effective_tags,
                     *semantic_visible_outfit_tags,
                     *semantic_result.appearance_profile_tags,
+                    *(("casual",) if casual_life_requested else ()),
                     *semantic_result.named_outfit_tags,
                 )
             )
@@ -2082,6 +2091,7 @@ class PromptPipeline:
             include_outfit_source_anchor=include_source_anchor,
             effective_outfit_tags=effective_outfit.effective_tags,
             removed_outfit_tags=effective_outfit.removed_tags,
+            suppress_profile_outfit_tags=casual_life_requested,
         )
         llm_prompt = build_llm_prompt(
             prompt,
