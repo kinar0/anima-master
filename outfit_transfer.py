@@ -283,7 +283,15 @@ class EffectiveOutfitPlan:
 
     @property
     def has_destructive_override(self) -> bool:
-        return any(patch.operation in {"remove", "replace"} for patch in self.patches)
+        return any(
+            patch.operation in {"remove", "replace", "keep_only"}
+            for patch in self.patches
+        )
+
+    @property
+    def has_allowlist_override(self) -> bool:
+        """Whether the request explicitly restricts clothing to listed layers."""
+        return any(patch.operation == "keep_only" for patch in self.patches)
 
 
 _COLOR_WORDS = {
@@ -368,7 +376,9 @@ def outfit_tag_slot(tag: str) -> str:
         return "handwear"
     if any(word in key for word in ("boot", "shoe", "heel", "mary jane")):
         return "footwear"
-    if any(word in key for word in ("hair ribbon", "hair ornament", "hairpin", "headdress")):
+    if any(word in key for word in ("veil", "headdress", "hat", "headwear")):
+        return "headwear"
+    if any(word in key for word in ("hair ribbon", "hair ornament", "hairpin")):
         return "hair_accessory"
     if "ribbon" in key or "bow" in key:
         return "accessory.ribbon"
@@ -522,19 +532,35 @@ def build_effective_outfit_plan(
     user_prompt: str,
     base_tags: tuple[str, ...],
     known_character_names: tuple[str, ...] = (),
+    semantic_patches: tuple[UserOutfitPatch, ...] = (),
 ) -> EffectiveOutfitPlan:
     """Apply explicit user patches to a verified source-outfit profile."""
     normalized_base = tuple(dict.fromkeys(tag for tag in base_tags if str(tag).strip()))
-    patches = parse_user_outfit_patches(
-        user_prompt,
-        plan.target_character,
-        known_character_names=known_character_names,
+    patches = tuple(
+        dict.fromkeys(
+            (
+                *parse_user_outfit_patches(
+                    user_prompt,
+                    plan.target_character,
+                    known_character_names=known_character_names,
+                ),
+                *semantic_patches,
+            )
+        )
     )
     effective = list(normalized_base)
     removed: list[str] = []
     added: list[str] = []
     forbidden_slots: list[str] = []
     for patch in patches:
+        if patch.operation == "keep_only":
+            allowed_slots = set(filter(None, patch.slot.split(",")))
+            for tag in tuple(effective):
+                if outfit_tag_slot(tag) not in allowed_slots:
+                    effective.remove(tag)
+                    if tag not in removed:
+                        removed.append(tag)
+            continue
         matching = [tag for tag in effective if _tag_matches_slot(tag, patch.slot)]
         if patch.operation in {"remove", "replace"}:
             for tag in matching:

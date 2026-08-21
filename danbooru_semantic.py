@@ -61,6 +61,21 @@ class SemanticAnchor:
 
 
 @dataclass(frozen=True)
+class SemanticOutfitDirective:
+    """A bounded clothing operation proposed by the planning LLM.
+
+    This is deliberately semantic rather than tag-level: the planner may say
+    which *slot* to keep or remove, but local verified outfit data decides the
+    actual Danbooru tags affected.
+    """
+
+    operation: str
+    slots: tuple[str, ...]
+    color: str = ""
+    source_text: str = ""
+
+
+@dataclass(frozen=True)
 class SemanticLookupResult:
     """Locally validated semantic anchors for one image request."""
 
@@ -200,7 +215,10 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         '{"anchors":[{"id":"target_1","role":"target_character",'
         '"group":"character","source_text":"exact phrase from request",'
         '"description":"short English visible meaning",'
-        '"candidates":["canonical_tag_guess"]}]}\n'
+        '"candidates":["canonical_tag_guess"]}],'
+        '"outfit_directives":[{"operation":"keep_only",'
+        '"slots":["outerwear","headwear"],'
+        '"source_text":"exact clothing instruction from request"}]}\n'
         "Allowed roles: target_character, outfit_source, copyright, appearance, "
         "expression, pose, action, clothing, outfit, accessory, prop, scene, lighting. "
         "Allowed groups are the same except target_character/outfit_source use "
@@ -220,7 +238,15 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "specific set; never shorten it to school_uniform or replace it with another "
         "school's uniform. "
         "Omit ordinary prose "
-        "that does not need a hard tag.\n\n"
+        "that does not need a hard tag. outfit_directives are optional and are "
+        "only for an explicit modification of a character's clothes. Allowed "
+        "operations are remove, replace_color, add, and keep_only. Allowed slots "
+        "are upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, "
+        "headwear, face_accessory.mask, handwear, legwear, and footwear. For "
+        "replace_color/add include a basic English color in color. keep_only means "
+        "the user explicitly says to retain only the listed clothing layers; never "
+        "use it for a normal outfit request. source_text must be an exact substring "
+        "of the user request. Do not emit tags in outfit_directives.\n\n"
         f"User request: {user_prompt}"
     )
 
@@ -298,6 +324,75 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
             )
         )
     return tuple(anchors)
+
+
+_OUTFIT_DIRECTIVE_OPERATIONS = {"remove", "replace_color", "add", "keep_only"}
+_OUTFIT_DIRECTIVE_SLOTS = {
+    "upper_body.primary",
+    "lower_body.skirt",
+    "one_piece.dress",
+    "outerwear",
+    "headwear",
+    "face_accessory.mask",
+    "handwear",
+    "legwear",
+    "footwear",
+}
+_OUTFIT_DIRECTIVE_COLORS = {
+    "pink", "red", "white", "black", "blue", "green", "yellow", "purple",
+    "grey", "brown", "gold", "silver", "orange", "beige", "navy",
+}
+
+
+def parse_semantic_outfit_directives(
+    raw: str, user_prompt: str
+) -> tuple[SemanticOutfitDirective, ...]:
+    """Parse only explicit, source-grounded outfit operations from a plan."""
+    text = re.sub(r"^```(?:json)?\s*", "", str(raw or "").strip(), flags=re.I)
+    text = re.sub(r"\s*```$", "", text)
+    match = re.search(r"\{.*\}", text, flags=re.S)
+    if match:
+        text = match.group(0)
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return ()
+    items = data.get("outfit_directives") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return ()
+    directives: list[SemanticOutfitDirective] = []
+    for item in items[:6]:
+        if not isinstance(item, dict):
+            continue
+        operation = str(item.get("operation") or "").strip().lower()
+        source_text = str(item.get("source_text") or "").strip()
+        raw_slots = item.get("slots")
+        if not isinstance(raw_slots, list):
+            continue
+        slots = tuple(
+            dict.fromkeys(
+                str(slot or "").strip().lower() for slot in raw_slots[:4]
+            )
+        )
+        color = str(item.get("color") or "").strip().lower()
+        if (
+            operation not in _OUTFIT_DIRECTIVE_OPERATIONS
+            or not slots
+            or any(slot not in _OUTFIT_DIRECTIVE_SLOTS for slot in slots)
+            or not source_text
+            or (source_text not in user_prompt and source_text.lower() not in user_prompt.lower())
+        ):
+            continue
+        if operation == "keep_only" and len(slots) > 4:
+            continue
+        if operation in {"remove", "replace_color", "add"} and len(slots) != 1:
+            continue
+        if operation in {"replace_color", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
+            continue
+        directive = SemanticOutfitDirective(operation, slots, color, source_text)
+        if directive not in directives:
+            directives.append(directive)
+    return tuple(directives)
 
 
 def extract_parenthesized_character_aliases(user_prompt: str) -> tuple[SemanticAnchor, ...]:

@@ -8,6 +8,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from outfit_transfer import (
+    UserOutfitPatch,
     build_effective_outfit_plan,
     build_outfit_constraint_narrative,
     build_outfit_transfer_context,
@@ -190,6 +191,36 @@ def test_no_skirt_removes_only_skirt_layer_without_implying_bottomless() -> None
     )
     assert "black skirt" not in detail
     assert "no skirt" in detail
+
+
+def test_semantic_keep_only_filters_learned_profile_to_requested_layers() -> None:
+    effective = build_effective_outfit_plan(
+        detect_outfit_transfer("复仇者穿着常服"),
+        user_prompt="复仇者穿着常服，但除了最外面的大衣和头饰、头纱以外什么都没穿",
+        base_tags=(
+            "white_dress",
+            "wide_sleeves",
+            "white_veil",
+            "white_choker",
+            "blue_cape",
+        ),
+        semantic_patches=(
+            UserOutfitPatch(
+                subject="semantic_target",
+                operation="keep_only",
+                slot="outerwear,headwear",
+                evidence="除了最外面的大衣和头饰、头纱以外什么都没穿",
+            ),
+        ),
+    )
+
+    assert effective.effective_tags == ("white_veil", "blue_cape")
+    assert effective.removed_tags == (
+        "white_dress",
+        "wide_sleeves",
+        "white_choker",
+    )
+    assert effective.has_destructive_override is True
 
 
 def test_outfit_patch_does_not_leak_to_another_named_character() -> None:

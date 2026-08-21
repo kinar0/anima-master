@@ -21,6 +21,7 @@ from danbooru_semantic import (  # noqa: E402
     lookup_semantic_anchors,
     merge_semantic_results,
     parse_semantic_plan,
+    parse_semantic_outfit_directives,
 )
 from danbooru_resolver import DanbooruResolver  # noqa: E402
 from danbooru_tags import VariantOutfitProfile  # noqa: E402
@@ -36,6 +37,31 @@ def test_semantic_source_phrase_matches_ascii_case_insensitively() -> None:
     )
 
     assert plan and plan[0].role == "outfit_source"
+
+
+def test_semantic_plan_accepts_only_keep_clothing_directive() -> None:
+    directives = parse_semantic_outfit_directives(
+        '{"anchors":[],"outfit_directives":[{"operation":"keep_only",'
+        '"slots":["outerwear","headwear"],'
+        '"source_text":"除了最外面的大衣和头饰、头纱以外什么都没穿"}]}',
+        "复仇者穿着常服，但除了最外面的大衣和头饰、头纱以外什么都没穿",
+    )
+
+    assert len(directives) == 1
+    assert directives[0].operation == "keep_only"
+    assert directives[0].slots == ("outerwear", "headwear")
+
+
+def test_semantic_outfit_directive_rejects_unsourced_or_tag_level_claims() -> None:
+    directives = parse_semantic_outfit_directives(
+        '{"outfit_directives":[{"operation":"keep_only",'
+        '"slots":["white_dress"],"source_text":"只保留大衣"},'
+        '{"operation":"remove","slots":["outerwear"],'
+        '"source_text":"用户没说过的话"}]}',
+        "复仇者只保留大衣",
+    )
+
+    assert directives == ()
 
 
 def test_parenthesized_english_alias_becomes_a_character_anchor() -> None:

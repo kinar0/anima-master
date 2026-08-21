@@ -17,6 +17,7 @@ try:
         extract_parenthesized_copyright_aliases,
         merge_semantic_results,
         parse_semantic_plan,
+        parse_semantic_outfit_directives,
     )
     from .multi_person_prompt import (
         build_multi_person_plan_prompt,
@@ -35,6 +36,7 @@ try:
         keep_only_verified_outfit_tags,
         preferred_search_prompt,
         rewrite_target_outfit_detail,
+        UserOutfitPatch,
     )
     from .prompt_background import (
         DEFAULT_PORTRAIT,
@@ -76,6 +78,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         extract_parenthesized_copyright_aliases,
         merge_semantic_results,
         parse_semantic_plan,
+        parse_semantic_outfit_directives,
     )
     from multi_person_prompt import (
         build_multi_person_plan_prompt,
@@ -94,6 +97,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         keep_only_verified_outfit_tags,
         preferred_search_prompt,
         rewrite_target_outfit_detail,
+        UserOutfitPatch,
     )
     from prompt_background import (
         DEFAULT_PORTRAIT,
@@ -1795,6 +1799,22 @@ class PromptPipeline:
                         )
                     )
                 )
+                semantic_outfit_patches = tuple(
+                    UserOutfitPatch(
+                        subject="semantic_target",
+                        operation=(
+                            "replace"
+                            if directive.operation == "replace_color"
+                            else directive.operation
+                        ),
+                        slot=",".join(directive.slots),
+                        value=directive.color,
+                        evidence=directive.source_text,
+                    )
+                    for directive in parse_semantic_outfit_directives(
+                        semantic_plan_raw, prompt
+                    )
+                )
                 if cached_named_result is not None:
                     cached_named_keys = {
                         tag.lower() for tag in cached_named_result.named_outfit_tags
@@ -2042,6 +2062,7 @@ class PromptPipeline:
             user_prompt=prompt,
             base_tags=tuple(split_tags(outfit_summary)),
             known_character_names=tuple(local_character_hints),
+            semantic_patches=semantic_outfit_patches if semantic_plan_raw else (),
         )
         if effective_outfit.modified:
             outfit_summary = ", ".join(effective_outfit.effective_tags)
@@ -2297,7 +2318,9 @@ class PromptPipeline:
                     ),
                     effective_outfit.forbidden_slots,
                     strict_allowlist=bool(
-                        outfit_plan.enabled or semantic_result.named_outfit_tags
+                        effective_outfit.has_allowlist_override
+                        or outfit_plan.enabled
+                        or semantic_result.named_outfit_tags
                     ),
                 )
             resolution_statuses: list[dict[str, Any]] = []
@@ -2487,7 +2510,9 @@ class PromptPipeline:
                     ),
                     effective_outfit.forbidden_slots,
                     strict_allowlist=bool(
-                        outfit_plan.enabled or semantic_result.named_outfit_tags
+                        effective_outfit.has_allowlist_override
+                        or outfit_plan.enabled
+                        or semantic_result.named_outfit_tags
                     ),
                 )
             if semantic_result.outfit_source_tags:
