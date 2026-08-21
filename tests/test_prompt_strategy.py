@@ -14,11 +14,20 @@ from prompt_pipeline import (  # noqa: E402
     filter_unbound_directional_tags,
     minimal_verified_outfit_nltags,
     normalize_structured_nltags,
+    build_character_effective_outfits,
+    controlled_character_outfit_detail,
+    character_wardrobe_authority_context,
 )
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
 from prompt_templates import build_llm_prompt  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
-from danbooru_semantic import SemanticLookupResult  # noqa: E402
+from danbooru_semantic import (  # noqa: E402
+    SemanticAnchor,
+    SemanticCharacterPlan,
+    SemanticLookupResult,
+    SemanticOutfitDirective,
+    SemanticWardrobe,
+)
 from task_summary import (  # noqa: E402
     apply_verification_summary,
     build_last_task_debug_lines,
@@ -519,6 +528,212 @@ def test_verified_outfit_nltags_drop_guessed_clothing_prose() -> None:
         "Costume based on the character Oblivionis. "
         "wakaba mutsumi and togawa sakiko stand side by side."
     )
+
+
+def test_character_outfits_stay_scoped_and_control_bottomless_per_target() -> None:
+    anchors = (
+        SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "Sakiko", ("togawa_sakiko",)),
+        SemanticAnchor("anon", "target_character", "character", "千早爱音", "Anon", ("chihaya_anon",)),
+        SemanticAnchor("haneoka", "outfit", "outfit", "羽丘冬季校服", "Haneoka winter uniform", ("haneoka_school_uniform",)),
+    )
+    plans = (
+        SemanticCharacterPlan(
+            "sakiko",
+            SemanticWardrobe("default_profile"),
+            (SemanticOutfitDirective("remove", ("lower_body.all",), "", "下半身什么都没穿", "sakiko"),),
+        ),
+        SemanticCharacterPlan("anon", SemanticWardrobe("named_outfit", "haneoka")),
+    )
+    lookup = SemanticLookupResult(
+        anchor_tags=(("sakiko", "togawa_sakiko"), ("anon", "chihaya_anon"), ("haneoka", "haneoka_school_uniform")),
+        character_profiles=(("sakiko", "togawa_sakiko", ("red_shirt", "black_skirt", "black_pantyhose"), ("blue_hair",)),),
+        anchor_outfit_profiles=(("haneoka", "haneoka_school_uniform", (), "winter"),),
+        status="resolved",
+    )
+
+    effective = build_character_effective_outfits(
+        anchors,
+        plans,
+        lookup,
+        user_prompt="丰川祥子默认服装且下半身什么都没穿，千早爱音穿羽丘冬季校服",
+        known_character_names=("丰川祥子", "千早爱音"),
+    )
+
+    sakiko, anon = effective
+    assert sakiko.effective.effective_tags == ("red_shirt", "bottomless")
+    assert anon.effective.effective_tags == ("haneoka_school_uniform",)
+    sakiko_detail = controlled_character_outfit_detail(
+        "togawa_sakiko wears haneoka winter school uniform and is bottomless",
+        "togawa_sakiko",
+        sakiko,
+    )
+    anon_detail = controlled_character_outfit_detail(
+        "chihaya_anon wears hanasaki summer school uniform and is bottomless",
+        "chihaya_anon",
+        anon,
+    )
+    assert "red_shirt" in sakiko_detail and "bottomless" in sakiko_detail
+    assert "haneoka" not in sakiko_detail
+    assert "haneoka_school_uniform" in anon_detail
+    assert "hanasaki" not in anon_detail and "bottomless" not in anon_detail
+
+
+def test_two_named_outfits_never_cross_character_details() -> None:
+    anchors = (
+        SemanticAnchor("a", "target_character", "character", "角色甲", "A", ("character_a",)),
+        SemanticAnchor("b", "target_character", "character", "角色乙", "B", ("character_b",)),
+        SemanticAnchor("look_a", "outfit", "outfit", "甲套装", "look A", ("named_look_a",)),
+        SemanticAnchor("look_b", "outfit", "outfit", "乙套装", "look B", ("named_look_b",)),
+    )
+    plans = (
+        SemanticCharacterPlan("a", SemanticWardrobe("named_outfit", "look_a")),
+        SemanticCharacterPlan("b", SemanticWardrobe("named_outfit", "look_b")),
+    )
+    lookup = SemanticLookupResult(
+        anchor_tags=(("look_a", "named_look_a"), ("look_b", "named_look_b")),
+        anchor_outfit_profiles=(("look_a", "named_look_a", (), "default"), ("look_b", "named_look_b", (), "default")),
+        status="resolved",
+    )
+    effective = build_character_effective_outfits(
+        anchors, plans, lookup, user_prompt="角色甲穿甲套装，角色乙穿乙套装"
+    )
+
+    a_detail = controlled_character_outfit_detail("character_a wears named look b", "character_a", effective[0])
+    b_detail = controlled_character_outfit_detail("character_b wears named look a", "character_b", effective[1])
+
+    assert "named_look_a" in a_detail and "named_look_b" not in a_detail
+    assert "named_look_b" in b_detail and "named_look_a" not in b_detail
+
+
+def test_creative_wardrobe_keeps_pretty_garments_but_rejects_named_uniform_and_nudity() -> None:
+    plan = build_character_effective_outfits(
+        (
+            SemanticAnchor("target", "target_character", "character", "角色甲", "A", ("character_a",)),
+            SemanticAnchor("funeral", "outfit", "outfit", "日式葬礼服装", "Japanese funeral attire", ("japanese_funeral_outfit",)),
+        ),
+        (SemanticCharacterPlan("target", SemanticWardrobe("named_outfit", "funeral")),),
+        SemanticLookupResult(status="resolved"),
+        user_prompt="角色甲穿日式葬礼服装、黑色头纱并带魅惑要素",
+    )[0]
+
+    assert plan.wardrobe_kind == "creative_fallback"
+    assert "角色甲: CREATIVE WARDROBE" in character_wardrobe_authority_context((plan,))
+
+    detail = controlled_character_outfit_detail(
+        "character_a wears black veil, lace-trimmed black thighhighs, "
+        "Hanasaki summer school uniform and is bottomless",
+        "character_a",
+        plan,
+    )
+
+    assert "black veil" in detail
+    assert "lace-trimmed black thighhighs" in detail
+    assert "Hanasaki" not in detail
+    assert "bottomless" not in detail
+
+
+def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak() -> None:
+    semantic_json = (
+        '{"anchors":['
+        '{"id":"sakiko","role":"target_character","group":"character","source_text":"丰川祥子","description":"Sakiko","candidates":["togawa_sakiko"]},'
+        '{"id":"anon","role":"target_character","group":"character","source_text":"千早爱音","description":"Anon","candidates":["chihaya_anon"]},'
+        '{"id":"haneoka","role":"outfit","group":"outfit","source_text":"羽丘冬季校服","description":"Haneoka winter uniform","candidates":["haneoka_school_uniform"]}],'
+        '"character_plans":['
+        '{"target_anchor_id":"sakiko","wardrobe":{"kind":"default_profile"},"directives":[{"operation":"remove","slots":["lower_body.all"],"source_text":"下半身什么都没穿"}]},'
+        '{"target_anchor_id":"anon","wardrobe":{"kind":"named_outfit","anchor_id":"haneoka"},"directives":[]}]}'
+    )
+    malicious_writer = (
+        "{Count: 2girls}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
+        "{Details: togawa_sakiko wears haneoka winter school uniform and is bottomless; "
+        "chihaya_anon wears Hanasaki summer school uniform and is bottomless}\n"
+        "{Tags: haneoka_school_uniform, hanasaki_summer_school_uniform, bottomless, standing, background_mode_default_portrait}\n"
+        "{Nltags: Both characters wear Hanasaki uniforms and are bottomless.}"
+    )
+
+    class _Response:
+        def __init__(self, text):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [semantic_json, malicious_writer]
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ("togawa_sakiko", "chihaya_anon")
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_semantic_anchors(self, anchors):
+            return SemanticLookupResult(
+                confirmed_tags=("togawa_sakiko", "chihaya_anon", "haneoka_school_uniform", "bang_dream!"),
+                named_outfit_tags=("haneoka_school_uniform",),
+                anchors=anchors,
+                anchor_tags=(("sakiko", "togawa_sakiko"), ("anon", "chihaya_anon"), ("haneoka", "haneoka_school_uniform")),
+                character_profiles=(("sakiko", "togawa_sakiko", ("red_shirt", "black_skirt", "black_pantyhose"), ("blue_hair",)),),
+                anchor_outfit_profiles=(("haneoka", "haneoka_school_uniform", (), "winter"),),
+                status="resolved",
+            )
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content, status="resolved", canonical_tag=llm_content, identity_tags=(llm_content,))
+
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(pipeline.build(
+        event,
+        "丰川祥子穿默认服装且下半身什么都没穿，千早爱音穿羽丘冬季校服",
+    ))
+
+    assert "togawa sakiko wears red shirt" in result.final_prompt
+    assert "togawa sakiko is bottomless" in result.final_prompt
+    assert "chihaya anon wears haneoka school uniform" in result.final_prompt
+    assert "Hanasaki" not in result.final_prompt and "hanasaki" not in result.final_prompt
+    anon_tail = result.final_prompt.split("chihaya anon wears haneoka school uniform", 1)[1]
+    assert "chihaya anon is bottomless" not in anon_tail
+    assert "- 丰川祥子: CREATIVE WARDROBE" not in context.calls[1]["prompt"]
+    assert "- 千早爱音: CREATIVE WARDROBE" not in context.calls[1]["prompt"]
 
 
 def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:

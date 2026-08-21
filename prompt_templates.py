@@ -63,7 +63,20 @@ BACKGROUND_POLICY_TEMPLATE = """
 """
 
 
+WARDROBE_AUTHORITY_POLICY = """
+
+-----------
+角色服装权限（此规则追加在自定义模板之后，必须遵守）：
+- Details 默认只能写每个角色自己的姿势、表情、互动和道具，不得自行写服装、校名、套装名或裸露状态。
+- 只有下方服装上下文明确把某角色标为 CREATIVE WARDROBE 时，才可在该角色自己的 Details 子句中补充协调、美观的普通服饰细节；不得把这些细节写到其他角色。
+- 即使启用 CREATIVE WARDROBE，也不得凭空创造学校/学院名称或命名套装，不得输出 bottomless、topless、nude、naked 等裸露状态。
+- VERIFIED WARDROBE 由程序稍后按角色注入；不要复述、扩写、混合或猜测其组成。
+- Tags 是共享场景区，只能写构图、姿势、表情、互动、道具、背景、光影和特效，不得写任何服装或裸露 tag。
+"""
+
+
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    "adbc9d2f63b6431709610ebf18549ca81da79e2978d1c10b0371bbe462be9b83",
     "e847b2ef55b0d19ff1db7ca92285966b39419e7a81a7a8e839d53ce7f44fd731",
     "1ca427c3208fc3d59f66d0a4c033a6ce19745d7df1858c96d009cc5a3460fa1c",
     "f63d42fcc21ae1d9dcc5a94c63c787f4e7d699e6c76fb3da90a1a46a2a0978f8",
@@ -221,6 +234,7 @@ def build_llm_prompt(
         # must still reach the LLM, so append it without requiring users to
         # migrate their stored template.
         prompt += f"\n\n-----------\n角色辅助信息：\n{character_rule}"
+    prompt += WARDROBE_AUTHORITY_POLICY
     prompt += build_keyword_rule_block(tuple(keyword_prompt_rules))
     if mode == "txt2img":
         prompt += BACKGROUND_POLICY_TEMPLATE.format(

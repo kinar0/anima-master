@@ -77,6 +77,23 @@ class SemanticOutfitDirective:
 
 
 @dataclass(frozen=True)
+class SemanticWardrobe:
+    """One target character's authoritative wardrobe selection."""
+
+    kind: str
+    anchor_id: str = ""
+
+
+@dataclass(frozen=True)
+class SemanticCharacterPlan:
+    """A strictly reference-checked visual/outfit plan for one character."""
+
+    target_anchor_id: str
+    wardrobe: SemanticWardrobe
+    directives: tuple[SemanticOutfitDirective, ...] = ()
+
+
+@dataclass(frozen=True)
 class SemanticLookupResult:
     """Locally validated semantic anchors for one image request."""
 
@@ -86,6 +103,13 @@ class SemanticLookupResult:
     appearance_profile_tags: tuple[str, ...] = ()
     named_outfit_tags: tuple[str, ...] = ()
     source_outfit_profiles: tuple[
+        tuple[str, str, tuple[str, ...], str], ...
+    ] = ()
+    anchor_tags: tuple[tuple[str, str], ...] = ()
+    character_profiles: tuple[
+        tuple[str, str, tuple[str, ...], tuple[str, ...]], ...
+    ] = ()
+    anchor_outfit_profiles: tuple[
         tuple[str, str, tuple[str, ...], str], ...
     ] = ()
     missing_descriptions: tuple[str, ...] = ()
@@ -217,10 +241,11 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         '"group":"character","source_text":"exact phrase from request",'
         '"description":"short English visible meaning",'
         '"candidates":["canonical_tag_guess"]}],'
-        '"outfit_directives":[{"operation":"keep_only",'
+        '"character_plans":[{"target_anchor_id":"target_1",'
+        '"wardrobe":{"kind":"default_profile"},'
+        '"directives":[{"operation":"keep_only",'
         '"slots":["outerwear","headwear"],'
-        '"target_anchor_id":"target_1",'
-        '"source_text":"exact clothing instruction from request"}]}\n'
+        '"source_text":"exact clothing instruction from request"}]}]}\n'
         "Allowed roles: target_character, outfit_source, copyright, appearance, "
         "expression, pose, action, clothing, outfit, accessory, prop, scene, lighting. "
         "Allowed groups are the same except target_character/outfit_source use "
@@ -239,8 +264,16 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "the complete proper name from the request and candidates must target that "
         "specific set; never shorten it to school_uniform or replace it with another "
         "school's uniform. "
-        "Omit ordinary prose "
-        "that does not need a hard tag. outfit_directives are optional and are "
+        "Omit ordinary prose that does not need a hard tag. Emit exactly one "
+        "character_plans item for each target character. Its target_anchor_id must "
+        "reference that target_character anchor. wardrobe.kind is default_profile "
+        "for canonical clothing, named_outfit for an explicit named ensemble, "
+        "outfit_source for clothes copied from a character/persona, creative_fallback "
+        "when the requested look has no verified named/default wardrobe and the final "
+        "writer may design compatible garment details, or none. "
+        "named_outfit and outfit_source require wardrobe.anchor_id referencing the "
+        "corresponding outfit or outfit_source anchor; other kinds must omit it. "
+        "directives are optional and are "
         "only for an explicit modification of a character's clothes. Allowed "
         "operations are remove, replace_color, recolor_all, add, and keep_only. Allowed slots "
         "are upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, "
@@ -250,9 +283,8 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "color; it requires color and must use an empty slots list. keep_only means "
         "the user explicitly says to retain only the listed clothing layers; never "
         "use it for a normal outfit request. source_text must be an exact substring "
-        "of the user request. target_anchor_id must identify the target_character "
-        "anchor affected by this operation; it is mandatory whenever there is more "
-        "than one target character. Do not emit tags in outfit_directives.\n\n"
+        "of the user request. Directives inherit their enclosing character target; "
+        "do not put target_anchor_id inside them and do not emit tags in directives.\n\n"
         f"User request: {user_prompt}"
     )
 
@@ -345,11 +377,126 @@ _OUTFIT_DIRECTIVE_SLOTS = {
     "handwear",
     "legwear",
     "footwear",
+    "lower_body.all",
 }
 _OUTFIT_DIRECTIVE_COLORS = {
     "pink", "red", "white", "black", "blue", "green", "yellow", "purple",
     "grey", "brown", "gold", "silver", "orange", "beige", "navy",
 }
+
+_WARDROBE_KINDS = {
+    "default_profile", "named_outfit", "outfit_source", "creative_fallback", "none"
+}
+
+
+def _semantic_json(raw: str) -> dict[str, Any]:
+    text = re.sub(r"^```(?:json)?\s*", "", str(raw or "").strip(), flags=re.I)
+    text = re.sub(r"\s*```$", "", text)
+    match = re.search(r"\{.*\}", text, flags=re.S)
+    if match:
+        text = match.group(0)
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _parse_outfit_directive_item(
+    item: Any, *, user_prompt: str, target_anchor_id: str
+) -> SemanticOutfitDirective | None:
+    if not isinstance(item, dict):
+        return None
+    operation = str(item.get("operation") or "").strip().lower()
+    source_text = str(item.get("source_text") or "").strip()
+    raw_slots = item.get("slots")
+    if not isinstance(raw_slots, list):
+        return None
+    slots = tuple(dict.fromkeys(str(slot or "").strip().lower() for slot in raw_slots[:4]))
+    color = str(item.get("color") or "").strip().lower()
+    if (
+        operation not in _OUTFIT_DIRECTIVE_OPERATIONS
+        or (not slots and operation != "recolor_all")
+        or any(slot not in _OUTFIT_DIRECTIVE_SLOTS for slot in slots)
+        or not source_text
+        or (source_text not in user_prompt and source_text.lower() not in user_prompt.lower())
+    ):
+        return None
+    if operation == "recolor_all" and slots:
+        return None
+    if operation in {"remove", "replace_color", "add"} and len(slots) != 1:
+        return None
+    if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
+        return None
+    return SemanticOutfitDirective(operation, slots, color, source_text, target_anchor_id)
+
+
+def parse_semantic_character_plans(
+    raw: str,
+    user_prompt: str,
+    anchors: tuple[SemanticAnchor, ...] | None = None,
+) -> tuple[SemanticCharacterPlan, ...]:
+    """Accept only unambiguous character/outfit references from the planner."""
+    items = _semantic_json(raw).get("character_plans")
+    if not isinstance(items, list):
+        return ()
+    validated = anchors if anchors is not None else parse_semantic_plan(raw, user_prompt)
+    counts: dict[str, int] = {}
+    by_id: dict[str, SemanticAnchor] = {}
+    for anchor in validated:
+        key = anchor.anchor_id.lower()
+        counts[key] = counts.get(key, 0) + 1
+        by_id[key] = anchor
+    plans: list[SemanticCharacterPlan] = []
+    referenced_targets: list[str] = []
+    for item in items[:8]:
+        if not isinstance(item, dict):
+            continue
+        target_id = str(item.get("target_anchor_id") or "").strip().lower()
+        target = by_id.get(target_id)
+        wardrobe_data = item.get("wardrobe")
+        if (
+            counts.get(target_id) != 1
+            or target is None
+            or target.role != "target_character"
+            or not isinstance(wardrobe_data, dict)
+        ):
+            continue
+        kind = str(wardrobe_data.get("kind") or "").strip().lower()
+        wardrobe_anchor_id = str(wardrobe_data.get("anchor_id") or "").strip().lower()
+        if kind not in _WARDROBE_KINDS:
+            continue
+        if kind in {"named_outfit", "outfit_source"}:
+            wardrobe_anchor = by_id.get(wardrobe_anchor_id)
+            expected_role = "outfit" if kind == "named_outfit" else "outfit_source"
+            if (
+                counts.get(wardrobe_anchor_id) != 1
+                or wardrobe_anchor is None
+                or wardrobe_anchor.role != expected_role
+            ):
+                continue
+        elif wardrobe_anchor_id:
+            continue
+        raw_directives = item.get("directives", [])
+        if not isinstance(raw_directives, list):
+            continue
+        directives = tuple(
+            directive
+            for raw_directive in raw_directives[:6]
+            if (directive := _parse_outfit_directive_item(
+                raw_directive,
+                user_prompt=user_prompt,
+                target_anchor_id=target_id,
+            )) is not None
+        )
+        plans.append(SemanticCharacterPlan(
+            target_anchor_id=target_id,
+            wardrobe=SemanticWardrobe(kind=kind, anchor_id=wardrobe_anchor_id),
+            directives=tuple(dict.fromkeys(directives)),
+        ))
+        referenced_targets.append(target_id)
+    ambiguous = {target for target in referenced_targets if referenced_targets.count(target) > 1}
+    return tuple(plan for plan in plans if plan.target_anchor_id not in ambiguous)
 
 
 def parse_semantic_outfit_directives(
@@ -889,6 +1036,10 @@ def lookup_semantic_anchors(
         missing_descriptions=tuple(missing),
         candidate_tags=tuple(candidates[:12]),
         anchors=anchors,
+        anchor_tags=tuple(
+            (anchors[index].anchor_id, tag)
+            for index, tag in confirmed_by_anchor.items()
+        ),
         status="resolved",
     )
 
@@ -924,6 +1075,9 @@ def merge_semantic_results(
         appearance_profile_tags=merged("appearance_profile_tags"),
         named_outfit_tags=merged("named_outfit_tags"),
         source_outfit_profiles=merged("source_outfit_profiles"),
+        anchor_tags=merged("anchor_tags"),
+        character_profiles=merged("character_profiles"),
+        anchor_outfit_profiles=merged("anchor_outfit_profiles"),
         missing_descriptions=merged("missing_descriptions"),
         candidate_tags=merged("candidate_tags"),
         anchors=merged("anchors"),

@@ -909,21 +909,34 @@ class DanbooruResolver:
             cli_path=cli_path,
             timeout=timeout,
         )
-        target_tags = {
-            tag
-            for tag in result.confirmed_tags
-            if any(
-                anchor.role == "target_character"
-                and any(
-                    tag == candidate or tag.startswith(candidate + "_(")
-                    for candidate in anchor.candidates
-                )
-                for anchor in anchors
+        anchor_tag_map = dict(result.anchor_tags)
+        for anchor in anchors:
+            if anchor.role != "target_character" or anchor.anchor_id in anchor_tag_map:
+                continue
+            matched_tag = next(
+                (
+                    tag
+                    for tag in result.confirmed_tags
+                    if any(
+                        tag == candidate or tag.startswith(candidate + "_(")
+                        for candidate in anchor.candidates
+                    )
+                ),
+                "",
             )
-        }
+            if matched_tag:
+                anchor_tag_map[anchor.anchor_id] = matched_tag
+        target_anchor_tags = tuple(
+            (anchor.anchor_id, anchor_tag_map.get(anchor.anchor_id, ""))
+            for anchor in anchors
+            if anchor.role == "target_character" and anchor_tag_map.get(anchor.anchor_id)
+        )
         learned_outfit_tags: list[str] = []
         learned_appearance_tags: list[str] = []
-        for target_tag in tuple(target_tags)[:2]:
+        character_profiles: list[
+            tuple[str, str, tuple[str, ...], tuple[str, ...]]
+        ] = []
+        for target_anchor_id, target_tag in target_anchor_tags:
             profile = await asyncio.to_thread(
                 fetch_variant_outfit_profile,
                 target_tag,
@@ -938,6 +951,9 @@ class DanbooruResolver:
             )
             learned_outfit_tags.extend(profile.tags)
             learned_appearance_tags.extend(profile.appearance_tags)
+            character_profiles.append(
+                (target_anchor_id, target_tag, profile.tags, profile.appearance_tags)
+            )
             if profile.tags or profile.appearance_tags:
                 self.remember_outfit_summary(
                     target_tag,
@@ -953,14 +969,16 @@ class DanbooruResolver:
                         "appearance_tags": list(profile.appearance_tags),
                     },
                 )
-        if learned_outfit_tags or learned_appearance_tags:
+        if character_profiles:
             result = replace(
                 result,
                 outfit_profile_tags=tuple(dict.fromkeys(learned_outfit_tags)),
                 appearance_profile_tags=tuple(
                     dict.fromkeys(learned_appearance_tags)
                 ),
+                character_profiles=tuple(character_profiles),
             )
+        anchor_outfit_profiles = list(result.anchor_outfit_profiles)
         if result.status == "resolved" and result.named_outfit_tags:
             for anchor in anchors:
                 if anchor.role not in {"outfit", "clothing"}:
@@ -998,7 +1016,11 @@ class DanbooruResolver:
                     donmai_base_urls=self._base_urls(),
                 )
                 if not profile.tags:
+                    anchor_outfit_profiles.append((anchor.anchor_id, tag, (), variant))
                     continue
+                anchor_outfit_profiles.append(
+                    (anchor.anchor_id, tag, profile.tags, variant)
+                )
                 self.remember_outfit_summary(
                     anchor.source_text,
                     (tag,),
@@ -1013,6 +1035,11 @@ class DanbooruResolver:
                     },
                     variant,
                 )
+        if anchor_outfit_profiles:
+            result = replace(
+                result,
+                anchor_outfit_profiles=tuple(dict.fromkeys(anchor_outfit_profiles)),
+            )
         if result.status != "resolved" or not result.outfit_source_tags:
             return result
         user_agent = (
@@ -1025,7 +1052,7 @@ class DanbooruResolver:
             anchor for anchor in anchors if anchor.role == "outfit_source"
         ]
         used_anchor_ids: set[str] = set()
-        for source_tag in result.outfit_source_tags[:2]:
+        for source_tag in result.outfit_source_tags:
             source_key = source_tag.lower()
             source_anchor = next(
                 (
@@ -1079,6 +1106,10 @@ class DanbooruResolver:
             scoped_profiles.append(
                 (source_alias, source_tag, profile.tags, qualifier)
             )
+            if source_anchor is not None:
+                anchor_outfit_profiles.append(
+                    (source_anchor.anchor_id, source_tag, profile.tags, qualifier)
+                )
             profile_evidence = {
                 "sample_mode": profile.sample_mode,
                 "total_posts": profile.total_posts,
@@ -1098,6 +1129,7 @@ class DanbooruResolver:
             result,
             outfit_profile_tags=tuple(profiles[:48]),
             source_outfit_profiles=tuple(scoped_profiles),
+            anchor_outfit_profiles=tuple(dict.fromkeys(anchor_outfit_profiles)),
         )
         return resolved
 

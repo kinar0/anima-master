@@ -22,9 +22,50 @@ from danbooru_semantic import (  # noqa: E402
     merge_semantic_results,
     parse_semantic_plan,
     parse_semantic_outfit_directives,
+    parse_semantic_character_plans,
 )
 from danbooru_resolver import DanbooruResolver  # noqa: E402
 from danbooru_tags import VariantOutfitProfile  # noqa: E402
+
+
+def test_character_plans_require_unique_role_correct_anchor_references() -> None:
+    prompt = "丰川祥子默认服装，千早爱音穿羽丘冬季校服，祥子下半身什么都没穿"
+    raw = json.dumps(
+        {
+            "anchors": [
+                {"id": "sakiko", "role": "target_character", "group": "character", "source_text": "丰川祥子", "description": "Sakiko", "candidates": ["togawa_sakiko"]},
+                {"id": "anon", "role": "target_character", "group": "character", "source_text": "千早爱音", "description": "Anon", "candidates": ["chihaya_anon"]},
+                {"id": "haneoka", "role": "outfit", "group": "outfit", "source_text": "羽丘冬季校服", "description": "winter uniform", "candidates": ["haneoka_school_uniform"]},
+            ],
+            "character_plans": [
+                {"target_anchor_id": "sakiko", "wardrobe": {"kind": "default_profile"}, "directives": [{"operation": "remove", "slots": ["lower_body.all"], "source_text": "下半身什么都没穿"}]},
+                {"target_anchor_id": "anon", "wardrobe": {"kind": "named_outfit", "anchor_id": "haneoka"}, "directives": []},
+                {"target_anchor_id": "haneoka", "wardrobe": {"kind": "default_profile"}, "directives": []},
+                {"target_anchor_id": "anon", "wardrobe": {"kind": "named_outfit", "anchor_id": "missing"}, "directives": []},
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    plans = parse_semantic_character_plans(raw, prompt)
+
+    assert [plan.target_anchor_id for plan in plans] == ["sakiko", "anon"]
+    assert plans[0].directives[0].slots == ("lower_body.all",)
+    assert plans[1].wardrobe.anchor_id == "haneoka"
+
+
+def test_duplicate_anchor_id_makes_character_plan_reference_ambiguous() -> None:
+    prompt = "丰川祥子穿羽丘校服"
+    raw = json.dumps({
+        "anchors": [
+            {"id": "target", "role": "target_character", "group": "character", "source_text": "丰川祥子", "description": "Sakiko", "candidates": ["togawa_sakiko"]},
+            {"id": "uniform", "role": "outfit", "group": "outfit", "source_text": "羽丘校服", "description": "uniform", "candidates": ["haneoka_school_uniform"]},
+            {"id": "uniform", "role": "outfit", "group": "outfit", "source_text": "羽丘校服", "description": "duplicate", "candidates": ["school_uniform"]},
+        ],
+        "character_plans": [{"target_anchor_id": "target", "wardrobe": {"kind": "named_outfit", "anchor_id": "uniform"}, "directives": []}],
+    }, ensure_ascii=False)
+
+    assert parse_semantic_character_plans(raw, prompt) == ()
 
 
 def test_semantic_source_phrase_matches_ascii_case_insensitively() -> None:

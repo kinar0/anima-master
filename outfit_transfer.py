@@ -91,6 +91,10 @@ _PRONOUN_SUBJECTS = {
 }
 
 _OUTFIT_HINTS = (
+    "bottomless",
+    "topless",
+    "nude",
+    "naked",
     "dress",
     "skirt",
     "gown",
