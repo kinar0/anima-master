@@ -87,6 +87,7 @@ def build_multi_person_plan_prompt(
     *,
     fixed_characters: dict[str, str] | None = None,
     original_user_prompt: str = "",
+    outfit_constraints: str = "",
 ) -> str:
     """Build the structured planning request for a multi-person scene.
 
@@ -179,6 +180,10 @@ Rules:
 - composition must use affirmative language to request one unified full-frame camera view.
 
 {fixed_note}
+
+Bound outfit instructions from the semantic planner:
+{outfit_constraints or "None."}
+Each instruction applies only to the named person. Do not transfer it to another character.
 
 Original user text for background intent:
 {str(original_user_prompt or user_prompt).strip()}
@@ -289,6 +294,7 @@ def render_multi_person_character(
     explicit_positions: bool = False,
     identity_anchors: tuple[str, ...] = (),
     include_pose: bool = True,
+    outfit_constraints: tuple[str, ...] = (),
 ) -> str:
     """Render one character as an Anima-friendly natural-language block.
 
@@ -324,6 +330,7 @@ def render_multi_person_character(
         details.append(character.appearance)
     if character.clothing:
         details.append(character.clothing)
+    details.extend(outfit_constraints)
     if character.expression:
         details.append(character.expression)
     if include_pose and character.pose:

@@ -73,6 +73,7 @@ class SemanticOutfitDirective:
     slots: tuple[str, ...]
     color: str = ""
     source_text: str = ""
+    target_anchor_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -218,6 +219,7 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         '"candidates":["canonical_tag_guess"]}],'
         '"outfit_directives":[{"operation":"keep_only",'
         '"slots":["outerwear","headwear"],'
+        '"target_anchor_id":"target_1",'
         '"source_text":"exact clothing instruction from request"}]}\n'
         "Allowed roles: target_character, outfit_source, copyright, appearance, "
         "expression, pose, action, clothing, outfit, accessory, prop, scene, lighting. "
@@ -248,7 +250,9 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "color; it requires color and must use an empty slots list. keep_only means "
         "the user explicitly says to retain only the listed clothing layers; never "
         "use it for a normal outfit request. source_text must be an exact substring "
-        "of the user request. Do not emit tags in outfit_directives.\n\n"
+        "of the user request. target_anchor_id must identify the target_character "
+        "anchor affected by this operation; it is mandatory whenever there is more "
+        "than one target character. Do not emit tags in outfit_directives.\n\n"
         f"User request: {user_prompt}"
     )
 
@@ -364,12 +368,25 @@ def parse_semantic_outfit_directives(
     items = data.get("outfit_directives") if isinstance(data, dict) else None
     if not isinstance(items, list):
         return ()
+    anchors = data.get("anchors") if isinstance(data, dict) else None
+    target_anchor_ids = {
+        str(anchor.get("id") or "").strip().lower()
+        for anchor in anchors or ()
+        if isinstance(anchor, dict)
+        and str(anchor.get("role") or "").strip().lower() == "target_character"
+        and str(anchor.get("id") or "").strip()
+    }
+    if not target_anchor_ids:
+        return ()
     directives: list[SemanticOutfitDirective] = []
     for item in items[:6]:
         if not isinstance(item, dict):
             continue
         operation = str(item.get("operation") or "").strip().lower()
         source_text = str(item.get("source_text") or "").strip()
+        target_anchor_id = str(item.get("target_anchor_id") or "").strip().lower()
+        if not target_anchor_id and len(target_anchor_ids) == 1:
+            target_anchor_id = next(iter(target_anchor_ids))
         raw_slots = item.get("slots")
         if not isinstance(raw_slots, list):
             continue
@@ -384,6 +401,7 @@ def parse_semantic_outfit_directives(
             or (not slots and operation != "recolor_all")
             or any(slot not in _OUTFIT_DIRECTIVE_SLOTS for slot in slots)
             or not source_text
+            or target_anchor_id not in target_anchor_ids
             or (source_text not in user_prompt and source_text.lower() not in user_prompt.lower())
         ):
             continue
@@ -395,7 +413,9 @@ def parse_semantic_outfit_directives(
             continue
         if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
             continue
-        directive = SemanticOutfitDirective(operation, slots, color, source_text)
+        directive = SemanticOutfitDirective(
+            operation, slots, color, source_text, target_anchor_id
+        )
         if directive not in directives:
             directives.append(directive)
     return tuple(directives)

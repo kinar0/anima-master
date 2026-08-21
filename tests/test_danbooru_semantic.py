@@ -41,8 +41,10 @@ def test_semantic_source_phrase_matches_ascii_case_insensitively() -> None:
 
 def test_semantic_plan_accepts_only_keep_clothing_directive() -> None:
     directives = parse_semantic_outfit_directives(
-        '{"anchors":[],"outfit_directives":[{"operation":"keep_only",'
+        '{"anchors":[{"id":"target","role":"target_character"}],'
+        '"outfit_directives":[{"operation":"keep_only",'
         '"slots":["outerwear","headwear"],'
+        '"target_anchor_id":"target",'
         '"source_text":"除了最外面的大衣和头饰、头纱以外什么都没穿"}]}',
         "复仇者穿着常服，但除了最外面的大衣和头饰、头纱以外什么都没穿",
     )
@@ -54,7 +56,8 @@ def test_semantic_plan_accepts_only_keep_clothing_directive() -> None:
 
 def test_semantic_outfit_directive_rejects_unsourced_or_tag_level_claims() -> None:
     directives = parse_semantic_outfit_directives(
-        '{"outfit_directives":[{"operation":"keep_only",'
+        '{"anchors":[{"id":"target","role":"target_character"}],'
+        '"outfit_directives":[{"operation":"keep_only",'
         '"slots":["white_dress"],"source_text":"只保留大衣"},'
         '{"operation":"remove","slots":["outerwear"],'
         '"source_text":"用户没说过的话"}]}',
@@ -66,7 +69,8 @@ def test_semantic_outfit_directive_rejects_unsourced_or_tag_level_claims() -> No
 
 def test_semantic_plan_accepts_full_outfit_recolor_without_slots() -> None:
     directives = parse_semantic_outfit_directives(
-        '{"outfit_directives":[{"operation":"recolor_all",'
+        '{"anchors":[{"id":"target","role":"target_character"}],'
+        '"outfit_directives":[{"operation":"recolor_all",'
         '"slots":[],"color":"black","source_text":"改成全黑色调"}]}',
         "复仇者的官方常服，改成全黑色调",
     )
@@ -74,6 +78,22 @@ def test_semantic_plan_accepts_full_outfit_recolor_without_slots() -> None:
     assert directives[0].operation == "recolor_all"
     assert directives[0].slots == ()
     assert directives[0].color == "black"
+
+
+def test_multi_target_outfit_directive_requires_a_valid_target_anchor() -> None:
+    raw = (
+        '{"anchors":[{"id":"sakiko","role":"target_character"},'
+        '{"id":"anon","role":"target_character"}],'
+        '"outfit_directives":[{"operation":"remove",'
+        '"slots":["upper_body.primary"],"source_text":"爱音的上衣消失"},'
+        '{"operation":"remove","slots":["upper_body.primary"],'
+        '"target_anchor_id":"anon","source_text":"爱音的上衣消失"}]}'
+    )
+
+    directives = parse_semantic_outfit_directives(raw, "祥子穿常服，爱音的上衣消失")
+
+    assert len(directives) == 1
+    assert directives[0].target_anchor_id == "anon"
 
 
 def test_parenthesized_english_alias_becomes_a_character_anchor() -> None:

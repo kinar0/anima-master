@@ -10,13 +10,17 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
+from danbooru_semantic import SemanticAnchor, SemanticOutfitDirective  # noqa: E402
 from multi_person_prompt import (  # noqa: E402
     MultiPersonCharacter,
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
     render_multi_person_character,
 )
-from prompt_pipeline import PromptPipeline  # noqa: E402
+from prompt_pipeline import (  # noqa: E402
+    PromptPipeline,
+    semantic_outfit_constraints_for_multi_person,
+)
 
 
 class _Logger:
@@ -154,6 +158,37 @@ def test_character_renderer_uses_fixed_tags_as_authoritative_identity() -> None:
     assert "white hair, red eyes, fox ears" in block
     assert "orange hair" not in block
     assert "black dress" in block
+
+
+def test_multi_person_outfit_constraint_is_bound_to_its_target_only() -> None:
+    constraints = semantic_outfit_constraints_for_multi_person(
+        (
+            SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "", ("togawa_sakiko",)),
+            SemanticAnchor("anon", "target_character", "character", "千早爱音", "", ("chihaya_anon",)),
+        ),
+        (
+            SemanticOutfitDirective(
+                "remove", ("upper_body.primary",), source_text="爱音的上衣消失", target_anchor_id="anon"
+            ),
+        ),
+        ("丰川祥子", "千早爱音"),
+    )
+
+    assert constraints == {1: ("wears no shirt or top.",)}
+
+
+def test_renderer_keeps_bound_outfit_constraint_in_character_block() -> None:
+    block = render_multi_person_character(
+        MultiPersonCharacter(
+            slot="left", name="丰川祥子", danbooru_candidate="togawa_sakiko",
+            appearance="", clothing="white blouse and black skirt",
+            expression="neutral", pose="standing", props=(),
+        ),
+        alias="Character A",
+        outfit_constraints=("wears no shirt or top.",),
+    )
+
+    assert "wears no shirt or top." in block
 
 
 def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:

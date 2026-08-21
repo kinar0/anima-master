@@ -11,6 +11,7 @@ try:
     from .danbooru_semantic import (
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         SemanticAnchor,
+        SemanticOutfitDirective,
         SemanticLookupResult,
         build_semantic_plan_prompt,
         extract_parenthesized_character_aliases,
@@ -72,6 +73,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from danbooru_semantic import (
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         SemanticAnchor,
+        SemanticOutfitDirective,
         SemanticLookupResult,
         build_semantic_plan_prompt,
         extract_parenthesized_character_aliases,
@@ -588,6 +590,54 @@ _OUTFIT_NARRATIVE_RE = re.compile(
 )
 
 
+def _semantic_outfit_instruction(directive: SemanticOutfitDirective) -> str:
+    """Render one target-bound planner operation for the multi-person writer."""
+    slot_names = {
+        "upper_body.primary": "shirt or top", "lower_body.skirt": "skirt",
+        "one_piece.dress": "dress", "outerwear": "outerwear",
+        "headwear": "headwear", "face_accessory.mask": "mask",
+        "handwear": "gloves", "legwear": "legwear", "footwear": "footwear",
+    }
+    slots = [slot_names.get(slot, slot) for slot in directive.slots]
+    if directive.operation == "remove":
+        return f"wears no {slots[0]}." if slots else ""
+    if directive.operation == "replace_color":
+        return f"wears {directive.color} {slots[0]}." if slots else ""
+    if directive.operation == "recolor_all":
+        return f"uses a {directive.color} color scheme for the outfit."
+    if directive.operation == "add":
+        return f"also wears {directive.color} {slots[0]}." if slots else ""
+    if directive.operation == "keep_only":
+        return "wears only " + " and ".join(slots) + "."
+    return ""
+
+
+def semantic_outfit_constraints_for_multi_person(
+    anchors: tuple[SemanticAnchor, ...],
+    directives: tuple[SemanticOutfitDirective, ...],
+    character_names: tuple[str, ...],
+) -> dict[int, tuple[str, ...]]:
+    """Bind semantic outfit operations to exactly one multi-person character."""
+    target_names = {
+        anchor.anchor_id.lower(): anchor.source_text.strip()
+        for anchor in anchors
+        if anchor.role == "target_character" and anchor.source_text.strip()
+    }
+    bound: dict[int, list[str]] = {}
+    for directive in directives:
+        target = target_names.get(directive.target_anchor_id.lower(), "")
+        matched = [
+            index for index, name in enumerate(character_names)
+            if target and target.lower() == str(name).strip().lower()
+        ]
+        if len(matched) != 1:
+            continue
+        instruction = _semantic_outfit_instruction(directive)
+        if instruction:
+            bound.setdefault(matched[0], []).append(instruction)
+    return {index: tuple(dict.fromkeys(items)) for index, items in bound.items()}
+
+
 def minimal_verified_outfit_nltags(
     nltags: str,
     source_tags: tuple[str, ...],
@@ -940,6 +990,8 @@ class PromptPipeline:
         use_deep_thinking: bool,
         summary: dict[str, Any],
         original_user_prompt: str = "",
+        semantic_anchors: tuple[SemanticAnchor, ...] = (),
+        semantic_outfit_directives: tuple[SemanticOutfitDirective, ...] = (),
     ) -> PromptPipelineResult | None:
         """Build a hybrid tag and natural-language prompt for 2–4 people.
 
@@ -961,10 +1013,23 @@ class PromptPipeline:
             for name, tags in configured_characters.items()
             if name and name in prompt
         }
+        target_names = {
+            anchor.anchor_id.lower(): anchor.source_text
+            for anchor in semantic_anchors
+            if anchor.role == "target_character" and anchor.source_text
+        }
+        prompt_outfit_constraints = "\n".join(
+            f"- {target_names.get(directive.target_anchor_id.lower())}: "
+            f"{_semantic_outfit_instruction(directive)}"
+            for directive in semantic_outfit_directives
+            if target_names.get(directive.target_anchor_id.lower())
+            and _semantic_outfit_instruction(directive)
+        )
         plan_prompt = build_multi_person_plan_prompt(
             prompt,
             fixed_characters=mentioned_fixed_characters,
             original_user_prompt=original_user_prompt,
+            outfit_constraints=prompt_outfit_constraints,
         )
         keyword_rules = match_keyword_prompt_rules(
             original_user_prompt or prompt, prompt_config
@@ -1053,6 +1118,16 @@ class PromptPipeline:
                 }
             )
             return None
+
+        multi_outfit_constraints = semantic_outfit_constraints_for_multi_person(
+            semantic_anchors,
+            semantic_outfit_directives,
+            tuple(character.name for character in plan.characters),
+        )
+        summary["semantic_multi_outfit_constraints"] = {
+            str(index): list(constraints)
+            for index, constraints in multi_outfit_constraints.items()
+        }
 
         character_blocks: list[str] = []
         character_entity_names: list[set[str]] = []
@@ -1318,6 +1393,7 @@ class PromptPipeline:
                     # interaction out of pose, so retaining pose here does not
                     # duplicate the relationship.
                     include_pose=True,
+                    outfit_constraints=multi_outfit_constraints.get(index, ()),
                 )
             )
 
@@ -1747,6 +1823,9 @@ class PromptPipeline:
 
         semantic_result = SemanticLookupResult()
         semantic_plan_raw = ""
+        semantic_anchors: tuple[SemanticAnchor, ...] = ()
+        semantic_outfit_directives: tuple[SemanticOutfitDirective, ...] = ()
+        semantic_outfit_patches: tuple[UserOutfitPatch, ...] = ()
         cached_source_getter = getattr(
             self._danbooru_resolver, "cached_outfit_source", None
         )
@@ -1799,6 +1878,9 @@ class PromptPipeline:
                         )
                     )
                 )
+                semantic_outfit_directives = parse_semantic_outfit_directives(
+                    semantic_plan_raw, prompt
+                )
                 semantic_outfit_patches = tuple(
                     UserOutfitPatch(
                         subject="semantic_target",
@@ -1811,9 +1893,7 @@ class PromptPipeline:
                         value=directive.color,
                         evidence=directive.source_text,
                     )
-                    for directive in parse_semantic_outfit_directives(
-                        semantic_plan_raw, prompt
-                    )
+                    for directive in semantic_outfit_directives
                 )
                 if cached_named_result is not None:
                     cached_named_keys = {
@@ -1981,6 +2061,8 @@ class PromptPipeline:
                 use_deep_thinking=research_plan.use_deep_thinking,
                 summary=summary,
                 original_user_prompt=background_intent_prompt,
+                semantic_anchors=semantic_anchors,
+                semantic_outfit_directives=semantic_outfit_directives,
             )
             if multi_result is not None:
                 return multi_result
