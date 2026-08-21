@@ -284,6 +284,7 @@ class VariantOutfitProfile:
     """One evidence-backed outfit cluster inferred from a character variant."""
 
     tags: tuple[str, ...] = ()
+    appearance_tags: tuple[str, ...] = ()
     sample_mode: str = "none"
     total_posts: int = 0
     selected_posts: int = 0
@@ -324,6 +325,13 @@ def _build_variant_outfit_profile(
         parts = tag.split("_")
         return any(term in parts for term in _OUTFIT_PROFILE_TERMS) or any(
             term in tag for term in ("thighhigh", "pantyhose", "sleeve")
+        )
+
+    def is_appearance_tag(tag: str) -> bool:
+        parts = set(tag.split("_"))
+        return bool(
+            parts
+            & {"hair", "eyes", "skin", "horns", "ears", "tail", "wings", "scar"}
         )
 
     all_counts = Counter(tag for tags in post_sets for tag in tags if is_outfit_tag(tag))
@@ -446,8 +454,24 @@ def _build_variant_outfit_profile(
             key=lambda tag: (_outfit_slot_rank(tag), -counts[tag], tag),
         )[:14]
     )
+    appearance_counts = Counter(
+        tag for tags in focused for tag in tags if is_appearance_tag(tag)
+    )
+    appearance_floor = max(2, (len(focused) * 25 + 99) // 100)
+    appearance_tags = tuple(
+        tag
+        for tag, _count in sorted(
+            (
+                (tag, count)
+                for tag, count in appearance_counts.items()
+                if count >= appearance_floor
+            ),
+            key=lambda item: (-item[1], item[0]),
+        )[:10]
+    )
     return VariantOutfitProfile(
         tags=tags,
+        appearance_tags=appearance_tags,
         sample_mode=sample_mode,
         total_posts=total_posts if total_posts is not None else len(post_sets),
         selected_posts=len(post_sets),

@@ -1,7 +1,7 @@
 const demoData = {
   revision: "preview000000000000000000000000000000000000000000000000000000000",
   outfits: [
-    { key: "amoris", aliases: ["Amoris"], sourceTags: ["amoris_(bang_dream!)"], tags: ["black_corset", "red_shorts", "see-through_sleeves", "masquerade_mask", "red_thighhighs"], qualifier: "default", evidence: { sampleMode: "single_character_anchor", sampleCount: 21 } },
+    { key: "amoris", aliases: ["Amoris"], sourceTags: ["amoris_(bang_dream!)"], tags: ["black_corset", "red_shorts", "see-through_sleeves", "masquerade_mask", "red_thighhighs"], appearanceTags: ["long_hair", "blue_eyes"], qualifier: "default", evidence: { sampleMode: "single_character_anchor", sampleCount: 21 } },
     { key: "千早爱音::stage", aliases: ["千早爱音的演出服"], sourceTags: ["chihaya_anon"], tags: ["blue_jacket", "cropped_jacket", "white_skirt", "black_choker"], qualifier: "stage", evidence: { sampleMode: "stage_single_character_anchor", sampleCount: 24 } },
   ],
   outfitSets: [
@@ -20,7 +20,7 @@ const fallbackBridge = {
 const bridge = window.AstrBotPluginPage || fallbackBridge;
 
 const META = {
-  outfits: { kicker: "OUTFIT PROFILES", title: "服装档案", description: "从角色或服装来源帖子中整理出的可见服饰结构。修改后会直接影响服装迁移。" },
+  outfits: { kicker: "VISUAL PROFILES", title: "角色视觉档案", description: "从角色或服装来源帖子中学习的默认服装与稳定外观锚点。它们会作为本次生成的硬约束。" },
   outfitSets: { kicker: "NAMED OUTFIT SETS", title: "服装套组", description: "完整且独立命名的服装 anchor；同一 canonical tag 的夏季、冬季等变体会分别保存。" },
   terms: { kicker: "TERM TRANSLATIONS", title: "名词翻译", description: "将常用中文名词稳定映射为 canonical Danbooru tag，命中提示词时直接使用。" },
 };
@@ -56,7 +56,7 @@ function outfitEntry(item, index) {
   select.addEventListener("change", () => { item.qualifier = select.value; markDirty(); }); qualifier.append(select); identity.append(qualifier);
   const evidence = node("div", "meta-line"); evidence.append(node("span", "pill", item.evidence?.sampleCount ? `${item.evidence.sampleCount} 个聚类样本` : "手动档案")); if (item.evidence?.sampleMode) evidence.append(node("span", "pill", item.evidence.sampleMode)); identity.append(evidence);
   const aliases = inputField("触发别名", item.aliases.join(", "), (value) => item.aliases = splitList(value), { textarea: true, placeholder: "Amoris, 爱音演出服" }); aliases.append(chips(item.aliases, "mint"));
-  const tags = node("div", "field-stack wide"); tags.append(inputField("来源角色 Tags", item.sourceTags.join(", "), (value) => item.sourceTags = splitList(value), { placeholder: "amoris_(bang_dream!)" })); const outfitTags = inputField("服装 Tags", item.tags.join(", "), (value) => item.tags = splitList(value), { textarea: true, placeholder: "black_corset, red_shorts, ..." }); outfitTags.append(chips(item.tags)); tags.append(outfitTags);
+  const tags = node("div", "field-stack wide"); tags.append(inputField("来源角色 Tags", item.sourceTags.join(", "), (value) => item.sourceTags = splitList(value), { placeholder: "amoris_(bang_dream!)" })); const outfitTags = inputField("服装 Tags", item.tags.join(", "), (value) => item.tags = splitList(value), { textarea: true, placeholder: "black_corset, red_shorts, ..." }); outfitTags.append(chips(item.tags)); tags.append(outfitTags); if (item.appearanceTags?.length) { const appearance = node("div", "appearance-preview"); appearance.append(node("span", "appearance-label", "STABLE APPEARANCE"), chips(item.appearanceTags, "mint")); tags.append(appearance); }
   card.append(identity, aliases, tags, deleteButton(index)); return card;
 }
 function mappingEntry(item, index, isSet) {

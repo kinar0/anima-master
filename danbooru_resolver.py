@@ -548,6 +548,11 @@ class DanbooruResolver:
                         if str(item).strip()
                     ],
                     "tags": tags,
+                    "appearanceTags": [
+                        str(item).strip()
+                        for item in evidence.get("appearance_tags", [])
+                        if str(item).strip()
+                    ],
                     "qualifier": self._normalize_outfit_variant(
                         raw.get("qualifier"), str(key), aliases
                     ),
@@ -904,6 +909,58 @@ class DanbooruResolver:
             cli_path=cli_path,
             timeout=timeout,
         )
+        target_tags = {
+            tag
+            for tag in result.confirmed_tags
+            if any(
+                anchor.role == "target_character"
+                and any(
+                    tag == candidate or tag.startswith(candidate + "_(")
+                    for candidate in anchor.candidates
+                )
+                for anchor in anchors
+            )
+        }
+        learned_outfit_tags: list[str] = []
+        learned_appearance_tags: list[str] = []
+        for target_tag in tuple(target_tags)[:2]:
+            profile = await asyncio.to_thread(
+                fetch_variant_outfit_profile,
+                target_tag,
+                outfit_kind="default",
+                timeout=min(2.5, timeout),
+                user_agent=(
+                    self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT).strip()
+                    or DEFAULT_USER_AGENT
+                ),
+                cache=self._cache,
+                donmai_base_urls=self._base_urls(),
+            )
+            learned_outfit_tags.extend(profile.tags)
+            learned_appearance_tags.extend(profile.appearance_tags)
+            if profile.tags or profile.appearance_tags:
+                self.remember_outfit_summary(
+                    target_tag,
+                    (target_tag,),
+                    profile.tags,
+                    {
+                        "sample_mode": profile.sample_mode,
+                        "total_posts": profile.total_posts,
+                        "selected_posts": profile.selected_posts,
+                        "focused_posts": profile.focused_posts,
+                        "anchor_tag": profile.anchor_tag,
+                        "tag_counts": dict(profile.tag_counts),
+                        "appearance_tags": list(profile.appearance_tags),
+                    },
+                )
+        if learned_outfit_tags or learned_appearance_tags:
+            result = replace(
+                result,
+                outfit_profile_tags=tuple(dict.fromkeys(learned_outfit_tags)),
+                appearance_profile_tags=tuple(
+                    dict.fromkeys(learned_appearance_tags)
+                ),
+            )
         if result.status == "resolved" and result.named_outfit_tags:
             for anchor in anchors:
                 if anchor.role not in {"outfit", "clothing"}:

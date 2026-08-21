@@ -1895,6 +1895,9 @@ class PromptPipeline:
                     )
                     or semantic_result.outfit_profile_tags
                 ),
+                "danbooru_semantic_appearance_tags": list(
+                    semantic_result.appearance_profile_tags
+                ),
                 "danbooru_semantic_source_outfit_profiles": [
                     {
                         "alias": alias,
@@ -2070,6 +2073,7 @@ class PromptPipeline:
                     *semantic_confirmed_tags,
                     *effective_outfit.effective_tags,
                     *semantic_visible_outfit_tags,
+                    *semantic_result.appearance_profile_tags,
                     *semantic_result.named_outfit_tags,
                 )
             )

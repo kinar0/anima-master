@@ -67,6 +67,7 @@ class SemanticLookupResult:
     confirmed_tags: tuple[str, ...] = ()
     outfit_source_tags: tuple[str, ...] = ()
     outfit_profile_tags: tuple[str, ...] = ()
+    appearance_profile_tags: tuple[str, ...] = ()
     named_outfit_tags: tuple[str, ...] = ()
     source_outfit_profiles: tuple[
         tuple[str, str, tuple[str, ...], str], ...
@@ -89,6 +90,7 @@ class SemanticLookupResult:
             and not self.confirmed_tags
             and not self.outfit_source_tags
             and not self.outfit_profile_tags
+            and not self.appearance_profile_tags
             and not self.named_outfit_tags
             and not self.source_outfit_profiles
             and not effective_outfit_tags
@@ -131,6 +133,11 @@ class SemanticLookupResult:
             lines.append(
                 "Do not add clothing outside this authoritative list. Explicit user "
                 "changes have already been applied to it."
+            )
+        if self.appearance_profile_tags:
+            lines.append(
+                "authoritative recurring appearance tags for this character: "
+                + ", ".join(self.appearance_profile_tags)
             )
         if self.source_outfit_profiles:
             lines.append("Character-scoped outfit-source profiles (never mix them):")
@@ -788,6 +795,7 @@ def merge_semantic_results(
         confirmed_tags=merged("confirmed_tags"),
         outfit_source_tags=merged("outfit_source_tags"),
         outfit_profile_tags=merged("outfit_profile_tags"),
+        appearance_profile_tags=merged("appearance_profile_tags"),
         named_outfit_tags=merged("named_outfit_tags"),
         source_outfit_profiles=merged("source_outfit_profiles"),
         missing_descriptions=merged("missing_descriptions"),
