@@ -464,12 +464,12 @@
         }
       },
       "danbooru_named_outfit_mappings": {
-        "description": "命名服装 Tag 映射",
+        "description": "服装套组映射（兼容配置入口）",
         "type": "list",
         "default": [
           "月之森校服=tsukinomori_school_uniform"
         ],
-        "hint": "每行一个套组，格式：别名1 | 别名2 | 别名3=canonical_tag；同一套组可配置任意数量的中英文触发别名。旧的单别名映射仍兼容。命中任一别名时，右侧 tag 会作为完整服装套组 hard tag。推荐使用插件页面“服装词库”编辑。",
+        "hint": "这是“服装词库 → 服装套组”的底层兼容配置，不是普通名词翻译。每行格式：别名1 | 别名2 | 别名3=canonical_outfit_tag；命中后会创建可绑定到具体穿着者的完整套组 anchor。默认的月之森校服只是一条历史种子，不代表完整词库；自动学习的套组保存在视觉档案缓存中，可能只在服装词库页面显示。推荐在“服装词库”页面编辑。",
         "collapsed": true,
         "items": {
           "type": "string"
@@ -557,10 +557,10 @@
     "hint": "用于角色、画师组和风格，以及涩气表现力相关设置。",
     "items": {
       "fixed_characters": {
-        "description": "角色",
+        "description": "固定角色辅助信息",
         "type": "list",
         "default": [],
-        "hint": "每行一个角色，格式：角色名=tags。只有用户提到角色名时才会使用。推荐在聊天里用 /anm 添加角色 名称=tags 添加。示例：狐莉=1girl, solo, fox girl",
+        "hint": "每行格式：显示名=canonical 角色 tag 与稳定外观信息，仅在用户明确提到显示名时使用。普通结构化流程主要把它作为角色身份提示；/anm 多人和旧回退路径会更强地注入这些内容。不要保存服装、动作、背景、质量词或画师词；服装请使用角色视觉档案或服装套组。可用 /anm 添加角色 名称=tags 保存。示例：狐莉=original_character, 1girl, white_hair, red_eyes, fox_ears",
         "collapsed": true,
         "items": {
           "type": "string"

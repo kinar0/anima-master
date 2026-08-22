@@ -12,7 +12,7 @@
 
 ## 命名服装套组与别名
 
-经过本地校验的独立命名服装套组会作为 hard tag 保存。套组使用 canonical Danbooru tag 标识身份，同时保存可供用户输入匹配的中英文别名：
+经过本地校验的独立命名服装套组会作为 hard tag 保存。每个套组实体保存自己的变体和中英文触发别名，并指向一个 canonical Danbooru tag：
 
 ```text
 haneoka_school_uniform
@@ -20,7 +20,7 @@ haneoka_school_uniform
 └─ haneoka school uniform
 ```
 
-用户输入任一别名时，最终提示词只注入一次 `haneoka_school_uniform`。下划线 canonical tag 不会再作为一条别名重复保存；它本身仍可直接匹配。多个自动学习结果得到相同 canonical tag 时会合并别名，不会复制出多个套组条目。
+用户输入任一别名时，最终提示词只注入一次 `haneoka_school_uniform`。下划线 canonical tag 不会再作为一条别名重复保存；它本身仍可直接匹配。不同套组实体允许指向同一个 canonical tag，不会仅按 tag 强制合并；匹配时仍保留各自别名、变体和角色绑定 anchor，最终 hard tag 再统一去重。
 
 命名套组命中后被视为完整服装 anchor。LLM 可以遵循用户明确提出的颜色、增删衣物等修改，但不能自行编造并追加未经验证的套组组成。用户没有要求修改时，应保留 canonical 套组而不展开猜测其中的上衣、裙子或配饰。
 
@@ -112,9 +112,11 @@ Tag 串中可以包含一个已保存的中文固定角色名，例如：
 狐莉=1 girl, solo, fox girl, white hair, heterochromia, fang, black choker
 ```
 
-之后在指令中明确提到角色名时，插件会拼接该角色 tags。
+之后在指令中明确提到角色名时，普通结构化路径会把这些内容作为角色身份辅助信息，并用于匹配结构化角色；`/anm 多人` 兼容路径和旧平铺回退路径会更强地注入这些内容。它们不应包含服装、动作、背景、质量词或画师词。
 
 没有提到固定角色名时，插件不会自动套用角色。
+
+固定角色、角色别名、视觉档案、服装套组和名词翻译的完整职责与注入顺序见 [角色与服装配置工作流](角色与服装配置工作流.md)。
 
 ## 画师与画风 tags
 

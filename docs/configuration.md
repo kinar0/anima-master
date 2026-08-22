@@ -99,24 +99,24 @@ vae_name = ComfyUI 中的 VAE 文件名
 - **服装套组**：保存独立命名的完整服装套组及其 canonical Danbooru tag。
 - **名词翻译**：把中文服装名词稳定映射到 canonical Danbooru tag。
 
-服装套组以 canonical tag 作为唯一身份，一个套组可以同时维护多个触发别名。例如：
+服装套组以“独立套组实体 + 变体”维护触发别名，每个实体指向一个 canonical tag。例如：
 
 ```text
 Canonical Tag: haneoka_school_uniform
 触发别名: 羽丘校服, haneoka school uniform
 ```
 
-下划线形式 `haneoka_school_uniform` 只保存在 canonical tag 字段，不会重复写进别名列表；中文名和空格英文名会分别保存并参与匹配。相同 canonical tag 被多次自动学习时会合并为一个套组，新的中文或英文说法并入其别名列表。手动配置与自动学习命中同一 canonical tag 时，页面以手动配置为主并合并可用别名。
+下划线形式 `haneoka_school_uniform` 只保存在 canonical tag 字段，不会重复写进别名列表；中文名和空格英文名会分别保存并参与匹配。不同套组实体允许指向同一个 canonical tag，不会仅因 tag 相同就强制合并；最终 hard tag 会去重，但各套组仍保留自己的别名、变体和角色绑定 anchor。手动配置的别名优先于冲突的自动学习别名。
 
 页面保存使用 revision 检查，若生成期间词库已被其他请求更新，会要求刷新后重试，避免覆盖新数据。保存成功后配置与运行时缓存立即更新，不需要为每次词库编辑重载插件；只有安装或更新本页代码后需要先重载一次插件。
 
-配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。命名套组每一行都是独立实体，格式为 `别名1 | 别名2=canonical_tag`；不同实体可以使用同一个 canonical tag，不会按 tag 合并。推荐日常使用“服装词库”页面，减少格式错误。
+配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。前者是“服装套组”的兼容配置入口，格式为 `别名1 | 别名2=canonical_tag`；后者是没有角色归属的全局 hard tag 映射。推荐日常使用“服装词库”页面，减少格式错误。完整的数据源职责、角色绑定和最终注入规则见 [角色与服装配置工作流](角色与服装配置工作流.md)。
 
 人物检测还支持两个上下文映射：`danbooru_series_alias_mappings` 把本地化标题、续作或外传名称归入角色 tag 实际使用的作品家族；`danbooru_character_alias_mappings` 把角色俗称映射到 canonical character tag。两者都使用 `别名1 | 别名2=canonical_tag`。带作品后缀的角色映射只有在同一请求也命中兼容作品家族时才会进入本地精确校验，因此单独出现的同名角色不会被强行消歧。
 
 ## 角色与画风
 
-- `fixed_characters`：固定角色预设。
+- `fixed_characters`：固定角色辅助信息；普通结构化路径主要把它作为身份提示，多人兼容路径和旧回退路径会更强地注入。不要在其中保存服装、动作、背景、质量词或画师词，详见 [角色与服装配置工作流](角色与服装配置工作流.md)。
 - `default_artist_tags`：未启用画师组时使用的备用画师 tags。
 - `style_tags`（画风）：独立于画师组的画风 tags，拼接在当前画师组之后。
 - `style_presets`：已保存的画风列表。
