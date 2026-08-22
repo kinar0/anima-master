@@ -9,6 +9,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_pipeline import (  # noqa: E402
+    CharacterEffectiveOutfit,
     PromptPipeline,
     extract_structured_prompt,
     filter_unbound_directional_tags,
@@ -20,7 +21,10 @@ from prompt_pipeline import (  # noqa: E402
     apply_requested_wardrobe_mode,
     requested_wardrobe_mode,
     requests_casual_life_outfit,
+    safe_global_outfit_tags,
+    scoped_outfit_narrative,
 )
+from outfit_transfer import EffectiveOutfitPlan  # noqa: E402
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
 from prompt_templates import build_llm_prompt  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver  # noqa: E402
@@ -865,6 +869,34 @@ def test_character_outfits_stay_scoped_and_control_bottomless_per_target() -> No
     assert "haneoka_school_uniform" in anon_detail
     assert "hanasaki" not in anon_detail and "bottomless" not in anon_detail
 
+    assert scoped_outfit_narrative(sakiko_detail) == (
+        "togawa_sakiko wears red_shirt. togawa_sakiko is bottomless."
+    )
+    assert scoped_outfit_narrative(anon_detail) == (
+        "chihaya_anon wears haneoka_school_uniform."
+    )
+    assert safe_global_outfit_tags(effective) == ()
+
+
+def test_global_outfit_reinforcement_is_single_or_shared_only() -> None:
+    def plan(name: str, *tags: str) -> CharacterEffectiveOutfit:
+        return CharacterEffectiveOutfit(
+            target_anchor_id=name,
+            target_source_text=name,
+            target_candidates=(name,),
+            wardrobe_kind="default_profile",
+            wardrobe_anchor_id="",
+            wardrobe_tag="",
+            appearance_tags=(),
+            effective=EffectiveOutfitPlan(effective_tags=tags),
+        )
+
+    red = plan("character_a", "school_uniform", "red_jacket")
+    blue = plan("character_b", "school_uniform", "blue_cardigan")
+
+    assert safe_global_outfit_tags((red,)) == ("school_uniform", "red_jacket")
+    assert safe_global_outfit_tags((red, blue)) == ("school_uniform",)
+
 
 def test_cached_editor_profiles_bind_to_each_character_without_crossing() -> None:
     anchors = (
@@ -1443,6 +1475,14 @@ def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak(
     assert "lace-trimmed black thighhighs" in result.final_prompt
     assert "Oblivionis" not in result.final_prompt
     assert "wakaba mutsumi is nude" not in result.final_prompt
+    nltags = result.final_prompt.split("Nltags:", 1)[1]
+    assert "togawa sakiko wears red shirt" in nltags
+    assert "togawa sakiko is bottomless" in nltags
+    assert "chihaya anon wears haneoka school uniform" in nltags
+    assert "Hanasaki" not in nltags and "hanasaki" not in nltags
+    assert "wakaba mutsumi wears a black veil" in nltags
+    assert "wakaba mutsumi is nude" not in nltags
+    assert result.summary["global_outfit_reinforcement_tags"] == []
     assert result.summary["structured_character_count"] == 3
     assert "- 丰川祥子: CREATIVE WARDROBE" not in context.calls[1]["prompt"]
     assert "- 千早爱音: CREATIVE WARDROBE" not in context.calls[1]["prompt"]

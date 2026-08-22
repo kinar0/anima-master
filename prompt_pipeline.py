@@ -733,6 +733,22 @@ def strip_outfit_narrative(nltags: str) -> str:
     )
 
 
+def scoped_outfit_narrative(detail: str) -> str:
+    """Keep wearer-bound wardrobe clauses from one post-processed Details entry.
+
+    The prompt writer's shared Nltags wardrobe prose is untrusted because it can
+    assign one character's clothes to another. Details has already passed the
+    per-character wardrobe authority rewrite, so wardrobe clauses extracted here
+    are the safe source for reinforcing the final character-to-outfit binding.
+    """
+    clauses = []
+    for clause in re.split(r"\s*;\s*", " ".join(str(detail or "").split())):
+        clause = clause.strip(" ,.;")
+        if clause and _OUTFIT_NARRATIVE_RE.search(clause):
+            clauses.append(clause + ".")
+    return " ".join(dict.fromkeys(clauses))
+
+
 @dataclass(frozen=True)
 class CharacterEffectiveOutfit:
     """Resolved request-scoped wardrobe data owned by exactly one character.
@@ -750,6 +766,25 @@ class CharacterEffectiveOutfit:
     wardrobe_tag: str
     appearance_tags: tuple[str, ...]
     effective: EffectiveOutfitPlan
+
+
+def safe_global_outfit_tags(
+    plans: tuple[CharacterEffectiveOutfit, ...],
+) -> tuple[str, ...]:
+    """Return wardrobe tags safe to reinforce without cross-character leakage.
+
+    A single wearer has no attribution ambiguity, so all verified tags are safe.
+    With multiple wearers, only tags shared by every verified per-character plan
+    may enter the global tag stream. Character-specific tags remain exclusively
+    in the wearer-bound Details and reconstructed Nltags clauses.
+    """
+    if not plans or any(plan.wardrobe_kind == "creative_fallback" for plan in plans):
+        return ()
+    tag_sets = [set(plan.effective.effective_tags) for plan in plans]
+    if len(tag_sets) == 1:
+        return tuple(plans[0].effective.effective_tags)
+    shared = set.intersection(*tag_sets) if tag_sets else set()
+    return tuple(tag for tag in plans[0].effective.effective_tags if tag in shared)
 
 
 _OFFICIAL_DEFAULT_OUTFIT_RE = re.compile(
@@ -2813,6 +2848,9 @@ class PromptPipeline:
             user_prompt=prompt,
             known_character_names=tuple(local_character_hints),
         )
+        global_outfit_reinforcement_tags = safe_global_outfit_tags(
+            character_effective_outfits
+        )
         semantic_visible_outfit_tags = tuple(
             tag
             for tag in profile_tags_for_request
@@ -3146,6 +3184,7 @@ class PromptPipeline:
                                     else semantic_result.named_outfit_tags
                                 ),
                                 *verified_character_outfit_tags,
+                                *global_outfit_reinforcement_tags,
                             )
                         )
                     ),
@@ -3246,6 +3285,11 @@ class PromptPipeline:
             structured_detail_blocks = tuple(
                 dict.fromkeys(block for block in effective_detail_blocks if block)
             )
+            scoped_outfit_narratives = tuple(
+                narrative
+                for block in structured_detail_blocks
+                if (narrative := scoped_outfit_narrative(block))
+            )
             # Only the seventh block's Danbooru tag section goes through the
             # tag cleaner.  The other structured fields are protected sections
             # assembled in their declared order by prompt_builder.
@@ -3256,6 +3300,9 @@ class PromptPipeline:
             )
             if character_effective_outfits or casual_life_requested:
                 nltags = strip_outfit_narrative(nltags)
+                nltags = " ".join(
+                    part for part in (*scoped_outfit_narratives, nltags) if part
+                )
             if semantic_result.outfit_source_tags and not character_effective_outfits:
                 nltags = minimal_verified_outfit_nltags(
                     nltags,
@@ -3502,7 +3549,13 @@ class PromptPipeline:
             structured_identity_blocks=structured_identity_blocks,
             structured_detail_blocks=structured_detail_blocks,
             structured_tag_tags=tuple(
-                dict.fromkeys((*required_profile_tags, *semantic_required_tags))
+                dict.fromkeys(
+                    (
+                        *required_profile_tags,
+                        *semantic_required_tags,
+                        *global_outfit_reinforcement_tags,
+                    )
+                )
             ),
             preserve_structured_order=structured_prompt_mode,
             constraint_plan=constraint_plan,
@@ -3581,6 +3634,9 @@ class PromptPipeline:
                     }
                     for item in character_effective_outfits
                 ],
+                "global_outfit_reinforcement_tags": list(
+                    global_outfit_reinforcement_tags
+                ),
                 "outfit_user_patches": [
                     {
                         "subject": patch.subject,
