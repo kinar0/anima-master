@@ -2843,7 +2843,20 @@ class PromptPipeline:
             tag.lower().replace("_", " ") == "no humans"
             for tag in structured_roster_tags
         )
-        if not structured_prompt_mode and "_(" not in llm_content:
+        structured_field_pattern = (
+            r"\{\s*(?:Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:"
+        )
+        has_structured_fields = bool(
+            re.search(structured_field_pattern, str(llm_content or ""), re.IGNORECASE)
+        )
+        # A parenthesized canonical character tag (for example
+        # ``revenant_(elden_ring)``) says nothing about whether a response that
+        # visibly contains the seven-field envelope parsed successfully.  Keep
+        # the old fast path for genuinely flat legacy tag streams, but never use
+        # it to suppress validation/retry of brace-block output.
+        if not structured_prompt_mode and (
+            has_structured_fields or "_(" not in llm_content
+        ):
             strict_format_prompt = (
                 llm_prompt
                 + "\n\nYour previous response was invalid. Return exactly the seven "
@@ -2876,6 +2889,7 @@ class PromptPipeline:
                 )
                 if retry_structured_prompt_mode:
                     llm_content = retry_content
+                    structured_prompt_mode = True
                     summary["structured_format_retry"] = True
                 else:
                     summary["structured_format_retry"] = False
@@ -2884,6 +2898,39 @@ class PromptPipeline:
                     "[comfyui_agent] structured prompt format retry failed: %s", exc
                 )
                 summary["structured_format_retry"] = False
+        if not structured_prompt_mode:
+            # Never reinterpret a failed seven-field response as a flat legacy
+            # tag stream.  The legacy cleanup below deliberately strips brace
+            # blocks; allowing a structured-looking response through therefore
+            # turns a validation error into a successful but almost empty image
+            # request.  Stop instead, preserving the failure in diagnostics.
+            structured_field_count = len(
+                re.findall(
+                    structured_field_pattern,
+                    str(llm_content or ""),
+                    flags=re.IGNORECASE,
+                )
+            )
+            if structured_field_count:
+                llm_error = "invalid_structured_prompt"
+                self.logger.warning(
+                    "[comfyui_agent] prompt builder returned %s structured fields "
+                    "but validation failed; aborting instead of stripping them",
+                    structured_field_count,
+                )
+                summary.update(
+                    {
+                        "llm_failed": True,
+                        "llm_error": llm_error,
+                        "structured_field_count": structured_field_count,
+                        "skipped_reason": llm_error,
+                        "final_prompt_head": "",
+                        "final_prompt_chars": 0,
+                    }
+                )
+                if self._bool("debug_prompt_enabled", False):
+                    summary["llm_raw_content"] = llm_content
+                return PromptPipelineResult("", summary)
         semantic_character_tags = confirmed_semantic_character_tags(semantic_result)
         structured_characters, structured_nltags = (
             bind_single_confirmed_semantic_character(

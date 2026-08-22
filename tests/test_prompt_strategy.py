@@ -316,7 +316,7 @@ def test_prompt_pipeline_uses_default_creative_generation():
     assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
 
 
-def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
+def test_prompt_pipeline_retries_invalid_structured_parenthesized_character() -> None:
     class _Response:
         def __init__(self, text: str):
             self.completion_text = text
@@ -324,7 +324,18 @@ def test_prompt_pipeline_retries_flat_output_for_structured_format() -> None:
     class _Context:
         def __init__(self):
             self.outputs = [
-                "blue_hair, black_pantyhose",
+                (
+                    "{Count: 1girl, solo}\n"
+                    "{Characters: revenant_(elden_ring)}\n"
+                    "{Copyright: elden_ring}\n"
+                    "{Identity: revenant_(elden_ring) has white_hair}\n"
+                    # Invalid because Details does not start with the roster
+                    # character.  The canonical ``_(...)`` tag must not suppress
+                    # the strict-format retry.
+                    "{Details: another_character stands}\n"
+                    "{Tags: arms_crossed, angry}\n"
+                    "{Nltags: revenant (elden ring) stands angrily.}"
+                ),
                 (
                     "{Count: 1girl, solo}\n"
                     "{Characters: togawa_sakiko}\n"
