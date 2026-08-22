@@ -32,6 +32,7 @@ class DailyUsageLimiter:
         *,
         today: Callable[[], date] | None = None,
     ) -> None:
+        """Create a limiter with an injectable date source for deterministic tests."""
         self.path = Path(path)
         self._logger = logger
         self._today = today or (lambda: datetime.now().astimezone().date())
@@ -82,6 +83,7 @@ class DailyUsageLimiter:
             )
 
     def _read_state(self, day: str) -> dict[str, object]:
+        """Load sanitized counts for ``day``; reset stale or corrupt state safely."""
         if not self.path.exists():
             return {"date": day, "counts": {}}
         try:
@@ -103,6 +105,7 @@ class DailyUsageLimiter:
             return {"date": day, "counts": {}}
 
     def _write_state(self, state: dict[str, object]) -> None:
+        """Best-effort atomically replace state without blocking generation on I/O."""
         try:
             payload = json.dumps(state, ensure_ascii=False, indent=2)
             self.path.parent.mkdir(parents=True, exist_ok=True)

@@ -119,6 +119,7 @@ class DanbooruResolver:
 
     @staticmethod
     def _outfit_variant(value: Any) -> str:
+        """Classify text into the small wardrobe-variant vocabulary used on disk."""
         text = str(value or "").strip().lower()
         if re.search(r"(?:冬季|冬装|冬服|winter)", text, flags=re.I):
             return "winter"
@@ -143,6 +144,7 @@ class DanbooruResolver:
 
     @classmethod
     def _normalize_outfit_variant(cls, value: Any, *hints: Any) -> str:
+        """Keep a valid stored variant or infer one from legacy textual hints."""
         explicit = str(value or "").strip().lower()
         if explicit in {"default", "casual", "summer", "winter", "stage"}:
             return explicit
@@ -150,6 +152,7 @@ class DanbooruResolver:
 
     @classmethod
     def _outfit_profile_key(cls, source_text: str, variant: str) -> str:
+        """Return the cache key that isolates non-default seasonal profiles."""
         source = cls._profile_alias_key(source_text)
         return source if variant == "default" else f"{source}::{variant}"
 
@@ -157,6 +160,7 @@ class DanbooruResolver:
     def _alias_fits_named_outfit(
         cls, alias: str, canonical_tag: str, variant: str
     ) -> bool:
+        """Reject learned aliases that would erase outfit identity or season."""
         alias_key = cls._profile_alias_key(alias)
         tag_key = str(canonical_tag or "").strip().lower()
         if not alias_key or alias_key == tag_key:
@@ -235,6 +239,21 @@ class DanbooruResolver:
         return human[0]
 
     def _profile_data(self) -> dict[str, Any]:
+        """Load the versioned profile cache once, or return an empty v3 cache.
+
+        Version 3 stores ``{"version": 3, "profiles": {key: record}}``. A
+        ``character_outfit`` record contains ``qualifier``, trigger ``aliases``,
+        donor-identity ``source_tags``, related ``copyright_tags``, copyable
+        ``outfit_tags``, and optional post-derived ``evidence``. A ``named_outfit``
+        record contains ``variant``, learned ``aliases``, editor-owned
+        ``manual_aliases``, and one complete ensemble tag in ``outfit_tags``.
+        Non-default character profiles use ``source::variant`` keys so summer,
+        winter, stage, and casual evidence cannot overwrite the default wardrobe.
+
+        Missing, corrupt, and obsolete files are deliberately treated alike. They
+        must not block image generation, and older schemas are unsafe to interpret
+        as current wardrobe evidence.
+        """
         if self._profile_cache_data is not None:
             return self._profile_cache_data
         data: dict[str, Any] = {"version": 3, "profiles": {}}
@@ -254,6 +273,7 @@ class DanbooruResolver:
         return data
 
     def _save_profile_data(self) -> None:
+        """Best-effort persist the in-memory profile cache via file replacement."""
         path = self._profile_cache_path
         if path is None or self._profile_cache_data is None:
             return
@@ -449,6 +469,7 @@ class DanbooruResolver:
 
     @classmethod
     def _named_profile_variant(cls, key: str, profile: dict[str, Any]) -> str:
+        """Read a named outfit's variant with compatibility for legacy records."""
         return cls._normalize_outfit_variant(
             profile.get("variant"), key, profile.get("aliases", [])
         )
@@ -495,7 +516,15 @@ class DanbooruResolver:
     def cached_named_outfits_for_prompt(
         self, user_prompt: str
     ) -> SemanticLookupResult | None:
-        """Return every persisted independent outfit-set explicitly named in a request."""
+        """Resolve complete outfit-set aliases using user config before learned data.
+
+        Explicit configured mappings are checked first and therefore own a
+        duplicate alias/variant anchor identity. Persisted learned records are
+        considered only after poison-data screening; within either source an alias
+        mention wins, while canonical spelling is a variant-compatible fallback.
+        Canonical tags are deduplicated, but conflicting distinct tags are retained
+        as separate evidence rather than silently choosing one.
+        """
         text = str(user_prompt or "").lower()
         requested_variant = self._outfit_variant(text)
         matched: list[str] = []
@@ -735,6 +764,8 @@ class DanbooruResolver:
         A scoped character alias is authoritative only when the same request also
         names a compatible work family.  This lets localized sequel/spinoff names
         disambiguate a character whose Danbooru suffix still uses the parent work.
+        Aliases are tested longest-first so a specific multi-word/localized title
+        wins over its shorter substring.
         """
         default_series = (
             "艾尔登法环 | 艾尔登法环黑夜君临 | 黑夜君临 | "
@@ -829,6 +860,7 @@ class DanbooruResolver:
 
     @staticmethod
     def _clean_tag_list(value: Any, *, limit: int = 80) -> list[str]:
+        """Validate and deduplicate an editor-supplied canonical-tag list."""
         if not isinstance(value, list) or len(value) > limit:
             raise WardrobeValidationError("Tag 列表格式无效或数量过多。")
         cleaned: list[str] = []
@@ -842,6 +874,7 @@ class DanbooruResolver:
 
     @staticmethod
     def _clean_alias(value: Any, *, label: str = "名称") -> str:
+        """Normalize one editor label while rejecting unsafe control characters."""
         alias = re.sub(r"\s+", " ", str(value or "").strip())
         if not alias or len(alias) > 80 or any(ord(char) < 32 for char in alias):
             raise WardrobeValidationError(f"{label}为空、过长或含控制字符。")
@@ -1096,7 +1129,12 @@ class DanbooruResolver:
         evidence: dict[str, Any] | None = None,
         qualifier: str = "default",
     ) -> None:
-        """Persist a validated source and its reusable outfit summary."""
+        """Persist validated donor identity and reusable clothing as separate fields.
+
+        ``source_tags`` identify the outfit donor and are not appearance tags for
+        the visible target. ``outfit_tags`` are the transferable garment evidence;
+        optional post statistics live under ``evidence`` and determine refresh age.
+        """
         qualifier_key = self._normalize_outfit_variant(qualifier, source_text)
         key = self._outfit_profile_key(source_text, qualifier_key)
         if not key or not source_tags:
@@ -1133,7 +1171,12 @@ class DanbooruResolver:
     def remember_named_outfit(
         self, alias: str, canonical_tag: str, variant: str | None = None
     ) -> None:
-        """Persist one screened Danbooru tag representing a complete named outfit set."""
+        """Persist one screened tag representing a complete named outfit set.
+
+        Generic ``school_uniform``/``uniform`` tags are rejected because caching
+        them under a proper-name alias would make unrelated schools resolve to the
+        same outfit. Existing aliases are merged only inside the same variant.
+        """
         key = self._profile_alias_key(alias)
         tag = str(canonical_tag or "").strip().lower()
         variant_key = self._normalize_outfit_variant(variant, alias)

@@ -733,7 +733,12 @@ def strip_outfit_narrative(nltags: str) -> str:
 
 @dataclass(frozen=True)
 class CharacterEffectiveOutfit:
-    """Resolved request-scoped wardrobe data owned by exactly one character."""
+    """Resolved request-scoped wardrobe data owned by exactly one character.
+
+    The semantic anchor IDs preserve ownership through lookup, user overrides,
+    prompt cleanup, and final hard-tag injection. This avoids a global outfit list,
+    which cannot represent who wears what in multi-character requests.
+    """
 
     target_anchor_id: str
     target_source_text: str
@@ -790,6 +795,7 @@ def build_character_effective_outfits(
     def cached_profile_for_target(
         target: SemanticAnchor,
     ) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
+        """Return a cache profile only when it belongs uniquely to ``target``."""
         target_text = re.sub(r"\s+", " ", target.source_text.strip().lower())
         target_candidates = {candidate.lower() for candidate in target.candidates}
         matches = [
@@ -837,6 +843,9 @@ def build_character_effective_outfits(
             elif cached_profile := cached_profile_for_target(target):
                 base_tags, appearance_tags = cached_profile
             elif len(plans) == 1:
+                # Older lookup results expose only one request-wide profile. It is
+                # safe to inherit solely when there is one wearer; with multiple
+                # plans this fallback would flatten character ownership.
                 base_tags = semantic_result.outfit_profile_tags
                 appearance_tags = semantic_result.appearance_profile_tags
         elif plan.wardrobe.kind in {"named_outfit", "outfit_source"}:
@@ -917,6 +926,7 @@ def strip_untrusted_outfit_detail(detail: str) -> str:
 def _character_outfit_matches(
     character_name: str, plan: CharacterEffectiveOutfit
 ) -> bool:
+    """Match a writer roster name to a plan's source name or canonical candidates."""
     key = _normalized_character_key(character_name)
     candidates = {
         _normalized_character_key(plan.target_source_text),
@@ -980,6 +990,11 @@ def controlled_character_outfit_detail(
 def character_wardrobe_authority_context(
     plans: tuple[CharacterEffectiveOutfit, ...]
 ) -> str:
+    """Render per-character wardrobe ownership rules for the prompt writer.
+
+    Verified plans tell the writer to omit clothing because code injects it later;
+    creative fallbacks permit ordinary design but remain scoped to one character.
+    """
     if not plans:
         return ""
     lines = ["Character-scoped wardrobe authority (never mix characters):"]
@@ -1069,6 +1084,11 @@ class PromptPipeline:
         return PromptPipelineResult("", summary)
 
     async def _current_chat_provider_id(self, event: Any) -> str:
+        """Resolve the prompt provider from explicit config, chat state, then default.
+
+        Failure to inspect the active chat provider is non-fatal because AstrBot's
+        per-origin default remains a valid final fallback.
+        """
         configured = self._str("prompt_builder_provider_id", "").strip()
         if configured:
             return configured
@@ -1095,6 +1115,18 @@ class PromptPipeline:
         fixed_character: bool,
         character_name: str = "",
     ) -> str:
+        """Ask the configured provider for the seven-block Anima prompt payload.
+
+        Args:
+            provider_id: AstrBot provider selected for prompt construction.
+            llm_prompt: Fully rendered user and validation context.
+            use_deep_thinking: Whether to request provider reasoning controls.
+            fixed_character: Whether a configured fixed character is active.
+            character_name: Fixed identity whose built-in appearance must be omitted.
+
+        Returns:
+            Provider completion text normalized across supported response shapes.
+        """
         if character_name:
             character_rule = f"不要输出固定角色“{character_name}”的固有外观设定。"
         else:
@@ -1149,6 +1181,11 @@ class PromptPipeline:
         summary_prompt: str,
         use_deep_thinking: bool,
     ) -> str:
+        """Extract outfit-only tags from reference evidence with a bounded response.
+
+        Identity, scene, quality, and artist tags are excluded by contract because
+        the summary may later be applied to a different visible character.
+        """
         kwargs: dict[str, Any] = {
             "chat_provider_id": provider_id,
             "prompt": summary_prompt,
@@ -2316,6 +2353,8 @@ class PromptPipeline:
                 semantic_anchors = prefer_configured_character_anchors(
                     configured_character_anchors,
                     (
+                        # Explicit parenthesized aliases are deterministic user
+                        # evidence and therefore precede untrusted planner guesses.
                         *extract_parenthesized_copyright_aliases(prompt),
                         *extract_parenthesized_character_aliases(prompt),
                         *parse_semantic_plan(semantic_plan_raw, prompt),
@@ -2407,6 +2446,7 @@ class PromptPipeline:
                     def cached_named_anchor_is_complete(
                         anchor: SemanticAnchor,
                     ) -> bool:
+                        """Skip lookup only for a fresh, complete cached profile."""
                         if not any(
                             candidate.lower() in cached_named_keys
                             for candidate in anchor.candidates
@@ -2454,6 +2494,10 @@ class PromptPipeline:
                             if candidate not in source_candidates:
                                 source_candidates.append(candidate)
                     if source_candidates:
+                        # Host-side transfer detection knows which person is the
+                        # donor. Replace overlapping planner roles with one explicit
+                        # outfit_source anchor so the donor cannot also become a
+                        # visible character or an unscoped clothing set.
                         semantic_anchors = tuple(
                             anchor
                             for anchor in semantic_anchors
@@ -2617,6 +2661,11 @@ class PromptPipeline:
         reference_tag_text = (
             extract_reference_tag_text(prompt) if outfit_plan.enabled else ""
         )
+        # Outfit evidence is selected from most request-specific to least: tags
+        # embedded with this reference image, a donor-scoped local profile, the
+        # legacy request-wide profile, then an LLM summary of search context. The
+        # latter starts as soft evidence: filtering may retain generic garments,
+        # but it never certifies donor identity or a named outfit set.
         if reference_tag_text:
             outfit_summary = filter_outfit_tags(reference_tag_text, max_tags=42)
             if outfit_summary:
@@ -2738,6 +2787,10 @@ class PromptPipeline:
                 )
             )
         )
+        # This is the soft/validated -> hard placement boundary. Confirmed/profile
+        # evidence and bounded outfit fallbacks enter only after wearer scoping and
+        # explicit removals. Planner candidates and unresolved descriptions stay in
+        # context for the writer and can never enter this tuple directly.
         semantic_context = semantic_result.prompt_context(
             include_outfit_source_anchor=include_source_anchor,
             effective_outfit_tags=effective_outfit.effective_tags,

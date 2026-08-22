@@ -240,6 +240,8 @@ _SCENE_HINTS = (
 
 @dataclass(frozen=True)
 class OutfitTransferPlan:
+    """Detected source-outfit-to-target request and its evidence channels."""
+
     enabled: bool = False
     source_subject: str = ""
     target_character: str = ""
@@ -283,10 +285,12 @@ class EffectiveOutfitPlan:
 
     @property
     def modified(self) -> bool:
+        """Whether any explicit request-scoped patch changed the base profile."""
         return bool(self.patches)
 
     @property
     def has_destructive_override(self) -> bool:
+        """Whether a patch removes or replaces previously verified garments."""
         return any(
             patch.operation in {"remove", "replace", "recolor_all", "keep_only"}
             for patch in self.patches
@@ -411,6 +415,7 @@ def _character_aliases(name: str) -> tuple[str, ...]:
 def _clause_targets_character(
     clause: str, target_character: str, known_character_names: tuple[str, ...]
 ) -> bool:
+    """Accept unscoped clauses, but reject clauses naming a different character."""
     mentioned: set[str] = set()
     for name in known_character_names:
         if any(alias in clause for alias in _character_aliases(name)):
@@ -426,7 +431,12 @@ def parse_user_outfit_patches(
     *,
     known_character_names: tuple[str, ...] = (),
 ) -> tuple[UserOutfitPatch, ...]:
-    """Extract explicit outfit changes while retaining their source evidence."""
+    """Extract explicit, target-compatible outfit changes from a user request.
+
+    Clauses naming another known character are ignored. Unscoped clauses remain
+    valid for the selected target to preserve natural single-character phrasing.
+    Each patch retains its exact clause so later hard wardrobe changes are auditable.
+    """
     if not target_character:
         return ()
     names = tuple(dict.fromkeys((*known_character_names, target_character)))
@@ -514,12 +524,14 @@ def parse_user_outfit_patches(
 
 
 def _replace_tag_color(tag: str, color: str) -> str:
+    """Replace known color tokens while preserving the garment portion of a tag."""
     words = normalize_tag_key(tag).split()
     remaining = [word for word in words if word not in _COLOR_TAG_WORDS]
     return "_".join((color, *remaining)) if remaining else color
 
 
 def _default_tag_for_patch(patch: UserOutfitPatch) -> str:
+    """Synthesize the narrowest garment tag when no verified slot tag exists."""
     noun = {
         "upper_body.primary": "shirt",
         "lower_body.skirt": "skirt",
@@ -541,7 +553,12 @@ def build_effective_outfit_plan(
     known_character_names: tuple[str, ...] = (),
     semantic_patches: tuple[UserOutfitPatch, ...] = (),
 ) -> EffectiveOutfitPlan:
-    """Apply explicit user patches to a verified source-outfit profile."""
+    """Apply explicit user patches to a verified source-outfit profile.
+
+    The returned plan records effective, removed, and synthesized tags separately.
+    Downstream prompt cleanup uses the removed set and forbidden slots to prevent
+    the LLM from restoring source garments that the user replaced or removed.
+    """
     normalized_base = tuple(dict.fromkeys(tag for tag in base_tags if str(tag).strip()))
     patches = tuple(
         dict.fromkeys(
@@ -999,11 +1016,13 @@ def build_outfit_transfer_block(
 
 
 def _directive_text(text: str) -> str:
+    """Exclude appended reference-tag blocks from natural-language detection."""
     parts = _DIRECTIVE_SPLIT_RE.split(str(text or "").strip(), maxsplit=1)
     return parts[0].strip() if parts else str(text or "").strip()
 
 
 def _extract_source_subject(directive: str, fixed_character_name: str) -> str:
+    """Return the outfit donor named by the directive, excluding pronouns/target."""
     text = str(directive or "").strip()
     wearing_source = _WEARING_SOURCE_RE.search(text)
     if wearing_source:
@@ -1084,6 +1103,7 @@ def _extract_target_character(
 
 
 def _clean_subject(subject: str) -> str:
+    """Trim parser scaffolding from a captured character or outfit-source name."""
     text = str(subject or "").strip(" ，,。；;：:\n\t")
     text = _SUBJECT_TAIL_TRIM_RE.sub("", text).strip(" ，,。；;：:\n\t")
     text = re.sub(r"^(?:角色|人物)", "", text).strip()

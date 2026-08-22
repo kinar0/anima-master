@@ -1,3 +1,26 @@
+"""Semantic planner boundary and tag-trust vocabulary.
+
+The planner receives the user's image request as plain text and returns JSON with
+three kinds of records: ``anchors`` are bounded lookup questions,
+``character_plans`` bind one wardrobe choice to one visible character, and outfit
+``directives`` describe explicit slot-level changes. Planner output is never tag
+evidence; parsers first require source-text grounding and then the local Danbooru
+index or a persisted verified profile must confirm any canonical spelling.
+
+Terminology used by the prompt pipeline:
+
+* A *soft tag* is an LLM/search candidate or descriptive hint. It may guide prose
+  or a lookup, but it must not establish character identity or wardrobe facts.
+* A *validated tag* has supporting local-index, configured, or persisted-profile
+  evidence. Validation describes provenance, not whether the tag will be emitted.
+* A *hard tag* is deterministically injected into the final prompt. This describes
+  placement, not provenance: identity and named-outfit hard tags require validated
+  or user-configured evidence, while generic garment fallbacks may be synthesized
+  from bounded user operations or filtered reference/search evidence. Conversely,
+  a validated tag may be withheld when it belongs to an outfit donor, a different
+  character, or a garment explicitly removed by the user.
+"""
+
 from __future__ import annotations
 
 import json
@@ -50,7 +73,13 @@ _ALLOWED_ROLES = {
 
 @dataclass(frozen=True)
 class SemanticAnchor:
-    """One bounded semantic concept proposed by the prompt-planning LLM."""
+    """One source-grounded lookup question proposed by the semantic planner.
+
+    ``source_text`` must occur in the request. ``role`` says how a confirmed result
+    may be used, while ``group`` restricts the local index category. ``candidates``
+    are soft spelling guesses only; they become hard-tag candidates only after the
+    local lookup returns a matching canonical record.
+    """
 
     anchor_id: str
     role: str
@@ -86,7 +115,13 @@ class SemanticWardrobe:
 
 @dataclass(frozen=True)
 class SemanticCharacterPlan:
-    """A strictly reference-checked visual/outfit plan for one character."""
+    """A strictly reference-checked visual/outfit plan for one character.
+
+    Outfit ownership is keyed by ``target_anchor_id`` rather than stored in a
+    request-wide tag bag. Clothing is visually attached to a wearer, so flattening
+    two profiles would let the final LLM swap uniforms or apply one character's
+    removal/recolor directive to another.
+    """
 
     target_anchor_id: str
     wardrobe: SemanticWardrobe
@@ -95,7 +130,15 @@ class SemanticCharacterPlan:
 
 @dataclass(frozen=True)
 class SemanticLookupResult:
-    """Locally validated semantic anchors for one image request."""
+    """Locally validated semantic evidence for one image request.
+
+    ``confirmed_tags`` and ``anchor_tags`` contain canonical lookup results.
+    ``candidate_tags`` remain soft diagnostics and must never be injected merely
+    because they were returned by fuzzy search. ``character_profiles`` and
+    ``anchor_outfit_profiles`` retain anchor IDs so outfit/appearance evidence can
+    be assigned to one wearer; the request-wide profile fields exist for legacy
+    single-character results only.
+    """
 
     confirmed_tags: tuple[str, ...] = ()
     outfit_source_tags: tuple[str, ...] = ()
@@ -245,7 +288,17 @@ class SemanticLookupResult:
 
 
 def build_semantic_plan_prompt(user_prompt: str) -> str:
-    """Ask the LLM for search hints without letting it certify tags."""
+    """Build the semantic planner's complete input/output protocol.
+
+    Args:
+        user_prompt: Original image request used both as planner input and as the
+            source-of-truth text against which returned evidence is checked.
+
+    Returns:
+        A prompt requiring JSON ``anchors`` and per-target ``character_plans``.
+        Candidate tags are explicitly defined as lookup hints, while directives
+        carry semantic slots and exact user evidence instead of invented tags.
+    """
     return (
         "Analyze the image request into a small set of Danbooru lookup anchors. "
         "Separate visible target characters from character/persona tags used only "
@@ -308,7 +361,13 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
 
 
 def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...]:
-    """Parse and tightly bound an untrusted semantic-plan response."""
+    """Convert an untrusted planner response into source-grounded lookup anchors.
+
+    ``raw`` may contain a fenced or prose-wrapped JSON object. The result contains
+    at most twelve anchors whose source text occurs in ``user_prompt`` and whose
+    candidate spellings are safe to pass to the local Danbooru lookup CLI. An
+    invalid response degrades to an empty tuple rather than aborting generation.
+    """
     text = re.sub(r"^```(?:json)?\s*", "", str(raw or "").strip(), flags=re.I)
     text = re.sub(r"\s*```$", "", text)
     match = re.search(r"\{.*\}", text, flags=re.S)
@@ -409,6 +468,12 @@ _WARDROBE_KINDS = {
 
 
 def _semantic_json(raw: str) -> dict[str, Any]:
+    """Extract one JSON object from a possibly fenced planner response.
+
+    Only mappings are accepted because every semantic-plan consumer expects named
+    fields. Malformed or differently shaped model output is represented by an
+    empty mapping so callers can use their normal no-plan fallback.
+    """
     text = re.sub(r"^```(?:json)?\s*", "", str(raw or "").strip(), flags=re.I)
     text = re.sub(r"\s*```$", "", text)
     match = re.search(r"\{.*\}", text, flags=re.S)
@@ -424,6 +489,12 @@ def _semantic_json(raw: str) -> dict[str, Any]:
 def _parse_outfit_directive_item(
     item: Any, *, user_prompt: str, target_anchor_id: str
 ) -> SemanticOutfitDirective | None:
+    """Validate one target-bound wardrobe operation from untrusted planner JSON.
+
+    The operation is accepted only when its evidence is present verbatim in the
+    user request and its slot/color cardinality matches the operation contract.
+    This prevents planner-invented removals or recolors from becoming hard tags.
+    """
     if not isinstance(item, dict):
         return None
     operation = str(item.get("operation") or "").strip().lower()
@@ -455,7 +526,13 @@ def parse_semantic_character_plans(
     user_prompt: str,
     anchors: tuple[SemanticAnchor, ...] | None = None,
 ) -> tuple[SemanticCharacterPlan, ...]:
-    """Accept only unambiguous character/outfit references from the planner."""
+    """Build character-scoped wardrobe plans from validated anchor references.
+
+    Duplicate target IDs and dangling or role-incompatible wardrobe IDs are
+    discarded. Returning no plan is intentional: downstream code can then use its
+    conservative creative fallback instead of assigning one character's clothes
+    to another.
+    """
     items = _semantic_json(raw).get("character_plans")
     if not isinstance(items, list):
         return ()
@@ -746,7 +823,18 @@ def lookup_semantic_anchors(
     cli_path: Path,
     timeout: float = 8.0,
 ) -> SemanticLookupResult:
-    """Validate all proposed candidates with one local batch invocation."""
+    """Validate planner candidates and return only locally supported hard tags.
+
+    Args:
+        anchors: Source-grounded concepts with untrusted candidate spellings.
+        cli_path: Local Danbooru lookup executable or script.
+        timeout: Maximum duration for each bounded batch lookup.
+
+    Returns:
+        A result whose ``confirmed_tags`` may be emitted as hard tags. Candidate
+        tags remain diagnostic hints; CLI failure is reported through ``status``
+        and does not raise into the generation pipeline.
+    """
     if not anchors:
         return SemanticLookupResult(status="empty_plan")
     queries: list[dict[str, Any]] = []
@@ -944,6 +1032,9 @@ def lookup_semantic_anchors(
         for index, value in selected_fallbacks.items()
         if index not in confirmed_by_anchor
     }
+    # Fuzzy lookup is used only to discover a plausible scoped character tag.
+    # Re-query it in exact-only mode before promotion; otherwise a popular fuzzy
+    # match could silently become authoritative identity evidence.
     fallback_queries = [
             {
                 "id": f"fallback_{index}",
@@ -1108,7 +1199,14 @@ def prefer_configured_character_anchors(
     configured: tuple[SemanticAnchor, ...],
     discovered: tuple[SemanticAnchor, ...],
 ) -> tuple[SemanticAnchor, ...]:
-    """Prefer configured identity anchors over equivalent planner guesses."""
+    """Resolve identity aliases in configured, explicit, then planner order.
+
+    Configured mappings are inserted first and suppress equivalent discovered
+    anchors. The caller orders parenthesized aliases before planner output, so an
+    explicit ``中文名 (canonical name)`` survives ahead of an LLM guess. Unrelated
+    discovered anchors keep request order. This precedence prevents a plausible
+    hallucinated spelling from replacing a user-maintained or explicit identity.
+    """
     if not configured:
         return tuple(dict.fromkeys(discovered))
 
