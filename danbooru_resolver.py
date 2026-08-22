@@ -63,6 +63,19 @@ class WardrobeValidationError(ValueError):
     """Raised when a visual wardrobe editor payload is unsafe or stale."""
 
 
+BUILTIN_DANBOORU_TERM_MAPPINGS: dict[str, str] = {
+    # High-confidence garment phrases should not depend on the prompt writer
+    # repeating them in its comma-separated Danbooru Tags block. Configured
+    # mappings are merged on top so operators can refine local vocabulary.
+    "芭蕾舞裙": "tutu",
+    "芭蕾裙": "tutu",
+    "白色连裤袜": "white_pantyhose",
+    "白连裤袜": "white_pantyhose",
+    "白色丝袜": "white_pantyhose",
+    "白丝袜": "white_pantyhose",
+}
+
+
 class DanbooruResolver:
     """Configuration-aware resolver for Danbooru character core tags."""
 
@@ -132,8 +145,7 @@ class DanbooruResolver:
         ):
             return "stage"
         if re.search(
-            r"(?:私服|便服|居家服|日常服(?:装)?|休闲服(?:装)?|休闲穿搭|"
-            r"随意(?:的)?生活服|(?<!官方)常服|"
+            r"(?:官方常服|常服|"
             r"(?<![a-z0-9_])casual(?:\s+(?:clothes?|clothing|outfit|wear|attire|look))?"
             r"(?![a-z0-9_]))",
             text,
@@ -703,6 +715,13 @@ class DanbooruResolver:
             mappings[alias] = tag
         return mappings
 
+    def _term_mappings(self) -> dict[str, str]:
+        """Merge built-in high-confidence noun mappings with operator overrides."""
+        return {
+            **BUILTIN_DANBOORU_TERM_MAPPINGS,
+            **self._configured_mappings("danbooru_term_mappings"),
+        }
+
     @staticmethod
     def _scope_compatible(left: str, right: str) -> bool:
         """Return whether two copyright scopes belong to the same tag family."""
@@ -845,9 +864,7 @@ class DanbooruResolver:
         matched = tuple(
             dict.fromkeys(
                 tag
-                for alias, tag in self._configured_mappings(
-                    "danbooru_term_mappings"
-                ).items()
+                for alias, tag in self._term_mappings().items()
                 if alias in text
             )
         )
@@ -1016,16 +1033,19 @@ class DanbooruResolver:
             if not isinstance(item, dict):
                 raise WardrobeValidationError("服装档案条目格式无效。")
             key = self._profile_alias_key(self._clean_alias(item.get("key"), label="档案名称"))
-            if key in seen_keys:
-                raise WardrobeValidationError(f"重复的服装档案：{key}")
-            seen_keys.add(key)
             aliases = [self._clean_alias(value, label="档案别名") for value in item.get("aliases", [])]
             source_tags = self._clean_tag_list(item.get("sourceTags", []), limit=20)
             tags = self._clean_tag_list(item.get("tags", []), limit=80)
             qualifier = self._normalize_outfit_variant(
                 item.get("qualifier"), key, aliases
             )
-            old = old_profiles.get(key) if isinstance(old_profiles.get(key), dict) else {}
+            base_key = key.split("::", 1)[0]
+            storage_key = self._outfit_profile_key(base_key, qualifier)
+            if storage_key in seen_keys:
+                raise WardrobeValidationError(f"重复的服装档案：{storage_key}")
+            seen_keys.add(storage_key)
+            old_candidate = old_profiles.get(key, old_profiles.get(storage_key))
+            old = old_candidate if isinstance(old_candidate, dict) else {}
             record: dict[str, Any] = {
                 "kind": "character_outfit",
                 "qualifier": qualifier,
@@ -1036,7 +1056,7 @@ class DanbooruResolver:
             }
             if isinstance(old.get("evidence"), dict):
                 record["evidence"] = old["evidence"]
-            new_profiles[key] = record
+            new_profiles[storage_key] = record
 
         configured_sets: list[str] = []
         learned_by_key: dict[str, dict[str, Any]] = {}

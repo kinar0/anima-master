@@ -17,6 +17,8 @@ from prompt_pipeline import (  # noqa: E402
     build_character_effective_outfits,
     controlled_character_outfit_detail,
     character_wardrobe_authority_context,
+    apply_requested_wardrobe_mode,
+    requested_wardrobe_mode,
     requests_casual_life_outfit,
 )
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
@@ -1011,22 +1013,52 @@ def test_creative_wardrobe_keeps_pretty_garments_but_rejects_named_uniform_and_n
     assert "bottomless" not in detail
 
 
-def test_casual_outfit_intent_is_broad_but_official_default_wins() -> None:
+def test_casual_outfit_intent_includes_official_casual_but_not_default() -> None:
     assert requests_casual_life_outfit("千早爱音和丰川祥子穿casual服装")
-    assert requests_casual_life_outfit("千早爱音穿便服")
-    assert requests_casual_life_outfit("丰川祥子的休闲服装")
+    assert requests_casual_life_outfit("千早爱音穿官方常服")
     assert not requests_casual_life_outfit("丰川祥子穿官方默认服装")
-    assert not requests_casual_life_outfit("丰川祥子穿官方常服，而不是私服")
+    assert requested_wardrobe_mode("千早爱音穿默认服装") == "default_profile"
+    assert requested_wardrobe_mode("千早爱音穿私服") == "creative_fallback"
+    assert requested_wardrobe_mode("千早爱音穿居家私服") == "creative_fallback"
+    assert requested_wardrobe_mode("千早爱音穿休闲穿搭") == "creative_fallback"
+
+
+def test_creative_private_request_synthesizes_per_character_wardrobe_plans() -> None:
+    anchors = (
+        SemanticAnchor("anon", "target_character", "character", "千早爱音", "Anon", ("chihaya_anon",)),
+        SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "Sakiko", ("togawa_sakiko",)),
+    )
+
+    plans, unchanged_anchors = apply_requested_wardrobe_mode(
+        (), anchors, "creative_fallback"
+    )
+
+    assert unchanged_anchors == anchors
+    assert [plan.target_anchor_id for plan in plans] == ["anon", "sakiko"]
+    assert all(plan.wardrobe.kind == "creative_fallback" for plan in plans)
+
+    default_plans, _ = apply_requested_wardrobe_mode(
+        (), anchors, "default_profile"
+    )
+    assert all(plan.wardrobe.kind == "default_profile" for plan in default_plans)
+
+    corrected_plans, _ = apply_requested_wardrobe_mode(
+        (
+            SemanticCharacterPlan(
+                "anon", SemanticWardrobe("creative_fallback")
+            ),
+        ),
+        anchors,
+        "default_profile",
+    )
+    assert corrected_plans[0].wardrobe.kind == "default_profile"
 
 
 def test_casual_request_uses_casual_evidence_instead_of_default_profiles() -> None:
     semantic_json = (
         '{"anchors":['
         '{"id":"sakiko","role":"target_character","group":"character","source_text":"丰川祥子","description":"Sakiko","candidates":["togawa_sakiko"]},'
-        '{"id":"anon","role":"target_character","group":"character","source_text":"千早爱音","description":"Anon","candidates":["chihaya_anon"]}],'
-        '"character_plans":['
-        '{"target_anchor_id":"sakiko","wardrobe":{"kind":"default_profile"},"directives":[]},'
-        '{"target_anchor_id":"anon","wardrobe":{"kind":"default_profile"},"directives":[]}]}'
+        '{"id":"anon","role":"target_character","group":"character","source_text":"千早爱音","description":"Anon","candidates":["chihaya_anon"]}]}'
     )
     malicious_writer = (
         "{Count: 2girls}\n"
@@ -1083,6 +1115,11 @@ def test_casual_request_uses_casual_evidence_instead_of_default_profiles() -> No
             return True
 
         async def resolve_semantic_anchors(self, anchors):
+            assert all(
+                "casual outfit variant" in anchor.description
+                for anchor in anchors
+                if anchor.role == "target_character"
+            )
             return SemanticLookupResult(
                 confirmed_tags=("togawa_sakiko", "chihaya_anon", "bang_dream!"),
                 outfit_profile_tags=(
@@ -1135,7 +1172,7 @@ def test_casual_request_uses_casual_evidence_instead_of_default_profiles() -> No
     event = type("_Event", (), {"unified_msg_origin": "session"})()
 
     result = asyncio.run(
-        pipeline.build(event, "千早爱音和丰川祥子穿casual服装一起合影")
+        pipeline.build(event, "千早爱音和丰川祥子穿官方常服一起合影")
     )
 
     lowered = result.final_prompt.lower()
@@ -1185,6 +1222,117 @@ def test_casual_profile_keeps_a_school_uniform_when_casual_evidence_contains_it(
 
     assert plan.wardrobe_kind == "casual_profile"
     assert plan.effective.effective_tags == ("school_uniform", "blue_cardigan")
+
+
+def test_private_outfit_uses_llm_design_without_default_profile_injection() -> None:
+    semantic_json = (
+        '{"anchors":[{"id":"anon","role":"target_character",'
+        '"group":"character","source_text":"千早爱音","description":"Anon",'
+        '"candidates":["chihaya_anon"]}],"character_plans":['
+        '{"target_anchor_id":"anon","wardrobe":{"kind":"default_profile"},'
+        '"directives":[]}]}'
+    )
+    writer = (
+        "{Count: 1girl, solo}\n"
+        "{Characters: chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: chihaya_anon has pink hair and grey eyes}\n"
+        "{Details: chihaya_anon wears Haneoka school uniform, "
+        "an oversized pink hoodie and denim shorts}\n"
+        "{Tags: haneoka_school_uniform, oversized_clothes, pink_hoodie, "
+        "denim_shorts, standing, background_mode_default_portrait}\n"
+        "{Nltags: chihaya anon wears a relaxed private outfit.}"
+    )
+
+    class _Response:
+        def __init__(self, text):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [semantic_json, writer]
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **_kwargs):
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ("chihaya_anon",)
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_outfit_profiles_for_prompt(self, _prompt):
+            raise AssertionError("creative private outfits must bypass profile cache")
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_semantic_anchors(self, anchors):
+            return SemanticLookupResult(
+                confirmed_tags=("chihaya_anon", "bang_dream!"),
+                outfit_profile_tags=("haneoka_school_uniform",),
+                character_profiles=(
+                    (
+                        "anon",
+                        "chihaya_anon",
+                        ("haneoka_school_uniform",),
+                        ("pink_hair", "grey_eyes"),
+                    ),
+                ),
+                anchor_tags=(("anon", "chihaya_anon"),),
+                anchors=anchors,
+                status="resolved",
+            )
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
+
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(pipeline.build(event, "千早爱音穿居家私服站立"))
+
+    lowered = result.final_prompt.lower()
+    assert "haneoka" not in lowered
+    assert "oversized pink hoodie" in lowered
+    assert "denim shorts" in lowered
+    assert result.summary["requested_outfit_mode"] == "creative_fallback"
+    assert result.summary["semantic_character_outfits"][0]["wardrobe_kind"] == (
+        "creative_fallback"
+    )
 
 
 def test_structured_pipeline_injects_each_character_wardrobe_without_cross_leak() -> None:
@@ -1455,6 +1603,107 @@ def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
     assert "bottomless" not in standalone.final_prompt
     assert "togawa sakiko wears no skirt" in standalone.final_prompt
     assert standalone.summary["outfit_transfer"] is False
+
+
+def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
+    class _Response:
+        completion_text = (
+            "{Count: 1girl, solo}\n"
+            "{Characters: wakaba_mutsumi}\n"
+            "{Copyright: bang_dream!}\n"
+            "{Identity: wakaba_mutsumi has green hair and green eyes}\n"
+            "{Details: wakaba_mutsumi wears a ballet dress and white pantyhose}\n"
+            "{Tags: black_dress, black_skirt, black_jacket, standing, "
+            "background_mode_default_portrait}\n"
+            "{Nltags: wakaba_mutsumi wears a ballet dress and white pantyhose.}"
+        )
+
+    class _Context:
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **_kwargs):
+            return _Response()
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    term_resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ("wakaba_mutsumi", "bang_dream!")
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_term_mappings_for_prompt(self, prompt):
+            return term_resolver.cached_term_mappings_for_prompt(prompt)
+
+        def cached_outfit_source(self, source):
+            assert source == "mortis"
+            return SemanticLookupResult(
+                confirmed_tags=("mortis_(bang_dream!)", "bang_dream!"),
+                outfit_source_tags=("mortis_(bang_dream!)",),
+                outfit_profile_tags=(
+                    "black_dress",
+                    "black_skirt",
+                    "black_jacket",
+                    "black_pantyhose",
+                ),
+                status="profile_cache",
+            )
+
+        def semantic_lookup_available(self):
+            return False
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content, status="not_requested")
+
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(
+        pipeline.build(event, "若叶睦穿着mortis的衣服、芭蕾舞裙和白丝袜")
+    )
+
+    assert result.summary["outfit_transfer"] is True
+    assert result.summary["danbooru_explicit_term_tags"] == [
+        "tutu",
+        "white_pantyhose",
+    ]
+    assert "tutu" in result.summary["required_core_tags"]
+    assert "white_pantyhose" in result.summary["required_core_tags"]
+    assert "tutu" in result.final_prompt
+    assert "white pantyhose" in result.final_prompt
 
 
 def test_cached_seasonal_named_outfit_is_deterministically_queried() -> None:

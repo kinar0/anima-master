@@ -106,6 +106,7 @@ def test_wardrobe_plugin_page_and_mapping_config_are_packaged() -> None:
     page_style = (page_root / "style.css").read_text(encoding="utf-8")
     assert 'bridge.apiGet("wardrobe")' in app_script
     assert 'bridge.apiPost("wardrobe/save"' in app_script
+    assert '["casual","官方常服 / Casual"]' in app_script
     assert "[hidden] { display: none !important; }" in page_style
     assert chinese_i18n["pages"]["wardrobe"]["title"] == "服装词库"
 

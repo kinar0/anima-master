@@ -1102,7 +1102,7 @@ def test_casual_outfit_profile_does_not_fall_back_to_default_cache() -> None:
         qualifier="casual",
     )
 
-    casual = resolver.cached_outfit_profiles_for_prompt("角色甲穿casual服装")
+    casual = resolver.cached_outfit_profiles_for_prompt("角色甲穿官方常服")
     default = resolver.cached_outfit_profiles_for_prompt("角色甲站立")
 
     assert casual is not None
@@ -1525,6 +1525,52 @@ def test_configured_term_mapping_is_returned_as_request_hard_tag() -> None:
     assert result.confirmed_tags == ("masquerade_mask",)
 
 
+def test_builtin_explicit_garments_are_returned_as_request_hard_tags() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            config={},
+        )
+
+        result = resolver.cached_term_mappings_for_prompt(
+            "若叶睦穿着芭蕾舞裙和白丝袜"
+        )
+
+    assert result is not None
+    assert result.confirmed_tags == ("tutu", "white_pantyhose")
+
+
+def test_configured_term_mapping_can_override_builtin_mapping() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={"danbooru_term_mappings": ["白丝袜=white_thighhighs"]},
+    )
+
+    result = resolver.cached_term_mappings_for_prompt("若叶睦穿着白丝袜")
+
+    assert result is not None
+    assert result.confirmed_tags == ("white_thighhighs",)
+
+
 def test_wardrobe_editor_round_trip_updates_profiles_and_mappings() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
@@ -1581,6 +1627,49 @@ def test_wardrobe_editor_round_trip_updates_profiles_and_mappings() -> None:
     assert resolver._config["danbooru_term_mappings"] == [
         "舞会面具=masquerade_mask"
     ]
+
+
+def test_wardrobe_editor_rekeys_manual_casual_profile() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={},
+    )
+    initial = resolver.wardrobe_snapshot()
+
+    resolver.save_wardrobe(
+        {
+            "baseRevision": initial["revision"],
+            "outfits": [
+                {
+                    "key": "千早爱音",
+                    "aliases": ["千早爱音", "chihaya_anon"],
+                    "sourceTags": ["chihaya_anon"],
+                    "tags": ["grey_dress", "pinafore_dress", "grey_belt"],
+                    "qualifier": "casual",
+                }
+            ],
+            "outfitSets": [],
+            "terms": [],
+        }
+    )
+
+    assert "千早爱音::casual" in resolver._profile_data()["profiles"]
+    casual = resolver.cached_outfit_profiles_for_prompt("千早爱音穿官方常服")
+    assert casual is not None
+    assert casual.outfit_profile_tags == (
+        "grey_dress",
+        "pinafore_dress",
+        "grey_belt",
+    )
 
 
 def test_character_outfit_profile_refreshes_once_per_algorithm_window() -> None:

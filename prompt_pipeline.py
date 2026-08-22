@@ -12,6 +12,7 @@ try:
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         SemanticAnchor,
         SemanticCharacterPlan,
+        SemanticWardrobe,
         SemanticOutfitDirective,
         SemanticLookupResult,
         build_semantic_plan_prompt,
@@ -79,6 +80,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         SemanticAnchor,
         SemanticCharacterPlan,
+        SemanticWardrobe,
         SemanticOutfitDirective,
         SemanticLookupResult,
         build_semantic_plan_prompt,
@@ -751,23 +753,82 @@ class CharacterEffectiveOutfit:
 
 
 _OFFICIAL_DEFAULT_OUTFIT_RE = re.compile(
-    r"(?:官方常服|官方默认服装|原作(?:默认)?服装|默认服装|标准服装)", re.I
+    r"(?:官方默认服装|原作(?:默认)?服装|默认服装|标准服装)", re.I
 )
-_CASUAL_LIFE_OUTFIT_RE = re.compile(
-    r"(?:私服|便服|居家服|日常服(?:装)?|休闲服(?:装)?|休闲穿搭|"
-    r"随意(?:的)?生活服|(?<!官方)常服|"
+_OFFICIAL_CASUAL_PROFILE_RE = re.compile(r"(?:官方常服|官方casual(?:套装|服装)?)", re.I)
+_CREATIVE_PRIVATE_OUTFIT_RE = re.compile(
+    r"(?:居家私服|私服|居家服|日常便服|日常服装|休闲服(?:装)?|休闲穿搭|"
+    r"随意(?:的)?生活服|homewear|home clothes?|private clothes?|off-duty clothes?)",
+    re.I,
+)
+_CASUAL_PROFILE_RE = re.compile(
+    r"(?:常服|"
     r"(?<![a-z0-9_])casual(?:\s+(?:clothes?|clothing|outfit|wear|attire|look))?"
     r"(?![a-z0-9_]))",
     re.I,
 )
 
 
+def requested_wardrobe_mode(user_prompt: str) -> str:
+    """Classify default evidence, official casual sets, and creative private wear."""
+    text = str(user_prompt or "")
+    if _OFFICIAL_DEFAULT_OUTFIT_RE.search(text):
+        return "default_profile"
+    if _OFFICIAL_CASUAL_PROFILE_RE.search(text):
+        return "casual_profile"
+    if _CREATIVE_PRIVATE_OUTFIT_RE.search(text):
+        return "creative_fallback"
+    if _CASUAL_PROFILE_RE.search(text):
+        return "casual_profile"
+    return ""
+
+
 def requests_casual_life_outfit(user_prompt: str) -> bool:
     """Return whether the request selects the evidence-backed casual variant."""
-    text = str(user_prompt or "")
-    return bool(_CASUAL_LIFE_OUTFIT_RE.search(text)) and not bool(
-        _OFFICIAL_DEFAULT_OUTFIT_RE.search(text)
-    )
+    return requested_wardrobe_mode(user_prompt) == "casual_profile"
+
+
+def apply_requested_wardrobe_mode(
+    plans: tuple[SemanticCharacterPlan, ...],
+    anchors: tuple[SemanticAnchor, ...],
+    mode: str,
+) -> tuple[tuple[SemanticCharacterPlan, ...], tuple[SemanticAnchor, ...]]:
+    """Apply deterministic request semantics when the planning LLM is incomplete."""
+    if mode not in {"default_profile", "casual_profile", "creative_fallback"}:
+        return plans, anchors
+    if plans:
+        plans = tuple(
+            replace(plan, wardrobe=SemanticWardrobe(mode))
+            if plan.wardrobe.kind
+            in {"default_profile", "casual_profile", "creative_fallback", "none"}
+            else plan
+            for plan in plans
+        )
+    else:
+        plans = tuple(
+            SemanticCharacterPlan(
+                target_anchor_id=anchor.anchor_id,
+                wardrobe=SemanticWardrobe(mode),
+            )
+            for anchor in anchors
+            if anchor.role == "target_character"
+        )
+    if mode == "casual_profile":
+        target_ids = {
+            plan.target_anchor_id.lower()
+            for plan in plans
+            if plan.wardrobe.kind == "casual_profile"
+        }
+        anchors = tuple(
+            replace(
+                anchor,
+                description=f"{anchor.description} casual outfit variant".strip(),
+            )
+            if anchor.anchor_id.lower() in target_ids
+            else anchor
+            for anchor in anchors
+        )
+    return plans, anchors
 
 
 def build_character_effective_outfits(
@@ -2187,10 +2248,13 @@ class PromptPipeline:
         prompt = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", prompt)
         prompt = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", prompt)
         prompt = re.sub(r"\s+", " ", prompt)
-        casual_life_requested = requests_casual_life_outfit(prompt)
+        requested_outfit_mode = requested_wardrobe_mode(prompt)
+        casual_life_requested = requested_outfit_mode == "casual_profile"
+        creative_private_requested = requested_outfit_mode == "creative_fallback"
         summary: dict[str, Any] = {
             "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
             "mode": mode,
+            "requested_outfit_mode": requested_outfit_mode,
             "multi_person_mode": bool(multi_person),
             "original_prompt_head": self._shorten(original_prompt, 600),
         }
@@ -2310,12 +2374,19 @@ class PromptPipeline:
         cached_term_result = (
             cached_term_getter(prompt) if callable(cached_term_getter) else None
         )
+        explicit_term_tags = tuple(
+            dict.fromkeys(
+                getattr(cached_term_result, "confirmed_tags", ())
+                if cached_term_result is not None
+                else ()
+            )
+        )
         cached_profile_getter = getattr(
             self._danbooru_resolver, "cached_outfit_profiles_for_prompt", None
         )
         cached_profile_result = (
             cached_profile_getter(prompt)
-            if callable(cached_profile_getter)
+            if callable(cached_profile_getter) and not creative_private_requested
             else None
         )
         configured_character_anchor_getter = getattr(
@@ -2388,36 +2459,13 @@ class PromptPipeline:
                 semantic_character_plans = parse_semantic_character_plans(
                     semantic_plan_raw, prompt, semantic_anchors
                 )
-                if casual_life_requested:
-                    semantic_character_plans = tuple(
-                        replace(
-                            plan,
-                            wardrobe=replace(
-                                plan.wardrobe,
-                                kind="casual_profile",
-                            ),
-                        )
-                        if plan.wardrobe.kind == "default_profile"
-                        else plan
-                        for plan in semantic_character_plans
+                semantic_character_plans, semantic_anchors = (
+                    apply_requested_wardrobe_mode(
+                        semantic_character_plans,
+                        semantic_anchors,
+                        requested_outfit_mode,
                     )
-                casual_target_ids = {
-                    plan.target_anchor_id.lower()
-                    for plan in semantic_character_plans
-                    if plan.wardrobe.kind == "casual_profile"
-                }
-                if casual_target_ids:
-                    semantic_anchors = tuple(
-                        replace(
-                            anchor,
-                            description=(
-                                f"{anchor.description} casual outfit variant"
-                            ).strip(),
-                        )
-                        if anchor.anchor_id.lower() in casual_target_ids
-                        else anchor
-                        for anchor in semantic_anchors
-                    )
+                )
                 if semantic_character_plans:
                     semantic_outfit_directives = tuple(
                         directive
@@ -2546,6 +2594,17 @@ class PromptPipeline:
                     cached_term_result,
                     resolved_semantic,
                 )
+                if creative_private_requested:
+                    semantic_result = replace(
+                        semantic_result,
+                        outfit_profile_tags=(),
+                        source_outfit_profiles=(),
+                        character_profiles=tuple(
+                            (anchor_id, character_tag, (), appearance_tags)
+                            for anchor_id, character_tag, _outfit_tags, appearance_tags
+                            in semantic_result.character_profiles
+                        ),
+                    )
             except Exception as exc:
                 self.logger.warning(
                     "[comfyui_agent] generalized Danbooru semantic lookup failed: %s",
@@ -2560,6 +2619,7 @@ class PromptPipeline:
                 "danbooru_semantic_confirmed_tags": list(
                     semantic_result.confirmed_tags
                 ),
+                "danbooru_explicit_term_tags": list(explicit_term_tags),
                 "danbooru_semantic_outfit_sources": list(
                     semantic_result.outfit_source_tags
                 ),
@@ -2778,6 +2838,7 @@ class PromptPipeline:
         semantic_required_tags = tuple(
             dict.fromkeys(
                 (
+                    *explicit_term_tags,
                     *semantic_confirmed_tags,
                     *(() if character_effective_outfits else effective_outfit.effective_tags),
                     *(() if character_effective_outfits else semantic_visible_outfit_tags),
@@ -3057,6 +3118,7 @@ class PromptPipeline:
                 or outfit_plan.enabled
                 or semantic_result.named_outfit_tags
                 or character_effective_outfits
+                or casual_life_requested
             ):
                 verified_character_outfit_tags = tuple(
                     dict.fromkeys(
@@ -3068,12 +3130,21 @@ class PromptPipeline:
                 )
                 structured_scene = keep_only_verified_outfit_tags(
                     structured_scene,
-                    () if character_effective_outfits else tuple(
+                    tuple(
                         dict.fromkeys(
                             (
+                                *explicit_term_tags,
                                 *effective_outfit.effective_tags,
-                                *semantic_visible_outfit_tags,
-                                *semantic_result.named_outfit_tags,
+                                *(
+                                    ()
+                                    if character_effective_outfits
+                                    else semantic_visible_outfit_tags
+                                ),
+                                *(
+                                    ()
+                                    if character_effective_outfits
+                                    else semantic_result.named_outfit_tags
+                                ),
                                 *verified_character_outfit_tags,
                             )
                         )
@@ -3084,6 +3155,7 @@ class PromptPipeline:
                         or outfit_plan.enabled
                         or semantic_result.named_outfit_tags
                         or character_effective_outfits
+                        or casual_life_requested
                     ),
                 )
             resolution_statuses: list[dict[str, Any]] = []
@@ -3132,7 +3204,7 @@ class PromptPipeline:
                     None,
                 )
                 detail = character.detail_tags
-                if character_effective_outfits:
+                if character_effective_outfits or casual_life_requested:
                     detail = controlled_character_outfit_detail(
                         detail,
                         character.name,
@@ -3182,7 +3254,7 @@ class PromptPipeline:
                 structured_nltags,
                 tuple(character.name for character in structured_characters),
             )
-            if character_effective_outfits:
+            if character_effective_outfits or casual_life_requested:
                 nltags = strip_outfit_narrative(nltags)
             if semantic_result.outfit_source_tags and not character_effective_outfits:
                 nltags = minimal_verified_outfit_nltags(
@@ -3294,6 +3366,7 @@ class PromptPipeline:
                     tuple(
                         dict.fromkeys(
                             (
+                                *explicit_term_tags,
                                 *effective_outfit.effective_tags,
                                 *semantic_visible_outfit_tags,
                                 *semantic_result.named_outfit_tags,
