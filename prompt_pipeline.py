@@ -803,6 +803,41 @@ _CASUAL_PROFILE_RE = re.compile(
     re.I,
 )
 
+UNSPECIFIED_WARDROBE_POLICIES = {
+    "default_profile",
+    "creative_fallback",
+    "scene_adaptive",
+}
+
+DEFAULT_SCENE_ADAPTIVE_WARDROBE_MARKERS = (
+    "刚刚出浴",
+    "刚出浴",
+    "洗完澡",
+    "浴后",
+    "刚起床",
+    "准备睡觉",
+    "运动结束后",
+    "训练结束后",
+    "比赛结束后",
+    "比赛",
+    "刚跑完步",
+    "正在健身",
+    "游泳结束后",
+    "演出结束后",
+    "刚结束演出",
+    "post-bath",
+    "after a bath",
+    "just woke up",
+    "getting ready for bed",
+    "after exercising",
+    "after training",
+    "after the competition",
+    "just finished running",
+    "working out",
+    "after swimming",
+    "after performing",
+)
+
 
 def requested_wardrobe_mode(user_prompt: str) -> str:
     """Classify default evidence, official casual sets, and creative private wear."""
@@ -816,6 +851,79 @@ def requested_wardrobe_mode(user_prompt: str) -> str:
     if _CASUAL_PROFILE_RE.search(text):
         return "casual_profile"
     return ""
+
+
+def scene_adaptive_wardrobe_marker(
+    user_prompt: str,
+    markers: tuple[str, ...] = DEFAULT_SCENE_ADAPTIVE_WARDROBE_MARKERS,
+) -> str:
+    """Return the first configured high-confidence creative wardrobe cue."""
+    lowered = str(user_prompt or "").lower()
+    return next(
+        (
+            marker
+            for raw_marker in markers
+            if (marker := str(raw_marker or "").strip().lower())
+            and marker in lowered
+            and not (
+                marker == "比赛"
+                and re.search(r"(?:观看|看|围观|观赏)\s*比赛|观赛", lowered)
+            )
+        ),
+        "",
+    )
+
+
+def resolve_unspecified_wardrobe_mode(
+    policy: str,
+    *,
+    sensual_mode: bool = False,
+    scene_marker: str = "",
+) -> tuple[str, str]:
+    """Resolve the host-side fallback for a request with no clothing intent."""
+    normalized = str(policy or "").strip().lower()
+    if normalized not in UNSPECIFIED_WARDROBE_POLICIES:
+        normalized = "scene_adaptive"
+    if normalized == "creative_fallback":
+        return "creative_fallback", "configured_creative"
+    if normalized == "scene_adaptive" and (sensual_mode or scene_marker):
+        return "creative_fallback", "scene_adaptive"
+    return "default_profile", "configured_default"
+
+
+def has_explicit_wardrobe_evidence(
+    *,
+    requested_mode: str,
+    outfit_transfer_enabled: bool,
+    anchors: tuple[SemanticAnchor, ...],
+    plans: tuple[SemanticCharacterPlan, ...],
+) -> bool:
+    """Return whether config must yield to request-grounded wardrobe evidence."""
+    wardrobe_text_re = re.compile(
+        r"(?:穿|衣|服|裙|裤|袜|鞋|靴|帽|手套|泳装|校服|制服|套装|礼服|睡衣|内衣|"
+        r"outfit|clothes?|clothing|wear|dress|gown|skirt|pants?|shorts?|stockings?|"
+        r"shoes?|boots?|uniform|costume|pajamas?|lingerie)",
+        re.I,
+    )
+    explicit_anchor_ids = {
+        anchor.anchor_id.lower()
+        for anchor in anchors
+        if anchor.role in {"clothing", "outfit", "outfit_source"}
+        and wardrobe_text_re.search(anchor.source_text)
+    }
+    return bool(
+        requested_mode
+        or outfit_transfer_enabled
+        or explicit_anchor_ids
+        or any(
+            (
+                plan.wardrobe.kind in {"named_outfit", "outfit_source"}
+                and plan.wardrobe.anchor_id.lower() in explicit_anchor_ids
+            )
+            or bool(plan.directives)
+            for plan in plans
+        )
+    )
 
 
 def requests_casual_life_outfit(user_prompt: str) -> bool:
@@ -995,6 +1103,40 @@ def build_character_effective_outfits(
             effective=effective,
         ))
     return tuple(built)
+
+
+def fallback_missing_unspecified_profiles(
+    plans: tuple[CharacterEffectiveOutfit, ...],
+    *,
+    explicit_wardrobe_evidence: bool,
+) -> tuple[tuple[CharacterEffectiveOutfit, ...], bool]:
+    """Let the writer design clothes when an implicit default profile is absent."""
+    if explicit_wardrobe_evidence:
+        return plans, False
+    changed = False
+    updated: list[CharacterEffectiveOutfit] = []
+    for plan in plans:
+        if plan.wardrobe_kind == "default_profile" and not plan.effective.effective_tags:
+            updated.append(replace(plan, wardrobe_kind="creative_fallback"))
+            changed = True
+        else:
+            updated.append(plan)
+    return tuple(updated), changed
+
+
+_CREATIVE_TAG_DENY_RE = re.compile(
+    r"(?:^|_)(?:bottomless|topless|nude|naked)(?:$|_)|(?:^|_)(?:school_)?uniform(?:$|_)",
+    re.I,
+)
+
+
+def keep_safe_creative_wardrobe_tags(text: str) -> str:
+    """Keep ordinary creative garments but reject named uniforms and nudity."""
+    return ", ".join(
+        tag
+        for tag in split_tags(text)
+        if not _CREATIVE_TAG_DENY_RE.search(tag.strip().lower().replace(" ", "_"))
+    )
 
 
 _UNTRUSTED_OUTFIT_DETAIL_RE = re.compile(
@@ -2345,6 +2487,40 @@ class PromptPipeline:
         fixed_character_name = fixed_character[0] if fixed_character else ""
         use_fixed_character = fixed_character is not None
         use_sensual_mode = wants_sensual_mode(prompt, prompt_config)
+        unspecified_wardrobe_policy = self._str(
+            "unspecified_wardrobe_policy", "scene_adaptive"
+        ).strip().lower()
+        raw_scene_markers = self.config.get(
+            "scene_adaptive_wardrobe_markers",
+            list(DEFAULT_SCENE_ADAPTIVE_WARDROBE_MARKERS),
+        )
+        if raw_scene_markers is None:
+            configured_scene_markers = ()
+        elif isinstance(raw_scene_markers, str):
+            configured_scene_markers = tuple(
+                item.strip()
+                for item in re.split(r"[,，\n]", raw_scene_markers)
+                if item.strip()
+            )
+        else:
+            configured_scene_markers = tuple(
+                str(item).strip() for item in raw_scene_markers if str(item).strip()
+            )
+        matched_wardrobe_scene_marker = scene_adaptive_wardrobe_marker(
+            prompt, configured_scene_markers
+        )
+        implicit_wardrobe_mode, wardrobe_source = resolve_unspecified_wardrobe_mode(
+            unspecified_wardrobe_policy,
+            sensual_mode=use_sensual_mode,
+            scene_marker=matched_wardrobe_scene_marker,
+        )
+        explicit_wardrobe_evidence = False
+        summary.update(
+            {
+                "unspecified_wardrobe_policy": unspecified_wardrobe_policy,
+                "scene_adaptive_wardrobe_marker": matched_wardrobe_scene_marker,
+            }
+        )
         keyword_rules = match_keyword_prompt_rules(
             background_intent_prompt, prompt_config
         )
@@ -2421,7 +2597,12 @@ class PromptPipeline:
         )
         cached_profile_result = (
             cached_profile_getter(prompt)
-            if callable(cached_profile_getter) and not creative_private_requested
+            if callable(cached_profile_getter)
+            and not creative_private_requested
+            and not (
+                not requested_outfit_mode
+                and implicit_wardrobe_mode == "creative_fallback"
+            )
             else None
         )
         configured_character_anchor_getter = getattr(
@@ -2501,6 +2682,34 @@ class PromptPipeline:
                         requested_outfit_mode,
                     )
                 )
+                explicit_wardrobe_evidence = has_explicit_wardrobe_evidence(
+                    requested_mode=requested_outfit_mode,
+                    outfit_transfer_enabled=outfit_plan.enabled,
+                    anchors=semantic_anchors,
+                    plans=semantic_character_plans,
+                )
+                if explicit_wardrobe_evidence:
+                    if requested_outfit_mode == "default_profile":
+                        wardrobe_source = "explicit_default_profile"
+                    elif requested_outfit_mode == "casual_profile":
+                        wardrobe_source = "explicit_casual_profile"
+                    elif requested_outfit_mode == "creative_fallback":
+                        wardrobe_source = "explicit_creative"
+                    elif outfit_plan.enabled or any(
+                        plan.wardrobe.kind in {"named_outfit", "outfit_source"}
+                        for plan in semantic_character_plans
+                    ):
+                        wardrobe_source = "explicit_named_outfit"
+                    else:
+                        wardrobe_source = "explicit_clothing"
+                else:
+                    semantic_character_plans, semantic_anchors = (
+                        apply_requested_wardrobe_mode(
+                            semantic_character_plans,
+                            semantic_anchors,
+                            implicit_wardrobe_mode,
+                        )
+                    )
                 if semantic_character_plans:
                     semantic_outfit_directives = tuple(
                         directive
@@ -2848,6 +3057,14 @@ class PromptPipeline:
             user_prompt=prompt,
             known_character_names=tuple(local_character_hints),
         )
+        character_effective_outfits, missing_profile_fallback = (
+            fallback_missing_unspecified_profiles(
+                character_effective_outfits,
+                explicit_wardrobe_evidence=explicit_wardrobe_evidence,
+            )
+        )
+        if missing_profile_fallback:
+            wardrobe_source = "missing_profile_fallback"
         global_outfit_reinforcement_tags = safe_global_outfit_tags(
             character_effective_outfits
         )
@@ -2901,6 +3118,24 @@ class PromptPipeline:
                 "Local Danbooru validation (non-wardrobe hard tags only):",
                 "confirmed hard tags: " + ", ".join(semantic_confirmed_tags),
             ]
+            visible_roster = tuple(
+                dict.fromkeys(
+                    tag
+                    for anchor_id, tag in semantic_result.anchor_tags
+                    if any(
+                        anchor.anchor_id.lower() == anchor_id.lower()
+                        and anchor.role == "target_character"
+                        for anchor in semantic_anchors
+                    )
+                )
+            )
+            if visible_roster:
+                context_lines.extend(
+                    (
+                        "confirmed visible character roster (authoritative):",
+                        ", ".join(visible_roster),
+                    )
+                )
             if semantic_result.missing_descriptions:
                 context_lines.append(
                     "unresolved concepts; express only when assigned by the character plan: "
@@ -3151,6 +3386,10 @@ class PromptPipeline:
             # Preserve the structured Tags block and let only the regular exact
             # deduplication/conflict cleaner process it.
             removed_unbound_tags: tuple[str, ...] = ()
+            creative_tags_are_shared_safe = bool(character_effective_outfits) and all(
+                item.wardrobe_kind == "creative_fallback"
+                for item in character_effective_outfits
+            )
             if (
                 effective_outfit.modified
                 or outfit_plan.enabled
@@ -3193,10 +3432,17 @@ class PromptPipeline:
                         effective_outfit.has_allowlist_override
                         or outfit_plan.enabled
                         or semantic_result.named_outfit_tags
-                        or character_effective_outfits
+                        or (
+                            character_effective_outfits
+                            and not creative_tags_are_shared_safe
+                        )
                         or casual_life_requested
                     ),
                 )
+                if creative_tags_are_shared_safe:
+                    structured_scene = keep_safe_creative_wardrobe_tags(
+                        structured_scene
+                    )
             resolution_statuses: list[dict[str, Any]] = []
             effective_detail_blocks: list[str] = []
             effective_identity_blocks: list[str] = []
@@ -3620,6 +3866,15 @@ class PromptPipeline:
                 "outfit_transfer_target": outfit_plan.target_character,
                 "outfit_summary_source": outfit_summary_source,
                 "outfit_summary_chars": len(outfit_summary),
+                "wardrobe_source": wardrobe_source,
+                "explicit_wardrobe_evidence": explicit_wardrobe_evidence,
+                "creative_shared_tags_allowed": bool(
+                    character_effective_outfits
+                    and all(
+                        item.wardrobe_kind == "creative_fallback"
+                        for item in character_effective_outfits
+                    )
+                ),
                 "outfit_effective_tags": list(effective_outfit.effective_tags),
                 "outfit_removed_tags": list(effective_outfit.removed_tags),
                 "outfit_added_tags": list(effective_outfit.added_tags),

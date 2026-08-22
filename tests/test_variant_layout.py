@@ -113,7 +113,7 @@ def test_wardrobe_plugin_page_and_mapping_config_are_packaged() -> None:
 
 def test_builtin_template_prioritizes_one_pass_visual_quality() -> None:
     assert "一幅完整、协调、具有视觉吸引力的画面" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "可以自由决定服装细节、姿态、构图、镜头、光影" in (
+    assert "服装只按末尾“角色服装权限”和动态服装上下文决定" in (
         DEFAULT_LLM_PROMPT_TEMPLATE
     )
     assert "用户未明确要求地点、环境或背景时" in DEFAULT_LLM_PROMPT_TEMPLATE

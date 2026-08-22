@@ -78,6 +78,8 @@
         "danbooru_semantic_system_prompt",
         "prompt_builder_max_tokens",
         "prompt_builder_max_content_tags",
+        "unspecified_wardrobe_policy",
+        "scene_adaptive_wardrobe_markers",
         "prompt_builder_web_search_enabled",
         "prompt_builder_search_max_results",
         "prompt_builder_search_depth",

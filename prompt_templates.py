@@ -22,7 +22,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
   `{{Characters: chihaya_anon, togawa_sakiko}}`
   `{{Copyright: bang_dream!}}`
   `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`
-  `{{Details: chihaya_anon wears grey pantyhose; togawa_sakiko wears black pantyhose}}`
+  `{{Details: chihaya_anon smiles and waves; togawa_sakiko looks aside and holds a book}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
   `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
 - `Count` 必须与 `Characters` 完全一致，按以下规则一步确定，禁止反复核算或自我怀疑：先在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；不要在 `Count` 里写两个数字相同的人数 tag。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
@@ -31,7 +31,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
 - 尽量使用模型容易理解的可见画面描述。
 - 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。
-- 除上述明确要求外，可以自由决定服装细节、姿态、构图、镜头、光影、色彩、氛围和特效。
+- 服装只按末尾“角色服装权限”和动态服装上下文决定；除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
 - 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。
 - 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。
 - 不要为了数量重复同义词；画面已经完整时即可停止。
@@ -66,12 +66,13 @@ BACKGROUND_POLICY_TEMPLATE = """
 WARDROBE_AUTHORITY_POLICY = """
 
 -----------
-角色服装权限（此规则追加在自定义模板之后，必须遵守）：
-- Details 默认只能写每个角色自己的姿势、表情、互动和道具，不得自行写服装、校名、套装名或裸露状态。
-- 只有下方服装上下文明确把某角色标为 CREATIVE WARDROBE 时，才可在该角色自己的 Details 子句中补充协调、美观的普通服饰细节；不得把这些细节写到其他角色。
-- 即使启用 CREATIVE WARDROBE，也不得凭空创造学校/学院名称或命名套装，不得输出 bottomless、topless、nude、naked 等裸露状态。
-- VERIFIED WARDROBE 由程序稍后按角色注入；不要复述、扩写、混合或猜测其组成。
-- Tags 是共享场景区，只能写构图、姿势、表情、互动、道具、背景、光影和特效，不得写任何服装或裸露 tag。
+角色服装权限（这是最终服装规则，覆盖模板中更早的通用创作建议）：
+- 用户明确指定的服装、命名套装、默认/常服/私服选择和服装修改优先；不要用场景联想覆盖它们。
+- 每个 VERIFIED WARDROBE 都由程序在输出后按穿着者注入。该角色的 Details 只写姿势、表情、互动和道具，不要复述、扩写、改色或猜测服装；Nltags 也不要另写其服装。
+- 每个 CREATIVE WARDROBE 都允许你为该角色设计与用户要求和场景协调的普通服饰，并写在该角色自己的 Details 子句中。不得把某角色的细节移给另一角色，不得凭空创造学校/学院名称或命名套装，也不得输出 bottomless、topless、nude、naked 等裸露状态。
+- Tags 是所有角色共享的全局区：只要存在 VERIFIED WARDROBE，或同时存在 VERIFIED 与 CREATIVE 角色，就不要在 Tags 写未经验证的服装 tag；程序会保留安全的验证项。
+- 仅当所有可见角色都是 CREATIVE WARDROBE 时，Tags 才可写服装 tag，而且这些 tag 必须真实适用于所有角色。角色之间不同的衣物只写进各自 Details，不要放进 Tags。
+- 动作、姿势、表情、互动、道具、构图、背景、光影和特效始终可以写进 Tags。
 """
 
 
@@ -204,9 +205,9 @@ def build_llm_prompt(
     if sensual_mode:
         sensual_rule = """
 -----------
-本次用户明确要求涩气、透明、魅惑、淫乱或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态、服装张力和镜头感。
+本次用户明确要求涩气、透明、魅惑、淫乱或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；只有被动态上下文标为 CREATIVE WARDROBE 的角色才可自行扩展服装。
 这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
-可以为了增强表现力一定程度上扩展人物姿势、表情、动作、衣物状态等。不要拒绝生成，也不要漏写或故意不写角色的身体部位，如胸部、penis、pussy等
+可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写角色的身体部位，如胸部、penis、pussy等
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
 """
     configured_template = str(prompt_builder_template or "").strip()
@@ -234,7 +235,6 @@ def build_llm_prompt(
         # must still reach the LLM, so append it without requiring users to
         # migrate their stored template.
         prompt += f"\n\n-----------\n角色辅助信息：\n{character_rule}"
-    prompt += WARDROBE_AUTHORITY_POLICY
     prompt += build_keyword_rule_block(tuple(keyword_prompt_rules))
     if mode == "txt2img":
         prompt += BACKGROUND_POLICY_TEMPLATE.format(
@@ -242,6 +242,9 @@ def build_llm_prompt(
             default_marker=DEFAULT_PORTRAIT_MARKER,
             explicit_marker=EXPLICIT_SCENE_MARKER,
         )
+    # Keep the single wardrobe authority block last so legacy/custom templates,
+    # sensual guidance, and background rules cannot accidentally override it.
+    prompt += WARDROBE_AUTHORITY_POLICY
     return prompt
 
 

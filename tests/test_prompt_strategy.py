@@ -19,9 +19,13 @@ from prompt_pipeline import (  # noqa: E402
     controlled_character_outfit_detail,
     character_wardrobe_authority_context,
     apply_requested_wardrobe_mode,
+    fallback_missing_unspecified_profiles,
+    has_explicit_wardrobe_evidence,
     requested_wardrobe_mode,
+    resolve_unspecified_wardrobe_mode,
     requests_casual_life_outfit,
     safe_global_outfit_tags,
+    scene_adaptive_wardrobe_marker,
     scoped_outfit_narrative,
 )
 from outfit_transfer import EffectiveOutfitPlan  # noqa: E402
@@ -1053,6 +1057,67 @@ def test_casual_outfit_intent_includes_official_casual_but_not_default() -> None
     assert requested_wardrobe_mode("千早爱音穿私服") == "creative_fallback"
     assert requested_wardrobe_mode("千早爱音穿居家私服") == "creative_fallback"
     assert requested_wardrobe_mode("千早爱音穿休闲穿搭") == "creative_fallback"
+
+
+def test_unspecified_wardrobe_policy_uses_only_strong_scene_cues() -> None:
+    assert scene_adaptive_wardrobe_marker("若叶睦刚刚出浴") == "刚刚出浴"
+    assert scene_adaptive_wardrobe_marker("爱音和祥子进行比赛") == "比赛"
+    assert scene_adaptive_wardrobe_marker("爱音和祥子一起看比赛") == ""
+    assert scene_adaptive_wardrobe_marker("爱音和祥子在公园里玩") == ""
+    assert scene_adaptive_wardrobe_marker("若叶睦在家里吃饭") == ""
+    assert resolve_unspecified_wardrobe_mode("scene_adaptive") == (
+        "default_profile",
+        "configured_default",
+    )
+    assert resolve_unspecified_wardrobe_mode(
+        "scene_adaptive", scene_marker="刚刚出浴"
+    ) == ("creative_fallback", "scene_adaptive")
+    assert resolve_unspecified_wardrobe_mode(
+        "scene_adaptive", sensual_mode=True
+    ) == ("creative_fallback", "scene_adaptive")
+    assert resolve_unspecified_wardrobe_mode("creative_fallback") == (
+        "creative_fallback",
+        "configured_creative",
+    )
+
+
+def test_explicit_wardrobe_evidence_prevents_config_override() -> None:
+    anchors = (
+        SemanticAnchor("target", "target_character", "character", "角色甲", "A", ("character_a",)),
+        SemanticAnchor("dress", "clothing", "clothing", "白色长裙", "white dress", ("white_dress",)),
+    )
+    plans = (SemanticCharacterPlan("target", SemanticWardrobe("none")),)
+
+    assert has_explicit_wardrobe_evidence(
+        requested_mode="",
+        outfit_transfer_enabled=False,
+        anchors=anchors,
+        plans=plans,
+    )
+
+
+def test_missing_implicit_default_profile_falls_back_to_creative() -> None:
+    empty_effective = EffectiveOutfitPlan()
+    plan = CharacterEffectiveOutfit(
+        target_anchor_id="target",
+        target_source_text="角色甲",
+        target_candidates=("character_a",),
+        wardrobe_kind="default_profile",
+        wardrobe_anchor_id="",
+        wardrobe_tag="",
+        appearance_tags=("blue_hair",),
+        effective=empty_effective,
+    )
+
+    fallback, changed = fallback_missing_unspecified_profiles(
+        (plan,), explicit_wardrobe_evidence=False
+    )
+    explicit, explicit_changed = fallback_missing_unspecified_profiles(
+        (plan,), explicit_wardrobe_evidence=True
+    )
+
+    assert changed and fallback[0].wardrobe_kind == "creative_fallback"
+    assert not explicit_changed and explicit[0].wardrobe_kind == "default_profile"
 
 
 def test_creative_private_request_synthesizes_per_character_wardrobe_plans() -> None:
