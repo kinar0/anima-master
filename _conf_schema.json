@@ -469,7 +469,31 @@
         "default": [
           "月之森校服=tsukinomori_school_uniform"
         ],
-        "hint": "每行一个映射，格式：中文服装名=canonical_tag。用户明确提到左侧名称时，右侧 tag 会直接作为完整服装套组 hard tag，并过滤 LLM 自行添加的未验证服装组成。示例：月之森校服=tsukinomori_school_uniform",
+        "hint": "每行一个套组，格式：别名1 | 别名2 | 别名3=canonical_tag；同一套组可配置任意数量的中英文触发别名。旧的单别名映射仍兼容。命中任一别名时，右侧 tag 会作为完整服装套组 hard tag。推荐使用插件页面“服装词库”编辑。",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "danbooru_series_alias_mappings": {
+        "description": "作品别名与父作品 Tag 映射",
+        "type": "list",
+        "default": [
+          "艾尔登法环 | 艾尔登法环黑夜君临 | 黑夜君临 | elden ring | nightreign | elden ring nightreign=elden_ring"
+        ],
+        "hint": "每行格式：别名1 | 别名2=canonical_copyright_tag。续作或外传可以映射到角色 Tag 实际使用的父作品作用域。",
+        "collapsed": true,
+        "items": {
+          "type": "string"
+        }
+      },
+      "danbooru_character_alias_mappings": {
+        "description": "上下文角色别名映射",
+        "type": "list",
+        "default": [
+          "复仇者 | revenant=revenant_(elden_ring)"
+        ],
+        "hint": "每行格式：别名1 | 别名2=canonical_character_tag。带作品消歧后缀的角色只有在同一请求命中兼容作品映射时才会成为 hard tag。",
         "collapsed": true,
         "items": {
           "type": "string"

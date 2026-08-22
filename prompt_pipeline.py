@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 try:
@@ -18,6 +18,7 @@ try:
         extract_parenthesized_character_aliases,
         extract_parenthesized_copyright_aliases,
         merge_semantic_results,
+        prefer_configured_character_anchors,
         parse_semantic_plan,
         parse_semantic_character_plans,
         parse_semantic_outfit_directives,
@@ -84,6 +85,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         extract_parenthesized_character_aliases,
         extract_parenthesized_copyright_aliases,
         merge_semantic_results,
+        prefer_configured_character_anchors,
         parse_semantic_plan,
         parse_semantic_character_plans,
         parse_semantic_outfit_directives,
@@ -237,6 +239,60 @@ class StructuredPromptCharacter:
     name: str
     identity_tags: str
     detail_tags: str
+
+
+def confirmed_semantic_character_tags(
+    result: SemanticLookupResult,
+) -> tuple[str, ...]:
+    """Return locally confirmed visible characters in request order."""
+    anchor_tag_map = dict(result.anchor_tags)
+    return tuple(
+        dict.fromkeys(
+            anchor_tag_map.get(anchor.anchor_id, "")
+            for anchor in result.anchors
+            if anchor.role == "target_character"
+            and anchor_tag_map.get(anchor.anchor_id, "")
+        )
+    )
+
+
+def bind_single_confirmed_semantic_character(
+    characters: tuple[StructuredPromptCharacter, ...],
+    nltags: str,
+    confirmed_tags: tuple[str, ...],
+) -> tuple[tuple[StructuredPromptCharacter, ...], str]:
+    """Replace a single writer-supplied identity with first-round evidence."""
+    if len(characters) != 1 or len(confirmed_tags) != 1:
+        return characters, nltags
+    character = characters[0]
+    canonical = confirmed_tags[0]
+    if character.name == canonical:
+        return characters, nltags
+
+    def replace_name(text: str) -> str:
+        result = str(text or "")
+        variants = tuple(
+            dict.fromkeys((character.name, character.name.replace("_", " ")))
+        )
+        for variant in variants:
+            result = re.sub(
+                rf"(?<!\w){re.escape(variant)}(?!\w)",
+                canonical,
+                result,
+                flags=re.I,
+            )
+        return result
+
+    return (
+        (
+            StructuredPromptCharacter(
+                name=canonical,
+                identity_tags=replace_name(character.identity_tags),
+                detail_tags=replace_name(character.detail_tags),
+            ),
+        ),
+        replace_name(nltags),
+    )
 
 
 def _normalized_character_key(value: str) -> str:
@@ -710,6 +766,33 @@ def build_character_effective_outfits(
         for anchor_id, outfit_tag, outfit_tags, qualifier
         in semantic_result.anchor_outfit_profiles
     }
+
+    def cached_profile_for_target(
+        target: SemanticAnchor,
+    ) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
+        target_text = re.sub(r"\s+", " ", target.source_text.strip().lower())
+        target_candidates = {candidate.lower() for candidate in target.candidates}
+        matches = [
+            tags
+            for alias, source_tag, tags, _qualifier
+            in semantic_result.source_outfit_profiles
+            if (
+                source_tag.lower() in target_candidates
+                or (
+                    target_text
+                    and re.sub(r"\s+", " ", alias.strip().lower()) == target_text
+                )
+            )
+        ]
+        if len(matches) != 1:
+            return None
+        appearances = (
+            semantic_result.appearance_profile_tags
+            if len(semantic_result.source_outfit_profiles) == 1
+            else ()
+        )
+        return matches[0], appearances
+
     built: list[CharacterEffectiveOutfit] = []
     scoped_character_names = tuple(dict.fromkeys((
         *known_character_names,
@@ -731,6 +814,8 @@ def build_character_effective_outfits(
             profile = character_profiles.get(plan.target_anchor_id.lower())
             if profile:
                 _character_tag, base_tags, appearance_tags = profile
+            elif cached_profile := cached_profile_for_target(target):
+                base_tags, appearance_tags = cached_profile
             elif len(plans) == 1:
                 base_tags = semantic_result.outfit_profile_tags
                 appearance_tags = semantic_result.appearance_profile_tags
@@ -1072,6 +1157,7 @@ class PromptPipeline:
         user_prompt: str,
         rejected_content: str,
         target_name: str = "",
+        copyright_hints: tuple[str, ...] = (),
     ) -> tuple[str, ...]:
         """Extract bounded Danbooru character candidates from the user request.
 
@@ -1080,6 +1166,7 @@ class PromptPipeline:
             user_prompt: Original request containing the named character.
             rejected_content: Initial LLM tags that online lookup could not verify.
             target_name: Optional character name selected by a multi-person plan.
+            copyright_hints: First-round work scopes used only for disambiguation.
 
         Returns:
             Normalized candidate tags proposed for evidence-based lookup.
@@ -1095,8 +1182,13 @@ class PromptPipeline:
                 'Return JSON only: {"source_name":"原文中的名字",'
                 '"copyright":"work name","tag_candidates":["name_(work)"]}.\n'
                 "The source_name must be an exact substring of the user request. "
-                "Do not invent a character when none is explicitly named.\n\n"
+                "Do not invent a character when none is explicitly named. A localized "
+                "class/title may be the official localized name of a character: recover "
+                "that character's official English or romanized proper name instead of "
+                "literally translating it as a generic noun.\n\n"
                 f"Target name: {target_name or 'not separately specified'}\n"
+                "Known work/copyright scope hints: "
+                f"{', '.join(copyright_hints) or 'none'}\n"
                 f"User request: {user_prompt}\n"
                 f"Initial character tags to cross-check: "
                 f"{self._shorten(rejected_content, 500)}"
@@ -1136,6 +1228,79 @@ class PromptPipeline:
             if candidate not in candidates:
                 candidates.append(candidate)
         return tuple(candidates[:6])
+
+    async def _refine_unresolved_semantic_characters(
+        self,
+        *,
+        provider_id: str,
+        user_prompt: str,
+        anchors: tuple[SemanticAnchor, ...],
+        result: SemanticLookupResult,
+    ) -> tuple[SemanticAnchor, ...]:
+        """Add bounded canonical guesses for unresolved visible characters."""
+        anchor_tag_map = dict(result.anchor_tags)
+
+        def confirmed_tag_for(anchor: SemanticAnchor) -> str:
+            mapped = anchor_tag_map.get(anchor.anchor_id, "")
+            if mapped:
+                return mapped
+            return next(
+                (
+                    tag
+                    for tag in result.confirmed_tags
+                    if any(
+                        tag == candidate or tag.startswith(candidate + "_(")
+                        for candidate in anchor.candidates
+                    )
+                ),
+                "",
+            )
+
+        copyright_hints = tuple(
+            dict.fromkeys(
+                tag
+                for anchor in anchors
+                if anchor.role == "copyright"
+                for tag in (
+                    confirmed_tag_for(anchor),
+                    *anchor.candidates,
+                )
+                if tag
+            )
+        )
+        refined: list[SemanticAnchor] = []
+        refinement_attempts = 0
+        for anchor in anchors:
+            if (
+                anchor.role != "target_character"
+                or confirmed_tag_for(anchor)
+                or refinement_attempts >= 4
+            ):
+                refined.append(anchor)
+                continue
+            refinement_attempts += 1
+            try:
+                candidate_hints = await self._generate_character_candidates_with_llm(
+                    provider_id=provider_id,
+                    user_prompt=user_prompt,
+                    rejected_content=", ".join(anchor.candidates),
+                    target_name=anchor.source_text,
+                    copyright_hints=copyright_hints,
+                )
+            except Exception as exc:
+                self.logger.warning(
+                    "[comfyui_agent] semantic character refinement failed target=%s: %s",
+                    anchor.source_text,
+                    exc,
+                )
+                candidate_hints = ()
+            merged_candidates = tuple(
+                dict.fromkeys((*candidate_hints, *anchor.candidates))
+            )[:6]
+            if candidate_hints and merged_candidates != anchor.candidates:
+                anchor = replace(anchor, candidates=merged_candidates)
+            refined.append(anchor)
+        return tuple(refined)
 
     async def _generate_semantic_plan_with_llm(
         self, *, provider_id: str, user_prompt: str
@@ -2087,8 +2252,27 @@ class PromptPipeline:
         cached_term_result = (
             cached_term_getter(prompt) if callable(cached_term_getter) else None
         )
+        cached_profile_getter = getattr(
+            self._danbooru_resolver, "cached_outfit_profiles_for_prompt", None
+        )
+        cached_profile_result = (
+            cached_profile_getter(prompt) if callable(cached_profile_getter) else None
+        )
+        configured_character_anchor_getter = getattr(
+            self._danbooru_resolver,
+            "configured_character_anchors_for_prompt",
+            None,
+        )
+        configured_character_anchors = (
+            tuple(configured_character_anchor_getter(prompt))
+            if callable(configured_character_anchor_getter)
+            else ()
+        )
         semantic_result = merge_semantic_results(
-            cached_source_result, cached_named_result, cached_term_result
+            cached_source_result,
+            cached_profile_result,
+            cached_named_result,
+            cached_term_result,
         )
         semantic_available = getattr(
             self._danbooru_resolver, "semantic_lookup_available", None
@@ -2106,15 +2290,36 @@ class PromptPipeline:
                     provider_id=provider_id,
                     user_prompt=prompt,
                 )
-                semantic_anchors = tuple(
-                    dict.fromkeys(
-                        (
-                            *extract_parenthesized_copyright_aliases(prompt),
-                            *extract_parenthesized_character_aliases(prompt),
-                            *parse_semantic_plan(semantic_plan_raw, prompt),
-                        )
-                    )
+                semantic_anchors = prefer_configured_character_anchors(
+                    configured_character_anchors,
+                    (
+                        *extract_parenthesized_copyright_aliases(prompt),
+                        *extract_parenthesized_character_aliases(prompt),
+                        *parse_semantic_plan(semantic_plan_raw, prompt),
+                    ),
                 )
+                if cached_named_result is not None:
+                    for cached_anchor in cached_named_result.anchors:
+                        cached_source_key = re.sub(
+                            r"\s+", " ", cached_anchor.source_text.strip().lower()
+                        )
+                        if any(
+                            anchor.role in {"outfit", "clothing"}
+                            and re.sub(
+                                r"\s+", " ", anchor.source_text.strip().lower()
+                            )
+                            == cached_source_key
+                            and bool(
+                                set(candidate.lower() for candidate in anchor.candidates)
+                                & set(
+                                    candidate.lower()
+                                    for candidate in cached_anchor.candidates
+                                )
+                            )
+                            for anchor in semantic_anchors
+                        ):
+                            continue
+                        semantic_anchors = (*semantic_anchors, cached_anchor)
                 semantic_outfit_directives = parse_semantic_outfit_directives(
                     semantic_plan_raw, prompt
                 )
@@ -2145,15 +2350,36 @@ class PromptPipeline:
                     cached_named_keys = {
                         tag.lower() for tag in cached_named_result.named_outfit_tags
                     }
+
+                    def cached_named_anchor_is_complete(
+                        anchor: SemanticAnchor,
+                    ) -> bool:
+                        if not any(
+                            candidate.lower() in cached_named_keys
+                            for candidate in anchor.candidates
+                        ):
+                            return False
+                        cached_detail = (
+                            cached_source_getter(anchor.source_text)
+                            if callable(cached_source_getter)
+                            else None
+                        )
+                        refresh_getter = getattr(
+                            self._danbooru_resolver,
+                            "outfit_source_refresh_needed",
+                            None,
+                        )
+                        return cached_detail is not None and not (
+                            callable(refresh_getter)
+                            and refresh_getter(anchor.source_text)
+                        )
+
                     semantic_anchors = tuple(
                         anchor
                         for anchor in semantic_anchors
                         if not (
                             anchor.role in {"outfit", "clothing"}
-                            and any(
-                                candidate.lower() in cached_named_keys
-                                for candidate in anchor.candidates
-                            )
+                            and cached_named_anchor_is_complete(anchor)
                         )
                     )
                 if outfit_plan.enabled and outfit_plan.source_subject:
@@ -2207,8 +2433,18 @@ class PromptPipeline:
                                 ),
                             )
                 resolved_semantic = await semantic_resolve(semantic_anchors)
+                refined_anchors = await self._refine_unresolved_semantic_characters(
+                    provider_id=provider_id,
+                    user_prompt=prompt,
+                    anchors=semantic_anchors,
+                    result=resolved_semantic,
+                )
+                if refined_anchors != semantic_anchors:
+                    semantic_anchors = refined_anchors
+                    resolved_semantic = await semantic_resolve(semantic_anchors)
                 semantic_result = merge_semantic_results(
                     cached_source_result,
+                    cached_profile_result,
                     cached_named_result,
                     cached_term_result,
                     resolved_semantic,
@@ -2648,6 +2884,14 @@ class PromptPipeline:
                     "[comfyui_agent] structured prompt format retry failed: %s", exc
                 )
                 summary["structured_format_retry"] = False
+        semantic_character_tags = confirmed_semantic_character_tags(semantic_result)
+        structured_characters, structured_nltags = (
+            bind_single_confirmed_semantic_character(
+                structured_characters,
+                structured_nltags,
+                semantic_character_tags,
+            )
+        )
         structured_prompt_mode = bool(structured_characters) or any(
             tag.lower().replace("_", " ") == "no humans"
             for tag in structured_roster_tags
@@ -2702,31 +2946,38 @@ class PromptPipeline:
             effective_identity_blocks: list[str] = []
             used_fixed_names: set[str] = set()
             for character in structured_characters:
-                fixed_name = _match_fixed_character_hint(
-                    character.name,
-                    local_character_hints,
-                    used_fixed_names,
-                    structured_character_count=len(structured_characters),
-                )
-                if fixed_name:
-                    used_fixed_names.add(fixed_name)
-                    # The local text is an LLM hint, not a schema.  It may begin
-                    # with natural language rather than a canonical tag, so the
-                    # final roster anchor remains the LLM's structured name.
+                semantic_confirmed = character.name in semantic_character_tags
+                fixed_name = ""
+                if semantic_confirmed:
                     identity_tags = (character.name,)
-                    status = "fixed"
+                    status = "semantic_confirmed"
                     canonical_tag = character.name
                 else:
-                    resolution = await self._danbooru_resolver.resolve_detailed(
-                        llm_content=character.name,
-                        user_prompt=character.name,
-                        fixed_character=False,
+                    fixed_name = _match_fixed_character_hint(
+                        character.name,
+                        local_character_hints,
+                        used_fixed_names,
+                        structured_character_count=len(structured_characters),
                     )
-                    identity_tags = resolution.identity_tags or tuple(
-                        split_tags(resolution.text)
-                    )[:1]
-                    status = resolution.status
-                    canonical_tag = resolution.canonical_tag
+                    if fixed_name:
+                        used_fixed_names.add(fixed_name)
+                        # The local text is an LLM hint, not a schema.  It may begin
+                        # with natural language rather than a canonical tag, so the
+                        # final roster anchor remains the LLM's structured name.
+                        identity_tags = (character.name,)
+                        status = "fixed"
+                        canonical_tag = character.name
+                    else:
+                        resolution = await self._danbooru_resolver.resolve_detailed(
+                            llm_content=character.name,
+                            user_prompt=character.name,
+                            fixed_character=False,
+                        )
+                        identity_tags = resolution.identity_tags or tuple(
+                            split_tags(resolution.text)
+                        )[:1]
+                        status = resolution.status
+                        canonical_tag = resolution.canonical_tag
                 character_outfit = next(
                     (
                         candidate

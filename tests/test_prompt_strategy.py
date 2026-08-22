@@ -20,7 +20,7 @@ from prompt_pipeline import (  # noqa: E402
 )
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
 from prompt_templates import build_llm_prompt  # noqa: E402
-from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
+from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
     SemanticAnchor,
     SemanticCharacterPlan,
@@ -517,6 +517,280 @@ def test_semantic_outfit_source_is_kept_separate_from_target_character() -> None
     assert "togawa sakiko" not in result.final_prompt
 
 
+def test_configured_character_anchors_enter_first_round_semantic_lookup() -> None:
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+            self.outputs = [
+                '{"anchors":[]}',
+                (
+                    "{Count: 1girl, solo}\n"
+                    "{Characters: revenant_(elden_ring_nightreign)}\n"
+                    "{Copyright: elden_ring}\n"
+                    "{Identity: revenant_(elden_ring_nightreign) has long hair}\n"
+                    "{Details: revenant_(elden_ring_nightreign) crosses her arms}\n"
+                    "{Tags: crossed arms, white background, "
+                    "background_mode_default_portrait}\n"
+                    "{Nltags: revenant_(elden_ring_nightreign) crosses her arms.}"
+                ),
+            ]
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    base_resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+
+    class _Resolver:
+        def __init__(self):
+            self.semantic_anchors = ()
+            self.second_round_resolution_calls = 0
+
+        def configured_character_anchors_for_prompt(self, prompt):
+            return base_resolver.configured_character_anchors_for_prompt(prompt)
+
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_semantic_anchors(self, anchors):
+            self.semantic_anchors = anchors
+            return SemanticLookupResult(
+                confirmed_tags=("revenant_(elden_ring)", "elden_ring"),
+                anchors=anchors,
+                anchor_tags=(
+                    ("configured_copyright_1", "elden_ring"),
+                    ("configured_character_1", "revenant_(elden_ring)"),
+                ),
+                status="resolved",
+            )
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            self.second_round_resolution_calls += 1
+            return DanbooruResolveOutcome(
+                text=llm_content,
+                status="resolved",
+                canonical_tag=llm_content,
+                identity_tags=(llm_content,),
+            )
+
+    resolver = _Resolver()
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=resolver,
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(
+        pipeline.build(event, "艾尔登法环黑夜君临的复仇者，双手抱胸")
+    )
+
+    assert [(anchor.role, anchor.candidates) for anchor in resolver.semantic_anchors] == [
+        ("copyright", ("elden_ring",)),
+        ("target_character", ("revenant_(elden_ring)",)),
+    ]
+    assert result.summary["danbooru_semantic_confirmed_tags"] == [
+        "revenant_(elden_ring)",
+        "elden_ring",
+    ]
+    assert "confirmed visible character roster (authoritative)" in context.calls[1][
+        "prompt"
+    ]
+    assert "revenant_(elden_ring_nightreign)" not in result.final_prompt
+    assert "revenant (elden ring)" in result.final_prompt
+    assert resolver.second_round_resolution_calls == 0
+    assert result.summary["character_resolution_statuses"][0]["status"] == (
+        "semantic_confirmed"
+    )
+
+
+def test_unresolved_localized_character_is_refined_and_exactly_rechecked() -> None:
+    class _Response:
+        def __init__(self, text: str):
+            self.completion_text = text
+
+    class _Context:
+        def __init__(self):
+            self.calls = []
+            self.outputs = [
+                (
+                    '{"anchors":['
+                    '{"id":"target","role":"target_character",'
+                    '"group":"character","source_text":"追踪者",'
+                    '"description":"localized hunter character",'
+                    '"candidates":["tracker"]},'
+                    '{"id":"work","role":"copyright","group":"series",'
+                    '"source_text":"艾尔登法环黑夜君临",'
+                    '"description":"Elden Ring Nightreign",'
+                    '"candidates":["elden_ring"]}]}'
+                ),
+                (
+                    '{"source_name":"追踪者","copyright":"elden_ring",'
+                    '"tag_candidates":["wylder_(elden_ring)"]}'
+                ),
+                (
+                    "{Count: 1boy, solo}\n"
+                    "{Characters: tracker}\n"
+                    "{Copyright: elden_ring}\n"
+                    "{Identity: tracker has blonde hair and blue eyes}\n"
+                    "{Details: tracker stands for a full body portrait}\n"
+                    "{Tags: full body, white background, "
+                    "background_mode_default_portrait}\n"
+                    "{Nltags: tracker stands in a full body portrait.}"
+                ),
+            ]
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response(self.outputs.pop(0))
+
+    class _Plan:
+        use_web_search = False
+        use_deep_thinking = False
+        search_reason = ""
+        thinking_reason = ""
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return _Plan()
+
+    base_resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+
+    class _Resolver:
+        def __init__(self):
+            self.semantic_calls = []
+            self.second_round_resolution_calls = 0
+
+        def configured_character_anchors_for_prompt(self, prompt):
+            return base_resolver.configured_character_anchors_for_prompt(prompt)
+
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def semantic_lookup_available(self):
+            return True
+
+        async def resolve_semantic_anchors(self, anchors):
+            self.semantic_calls.append(anchors)
+            copyright_anchor = next(
+                anchor for anchor in anchors if anchor.role == "copyright"
+            )
+            target_anchor = next(
+                anchor for anchor in anchors if anchor.role == "target_character"
+            )
+            if len(self.semantic_calls) == 1:
+                return SemanticLookupResult(
+                    confirmed_tags=("elden_ring",),
+                    missing_descriptions=(target_anchor.description,),
+                    anchors=anchors,
+                    anchor_tags=((copyright_anchor.anchor_id, "elden_ring"),),
+                    status="resolved",
+                )
+            assert target_anchor.candidates[0] == "wylder_(elden_ring)"
+            return SemanticLookupResult(
+                confirmed_tags=("wylder_(elden_ring)", "elden_ring"),
+                anchors=anchors,
+                anchor_tags=(
+                    (target_anchor.anchor_id, "wylder_(elden_ring)"),
+                    (copyright_anchor.anchor_id, "elden_ring"),
+                ),
+                status="resolved",
+            )
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            self.second_round_resolution_calls += 1
+            return DanbooruResolveOutcome(text=llm_content)
+
+    resolver = _Resolver()
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context,
+        config={},
+        logger=_Logger(),
+        danbooru_resolver=resolver,
+        researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(
+        pipeline.build(event, "艾尔登法环黑夜君临的追踪者，全身照")
+    )
+
+    assert len(resolver.semantic_calls) == 2
+    assert "Known work/copyright scope hints: elden_ring" in context.calls[1][
+        "prompt"
+    ]
+    assert "tracker" not in result.final_prompt
+    assert "wylder (elden ring)" in result.final_prompt
+    assert result.summary["danbooru_semantic_confirmed_tags"] == [
+        "wylder_(elden_ring)",
+        "elden_ring",
+    ]
+    assert resolver.second_round_resolution_calls == 0
+
+
 def test_verified_outfit_nltags_drop_guessed_clothing_prose() -> None:
     result = minimal_verified_outfit_nltags(
         "wakaba mutsumi wears a black gothic dress with white lace. "
@@ -576,6 +850,35 @@ def test_character_outfits_stay_scoped_and_control_bottomless_per_target() -> No
     assert "haneoka" not in sakiko_detail
     assert "haneoka_school_uniform" in anon_detail
     assert "hanasaki" not in anon_detail and "bottomless" not in anon_detail
+
+
+def test_cached_editor_profiles_bind_to_each_character_without_crossing() -> None:
+    anchors = (
+        SemanticAnchor("a", "target_character", "character", "角色甲", "A", ("character_a",)),
+        SemanticAnchor("b", "target_character", "character", "角色乙", "B", ("character_b",)),
+    )
+    plans = (
+        SemanticCharacterPlan("a", SemanticWardrobe("default_profile")),
+        SemanticCharacterPlan("b", SemanticWardrobe("default_profile")),
+    )
+    lookup = SemanticLookupResult(
+        outfit_profile_tags=("red_jacket", "blue_dress"),
+        source_outfit_profiles=(
+            ("角色甲", "character_a", ("red_jacket",), "default"),
+            ("角色乙", "character_b", ("blue_dress",), "default"),
+        ),
+        status="profile_cache",
+    )
+
+    effective = build_character_effective_outfits(
+        anchors,
+        plans,
+        lookup,
+        user_prompt="角色甲和角色乙站在一起",
+    )
+
+    assert effective[0].effective.effective_tags == ("red_jacket",)
+    assert effective[1].effective.effective_tags == ("blue_dress",)
 
 
 def test_two_named_outfits_never_cross_character_details() -> None:
@@ -966,7 +1269,7 @@ def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
     assert standalone.summary["outfit_transfer"] is False
 
 
-def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
+def test_cached_seasonal_named_outfit_is_deterministically_queried() -> None:
     class _Response:
         def __init__(self, text: str):
             self.completion_text = text
@@ -974,11 +1277,7 @@ def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
     class _Context:
         def __init__(self):
             self.outputs = [
-                '{"anchors":[{"id":"uniform","role":"outfit",'
-                '"group":"outfit","source_text":"羽丘校服",'
-                '"description":"Haneoka school uniform",'
-                '"candidates":["haneoka_school_uniform"]},'
-                '{"id":"duplicate_source","role":"outfit",'
+                '{"anchors":[{"id":"duplicate_source","role":"outfit",'
                 '"group":"outfit","source_text":"oblivionis",'
                 '"description":"outfit belonging to oblivionis",'
                 '"candidates":["oblivionis_outfit"]}]}',
@@ -1025,7 +1324,9 @@ def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
         def profile_hints_for_prompt(self, _prompt):
             return {}
 
-        def cached_outfit_source(self, _source):
+        def cached_outfit_source(self, source):
+            if source == "羽丘夏季校服":
+                return None
             return SemanticLookupResult(
                 confirmed_tags=("oblivionis_(bang_dream!)", "bang_dream!"),
                 outfit_source_tags=("oblivionis_(bang_dream!)",),
@@ -1034,10 +1335,24 @@ def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
             )
 
         def cached_named_outfits_for_prompt(self, _prompt):
-            return None
+            return SemanticLookupResult(
+                confirmed_tags=("haneoka_school_uniform",),
+                named_outfit_tags=("haneoka_school_uniform",),
+                anchors=(
+                    SemanticAnchor(
+                        "cached_haneoka_summer",
+                        "outfit",
+                        "outfit",
+                        "羽丘夏季校服",
+                        "Haneoka summer school uniform",
+                        ("haneoka_school_uniform",),
+                    ),
+                ),
+                status="profile_cache",
+            )
 
-        def outfit_source_refresh_needed(self, _source):
-            return False
+        def outfit_source_refresh_needed(self, source):
+            return source == "羽丘夏季校服"
 
         def semantic_lookup_available(self):
             return True
@@ -1046,7 +1361,7 @@ def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
             self.semantic_calls += 1
             assert any(
                 anchor.role == "outfit"
-                and anchor.source_text == "羽丘校服"
+                and anchor.source_text == "羽丘夏季校服"
                 for anchor in anchors
             )
             assert sum(
@@ -1080,7 +1395,7 @@ def test_cached_source_does_not_shadow_fresh_named_outfit_lookup() -> None:
     result = asyncio.run(
         pipeline.build(
             event,
-            "丰川祥子穿着oblivionis的衣服，千早爱音穿着羽丘校服",
+            "丰川祥子穿着oblivionis的衣服，千早爱音穿着羽丘夏季校服",
         )
     )
 

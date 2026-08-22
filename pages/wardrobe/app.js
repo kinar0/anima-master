@@ -21,7 +21,7 @@ const bridge = window.AstrBotPluginPage || fallbackBridge;
 
 const META = {
   outfits: { kicker: "VISUAL PROFILES", title: "角色视觉档案", description: "从角色或服装来源帖子中学习的默认服装与稳定外观锚点。它们会作为本次生成的硬约束。" },
-  outfitSets: { kicker: "NAMED OUTFIT SETS", title: "服装套组", description: "完整且独立命名的服装 anchor；同一 canonical tag 的夏季、冬季等变体会分别保存。" },
+  outfitSets: { kicker: "NAMED OUTFIT SETS", title: "服装套组", description: "每一行都是独立套组实体，可有任意数量别名；不同套组允许指向同一个 canonical tag，不会再按 tag 强行合并。" },
   terms: { kicker: "TERM TRANSLATIONS", title: "名词翻译", description: "将常用中文名词稳定映射为 canonical Danbooru tag，命中提示词时直接使用。" },
 };
 const $ = (selector) => document.querySelector(selector);
@@ -63,7 +63,7 @@ function mappingEntry(item, index, isSet) {
   const card = node("article", "entry");
   const setAliases = item.aliases?.length ? item.aliases : [item.alias].filter(Boolean);
   const left = isSet
-    ? inputField("触发别名（中文 / 英文）", setAliases.join(", "), (value) => { item.aliases = splitList(value); item.alias = item.aliases[0] || ""; }, { textarea: true, placeholder: "羽丘校服, haneoka school uniform" })
+    ? inputField("触发别名（不限数量）", setAliases.join(", "), (value) => { item.aliases = splitList(value); item.alias = item.aliases[0] || ""; }, { textarea: true, placeholder: "羽丘校服, 羽丘制服, haneoka uniform, haneoka academy uniform" })
     : inputField("中文名词 / 触发词", item.alias, (value) => item.alias = value, { placeholder: "百褶裙" });
   if (isSet) left.append(chips(setAliases, "mint"));
   const right = inputField("Canonical Danbooru Tag", item.tag, (value) => item.tag = value, { placeholder: isSet ? "tsukinomori_school_uniform" : "pleated_skirt", className: "wide" }); right.append(chips(item.tag ? [item.tag] : []));

@@ -102,6 +102,21 @@ class DanbooruResolver:
     def _profile_alias_key(value: str) -> str:
         return re.sub(r"\s+", " ", str(value or "").strip().lower())
 
+    @classmethod
+    def _text_mentions_alias(cls, text: str, alias: str) -> bool:
+        """Match a trigger without letting short Latin aliases hit inside words."""
+        haystack = cls._profile_alias_key(text)
+        needle = cls._profile_alias_key(alias)
+        if not needle:
+            return False
+        if re.search(r"[\u3400-\u9fff]", needle):
+            return needle in haystack
+        return re.search(
+            rf"(?<![a-z0-9_]){re.escape(needle)}(?![a-z0-9_])",
+            haystack,
+            flags=re.I,
+        ) is not None
+
     @staticmethod
     def _outfit_variant(value: Any) -> str:
         text = str(value or "").strip().lower()
@@ -163,7 +178,11 @@ class DanbooruResolver:
         *collections: Any,
         variant: str = "default",
     ) -> list[str]:
-        """Build stable trigger aliases without treating them as separate sets."""
+        """Build stable trigger aliases without treating them as separate sets.
+
+        Aliases entered by the user are authoritative. Learned aliases are
+        screened separately by ``_safe_learned_outfit_aliases``.
+        """
         variant = cls._normalize_outfit_variant(variant, primary, *collections)
         values: list[str] = [primary]
         for collection in collections:
@@ -179,7 +198,6 @@ class DanbooruResolver:
                 alias
                 and alias != canonical_key
                 and alias not in seen
-                and cls._alias_fits_named_outfit(alias, canonical_tag, variant)
             ):
                 seen.add(alias)
                 aliases.append(alias)
@@ -195,8 +213,9 @@ class DanbooruResolver:
     ) -> str:
         """Choose one human-facing alias while retaining all triggers in storage."""
         generated = {cls._profile_alias_key(canonical_tag)}
+        primary = aliases[0] if aliases else profile_key
         candidates = cls._named_outfit_aliases(
-            profile_key, canonical_tag, aliases, variant=variant
+            primary, canonical_tag, aliases, variant=variant
         )
         human = [item for item in candidates if item not in generated]
         if not human:
@@ -245,8 +264,30 @@ class DanbooruResolver:
     def cached_outfit_source(self, source_text: str) -> SemanticLookupResult | None:
         """Return a persistent outfit-source profile without invoking an LLM."""
         variant = self._outfit_variant(source_text)
+        profiles = self._profile_data().get("profiles", {})
         key = self._outfit_profile_key(source_text, variant)
-        profile = self._profile_data().get("profiles", {}).get(key)
+        profile = profiles.get(key)
+        if not isinstance(profile, dict):
+            profile = next(
+                (
+                    candidate
+                    for profile_key, candidate in profiles.items()
+                    if isinstance(candidate, dict)
+                    and candidate.get("kind") != "named_outfit"
+                    and self._normalize_outfit_variant(
+                        candidate.get("qualifier"),
+                        profile_key,
+                        candidate.get("aliases", []),
+                    )
+                    == variant
+                    and any(
+                        self._profile_alias_key(source_text)
+                        == self._profile_alias_key(alias)
+                        for alias in (profile_key, *candidate.get("aliases", []))
+                    )
+                ),
+                None,
+            )
         if not isinstance(profile, dict):
             return None
         source_tags = tuple(
@@ -274,6 +315,82 @@ class DanbooruResolver:
                 for tag in profile.get("outfit_tags", [])
                 if str(tag).strip()
             ),
+            status="profile_cache",
+        )
+
+    def cached_outfit_profiles_for_prompt(
+        self, user_prompt: str
+    ) -> SemanticLookupResult | None:
+        """Return every editable clothing profile explicitly named in a prompt."""
+        text = str(user_prompt or "")
+        requested_variant = self._outfit_variant(text)
+        confirmed: list[str] = []
+        outfit_tags: list[str] = []
+        appearance_tags: list[str] = []
+        scoped: list[tuple[str, str, tuple[str, ...], str]] = []
+        for profile_key, profile in self._profile_data().get("profiles", {}).items():
+            if not isinstance(profile, dict) or profile.get("kind") == "named_outfit":
+                continue
+            variant = self._normalize_outfit_variant(
+                profile.get("qualifier"), profile_key, profile.get("aliases", [])
+            )
+            if variant != requested_variant:
+                continue
+            aliases = tuple(
+                dict.fromkeys(
+                    self._profile_alias_key(alias)
+                    for alias in (
+                        str(profile_key).split("::", 1)[0],
+                        *profile.get("aliases", []),
+                    )
+                    if self._profile_alias_key(alias)
+                )
+            )
+            matched_alias = next(
+                (alias for alias in aliases if self._text_mentions_alias(text, alias)),
+                "",
+            )
+            if not matched_alias:
+                continue
+            sources = tuple(
+                str(tag).strip()
+                for tag in profile.get("source_tags", [])
+                if str(tag).strip()
+            )
+            tags = tuple(
+                str(tag).strip()
+                for tag in profile.get("outfit_tags", [])
+                if str(tag).strip()
+            )
+            evidence = (
+                profile.get("evidence")
+                if isinstance(profile.get("evidence"), dict)
+                else {}
+            )
+            appearances = tuple(
+                str(tag).strip()
+                for tag in evidence.get("appearance_tags", [])
+                if str(tag).strip()
+            )
+            for tag in (*sources, *profile.get("copyright_tags", [])):
+                value = str(tag).strip()
+                if value and value not in confirmed:
+                    confirmed.append(value)
+            for tag in tags:
+                if tag not in outfit_tags:
+                    outfit_tags.append(tag)
+            for tag in appearances:
+                if tag not in appearance_tags:
+                    appearance_tags.append(tag)
+            source_tag = sources[0] if sources else ""
+            scoped.append((matched_alias, source_tag, tags, variant))
+        if not scoped:
+            return None
+        return SemanticLookupResult(
+            confirmed_tags=tuple(confirmed),
+            outfit_profile_tags=tuple(outfit_tags),
+            appearance_profile_tags=tuple(appearance_tags),
+            source_outfit_profiles=tuple(scoped),
             status="profile_cache",
         )
 
@@ -341,7 +458,15 @@ class DanbooruResolver:
         generated = cls._profile_alias_key(
             cls._variant_english_alias(canonical_tag, variant)
         )
+        # Aliases explicitly saved in the editor are user-owned data.  They
+        # must survive the stricter screening used for machine-learned aliases.
+        # Older cache records have no ``manual_aliases`` field and therefore
+        # still receive the legacy poison-data cleanup below.
         safe: list[str] = []
+        for raw_alias in profile.get("manual_aliases", []):
+            alias = cls._profile_alias_key(raw_alias)
+            if alias and alias != cls._profile_alias_key(canonical_tag) and alias not in safe:
+                safe.append(alias)
         for raw_alias in (key_alias, *profile.get("aliases", [])):
             alias = cls._profile_alias_key(raw_alias)
             if not cls._alias_fits_named_outfit(alias, canonical_tag, variant):
@@ -364,13 +489,45 @@ class DanbooruResolver:
         """Return every persisted independent outfit-set explicitly named in a request."""
         text = str(user_prompt or "").lower()
         requested_variant = self._outfit_variant(text)
-        matched: list[str] = list(
-            dict.fromkeys(
-                tag
-                for alias, tag in self._configured_named_outfits().items()
-                if alias.lower() in text or tag.replace("_", " ") in text
+        matched: list[str] = []
+        matched_anchors: list[SemanticAnchor] = []
+        anchor_identities: set[tuple[str, str]] = set()
+
+        def register_match(alias: str, tag: str, variant: str) -> None:
+            if tag not in matched:
+                matched.append(tag)
+            identity = (self._profile_alias_key(alias), variant)
+            if identity in anchor_identities:
+                return
+            anchor_identities.add(identity)
+            matched_anchors.append(
+                SemanticAnchor(
+                    anchor_id=f"cached_named_outfit_{len(matched_anchors) + 1}",
+                    role="outfit",
+                    group="outfit",
+                    source_text=alias,
+                    description=f"{variant} named outfit: {alias}",
+                    candidates=(tag,),
+                )
             )
-        )
+
+        for tag, variant, aliases in self._configured_named_outfit_groups():
+            matched_alias = next(
+                (
+                    alias
+                    for alias in aliases
+                    if self._text_mentions_alias(text, alias)
+                ),
+                "",
+            )
+            if (
+                not matched_alias
+                and variant == requested_variant
+                and self._text_mentions_alias(text, tag.replace("_", " "))
+            ):
+                matched_alias = tag.replace("_", " ")
+            if matched_alias:
+                register_match(matched_alias, tag, variant)
         profile_tags_for_request: list[str] = []
         profiles = self._profile_data().get("profiles", {})
         trusted_uniforms = self._trusted_uniform_alias_tags(profiles)
@@ -389,16 +546,27 @@ class DanbooruResolver:
                 continue
             canonical = profile_tags[0] if profile_tags else ""
             variant = self._named_profile_variant(str(alias), profile)
-            if variant != requested_variant:
-                continue
             aliases = self._safe_learned_outfit_aliases(
                 str(alias), profile, canonical, variant, trusted_uniforms
             )
-            derived_matches = (
-                canonical in text or canonical.replace("_", " ") in text
+            alias_matches = any(
+                self._text_mentions_alias(text, value) for value in aliases
             )
-            if not derived_matches and not any(value in text for value in aliases):
+            derived_matches = variant == requested_variant and (
+                self._text_mentions_alias(text, canonical)
+                or self._text_mentions_alias(text, canonical.replace("_", " "))
+            )
+            if not derived_matches and not alias_matches:
                 continue
+            matched_alias = next(
+                (
+                    value
+                    for value in aliases
+                    if self._text_mentions_alias(text, value)
+                ),
+                str(alias).split("::", 1)[0],
+            )
+            register_match(matched_alias, canonical, variant)
             for tag in profile.get("outfit_tags", []):
                 value = str(tag).strip()
                 if value and value not in matched:
@@ -426,12 +594,51 @@ class DanbooruResolver:
             confirmed_tags=tuple(matched),
             named_outfit_tags=tuple(matched),
             outfit_profile_tags=tuple(profile_tags_for_request),
+            anchors=tuple(matched_anchors),
             status="profile_cache",
         )
 
     def _configured_named_outfits(self) -> dict[str, str]:
         """Parse user-defined alias=canonical_tag mappings from plugin config."""
-        return self._configured_mappings("danbooru_named_outfit_mappings")
+        return {
+            alias.lower(): tag
+            for tag, _variant, aliases in self._configured_named_outfit_groups()
+            for alias in aliases
+        }
+
+    def _configured_named_outfit_groups(
+        self,
+    ) -> list[tuple[str, str, list[str]]]:
+        """Parse one canonical outfit record with any number of trigger aliases."""
+        configured = self._config.get("danbooru_named_outfit_mappings", [])
+        raw_pairs: list[tuple[str, str]] = []
+        if isinstance(configured, dict):
+            raw_pairs.extend(
+                (str(alias), str(tag)) for alias, tag in configured.items()
+            )
+        elif isinstance(configured, (list, tuple)):
+            for item in configured:
+                match = re.fullmatch(
+                    r"\s*(.+?)\s*(?:=>|=|＝|→|：|:)\s*(.+?)\s*",
+                    str(item or ""),
+                )
+                if match:
+                    raw_pairs.append((match.group(1), match.group(2)))
+        groups: list[tuple[str, str, list[str]]] = []
+        for raw_aliases, raw_tag in raw_pairs:
+            tag = str(raw_tag or "").strip().lower().replace(" ", "_")
+            if not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", tag):
+                continue
+            aliases = [
+                self._profile_alias_key(alias)
+                for alias in re.split(r"\s*[|｜]\s*", str(raw_aliases or ""))
+                if self._profile_alias_key(alias)
+            ]
+            if not aliases or any(len(alias) > 80 for alias in aliases):
+                continue
+            variant = self._normalize_outfit_variant("", aliases)
+            groups.append((tag, variant, list(dict.fromkeys(aliases))))
+        return groups
 
     def _configured_mappings(self, key: str) -> dict[str, str]:
         """Parse a bounded config mapping list into normalized aliases and tags."""
@@ -457,6 +664,138 @@ class DanbooruResolver:
                 continue
             mappings[alias] = tag
         return mappings
+
+    @staticmethod
+    def _scope_compatible(left: str, right: str) -> bool:
+        """Return whether two copyright scopes belong to the same tag family."""
+        left_key = str(left or "").strip().lower().replace(" ", "_")
+        right_key = str(right or "").strip().lower().replace(" ", "_")
+        return bool(
+            left_key
+            and right_key
+            and (
+                left_key == right_key
+                or left_key.startswith(right_key + "_")
+                or right_key.startswith(left_key + "_")
+            )
+        )
+
+    def _configured_alias_groups(
+        self,
+        key: str,
+        defaults: tuple[str, ...] = (),
+    ) -> tuple[tuple[str, tuple[str, ...]], ...]:
+        """Parse ``alias 1 | alias 2=canonical_tag`` records."""
+        configured = self._config.get(key, defaults)
+        raw_pairs: list[tuple[str, str]] = []
+        if isinstance(configured, dict):
+            raw_pairs.extend(
+                (str(raw_aliases), str(tag))
+                for raw_aliases, tag in configured.items()
+            )
+        elif isinstance(configured, (list, tuple)):
+            for item in configured:
+                match = re.fullmatch(
+                    r"\s*(.+?)\s*(?:=>|=|＝|→|：|:)\s*(.+?)\s*",
+                    str(item or ""),
+                )
+                if match:
+                    raw_pairs.append((match.group(1), match.group(2)))
+        groups: list[tuple[str, tuple[str, ...]]] = []
+        for raw_aliases, raw_tag in raw_pairs:
+            tag = str(raw_tag or "").strip().lower().replace(" ", "_")
+            if not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", tag):
+                continue
+            aliases = tuple(
+                dict.fromkeys(
+                    self._profile_alias_key(alias)
+                    for alias in re.split(r"\s*[|｜]\s*", raw_aliases)
+                    if self._profile_alias_key(alias)
+                    and len(self._profile_alias_key(alias)) <= 80
+                )
+            )
+            if aliases:
+                groups.append((tag, aliases))
+        return tuple(groups)
+
+    def configured_character_anchors_for_prompt(
+        self, user_prompt: str
+    ) -> tuple[SemanticAnchor, ...]:
+        """Build context-scoped character anchors from extensible alias records.
+
+        A scoped character alias is authoritative only when the same request also
+        names a compatible work family.  This lets localized sequel/spinoff names
+        disambiguate a character whose Danbooru suffix still uses the parent work.
+        """
+        default_series = (
+            "艾尔登法环 | 艾尔登法环黑夜君临 | 黑夜君临 | "
+            "elden ring | nightreign | elden ring nightreign=elden_ring",
+        )
+        default_characters = (
+            "复仇者 | revenant=revenant_(elden_ring)",
+        )
+        series_groups = self._configured_alias_groups(
+            "danbooru_series_alias_mappings", default_series
+        )
+        character_groups = self._configured_alias_groups(
+            "danbooru_character_alias_mappings", default_characters
+        )
+        matched_series: list[tuple[str, str]] = []
+        for canonical, aliases in series_groups:
+            matched_alias = next(
+                (
+                    alias
+                    for alias in sorted(aliases, key=len, reverse=True)
+                    if self._text_mentions_alias(user_prompt, alias)
+                ),
+                "",
+            )
+            if matched_alias and canonical not in {
+                item[0] for item in matched_series
+            }:
+                matched_series.append((canonical, matched_alias))
+
+        anchors: list[SemanticAnchor] = [
+            SemanticAnchor(
+                anchor_id=f"configured_copyright_{index}",
+                role="copyright",
+                group="series",
+                source_text=alias,
+                description=f"Configured work alias: {alias}",
+                candidates=(canonical,),
+            )
+            for index, (canonical, alias) in enumerate(matched_series, start=1)
+        ]
+        seen_characters: set[str] = set()
+        for canonical, aliases in character_groups:
+            matched_alias = next(
+                (
+                    alias
+                    for alias in sorted(aliases, key=len, reverse=True)
+                    if self._text_mentions_alias(user_prompt, alias)
+                ),
+                "",
+            )
+            if not matched_alias or canonical in seen_characters:
+                continue
+            scoped = re.fullmatch(r".+_\(([^)]+)\)", canonical)
+            if scoped and not any(
+                self._scope_compatible(scoped.group(1), series)
+                for series, _alias in matched_series
+            ):
+                continue
+            seen_characters.add(canonical)
+            anchors.append(
+                SemanticAnchor(
+                    anchor_id=f"configured_character_{len(seen_characters)}",
+                    role="target_character",
+                    group="character",
+                    source_text=matched_alias,
+                    description=f"Configured character alias: {matched_alias}",
+                    candidates=(canonical,),
+                )
+            )
+        return tuple(anchors)
 
     def cached_term_mappings_for_prompt(
         self, user_prompt: str
@@ -503,7 +842,7 @@ class DanbooruResolver:
         """Return editable outfit profiles, named sets, and noun translations."""
         profiles = self._profile_data().get("profiles", {})
         outfits: list[dict[str, Any]] = []
-        learned_by_identity: dict[tuple[str, str], dict[str, Any]] = {}
+        learned_sets: list[dict[str, Any]] = []
         trusted_uniforms = self._trusted_uniform_alias_tags(profiles)
         for key, raw in profiles.items():
             if not isinstance(raw, dict):
@@ -529,11 +868,24 @@ class DanbooruResolver:
                 )
                 if not cleaned_aliases:
                     continue
-                learned = learned_by_identity.setdefault(
-                    (canonical, variant),
-                    {"profileKey": str(key), "aliases": []},
+                preferred = self._preferred_named_outfit_alias(
+                    str(key), cleaned_aliases, canonical, variant
                 )
-                learned["aliases"].extend(cleaned_aliases)
+                learned_sets.append(
+                    {
+                        "alias": preferred,
+                        "aliases": self._named_outfit_aliases(
+                            preferred,
+                            canonical,
+                            cleaned_aliases,
+                            variant=variant,
+                        ),
+                        "tag": canonical,
+                        "variant": variant,
+                        "origin": "learned",
+                        "profileKey": str(key),
+                    }
+                )
                 continue
             if not raw.get("source_tags") and not tags:
                 continue
@@ -563,20 +915,12 @@ class DanbooruResolver:
                     },
                 }
             )
-        configured_by_identity: dict[tuple[str, str], list[str]] = {}
-        for alias, tag in self._configured_named_outfits().items():
-            variant = self._outfit_variant(alias)
-            configured_by_identity.setdefault((tag, variant), []).append(alias)
         configured_sets: list[dict[str, Any]] = []
-        for (tag, variant), configured_aliases in configured_by_identity.items():
-            learned_aliases = learned_by_identity.get(
-                (tag, variant), {}
-            ).get("aliases", [])
+        for tag, variant, configured_aliases in self._configured_named_outfit_groups():
             aliases = self._named_outfit_aliases(
                 configured_aliases[0],
                 tag,
                 configured_aliases,
-                learned_aliases,
                 variant=variant,
             )
             configured_sets.append(
@@ -591,26 +935,6 @@ class DanbooruResolver:
                     "profileKey": "",
                 }
             )
-        configured_identities = set(configured_by_identity)
-        learned_sets = [
-            {
-                "alias": preferred,
-                "aliases": self._named_outfit_aliases(
-                    preferred, tag, item["aliases"], variant=variant
-                ),
-                "tag": tag,
-                "variant": variant,
-                "origin": "learned",
-                "profileKey": item["profileKey"],
-            }
-            for (tag, variant), item in learned_by_identity.items()
-            for preferred in [
-                self._preferred_named_outfit_alias(
-                    item["profileKey"], item["aliases"], tag, variant
-                )
-            ]
-            if (tag, variant) not in configured_identities
-        ]
         terms = [
             {"alias": alias, "tag": tag}
             for alias, tag in self._configured_mappings("danbooru_term_mappings").items()
@@ -674,7 +998,7 @@ class DanbooruResolver:
 
         configured_sets: list[str] = []
         learned_by_key: dict[str, dict[str, Any]] = {}
-        seen_set_aliases: set[str] = set()
+        seen_set_aliases: dict[str, str] = {}
         for item in raw_sets:
             if not isinstance(item, dict):
                 raise WardrobeValidationError("服装套组条目格式无效。")
@@ -700,29 +1024,30 @@ class DanbooruResolver:
                 )
             for alias in aliases:
                 alias_key = alias.lower()
-                if alias_key in seen_set_aliases:
+                previous_tag = seen_set_aliases.get(alias_key)
+                if previous_tag is not None and previous_tag != tag:
                     raise WardrobeValidationError(f"重复的服装套组名称：{alias}")
-                seen_set_aliases.add(alias_key)
+                seen_set_aliases[alias_key] = tag
             if item.get("origin") == "learned" and item.get("profileKey"):
-                profile_key = self._profile_alias_key(aliases[0])
-                if profile_key in new_profiles:
-                    profile_key = f"{profile_key}::named"
-                learned = learned_by_key.setdefault(
-                    profile_key,
-                    {
-                        "kind": "named_outfit",
-                        "variant": variant,
-                        "aliases": [],
-                        "source_tags": [],
-                        "copyright_tags": [],
-                        "outfit_tags": [tag],
-                    },
+                profile_key = self._profile_alias_key(
+                    self._clean_alias(item.get("profileKey"), label="套组条目 ID")
                 )
-                if learned["outfit_tags"] != [tag] or learned["variant"] != variant:
-                    raise WardrobeValidationError("同一学习套组的 canonical tag 不一致。")
-                learned["aliases"].extend(aliases)
+                base_key = profile_key
+                suffix = 2
+                while profile_key in new_profiles or profile_key in learned_by_key:
+                    profile_key = f"{base_key}::named{suffix}"
+                    suffix += 1
+                learned_by_key[profile_key] = {
+                    "kind": "named_outfit",
+                    "variant": variant,
+                    "aliases": list(aliases),
+                    "manual_aliases": list(aliases),
+                    "source_tags": [],
+                    "copyright_tags": [],
+                    "outfit_tags": [tag],
+                }
             else:
-                configured_sets.extend(f"{alias}={tag}" for alias in aliases)
+                configured_sets.append(f"{' | '.join(aliases)}={tag}")
         for profile_key, learned in learned_by_key.items():
             tag = learned["outfit_tags"][0]
             learned["aliases"] = self._named_outfit_aliases(
@@ -730,6 +1055,9 @@ class DanbooruResolver:
                 tag,
                 learned["aliases"],
                 variant=learned["variant"],
+            )
+            learned["manual_aliases"] = list(
+                dict.fromkeys(learned["manual_aliases"])
             )
             new_profiles[profile_key] = learned
 
@@ -807,31 +1135,36 @@ class DanbooruResolver:
         ):
             return
         profiles = self._profile_data().setdefault("profiles", {})
+        configured_tag = self._configured_named_outfits().get(key)
+        if configured_tag == tag:
+            return
         matching_keys = [
             str(profile_key)
             for profile_key, profile in profiles.items()
             if isinstance(profile, dict)
             and profile.get("kind") == "named_outfit"
             and self._named_profile_variant(str(profile_key), profile) == variant_key
-            and tag
+            and key
             in {
-                str(item).strip().lower()
-                for item in profile.get("outfit_tags", [])
+                self._profile_alias_key(str(profile_key).split("::", 1)[0]),
+                *(
+                    self._profile_alias_key(item)
+                    for item in profile.get("aliases", [])
+                ),
+                *(
+                    self._profile_alias_key(item)
+                    for item in profile.get("manual_aliases", [])
+                ),
             }
         ]
-        target_key = next(
-            (
-                profile_key
-                for profile_key in matching_keys
-                if self._alias_fits_named_outfit(profile_key, tag, variant_key)
-            ),
-            key,
-        )
+        target_key = matching_keys[0] if matching_keys else key
         existing_aliases: list[str] = []
+        manual_aliases: list[str] = []
         removed_duplicate = False
         for profile_key in matching_keys:
             profile = profiles.get(profile_key, {})
             existing_aliases.extend(profile.get("aliases", []))
+            manual_aliases.extend(profile.get("manual_aliases", []))
             if profile_key != target_key:
                 profiles.pop(profile_key, None)
                 removed_duplicate = True
@@ -839,12 +1172,14 @@ class DanbooruResolver:
             "kind": "named_outfit",
             "variant": variant_key,
             "aliases": self._named_outfit_aliases(
-                key, tag, existing_aliases, variant=variant_key
+                key, tag, existing_aliases, manual_aliases, variant=variant_key
             ),
             "source_tags": [],
             "copyright_tags": [],
             "outfit_tags": [tag],
         }
+        if manual_aliases:
+            new_profile["manual_aliases"] = list(dict.fromkeys(manual_aliases))
         if not new_profile["aliases"]:
             return
         if profiles.get(target_key) == new_profile and not removed_duplicate:
@@ -1001,8 +1336,6 @@ class DanbooruResolver:
                     f"{anchor.source_text} {anchor.description}"
                 )
                 self.remember_named_outfit(anchor.source_text, tag, variant)
-                if variant not in {"summer", "winter"}:
-                    continue
                 profile = await asyncio.to_thread(
                     fetch_variant_outfit_profile,
                     tag,

@@ -110,7 +110,9 @@ Canonical Tag: haneoka_school_uniform
 
 页面保存使用 revision 检查，若生成期间词库已被其他请求更新，会要求刷新后重试，避免覆盖新数据。保存成功后配置与运行时缓存立即更新，不需要为每次词库编辑重载插件；只有安装或更新本页代码后需要先重载一次插件。
 
-配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。命名套组的多个别名会分别保存成 `别名=canonical_tag` 映射；推荐日常使用“服装词库”页面，减少格式错误。
+配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。命名套组每一行都是独立实体，格式为 `别名1 | 别名2=canonical_tag`；不同实体可以使用同一个 canonical tag，不会按 tag 合并。推荐日常使用“服装词库”页面，减少格式错误。
+
+人物检测还支持两个上下文映射：`danbooru_series_alias_mappings` 把本地化标题、续作或外传名称归入角色 tag 实际使用的作品家族；`danbooru_character_alias_mappings` 把角色俗称映射到 canonical character tag。两者都使用 `别名1 | 别名2=canonical_tag`。带作品后缀的角色映射只有在同一请求也命中兼容作品家族时才会进入本地精确校验，因此单独出现的同名角色不会被强行消歧。
 
 ## 角色与画风
 

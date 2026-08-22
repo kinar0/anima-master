@@ -148,6 +148,22 @@ class SemanticLookupResult:
         )
         if confirmed:
             lines.append("confirmed hard tags: " + ", ".join(confirmed))
+        anchor_tag_map = dict(self.anchor_tags)
+        confirmed_characters = tuple(
+            (anchor.source_text, anchor_tag_map.get(anchor.anchor_id, ""))
+            for anchor in self.anchors
+            if anchor.role == "target_character"
+            and anchor_tag_map.get(anchor.anchor_id, "")
+        )
+        if confirmed_characters:
+            lines.append("confirmed visible character roster (authoritative):")
+            lines.extend(
+                f"- {source}: {tag}" for source, tag in confirmed_characters
+            )
+            lines.append(
+                "Characters must use these exact canonical tags. Do not rename, "
+                "translate, re-scope, or independently guess them."
+            )
         if self.outfit_source_tags:
             if include_outfit_source_anchor:
                 lines.append(
@@ -1083,3 +1099,54 @@ def merge_semantic_results(
         anchors=merged("anchors"),
         status=status,
     )
+
+
+def prefer_configured_character_anchors(
+    configured: tuple[SemanticAnchor, ...],
+    discovered: tuple[SemanticAnchor, ...],
+) -> tuple[SemanticAnchor, ...]:
+    """Prefer configured identity anchors over equivalent planner guesses."""
+    if not configured:
+        return tuple(dict.fromkeys(discovered))
+
+    def normalized(value: str) -> str:
+        return re.sub(
+            r"[^a-z0-9\u3400-\u9fff]+", "_", value.lower()
+        ).strip("_")
+
+    def terms(anchor: SemanticAnchor) -> set[str]:
+        values = {
+            normalized(anchor.source_text),
+            *(normalized(item) for item in anchor.candidates),
+        }
+        for candidate in anchor.candidates:
+            scoped = re.fullmatch(r"(.+)_\([^)]+\)", candidate.strip().lower())
+            if scoped:
+                values.add(normalized(scoped.group(1)))
+        return {value for value in values if value}
+
+    configured_by_role = {
+        role: tuple(anchor for anchor in configured if anchor.role == role)
+        for role in {anchor.role for anchor in configured}
+    }
+    configured_copyright_terms = {
+        value
+        for anchor in configured_by_role.get("copyright", ())
+        for value in terms(anchor)
+    }
+    kept: list[SemanticAnchor] = list(dict.fromkeys(configured))
+    for anchor in discovered:
+        anchor_terms = terms(anchor)
+        if (
+            anchor.role == "target_character"
+            and anchor_terms & configured_copyright_terms
+        ):
+            # A loose ``作品(alias)的角色(alias)`` extractor can mistake the
+            # work alias for a second visible character.
+            continue
+        equivalents = configured_by_role.get(anchor.role, ())
+        if any(anchor_terms & terms(candidate) for candidate in equivalents):
+            continue
+        if anchor not in kept:
+            kept.append(anchor)
+    return tuple(kept)

@@ -20,6 +20,7 @@ from danbooru_semantic import (  # noqa: E402
     extract_parenthesized_copyright_aliases,
     lookup_semantic_anchors,
     merge_semantic_results,
+    prefer_configured_character_anchors,
     parse_semantic_plan,
     parse_semantic_outfit_directives,
     parse_semantic_character_plans,
@@ -238,6 +239,144 @@ def test_character_alias_prefers_the_explicit_copyright_scope(monkeypatch) -> No
     )
 
 
+def test_contextual_character_aliases_cover_revenant_work_name_matrix() -> None:
+    resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    works = (
+        "艾尔登法环",
+        "艾尔登法环黑夜君临",
+        "黑夜君临",
+        "elden ring",
+        "nightreign",
+        "elden ring nightreign",
+    )
+    characters = ("复仇者", "revenant")
+
+    for work in works:
+        for character in characters:
+            anchors = resolver.configured_character_anchors_for_prompt(
+                f"{work}的{character}，双手抱胸"
+            )
+            assert [(anchor.role, anchor.candidates) for anchor in anchors] == [
+                ("copyright", ("elden_ring",)),
+                ("target_character", ("revenant_(elden_ring)",)),
+            ]
+
+
+def test_contextual_character_alias_requires_compatible_work_scope() -> None:
+    resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={
+            "danbooru_series_alias_mappings": [
+                "作品甲 | work a sequel=work_a",
+                "作品乙 | work b=work_b",
+            ],
+            "danbooru_character_alias_mappings": [
+                "英雄甲 | hero a=hero_a_(work_a)",
+            ],
+        },
+    )
+
+    matched = resolver.configured_character_anchors_for_prompt(
+        "work a sequel + hero a"
+    )
+    wrong_work = resolver.configured_character_anchors_for_prompt("work b + hero a")
+    no_work = resolver.configured_character_anchors_for_prompt("hero a")
+
+    assert [anchor.candidates for anchor in matched] == [
+        ("work_a",),
+        ("hero_a_(work_a)",),
+    ]
+    assert [anchor.candidates for anchor in wrong_work] == [("work_b",)]
+    assert no_work == ()
+
+
+def test_contextual_character_anchor_is_exactly_validated_locally(monkeypatch) -> None:
+    resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    anchors = resolver.configured_character_anchors_for_prompt(
+        "elden ring nightreign + revenant"
+    )
+
+    def fake_batch(queries, **_kwargs):
+        return {
+            "results": {
+                query["id"]: {
+                    "confirmed_tags": {
+                        "characters" if query["group"] == "character" else "series": [
+                            {"tag": query["keyword"], "count": 100}
+                        ]
+                    }
+                }
+                for query in queries
+            }
+        }
+
+    monkeypatch.setattr(semantic_module, "_run_cli_batch", fake_batch)
+
+    result = lookup_semantic_anchors(anchors, cli_path=PLUGIN_DIR / "unused.exe")
+
+    assert result.confirmed_tags == ("revenant_(elden_ring)", "elden_ring")
+    assert result.missing_descriptions == ()
+
+
+def test_configured_identity_drops_weaker_duplicate_and_misclassified_work_aliases() -> None:
+    resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    prompt = "艾尔登法环黑夜君临(nightreign)的复仇者(revenant)"
+    configured = resolver.configured_character_anchors_for_prompt(prompt)
+    discovered = (
+        *extract_parenthesized_character_aliases(prompt),
+        SemanticAnchor(
+            "planner_character",
+            "target_character",
+            "character",
+            "复仇者",
+            "Revenant",
+            ("revenant",),
+        ),
+        SemanticAnchor(
+            "other_character",
+            "target_character",
+            "character",
+            "梅琳娜",
+            "Melina",
+            ("melina_(elden_ring)",),
+        ),
+    )
+
+    preferred = prefer_configured_character_anchors(configured, discovered)
+
+    assert [(anchor.role, anchor.candidates) for anchor in preferred] == [
+        ("copyright", ("elden_ring",)),
+        ("target_character", ("revenant_(elden_ring)",)),
+        ("target_character", ("melina_(elden_ring)",)),
+    ]
+
+
 def test_semantic_plan_accepts_independently_named_outfit_role() -> None:
     plan = parse_semantic_plan(
         '{"anchors":[{"id":"outfit","role":"outfit",'
@@ -454,6 +593,76 @@ def test_outfit_profile_cache_survives_resolver_recreation() -> None:
     )
 
 
+def test_editable_outfit_profile_alias_is_a_hard_tag_trigger_for_normal_prompt() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "amoris",
+            ("amoris_(bang_dream!)",),
+            ("black_corset", "red_shorts"),
+            {"appearance_tags": ["blue_eyes"]},
+        )
+        snapshot = resolver.wardrobe_snapshot()
+        snapshot["outfits"][0]["aliases"].extend(["阿莫莉丝", "amoris costume"])
+        resolver.save_wardrobe(
+            {
+                "baseRevision": snapshot["revision"],
+                "outfits": snapshot["outfits"],
+                "outfitSets": snapshot["outfitSets"],
+                "terms": snapshot["terms"],
+            }
+        )
+        cached = resolver.cached_outfit_profiles_for_prompt(
+            "让角色穿阿莫莉丝，在舞台上挥手"
+        )
+
+    assert cached is not None
+    assert cached.confirmed_tags == ("amoris_(bang_dream!)", "bang_dream!")
+    assert cached.outfit_profile_tags == ("black_corset", "red_shorts")
+    assert cached.appearance_profile_tags == ("blue_eyes",)
+
+
+def test_editable_outfit_profile_does_not_match_inside_latin_word() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver._profile_cache_data = {
+        "version": 3,
+        "profiles": {
+            "cat": {
+                "kind": "character_outfit",
+                "aliases": ["cat"],
+                "source_tags": ["cat_costume"],
+                "outfit_tags": ["cat_ears"],
+            }
+        },
+    }
+
+    assert resolver.cached_outfit_profiles_for_prompt("a concatenate test") is None
+
+
 def test_named_outfit_profile_survives_recreation_and_matches_english_alias() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
@@ -484,7 +693,7 @@ def test_named_outfit_profile_survives_recreation_and_matches_english_alias() ->
     assert cached.named_outfit_tags == ("haneoka_school_uniform",)
 
 
-def test_named_outfit_learning_merges_same_canonical_set_and_ui_shows_one_row() -> None:
+def test_named_outfit_learning_keeps_distinct_entities_that_share_one_tag() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
             pass
@@ -521,24 +730,52 @@ def test_named_outfit_learning_merges_same_canonical_set_and_ui_shows_one_row() 
     stored = [
         item for item in persisted.values() if item.get("kind") == "named_outfit"
     ]
-    assert learned == [
-        {
-            "alias": "羽丘校服",
-            "aliases": [
-                "羽丘校服",
-                "羽丘学园校服",
-                "haneoka school uniform",
-            ],
-            "tag": "haneoka_school_uniform",
-            "variant": "default",
-            "origin": "learned",
-            "profileKey": "羽丘校服",
-        }
-    ]
-    assert len(stored) == 1
-    assert "羽丘学园校服" in stored[0]["aliases"]
-    assert "haneoka school uniform" in stored[0]["aliases"]
-    assert "haneoka_school_uniform" not in stored[0]["aliases"]
+    assert len(learned) == 2
+    assert {item["alias"] for item in learned} == {"羽丘校服", "羽丘学园校服"}
+    assert {item["tag"] for item in learned} == {"haneoka_school_uniform"}
+    assert len(stored) == 2
+    assert {item["aliases"][0] for item in stored} == {"羽丘校服", "羽丘学园校服"}
+
+
+def test_editor_alias_on_learned_outfit_survives_save_response_and_reload() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    def build(path: Path) -> DanbooruResolver:
+        return DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = build(path)
+        resolver.remember_named_outfit(
+            "羽丘冬季校服", "haneoka_school_uniform", "winter"
+        )
+        snapshot = resolver.wardrobe_snapshot()
+        item = snapshot["outfitSets"][0]
+        item["aliases"].extend(["羽丘冬装", "Haneoka cold-weather look"])
+
+        saved = resolver.save_wardrobe(
+            {
+                "baseRevision": snapshot["revision"],
+                "outfits": snapshot["outfits"],
+                "outfitSets": snapshot["outfitSets"],
+                "terms": snapshot["terms"],
+            }
+        )
+        reloaded = build(path).wardrobe_snapshot()
+
+    assert "羽丘冬装" in saved["outfitSets"][0]["aliases"]
+    assert "haneoka cold-weather look" in saved["outfitSets"][0]["aliases"]
+    assert reloaded["outfitSets"][0]["aliases"] == saved["outfitSets"][0]["aliases"]
 
 
 def test_configured_named_outfit_ui_groups_chinese_and_english_aliases() -> None:
@@ -586,11 +823,139 @@ def test_configured_named_outfit_ui_groups_chinese_and_english_aliases() -> None
     assert english_before_save is not None
     assert english_before_save.named_outfit_tags == ("haneoka_school_uniform",)
     assert resolver._config["danbooru_named_outfit_mappings"] == [
-        "羽丘校服=haneoka_school_uniform",
-        "haneoka school uniform=haneoka_school_uniform",
+        "羽丘校服 | haneoka school uniform=haneoka_school_uniform",
     ]
     assert english is not None
     assert english.named_outfit_tags == ("haneoka_school_uniform",)
+
+
+def test_configured_named_outfit_supports_many_manual_aliases_per_tag() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={
+            "danbooru_named_outfit_mappings": [
+                "羽丘校服 | 羽丘制服 | haneoka uniform | haneoka academy uniform=haneoka_school_uniform"
+            ]
+        },
+    )
+
+    snapshot = resolver.wardrobe_snapshot()
+    aliases = snapshot["outfitSets"][0]["aliases"]
+    matched = resolver.cached_named_outfits_for_prompt("穿羽丘制服拍照")
+
+    assert aliases == [
+        "羽丘校服",
+        "羽丘制服",
+        "haneoka uniform",
+        "haneoka academy uniform",
+        "haneoka school uniform",
+    ]
+    assert matched is not None
+    assert matched.named_outfit_tags == ("haneoka_school_uniform",)
+    assert len(matched.anchors) == 1
+    assert matched.anchors[0].source_text == "羽丘制服"
+    assert matched.anchors[0].candidates == ("haneoka_school_uniform",)
+
+
+def test_editor_alias_on_configured_outfit_survives_config_reload() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    def build(config) -> DanbooruResolver:
+        return DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            config=config,
+        )
+
+    resolver = build(
+        {"danbooru_named_outfit_mappings": ["羽丘校服=haneoka_school_uniform"]}
+    )
+    snapshot = resolver.wardrobe_snapshot()
+    snapshot["outfitSets"][0]["aliases"].extend(
+        ["羽丘学院套装", "Anon school look"]
+    )
+    saved = resolver.save_wardrobe(
+        {
+            "baseRevision": snapshot["revision"],
+            "outfits": snapshot["outfits"],
+            "outfitSets": snapshot["outfitSets"],
+            "terms": snapshot["terms"],
+        }
+    )
+    reloaded = build(resolver._config).wardrobe_snapshot()
+    assert "羽丘学院套装" in saved["outfitSets"][0]["aliases"]
+    assert "anon school look" in saved["outfitSets"][0]["aliases"]
+    assert reloaded["outfitSets"][0]["aliases"] == saved["outfitSets"][0]["aliases"]
+
+
+def test_configured_outfit_rows_sharing_one_tag_survive_save_and_reload() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    def build(config) -> DanbooruResolver:
+        return DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            config=config,
+        )
+
+    resolver = build(
+        {
+            "danbooru_named_outfit_mappings": [
+                "羽丘夏季校服 | haneoka summer look=haneoka_school_uniform",
+                "羽丘冬季校服 | haneoka winter look=haneoka_school_uniform",
+            ]
+        }
+    )
+    snapshot = resolver.wardrobe_snapshot()
+    saved = resolver.save_wardrobe(
+        {
+            "baseRevision": snapshot["revision"],
+            "outfits": snapshot["outfits"],
+            "outfitSets": snapshot["outfitSets"],
+            "terms": snapshot["terms"],
+        }
+    )
+    reloaded = build(resolver._config).wardrobe_snapshot()
+    matched = build(resolver._config).cached_named_outfits_for_prompt(
+        "角色甲穿羽丘夏季校服，角色乙穿羽丘冬季校服"
+    )
+
+    assert len(saved["outfitSets"]) == 2
+    assert len(reloaded["outfitSets"]) == 2
+    assert {item["variant"] for item in reloaded["outfitSets"]} == {
+        "summer",
+        "winter",
+    }
+    assert {item["tag"] for item in reloaded["outfitSets"]} == {
+        "haneoka_school_uniform"
+    }
+    assert matched is not None
+    assert len(matched.anchors) == 2
+    assert {anchor.source_text for anchor in matched.anchors} == {
+        "羽丘夏季校服",
+        "羽丘冬季校服",
+    }
 
 
 def test_seasonal_named_outfits_remain_separate_and_drop_poisoned_aliases() -> None:
@@ -667,8 +1032,7 @@ def test_seasonal_named_outfits_remain_separate_and_drop_poisoned_aliases() -> N
         "羽丘冬季制服",
     ]
     assert "两只大猫爪子" not in variants["winter"]["aliases"]
-    assert "两只大猫爪子" not in persisted
-    assert persisted["羽丘冬季校服"]["variant"] == "winter"
+    assert persisted["两只大猫爪子"]["variant"] == "winter"
     assert persisted["羽丘夏季校服"]["variant"] == "summer"
     assert saved["revision"] == saved_again["revision"]
 
@@ -772,7 +1136,136 @@ def test_named_outfit_persistence_stays_bound_to_matching_anchor(monkeypatch) ->
     ]
 
 
-def test_wardrobe_snapshot_collapses_legacy_named_outfit_duplicates() -> None:
+def test_haneoka_summer_uniform_enters_concrete_profile_tag_query(
+    monkeypatch,
+) -> None:
+    anchor = SemanticAnchor(
+        "haneoka_summer",
+        "outfit",
+        "outfit",
+        "羽丘夏季校服",
+        "Haneoka summer school uniform",
+        ("haneoka_school_uniform",),
+    )
+    monkeypatch.setattr(
+        resolver_module,
+        "lookup_semantic_anchors",
+        lambda *_args, **_kwargs: SemanticLookupResult(
+            confirmed_tags=("haneoka_school_uniform",),
+            named_outfit_tags=("haneoka_school_uniform",),
+            anchors=(anchor,),
+            status="resolved",
+        ),
+    )
+    calls: list[tuple[str, str]] = []
+
+    def fake_profile(tag, *, outfit_kind, **_kwargs):
+        calls.append((tag, outfit_kind))
+        return VariantOutfitProfile(
+            tags=("summer_uniform", "short_sleeves", "white_shirt"),
+            sample_mode="summer_single_character_anchor",
+            focused_posts=8,
+        )
+
+    monkeypatch.setattr(
+        resolver_module, "fetch_variant_outfit_profile", fake_profile
+    )
+
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver._local_cli_path = lambda: PLUGIN_DIR / "unused.exe"
+        result = asyncio.run(resolver.resolve_semantic_anchors((anchor,)))
+
+    assert calls == [("haneoka_school_uniform", "summer")]
+    assert result.anchor_outfit_profiles == (
+        (
+            "haneoka_summer",
+            "haneoka_school_uniform",
+            ("summer_uniform", "short_sleeves", "white_shirt"),
+            "summer",
+        ),
+    )
+
+
+def test_every_named_outfit_variant_uses_the_same_profile_query_policy(
+    monkeypatch,
+) -> None:
+    anchors = (
+        SemanticAnchor(
+            "default_set",
+            "outfit",
+            "outfit",
+            "默认套组",
+            "default named outfit",
+            ("default_named_set",),
+        ),
+        SemanticAnchor(
+            "summer_set", "outfit", "outfit", "夏季套组", "summer named outfit", ("summer_named_set",)
+        ),
+        SemanticAnchor(
+            "winter_set", "outfit", "outfit", "冬季套组", "winter named outfit", ("winter_named_set",)
+        ),
+        SemanticAnchor(
+            "stage_set", "outfit", "outfit", "舞台套组", "stage outfit", ("stage_named_set",)
+        ),
+    )
+    canonical_tags = tuple(anchor.candidates[0] for anchor in anchors)
+    monkeypatch.setattr(
+        resolver_module,
+        "lookup_semantic_anchors",
+        lambda *_args, **_kwargs: SemanticLookupResult(
+            confirmed_tags=canonical_tags,
+            named_outfit_tags=canonical_tags,
+            anchors=anchors,
+            status="resolved",
+        ),
+    )
+    calls: list[tuple[str, str]] = []
+
+    def fake_profile(tag, *, outfit_kind, **_kwargs):
+        calls.append((tag, outfit_kind))
+        return VariantOutfitProfile()
+
+    monkeypatch.setattr(
+        resolver_module, "fetch_variant_outfit_profile", fake_profile
+    )
+
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver._local_cli_path = lambda: PLUGIN_DIR / "unused.exe"
+    asyncio.run(resolver.resolve_semantic_anchors(anchors))
+
+    assert calls == [
+        ("default_named_set", "default"),
+        ("summer_named_set", "summer"),
+        ("winter_named_set", "winter"),
+        ("stage_named_set", "stage"),
+    ]
+
+
+def test_wardrobe_snapshot_does_not_collapse_distinct_rows_by_canonical_tag() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
             pass
@@ -812,8 +1305,14 @@ def test_wardrobe_snapshot_collapses_legacy_named_outfit_duplicates() -> None:
 
         snapshot = resolver.wardrobe_snapshot()
 
-    assert len(snapshot["outfitSets"]) == 1
-    assert snapshot["outfitSets"][0]["tag"] == "haneoka_school_uniform"
+    assert len(snapshot["outfitSets"]) == 2
+    assert {item["tag"] for item in snapshot["outfitSets"]} == {
+        "haneoka_school_uniform"
+    }
+    assert {item["alias"] for item in snapshot["outfitSets"]} == {
+        "羽丘校服",
+        "羽丘学园校服",
+    }
 
 
 def test_generic_school_uniform_is_neither_persisted_nor_loaded_as_named_set() -> None:
