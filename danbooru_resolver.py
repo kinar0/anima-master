@@ -63,19 +63,6 @@ class WardrobeValidationError(ValueError):
     """Raised when a visual wardrobe editor payload is unsafe or stale."""
 
 
-BUILTIN_DANBOORU_TERM_MAPPINGS: dict[str, str] = {
-    # High-confidence garment phrases should not depend on the prompt writer
-    # repeating them in its comma-separated Danbooru Tags block. Configured
-    # mappings are merged on top so operators can refine local vocabulary.
-    "芭蕾舞裙": "tutu",
-    "芭蕾裙": "tutu",
-    "白色连裤袜": "white_pantyhose",
-    "白连裤袜": "white_pantyhose",
-    "白色丝袜": "white_pantyhose",
-    "白丝袜": "white_pantyhose",
-}
-
-
 class DanbooruResolver:
     """Configuration-aware resolver for Danbooru character core tags."""
 
@@ -715,13 +702,6 @@ class DanbooruResolver:
             mappings[alias] = tag
         return mappings
 
-    def _term_mappings(self) -> dict[str, str]:
-        """Merge built-in high-confidence noun mappings with operator overrides."""
-        return {
-            **BUILTIN_DANBOORU_TERM_MAPPINGS,
-            **self._configured_mappings("danbooru_term_mappings"),
-        }
-
     @staticmethod
     def _scope_compatible(left: str, right: str) -> bool:
         """Return whether two copyright scopes belong to the same tag family."""
@@ -864,7 +844,9 @@ class DanbooruResolver:
         matched = tuple(
             dict.fromkeys(
                 tag
-                for alias, tag in self._term_mappings().items()
+                for alias, tag in self._configured_mappings(
+                    "danbooru_term_mappings"
+                ).items()
                 if alias in text
             )
         )

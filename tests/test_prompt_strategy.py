@@ -1682,6 +1682,12 @@ def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
         get_int=lambda _key, default: default,
         get_float=lambda _key, default: default,
         get_str=lambda _key, default: default,
+        config={
+            "danbooru_term_mappings": [
+                "芭蕾舞裙=tutu",
+                "白丝袜=white_pantyhose",
+            ]
+        },
     )
 
     class _Resolver:

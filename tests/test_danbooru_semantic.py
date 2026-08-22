@@ -1525,52 +1525,6 @@ def test_configured_term_mapping_is_returned_as_request_hard_tag() -> None:
     assert result.confirmed_tags == ("masquerade_mask",)
 
 
-def test_builtin_explicit_garments_are_returned_as_request_hard_tags() -> None:
-    class _Logger:
-        def warning(self, *_args, **_kwargs):
-            pass
-
-    with tempfile.TemporaryDirectory() as directory:
-        resolver = DanbooruResolver(
-            logger=_Logger(),
-            cache={},
-            profile_cache_path=Path(directory) / "profiles.json",
-            get_bool=lambda _key, default: default,
-            get_int=lambda _key, default: default,
-            get_float=lambda _key, default: default,
-            get_str=lambda _key, default: default,
-            config={},
-        )
-
-        result = resolver.cached_term_mappings_for_prompt(
-            "若叶睦穿着芭蕾舞裙和白丝袜"
-        )
-
-    assert result is not None
-    assert result.confirmed_tags == ("tutu", "white_pantyhose")
-
-
-def test_configured_term_mapping_can_override_builtin_mapping() -> None:
-    class _Logger:
-        def warning(self, *_args, **_kwargs):
-            pass
-
-    resolver = DanbooruResolver(
-        logger=_Logger(),
-        cache={},
-        get_bool=lambda _key, default: default,
-        get_int=lambda _key, default: default,
-        get_float=lambda _key, default: default,
-        get_str=lambda _key, default: default,
-        config={"danbooru_term_mappings": ["白丝袜=white_thighhighs"]},
-    )
-
-    result = resolver.cached_term_mappings_for_prompt("若叶睦穿着白丝袜")
-
-    assert result is not None
-    assert result.confirmed_tags == ("white_thighhighs",)
-
-
 def test_wardrobe_editor_round_trip_updates_profiles_and_mappings() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
