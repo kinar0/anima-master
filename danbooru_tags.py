@@ -822,10 +822,10 @@ def fetch_variant_outfit_profile(
     requested_kind = str(outfit_kind).strip().lower()
     kind = (
         requested_kind
-        if requested_kind in {"default", "stage", "summer", "winter"}
+        if requested_kind in {"default", "casual", "stage", "summer", "winter"}
         else "default"
     )
-    cache_key = f"outfit-profile-v5:{canonical_key}:{kind}"
+    cache_key = f"outfit-profile-v6:{canonical_key}:{kind}"
     cached = cache.get(cache_key)
     if isinstance(cached, tuple) and len(cached) == 2:
         cached_at, cached_profile = cached
@@ -847,6 +847,7 @@ def fetch_variant_outfit_profile(
                                 (
                                     canonical_tag,
                                     "instrument" if kind == "stage" else "",
+                                    "casual" if kind == "casual" else "",
                                     (
                                         f"{kind}_uniform"
                                         if kind in {"summer", "winter"}
@@ -889,6 +890,7 @@ def fetch_variant_outfit_profile(
                             None,
                             (
                                 canonical_tag,
+                                "casual" if kind == "casual" else "",
                                 (
                                     f"{kind}_uniform"
                                     if kind in {"summer", "winter"}
@@ -952,6 +954,16 @@ def fetch_variant_outfit_profile(
             }
             & set(general.split())
         ]
+    elif kind == "casual":
+        single_character = [
+            general for general in single_character if "casual" in general.split()
+        ]
+        if len(single_character) < 3:
+            single_character = [
+                general
+                for general, _characters in post_samples
+                if "casual" in general.split()
+            ]
     elif kind in {"summer", "winter"}:
         seasonal_tag = f"{kind}_uniform"
         single_character = [
@@ -971,13 +983,13 @@ def fetch_variant_outfit_profile(
                 if pure_signature
                 else f"{kind}_filtered"
             )
-            if kind in {"summer", "winter"}
+            if kind in {"casual", "summer", "winter"}
             else "stage_single_character"
             if kind == "stage"
             else "single_character"
         )
     else:
-        if kind in {"stage", "summer", "winter"}:
+        if kind in {"stage", "casual", "summer", "winter"}:
             empty = VariantOutfitProfile(
                 sample_mode=f"{kind}_evidence_insufficient",
                 total_posts=len(post_samples),
@@ -1006,6 +1018,8 @@ def fetch_variant_outfit_profile(
         in {
             "single_character",
             "stage_single_character",
+            "casual_single_character",
+            "casual_filtered",
             "summer_single_character",
             "winter_single_character",
             "summer_filtered",
@@ -1048,9 +1062,16 @@ def fetch_variant_outfit_profile(
                             & set(str(post.get("tag_string_general") or "").split())
                         )
                         and (
-                            kind not in {"summer", "winter"}
-                            or f"{kind}_uniform"
-                            in set(str(post.get("tag_string_general") or "").split())
+                            (
+                                kind not in {"summer", "winter"}
+                                or f"{kind}_uniform"
+                                in set(str(post.get("tag_string_general") or "").split())
+                            )
+                            and (
+                                kind != "casual"
+                                or "casual"
+                                in set(str(post.get("tag_string_general") or "").split())
+                            )
                         )
                     ]
                 if len(refined_samples) >= 3:

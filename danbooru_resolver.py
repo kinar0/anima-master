@@ -130,12 +130,21 @@ class DanbooruResolver:
             flags=re.I,
         ):
             return "stage"
+        if re.search(
+            r"(?:私服|便服|居家服|日常服(?:装)?|休闲服(?:装)?|休闲穿搭|"
+            r"随意(?:的)?生活服|(?<!官方)常服|"
+            r"(?<![a-z0-9_])casual(?:\s+(?:clothes?|clothing|outfit|wear|attire|look))?"
+            r"(?![a-z0-9_]))",
+            text,
+            flags=re.I,
+        ):
+            return "casual"
         return "default"
 
     @classmethod
     def _normalize_outfit_variant(cls, value: Any, *hints: Any) -> str:
         explicit = str(value or "").strip().lower()
-        if explicit in {"default", "summer", "winter", "stage"}:
+        if explicit in {"default", "casual", "summer", "winter", "stage"}:
             return explicit
         return cls._outfit_variant(" ".join(str(hint or "") for hint in hints))
 
@@ -166,7 +175,7 @@ class DanbooruResolver:
         spaced = canonical_tag.replace("_", " ")
         if variant in {"summer", "winter"} and spaced.endswith(" school uniform"):
             return spaced.removesuffix(" uniform") + f" {variant} uniform"
-        if variant in {"summer", "winter", "stage"}:
+        if variant in {"casual", "summer", "winter", "stage"}:
             return f"{spaced} {variant}"
         return spaced
 
@@ -1272,10 +1281,18 @@ class DanbooruResolver:
             tuple[str, str, tuple[str, ...], tuple[str, ...]]
         ] = []
         for target_anchor_id, target_tag in target_anchor_tags:
+            target_anchor = next(
+                anchor
+                for anchor in anchors
+                if anchor.anchor_id == target_anchor_id
+            )
+            target_variant = self._outfit_variant(
+                f"{target_anchor.source_text} {target_anchor.description}"
+            )
             profile = await asyncio.to_thread(
                 fetch_variant_outfit_profile,
                 target_tag,
-                outfit_kind="default",
+                outfit_kind=target_variant,
                 timeout=min(2.5, timeout),
                 user_agent=(
                     self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT).strip()
@@ -1291,7 +1308,11 @@ class DanbooruResolver:
             )
             if profile.tags or profile.appearance_tags:
                 self.remember_outfit_summary(
-                    target_tag,
+                    (
+                        target_anchor.source_text or target_tag
+                        if target_variant != "default"
+                        else target_tag
+                    ),
                     (target_tag,),
                     profile.tags,
                     {
@@ -1303,6 +1324,7 @@ class DanbooruResolver:
                         "tag_counts": dict(profile.tag_counts),
                         "appearance_tags": list(profile.appearance_tags),
                     },
+                    target_variant,
                 )
         if character_profiles:
             result = replace(

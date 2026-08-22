@@ -1077,6 +1077,91 @@ def test_seasonal_outfit_profiles_use_distinct_keys_and_cache_entries() -> None:
     assert winter.outfit_profile_tags[0] == "winter_uniform"
 
 
+def test_casual_outfit_profile_does_not_fall_back_to_default_cache() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver.remember_outfit_summary(
+        "角色甲",
+        ("character_a",),
+        ("school_uniform",),
+    )
+    resolver.remember_outfit_summary(
+        "角色甲",
+        ("character_a",),
+        ("blue_cardigan", "jeans"),
+        qualifier="casual",
+    )
+
+    casual = resolver.cached_outfit_profiles_for_prompt("角色甲穿casual服装")
+    default = resolver.cached_outfit_profiles_for_prompt("角色甲站立")
+
+    assert casual is not None
+    assert casual.outfit_profile_tags == ("blue_cardigan", "jeans")
+    assert default is not None
+    assert default.outfit_profile_tags == ("school_uniform",)
+
+
+def test_target_casual_variant_uses_casual_post_query(monkeypatch) -> None:
+    anchor = SemanticAnchor(
+        "target",
+        "target_character",
+        "character",
+        "角色甲",
+        "A casual outfit variant",
+        ("character_a",),
+    )
+    monkeypatch.setattr(
+        resolver_module,
+        "lookup_semantic_anchors",
+        lambda *_args, **_kwargs: SemanticLookupResult(
+            confirmed_tags=("character_a",),
+            anchor_tags=(("target", "character_a"),),
+            anchors=(anchor,),
+            status="resolved",
+        ),
+    )
+    calls: list[tuple[str, str]] = []
+
+    def fake_profile(tag, *, outfit_kind, **_kwargs):
+        calls.append((tag, outfit_kind))
+        return VariantOutfitProfile(tags=("blue_shirt", "jeans"))
+
+    monkeypatch.setattr(
+        resolver_module, "fetch_variant_outfit_profile", fake_profile
+    )
+
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver._local_cli_path = lambda: PLUGIN_DIR / "unused.exe"
+
+    result = asyncio.run(resolver.resolve_semantic_anchors((anchor,)))
+
+    assert calls == [("character_a", "casual")]
+    assert result.character_profiles == (
+        ("target", "character_a", ("blue_shirt", "jeans"), ()),
+    )
+
+
 def test_named_outfit_persistence_stays_bound_to_matching_anchor(monkeypatch) -> None:
     anchors = (
         SemanticAnchor(

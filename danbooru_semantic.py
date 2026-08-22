@@ -283,7 +283,9 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "Omit ordinary prose that does not need a hard tag. Emit exactly one "
         "character_plans item for each target character. Its target_anchor_id must "
         "reference that target_character anchor. wardrobe.kind is default_profile "
-        "for canonical clothing, named_outfit for an explicit named ensemble, "
+        "for canonical clothing, casual_profile for an explicitly requested casual, "
+        "everyday, home, off-duty, 私服, 便服, 居家服, 日常服装, or 休闲服 variant, "
+        "named_outfit for an explicit named ensemble, "
         "outfit_source for clothes copied from a character/persona, creative_fallback "
         "when the requested look has no verified named/default wardrobe and the final "
         "writer may design compatible garment details, or none. "
@@ -401,7 +403,8 @@ _OUTFIT_DIRECTIVE_COLORS = {
 }
 
 _WARDROBE_KINDS = {
-    "default_profile", "named_outfit", "outfit_source", "creative_fallback", "none"
+    "default_profile", "casual_profile", "named_outfit", "outfit_source",
+    "creative_fallback", "none"
 }
 
 

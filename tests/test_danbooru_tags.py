@@ -598,6 +598,47 @@ def test_named_uniform_fetch_filters_summer_and_winter_profiles(monkeypatch) -> 
     assert "sweater_vest" not in winter.tags
 
 
+def test_casual_outfit_fetch_uses_casual_evidence_without_banning_uniforms(
+    monkeypatch,
+) -> None:
+    calls: list[str] = []
+    posts = [
+        {
+            "tag_string_general": (
+                "1girl solo casual school_uniform blue_shirt pleated_skirt"
+            ),
+            "tag_string_character": "character_a",
+        }
+        for _index in range(8)
+    ]
+
+    class _Response:
+        status_code = 200
+
+        def json(self):
+            return posts
+
+    def fake_get(_url, *, params, **_kwargs):
+        calls.append(params["tags"])
+        return _Response()
+
+    monkeypatch.setattr(tags_module.requests, "get", fake_get)
+
+    profile = tags_module.fetch_variant_outfit_profile(
+        "character_a",
+        outfit_kind="casual",
+        timeout=2.0,
+        user_agent="test",
+        cache={},
+        donmai_base_urls=("https://example.invalid",),
+    )
+
+    assert calls[0] == "character_a casual"
+    assert profile.sample_mode == "casual_single_character"
+    assert "school_uniform" in profile.tags
+    assert "blue_shirt" in profile.tags
+
+
 def test_empty_lookup_cache_expires_quickly(monkeypatch) -> None:
     clock = [100.0]
     calls: list[str] = []

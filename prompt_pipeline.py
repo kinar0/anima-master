@@ -745,6 +745,26 @@ class CharacterEffectiveOutfit:
     effective: EffectiveOutfitPlan
 
 
+_OFFICIAL_DEFAULT_OUTFIT_RE = re.compile(
+    r"(?:官方常服|官方默认服装|原作(?:默认)?服装|默认服装|标准服装)", re.I
+)
+_CASUAL_LIFE_OUTFIT_RE = re.compile(
+    r"(?:私服|便服|居家服|日常服(?:装)?|休闲服(?:装)?|休闲穿搭|"
+    r"随意(?:的)?生活服|(?<!官方)常服|"
+    r"(?<![a-z0-9_])casual(?:\s+(?:clothes?|clothing|outfit|wear|attire|look))?"
+    r"(?![a-z0-9_]))",
+    re.I,
+)
+
+
+def requests_casual_life_outfit(user_prompt: str) -> bool:
+    """Return whether the request selects the evidence-backed casual variant."""
+    text = str(user_prompt or "")
+    return bool(_CASUAL_LIFE_OUTFIT_RE.search(text)) and not bool(
+        _OFFICIAL_DEFAULT_OUTFIT_RE.search(text)
+    )
+
+
 def build_character_effective_outfits(
     anchors: tuple[SemanticAnchor, ...],
     plans: tuple[SemanticCharacterPlan, ...],
@@ -810,7 +830,7 @@ def build_character_effective_outfits(
         wardrobe_kind = plan.wardrobe.kind
         base_tags: tuple[str, ...] = ()
         appearance_tags: tuple[str, ...] = ()
-        if plan.wardrobe.kind == "default_profile":
+        if plan.wardrobe.kind in {"default_profile", "casual_profile"}:
             profile = character_profiles.get(plan.target_anchor_id.lower())
             if profile:
                 _character_tag, base_tags, appearance_tags = profile
@@ -2130,6 +2150,7 @@ class PromptPipeline:
         prompt = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", prompt)
         prompt = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", prompt)
         prompt = re.sub(r"\s+", " ", prompt)
+        casual_life_requested = requests_casual_life_outfit(prompt)
         summary: dict[str, Any] = {
             "prompt_optimize_enabled": self._bool("prompt_optimize_enabled", True),
             "mode": mode,
@@ -2256,7 +2277,9 @@ class PromptPipeline:
             self._danbooru_resolver, "cached_outfit_profiles_for_prompt", None
         )
         cached_profile_result = (
-            cached_profile_getter(prompt) if callable(cached_profile_getter) else None
+            cached_profile_getter(prompt)
+            if callable(cached_profile_getter)
+            else None
         )
         configured_character_anchor_getter = getattr(
             self._danbooru_resolver,
@@ -2326,6 +2349,36 @@ class PromptPipeline:
                 semantic_character_plans = parse_semantic_character_plans(
                     semantic_plan_raw, prompt, semantic_anchors
                 )
+                if casual_life_requested:
+                    semantic_character_plans = tuple(
+                        replace(
+                            plan,
+                            wardrobe=replace(
+                                plan.wardrobe,
+                                kind="casual_profile",
+                            ),
+                        )
+                        if plan.wardrobe.kind == "default_profile"
+                        else plan
+                        for plan in semantic_character_plans
+                    )
+                casual_target_ids = {
+                    plan.target_anchor_id.lower()
+                    for plan in semantic_character_plans
+                    if plan.wardrobe.kind == "casual_profile"
+                }
+                if casual_target_ids:
+                    semantic_anchors = tuple(
+                        replace(
+                            anchor,
+                            description=(
+                                f"{anchor.description} casual outfit variant"
+                            ).strip(),
+                        )
+                        if anchor.anchor_id.lower() in casual_target_ids
+                        else anchor
+                        for anchor in semantic_anchors
+                    )
                 if semantic_character_plans:
                     semantic_outfit_directives = tuple(
                         directive
@@ -2644,14 +2697,6 @@ class PromptPipeline:
         profile_tags_for_request = (
             scoped_profile_tags or semantic_result.outfit_profile_tags
         )
-        official_default_requested = bool(
-            re.search(r"(?:官方常服|官方默认服装|原作(?:默认)?服装|默认服装|标准服装)", prompt, re.I)
-        )
-        casual_life_requested = bool(
-            re.search(r"(?:私服|居家服|日常便服|随意(?:的)?生活服|休闲穿搭|(?<!官方)常服)", prompt, re.I)
-        ) and not official_default_requested
-        if casual_life_requested:
-            profile_tags_for_request = ()
         character_effective_outfits = build_character_effective_outfits(
             semantic_anchors,
             semantic_character_plans,
@@ -2697,7 +2742,7 @@ class PromptPipeline:
             include_outfit_source_anchor=include_source_anchor,
             effective_outfit_tags=effective_outfit.effective_tags,
             removed_outfit_tags=effective_outfit.removed_tags,
-            suppress_profile_outfit_tags=casual_life_requested,
+            suppress_profile_outfit_tags=False,
         )
         if character_effective_outfits:
             context_lines = [
