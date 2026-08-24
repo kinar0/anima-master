@@ -3,7 +3,7 @@
 > 数据来源：仓库 git 提交历史
 > 分支：`codex/local-anima-custom`
 > 提交作者：`Local AstrBot Customization <local-astrbot@localhost>`
-> 提交总数：14 次（含本次提交）
+> 当前分支提交总数：43 次；下表记录关键里程碑，不是完整逐提交清单
 
 ## 代码注释规则
 
@@ -33,7 +33,7 @@ docstring 和就地设计注释。注释的目标是记录代码本身无法直�
 解释的接口或分支；实现、协议或优先级变化时必须同步更新，避免留下比缺少注释
 更危险的过期说明。
 
-## 提交概览
+## 关键提交概览
 
 | 时间 | 提交 | 说明 |
 |------|------|------|
@@ -51,6 +51,7 @@ docstring 和就地设计注释。注释的目标是记录代码本身无法直�
 | 2026-08-21 03:35 | `b886ca2` | fix: 防止 ComfyUI API 短暂超时被误报为未启动 |
 | 2026-08-21 | （本次提交） | fix: 统一服装套组 canonical tag 与中英文别名并修复 UI 状态 |
 | 2026-08-21 | （本次提交） | fix: 使用轻量 ComfyUI 健康检查，避免重复读取节点清单 |
+| 2026-08-24 | `ccc3992` | fix: centralize character appearance and wardrobe authority |
 
 ## 各提交详细改动
 
@@ -207,6 +208,17 @@ docstring 和就地设计注释。注释的目标是记录代码本身无法直�
 - `agent_tools/comfyui_status.py`：支持轻量状态模式；完整能力校验的 `/object_info` 超时提高到 60 秒，并明确其只用于首次配置/模型验证。
 - `comfyui_startup.py` / `comfyui_runtime.py`：首次完整验证成功后，后续生图调用轻量 `/system_stats` 健康检查并复用已验证的模型能力，避免每次生成重复读取数 MB 的 `/object_info`。
 - 测试：`tests/test_comfyui_readiness.py` 增加轻量健康检查用例；相关测试通过（8 passed）。
+
+### 15. `ccc3992` — 集中角色外观与服装权限
+
+- 第一次语义 LLM 与本地 Danbooru 查询能力解耦：正常优化时仍会识别可见角色和逐角色服装；查询不可用只跳过标签验证，不再退化为单纯读取角色缓存。
+- 语义规划规则明确把“双方、两人、都、双女主、both、all”等共享服装要求展开到每个目标角色；普通服装描述可形成 `creative_fallback` 计划，不必先存在命名套组。
+- `prompt_pipeline.py` 新增集中 `WardrobeAuthority`，统一记录 `cached_tags`、`explicit_tags`、`selected_tags` 和 `stale_cached_tags`。角色默认/缓存衣柜不再与用户明确服装平级合并。
+- 已有逐角色服装计划时抑制请求级 `outfit_summary`；同一权限同时过滤第二次 LLM 上下文、七段 `Identity` / `Details` / `Tags` / `Nltags`、`required_profile_tags`、`required_core_tags` 和最终结构化内容，堵住陈旧服装的旁路注入。
+- 发色、瞳色、发型和角色身份等稳定外观与服装分离：替换衣服不会误删角色识别特征。
+- 外貌权限进一步改为“角色 × 维度”合并：用户只修改发色/发型时不会整体放弃角色档案，未提及的瞳色、体型等仍保持稳定；多角色修改必须命中对应穿着者。
+- 固定角色辅助信息若携带陈旧外貌，会在送入第二阶段 LLM 前用当前 canonical 角色与 `appearanceTags` 重建；第二阶段返回后再次删除冲突 Identity 描述，而不是在末尾追加竞争 tag。
+- 角色衣柜页面与解析器同步支持稳定外观字段，测试覆盖“双人都穿婚纱不混入羽丘校服”等共享范围和多通道过滤场景；相关套件 `142 passed`。
 
 ## 总结
 

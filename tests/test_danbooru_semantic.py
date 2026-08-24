@@ -16,6 +16,8 @@ import danbooru_resolver as resolver_module  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
     SemanticAnchor,
     SemanticLookupResult,
+    build_semantic_plan_prompt,
+    build_semantic_plan_repair_prompt,
     extract_parenthesized_character_aliases,
     extract_parenthesized_copyright_aliases,
     lookup_semantic_anchors,
@@ -24,9 +26,82 @@ from danbooru_semantic import (  # noqa: E402
     parse_semantic_plan,
     parse_semantic_outfit_directives,
     parse_semantic_character_plans,
+    semantic_plan_validation_issues,
 )
 from danbooru_resolver import DanbooruResolver  # noqa: E402
 from danbooru_tags import VariantOutfitProfile  # noqa: E402
+
+
+def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
+    prompt = build_semantic_plan_prompt(
+        "爱音cosplay黑魔导，祥子cosplay黑魔导女孩"
+    )
+
+    assert "Relationship-first contract" in prompt
+    assert "exactly one character_plans item" in prompt
+    assert "爱音cosplay黑魔导，祥子cosplay黑魔导女孩" in prompt
+    assert "do not shorten 黑魔导女孩" in prompt
+    assert "number of character_plans equals" in prompt
+    assert "add the pink-hair request separately" in prompt
+    assert '"kind":"outfit_source","anchor_id":"source_1"' in prompt
+
+
+def test_missing_outfit_source_reference_requests_llm_repair_without_guessing() -> None:
+    prompt = (
+        "千早爱音正在cosplay重音teto，但她的裙子不翼而飞，上衣也被撕破了。"
+        "她绑着粉色的双钻头发型，就像重音teto那样。"
+    )
+    raw = json.dumps(
+        {
+            "anchors": [
+                {
+                    "id": "target_1",
+                    "role": "target_character",
+                    "group": "character",
+                    "source_text": "千早爱音",
+                    "description": "Chihaya Anon",
+                    "candidates": ["chihaya_anon"],
+                },
+                {
+                    "id": "source_1",
+                    "role": "outfit_source",
+                    "group": "character",
+                    "source_text": "重音teto",
+                    "description": "Kasane Teto outfit source",
+                    "candidates": ["kasane_teto"],
+                },
+            ],
+            "character_plans": [
+                {
+                    "target_anchor_id": "target_1",
+                    "wardrobe": {"kind": "outfit_source"},
+                    "directives": [
+                        {
+                            "operation": "remove",
+                            "slots": ["lower_body.skirt"],
+                            "source_text": "她的裙子不翼而飞",
+                        },
+                        {
+                            "operation": "damage",
+                            "slots": ["upper_body.primary"],
+                            "source_text": "上衣也被撕破了",
+                        },
+                    ],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    issues = semantic_plan_validation_issues(raw, prompt)
+    repair = build_semantic_plan_repair_prompt(prompt, raw, issues)
+
+    assert issues == (
+        "character_plans[1].wardrobe.anchor_id is required when kind is outfit_source",
+    )
+    assert 'wardrobe.anchor_id is mandatory' in repair
+    assert '"source_text": "重音teto"' in repair
+    assert '"operation": "damage"' in repair
 
 
 def test_character_plans_require_unique_role_correct_anchor_references() -> None:
@@ -120,6 +195,27 @@ def test_semantic_plan_accepts_full_outfit_recolor_without_slots() -> None:
     assert directives[0].operation == "recolor_all"
     assert directives[0].slots == ()
     assert directives[0].color == "black"
+
+
+def test_semantic_plan_keeps_torn_garment_as_damage_not_removal() -> None:
+    prompt = "千早爱音cosplay重音teto，上衣被撕破了"
+    raw = json.dumps({
+        "anchors": [
+            {"id": "anon", "role": "target_character", "group": "character", "source_text": "千早爱音", "description": "Anon", "candidates": ["chihaya_anon"]},
+            {"id": "teto", "role": "outfit_source", "group": "character", "source_text": "重音teto", "description": "Teto outfit", "candidates": ["kasane_teto"]},
+        ],
+        "character_plans": [{
+            "target_anchor_id": "anon",
+            "wardrobe": {"kind": "outfit_source", "anchor_id": "teto"},
+            "directives": [{"operation": "damage", "slots": ["upper_body.primary"], "source_text": "上衣被撕破了"}],
+        }],
+    }, ensure_ascii=False)
+
+    plans = parse_semantic_character_plans(raw, prompt)
+
+    assert plans[0].directives[0].operation == "damage"
+    assert "damage" in build_semantic_plan_prompt(prompt)
+    assert "never encode damage as remove" in build_semantic_plan_prompt(prompt)
 
 
 def test_multi_target_outfit_directive_requires_a_valid_target_anchor() -> None:
@@ -633,6 +729,263 @@ def test_editable_outfit_profile_alias_is_a_hard_tag_trigger_for_normal_prompt()
     assert cached.confirmed_tags == ("amoris_(bang_dream!)", "bang_dream!")
     assert cached.outfit_profile_tags == ("black_corset", "red_shorts")
     assert cached.appearance_profile_tags == ("blue_eyes",)
+
+
+def test_exact_visual_profile_alias_overrides_untrusted_outfit_source_candidate() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "重音tetosv",
+            ("kasane_teto_(sv)",),
+            ("grey_jacket", "grey_skirt"),
+        )
+        anchor = SemanticAnchor(
+            "source",
+            "outfit_source",
+            "character",
+            "重音tetosv",
+            "Kasane Teto SV outfit donor",
+            ("kasane_teto",),
+        )
+
+        preferred = resolver.prefer_cached_outfit_source_anchors((anchor,))
+
+    assert preferred[0].candidates == ("kasane_teto_(sv)",)
+
+
+def test_visual_profile_alias_matches_inside_longer_source_phrase() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "kasane teto (sv)",
+            ("kasane_teto_(sv)",),
+            ("grey_jacket",),
+        )
+        anchor = SemanticAnchor(
+            "source",
+            "outfit_source",
+            "character",
+            "SynthV服装（也就是kasane teto (sv))",
+            "outfit donor",
+            ("kasane_teto",),
+        )
+
+        preferred = resolver.prefer_cached_character_anchors((anchor,))
+
+    assert preferred[0].candidates == ("kasane_teto_(sv)",)
+
+
+def test_visual_profile_alias_also_stabilizes_visible_target_identity() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "闪刀姬零衣",
+            ("sky_striker_ace_-_raye",),
+            ("two-tone_dress",),
+        )
+        anchor = SemanticAnchor(
+            "target",
+            "target_character",
+            "character",
+            "闪刀姬零衣",
+            "visible character",
+            ("raye",),
+        )
+
+        preferred = resolver.prefer_cached_character_anchors((anchor,))
+
+    assert preferred[0].candidates == ("sky_striker_ace_-_raye",)
+
+
+def test_visual_profile_alias_does_not_cross_wardrobe_qualifiers() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "角色甲的演出服",
+            ("character_a",),
+            ("stage_dress",),
+            qualifier="stage",
+        )
+        anchor = SemanticAnchor(
+            "source",
+            "outfit_source",
+            "character",
+            "角色甲",
+            "default outfit donor",
+            ("wrong_character",),
+        )
+
+        preferred = resolver.prefer_cached_character_anchors((anchor,))
+
+    assert preferred[0].candidates == ("wrong_character",)
+
+
+def test_prompt_profile_scan_uses_longest_non_overlapping_alias_occurrences() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "黑魔导", ("dark_magician",), ("dark_robe",)
+        )
+        resolver.remember_outfit_summary(
+            "黑魔导女孩", ("dark_magician_girl",), ("blue_dress",)
+        )
+
+        girl_only = resolver.cached_outfit_profiles_for_prompt(
+            "祥子cosplay黑魔导女孩"
+        )
+        both = resolver.cached_outfit_profiles_for_prompt(
+            "爱音cosplay黑魔导，祥子cosplay黑魔导女孩"
+        )
+
+    assert girl_only is not None
+    assert girl_only.outfit_profile_tags == ("blue_dress",)
+    assert both is not None
+    assert set(both.outfit_profile_tags) == {"dark_robe", "blue_dress"}
+
+
+def test_learning_refuses_second_canonical_source_for_exact_trigger_alias() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "重音tetosv",
+            ("kasane_teto_(sv)",),
+            ("grey_jacket", "grey_skirt"),
+        )
+        resolver.remember_outfit_summary(
+            "重音tetosv",
+            ("kasane_teto",),
+            ("white_shirt", "black_skirt"),
+        )
+        profiles = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+
+    assert list(profiles) == ["重音tetosv"]
+    assert profiles["重音tetosv"]["source_tags"] == ["kasane_teto_(sv)"]
+    assert profiles["重音tetosv"]["outfit_tags"] == ["grey_jacket", "grey_skirt"]
+
+
+def test_scoped_source_suffix_disambiguates_existing_trigger_collision() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "version": 3,
+                    "profiles": {
+                        "wrong": {
+                            "kind": "character_outfit",
+                            "qualifier": "default",
+                            "aliases": ["重音tetosv"],
+                            "source_tags": ["kasane_teto"],
+                            "outfit_tags": ["white_shirt"],
+                        },
+                        "sv": {
+                            "kind": "character_outfit",
+                            "qualifier": "default",
+                            "aliases": ["重音tetosv"],
+                            "source_tags": ["kasane_teto_(sv)"],
+                            "outfit_tags": ["grey_jacket"],
+                        },
+                    }
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        anchor = SemanticAnchor(
+            "source", "outfit_source", "character", "重音tetosv", "donor",
+            ("kasane_teto",),
+        )
+
+        preferred = resolver.prefer_cached_outfit_source_anchors((anchor,))
+
+    assert preferred[0].candidates == ("kasane_teto_(sv)",)
 
 
 def test_refresh_preserves_editor_aliases_outfit_and_stable_appearance() -> None:
@@ -1336,6 +1689,68 @@ def test_target_casual_variant_uses_casual_post_query(monkeypatch) -> None:
     assert result.character_profiles == (
         ("target", "character_a", ("blue_shirt", "jeans"), ()),
     )
+
+
+def test_fresh_editor_profile_is_used_without_resampling_outfit_source(
+    monkeypatch,
+) -> None:
+    anchor = SemanticAnchor(
+        "source",
+        "outfit_source",
+        "character",
+        "重音tetosv",
+        "outfit donor",
+        ("kasane_teto_(sv)",),
+    )
+    monkeypatch.setattr(
+        resolver_module,
+        "lookup_semantic_anchors",
+        lambda *_args, **_kwargs: SemanticLookupResult(
+            confirmed_tags=("kasane_teto_(sv)",),
+            outfit_source_tags=("kasane_teto_(sv)",),
+            anchor_tags=(("source", "kasane_teto_(sv)"),),
+            anchors=(anchor,),
+            status="resolved",
+        ),
+    )
+
+    def unexpected_fetch(*_args, **_kwargs):
+        raise AssertionError("fresh editor profile must not be resampled")
+
+    monkeypatch.setattr(
+        resolver_module, "fetch_variant_outfit_profile", unexpected_fetch
+    )
+
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver._local_cli_path = lambda: PLUGIN_DIR / "unused.exe"
+        resolver.remember_outfit_summary(
+            "重音tetosv",
+            ("kasane_teto_(sv)",),
+            ("manual_grey_jacket", "manual_grey_skirt"),
+            {"appearance_tags": ["red_hair", "drill_hair"]},
+        )
+
+        result = asyncio.run(resolver.resolve_semantic_anchors((anchor,)))
+
+    assert result.anchor_outfit_profiles == ((
+        "source",
+        "kasane_teto_(sv)",
+        ("manual_grey_jacket", "manual_grey_skirt"),
+        "default",
+    ),)
 
 
 def test_named_outfit_persistence_stays_bound_to_matching_anchor(monkeypatch) -> None:

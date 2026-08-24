@@ -209,19 +209,28 @@ def build_final_prompt(
         # into the final Nltags paragraph or passed through comma-based tag
         # cleaning.  Keep their original block order all the way to ComfyUI:
         # Count -> Characters -> Copyright -> Identity -> Details -> Tags.
+        # Keep one display line per structured semantic block.  Quality stays
+        # with Count, while artist anchors stay with Copyright, so the cleaned
+        # prompt still follows the seven-block protocol without adding extra
+        # preset-only lines.
+        count_parts = list(parts)
         if required_count_tags:
-            parts.append(", ".join(required_count_tags))
+            count_parts.append(", ".join(required_count_tags))
+        ordered_sections = [join_prompt_parts(count_parts)]
         if structured_character_tags:
-            parts.append(", ".join(structured_character_tags))
+            ordered_sections.append(
+                join_prompt_parts([", ".join(structured_character_tags)])
+            )
+        copyright_parts: list[str] = []
         if structured_copyright_tags:
-            parts.append(", ".join(structured_copyright_tags))
+            copyright_parts.append(", ".join(structured_copyright_tags))
         # Artist tags are global authorship/style anchors.  In structured mode
-        # they belong immediately after Copyright and before character prose.
+        # they belong with Copyright and before character prose.
         if use_style and artist.strip():
-            parts.append(artist)
-        prefix = join_prompt_parts(parts)
-
-        ordered_sections = [prefix]
+            copyright_parts.append(artist)
+        copyright_section = join_prompt_parts(copyright_parts)
+        if copyright_section:
+            ordered_sections.append(copyright_section)
         for blocks in (structured_identity_blocks, structured_detail_blocks):
             section = "; ".join(
                 display_tag_text(str(block).strip())
@@ -245,7 +254,7 @@ def build_final_prompt(
         tag_section = join_prompt_parts(tag_parts)
         if tag_section:
             ordered_sections.append(tag_section)
-        final_prompt = ", ".join(section for section in ordered_sections if section)
+        final_prompt = "\n".join(section for section in ordered_sections if section)
     else:
         if required_count_tags:
             parts.append(", ".join(required_count_tags))
@@ -268,12 +277,14 @@ def build_final_prompt(
         if str(block or "").strip()
     )
     if narrative:
-        final_prompt += ", " + ", ".join(
+        separator = "\n" if preserve_structured_order else ", "
+        final_prompt += separator + ", ".join(
             display_tag_text(block) for block in narrative
         )
     nltags = " ".join(str(nltags or "").split()).strip(" ,;:")
     if nltags:
-        final_prompt += f", Nltags: {display_tag_text(nltags)}"
+        separator = "\n" if preserve_structured_order else ", "
+        final_prompt += f"{separator}Nltags: {display_tag_text(nltags)}"
     return PromptBuildResult(
         final_prompt=final_prompt,
         content_tags=content,

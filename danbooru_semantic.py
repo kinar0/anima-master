@@ -34,9 +34,19 @@ from typing import Any
 
 
 DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT = (
+    "You build a character-to-wardrobe relation graph and bounded lookup anchors "
+    "for a local Danbooru index. Relationship binding is the primary task: emit "
+    "exactly one character_plans item for every visible target_character, preserve "
+    "the wearer and its wardrobe/outfit_source even when the request also changes "
+    "hair, color, pose, expression, or scene, and keep separate clauses scoped to "
+    "their own wearers. Never merge overlapping source names or request-wide "
+    "wardrobes. Return valid JSON only. Candidates are unverified lookup hints."
+)
+
+LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS = frozenset({
     "You extract semantic lookup anchors for a local Danbooru index. "
     "Return valid JSON only. Never claim that a candidate is verified."
-)
+})
 
 
 _ALLOWED_GROUPS = {
@@ -318,12 +328,30 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         '{"anchors":[{"id":"target_1","role":"target_character",'
         '"group":"character","source_text":"exact phrase from request",'
         '"description":"short English visible meaning",'
-        '"candidates":["canonical_tag_guess"]}],'
+        '"candidates":["canonical_tag_guess"]},{"id":"source_1",'
+        '"role":"outfit_source","group":"character",'
+        '"source_text":"exact cosplay source phrase",'
+        '"description":"outfit donor character",'
+        '"candidates":["canonical_source_character_guess"]}],'
         '"character_plans":[{"target_anchor_id":"target_1",'
-        '"wardrobe":{"kind":"default_profile"},'
+        '"wardrobe":{"kind":"outfit_source","anchor_id":"source_1"},'
         '"directives":[{"operation":"keep_only",'
         '"slots":["outerwear","headwear"],'
         '"source_text":"exact clothing instruction from request"}]}]}\n'
+        "Relationship-first contract: before choosing tag candidates, identify every "
+        "visible wearer and write its wardrobe edge. Every target_character anchor "
+        "must have exactly one character_plans item; never omit character_plans merely "
+        "because anchors were already emitted. A later appearance, color, pose, action, "
+        "or scene sentence modifies that same target and must not erase its wardrobe "
+        "edge. Resolve each comma/semicolon-separated clause locally. Example: for "
+        "'爱音cosplay黑魔导，祥子cosplay黑魔导女孩', create two target anchors, two "
+        "outfit_source anchors, and bind 爱音 to the full source phrase 黑魔导 while "
+        "binding 祥子 to the full source phrase 黑魔导女孩. These source names overlap; "
+        "do not shorten 黑魔导女孩 or bind both wearers to one source. For '千早爱音正在"
+        "cosplay重音teto。包括双钻头在内的头发都是粉色的', keep 千早爱音 -> 重音teto "
+        "as outfit_source and add the pink-hair request separately. Before returning, "
+        "verify that the number of character_plans equals the number of target_character "
+        "anchors and every referenced ID exists with the required role.\n"
         "Allowed roles: target_character, outfit_source, copyright, appearance, "
         "expression, pose, action, clothing, outfit, accessory, prop, scene, lighting. "
         "Allowed groups are the same except target_character/outfit_source use "
@@ -372,7 +400,9 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "corresponding outfit or outfit_source anchor; other kinds must omit it. "
         "directives are optional and are "
         "only for an explicit modification of a character's clothes. Allowed "
-        "operations are remove, replace_color, recolor_all, add, and keep_only. Allowed slots "
+        "operations are remove, damage, replace_color, recolor_all, add, and keep_only. "
+        "Use damage when a garment remains present but is torn, ripped, broken, or visibly "
+        "damaged; never encode damage as remove. Allowed slots "
         "are upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, "
         "headwear, face_accessory.mask, handwear, legwear, and footwear. For "
         "replace_color/add include a basic English color in color. recolor_all "
@@ -468,7 +498,7 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
 
 
 _OUTFIT_DIRECTIVE_OPERATIONS = {
-    "remove", "replace_color", "recolor_all", "add", "keep_only"
+    "remove", "damage", "replace_color", "recolor_all", "add", "keep_only"
 }
 _OUTFIT_DIRECTIVE_SLOTS = {
     "upper_body.primary",
@@ -540,7 +570,7 @@ def _parse_outfit_directive_item(
         return None
     if operation == "recolor_all" and slots:
         return None
-    if operation in {"remove", "replace_color", "add"} and len(slots) != 1:
+    if operation in {"remove", "damage", "replace_color", "add"} and len(slots) != 1:
         return None
     if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
         return None
@@ -621,6 +651,99 @@ def parse_semantic_character_plans(
     return tuple(plan for plan in plans if plan.target_anchor_id not in ambiguous)
 
 
+def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ...]:
+    """Report structural relationship errors that warrant one planner retry.
+
+    This deliberately validates references rather than inferring them.  The repair
+    remains the planner's job, so a missing edge in a multi-character request can
+    never be filled by host-side proximity or name heuristics.
+    """
+    data = _semantic_json(raw)
+    if not data:
+        return ("response is not a valid JSON object",)
+    anchors = parse_semantic_plan(raw, user_prompt)
+    by_id = {anchor.anchor_id.lower(): anchor for anchor in anchors}
+    target_ids = [
+        anchor.anchor_id.lower()
+        for anchor in anchors
+        if anchor.role == "target_character"
+    ]
+    raw_plans = data.get("character_plans")
+    # An omitted plan is the planner's semantic abstention and must continue to
+    # degrade to explicit_but_unresolved.  Retry only a plan it actually attempted
+    # but encoded with broken references; otherwise ordinary no-plan responses
+    # would unexpectedly add another paid LLM call.
+    if not isinstance(raw_plans, list):
+        return ()
+    issues: list[str] = []
+    if isinstance(raw_plans, list):
+        seen_targets: list[str] = []
+        for index, item in enumerate(raw_plans[:8], start=1):
+            if not isinstance(item, dict):
+                issues.append(f"character_plans[{index}] is not an object")
+                continue
+            target_id = str(item.get("target_anchor_id") or "").strip().lower()
+            target = by_id.get(target_id)
+            if target is None or target.role != "target_character":
+                issues.append(
+                    f"character_plans[{index}].target_anchor_id does not reference "
+                    "one target_character anchor"
+                )
+            else:
+                seen_targets.append(target_id)
+            wardrobe = item.get("wardrobe")
+            if not isinstance(wardrobe, dict):
+                issues.append(f"character_plans[{index}].wardrobe must be an object")
+                continue
+            kind = str(wardrobe.get("kind") or "").strip().lower()
+            anchor_id = str(wardrobe.get("anchor_id") or "").strip().lower()
+            if kind not in _WARDROBE_KINDS:
+                issues.append(f"character_plans[{index}].wardrobe.kind is invalid")
+            elif kind in {"named_outfit", "outfit_source"}:
+                expected = "outfit" if kind == "named_outfit" else "outfit_source"
+                wardrobe_anchor = by_id.get(anchor_id)
+                if not anchor_id:
+                    issues.append(
+                        f"character_plans[{index}].wardrobe.anchor_id is required "
+                        f"when kind is {kind}"
+                    )
+                elif wardrobe_anchor is None or wardrobe_anchor.role != expected:
+                    issues.append(
+                        f"character_plans[{index}].wardrobe.anchor_id must reference "
+                        f"one {expected} anchor"
+                    )
+            elif anchor_id:
+                issues.append(
+                    f"character_plans[{index}].wardrobe.anchor_id must be omitted "
+                    f"when kind is {kind}"
+                )
+        for target_id in target_ids:
+            count = seen_targets.count(target_id)
+            if count == 0:
+                issues.append(f"target_character {target_id} has no character_plans item")
+            elif count > 1:
+                issues.append(f"target_character {target_id} has duplicate character_plans items")
+    return tuple(dict.fromkeys(issues))
+
+
+def build_semantic_plan_repair_prompt(
+    user_prompt: str, previous_raw: str, issues: tuple[str, ...]
+) -> str:
+    """Ask the same planner to repair references without changing user semantics."""
+    issue_lines = "\n".join(f"- {issue}" for issue in issues)
+    return (
+        build_semantic_plan_prompt(user_prompt)
+        + "\n\nYour previous response failed structural validation:\n"
+        + issue_lines
+        + "\nRepair the complete JSON object. Preserve every correctly understood user "
+        "requirement, anchor, per-character directive, and appearance request. "
+        "Do not merely describe the correction. For named_outfit and outfit_source, "
+        "wardrobe.anchor_id is mandatory and must reference the corresponding anchor ID. "
+        "Return the corrected complete JSON object only.\n\nPrevious response:\n"
+        + str(previous_raw or "")
+    )
+
+
 def parse_semantic_outfit_directives(
     raw: str, user_prompt: str
 ) -> tuple[SemanticOutfitDirective, ...]:
@@ -678,7 +801,7 @@ def parse_semantic_outfit_directives(
             continue
         if operation == "keep_only" and len(slots) > 4:
             continue
-        if operation in {"remove", "replace_color", "add"} and len(slots) != 1:
+        if operation in {"remove", "damage", "replace_color", "add"} and len(slots) != 1:
             continue
         if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
             continue

@@ -144,14 +144,15 @@ def test_structured_sections_keep_seven_block_order_and_hard_tags() -> None:
         nltags="togawa_sakiko stands against a white wall.",
     )
 
-    assert (
-        "1girl, solo, togawa sakiko, bang dream!, "
-        "@configured artist, "
-        "togawa sakiko has blue hair, "
-        "togawa sakiko wears black pantyhose, "
-        "blue hair, black pantyhose, full body, "
-        "Nltags: togawa sakiko stands against a white wall."
-    ) in result.final_prompt
+    assert result.final_prompt.splitlines() == [
+        "masterpiece, best quality, 1girl, solo",
+        "togawa sakiko",
+        "bang dream!, @configured artist",
+        "togawa sakiko has blue hair",
+        "togawa sakiko wears black pantyhose",
+        "blue hair, black pantyhose, full body",
+        "Nltags: togawa sakiko stands against a white wall.",
+    ]
     assert result.final_prompt.count("blue hair") == 2
     assert result.final_prompt.count("black pantyhose") == 2
     assert result.final_prompt.count("Nltags:") == 1

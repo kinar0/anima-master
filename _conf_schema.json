@@ -333,8 +333,8 @@
       "danbooru_semantic_system_prompt": {
         "description": "LLM1 系统提示词",
         "type": "string",
-        "default": "You extract semantic lookup anchors for a local Danbooru index. Return valid JSON only. Never claim that a candidate is verified.",
-        "hint": "只影响生成本地 Danbooru 查询候选的第一阶段 LLM，不影响最终七字段提示词优化。留空时使用内置默认值。",
+        "default": "You build a character-to-wardrobe relation graph and bounded lookup anchors for a local Danbooru index. Relationship binding is the primary task: emit exactly one character_plans item for every visible target_character, preserve the wearer and its wardrobe/outfit_source even when the request also changes hair, color, pose, expression, or scene, and keep separate clauses scoped to their own wearers. Never merge overlapping source names or request-wide wardrobes. Return valid JSON only. Candidates are unverified lookup hints.",
+        "hint": "控制第一次 LLM 的可见角色、逐角色服装归属、共享范围和本地 Danbooru 查询候选；不影响第二次七字段提示词模板。留空时使用内置默认值。",
         "collapsed": true,
         "condition": {
           "prompt_optimize_enabled": true

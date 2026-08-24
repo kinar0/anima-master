@@ -76,13 +76,14 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 - `prompt_optimize_enabled`：是否让聊天模型优化自然语言提示词。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
-- `prompt_builder_max_tokens`：提示词优化模型最大输出长度。
+- `prompt_builder_max_tokens`：提示词优化模型最大输出长度，同时约束两次 LLM；第一次语义规划最多使用 900 tokens，以容纳复数角色的 anchors 与逐角色计划。
 - `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，简单表情包或头像可以使用 30–45 个，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。普通模式会在去除较多同义词后尝试一次按缺失画面槽位补全。
 - `unspecified_wardrobe_policy`：用户完全没提服装时的策略。`scene_adaptive`（默认）在涩气或强场景词下让模型设计，其余使用角色 default 档案；也可固定为 `default_profile` 或 `creative_fallback`。
 - `scene_adaptive_wardrobe_markers`：场景自适应的强触发词列表。默认包含出浴、睡眠前后、比赛、运动/训练结束、健身、游泳结束和演出结束等；普通公园、在家、吃饭不会触发。
-- `prompt_builder_template`：主提示词模板。
+- `danbooru_semantic_system_prompt`：第一次 LLM 的语义规划规则，负责可见角色、共享范围和逐角色服装归属。
+- `prompt_builder_template`：第二次 LLM 的七段英文提示词模板。
 
-通常不需要一开始就改 `prompt_builder_template`。如果想改变插件如何理解中文需求，再调整它。
+通常不需要一开始就改这两个模板。第一次 LLM 的规划不会因为本地 Danbooru 查询关闭或暂时不可用而跳过；查询只负责验证候选。`unspecified_wardrobe_policy` 也只在用户和第一次 LLM 都没有给出服装证据时生效。第二次 LLM 始终读取完整原文，并结合 LLM1 关系建议、数据库证据和禁止恢复项完成最终语义；LLM1 缺失关系时会收到 `EXPLICIT BUT UNRESOLVED`，而不是由代码猜绑定。
 
 ## 联网与 tag 查询
 
@@ -179,6 +180,15 @@ Canonical Tag: haneoka_school_uniform
 - `debug_send_payload_enabled`
 
 开启后可能在日志和 `last_task.json` 中记录较长提示词，请注意隐私。
+
+`debug_prompt_enabled` 会同时记录第一次语义规划 LLM 的任务书、system prompt、完整原始回复、解析后的 anchors、恢复前后的 `character_plans`，以及第二次提示词 LLM 的任务书、回复和最终 prompt。任务摘要还会保存 `semantic_plan_prompt` 与 `semantic_plan_raw`，便于判断模型没有输出关系，还是关系在严格解析时被丢弃。
+
+排查服装串档时，优先查看最近任务摘要中的这些字段：
+
+- `semantic_character_outfits`：第一次 LLM 给每名角色分配的服装。
+- `explicit_wardrobe_evidence` / `wardrobe_source`：本次是否存在明确服装证据，以及最终采用哪个来源。
+- `wardrobe_authority.cached_tags` / `explicit_tags` / `selected_tags` / `source_grounding_tags` / `stale_cached_tags`：缓存、明确要求、最终选中、允许 cosplay 补全参考的来源衣柜，以及应删除的穿着者陈旧衣柜。
+- `outfit_summary_source`：存在逐角色计划时应为 `suppressed_by_character_authority`，避免请求级摘要重新注入旧衣服。
 
 ## 推荐做法
 

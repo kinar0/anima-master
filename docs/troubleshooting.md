@@ -84,3 +84,35 @@
   不会再把错误的 `2girls, futanari` 折叠成缺少人数锚点的 `futa with female`。
 - 若问题持续，把日志中 `prompt builder LLM returned empty content` 附近的内容
   提供给作者排查。
+
+## 明确指定新服装，却混入角色默认衣柜
+
+例如“爱音和祥子都穿婚纱”最终仍出现 `haneoka school uniform`，不要只检查第二次 LLM 的输出。当前流程应先由第一次 LLM 为每名角色建立服装计划，再由 `WardrobeAuthority` 把未选中的角色缓存衣柜标为陈旧，并在所有后续通道中移除。
+
+开启 `debug_prompt_enabled` 后检查最近任务摘要：
+
+1. `semantic_character_outfits` 应同时包含两名角色的婚纱计划；“双方、两人、都、both、all”等共享范围必须展开到每个目标角色。
+2. `explicit_wardrobe_evidence` 应为 `true`，`wardrobe_source` 不应是 `configured_default`。
+3. `wardrobe_authority.selected_tags` 应包含本次婚纱标签；`stale_cached_tags` 应包含未选中的校服缓存。
+4. 已有逐角色计划时，`outfit_summary_source` 应为 `suppressed_by_character_authority`。
+5. 给第二次 LLM 的任务书、七段输出、`required_profile_tags`、`required_core_tags` 和最终 prompt 都不应再出现陈旧校服。
+
+本地 Danbooru 查询不可用时，第一次 LLM 仍应运行；只会跳过候选 tag 的本地验证。如果更新代码后摘要仍只有 `danbooru_semantic_status=profile_cache`、且 `semantic_character_outfits=[]`，优先确认插件是否已经重载到新版本。
+
+注意两个显式绕过入口：raw / 无优化模式不经过服装权限流程；`#` 后的手工尾缀会原样插回，也不会被 `WardrobeAuthority` 清理。若冲突 tag 来自这两处，需由用户自行删除。
+
+对于“角色 A cosplay 角色 B”，检查 `wardrobe_resolution_states`、`source_grounding_tags` 和 `unbound_grounding_tags`。若 LLM1 成功绑定，应看到 `resolved` 和角色级 `source_grounding_tags`；若它只保留目标与来源 anchors、却漏掉关系，应看到 `explicit_but_unresolved`。此时程序不得恢复绑定或注入目标默认衣柜，来源同源证据只进入 `unbound_grounding_tags`，由第二次 LLM 结合完整原文判断。
+
+若 `semantic_plan_initial_raw` 已包含 `wardrobe.kind=outfit_source` 或 `named_outfit`，但漏写/错写 `wardrobe.anchor_id`，应看到 `semantic_plan_attempt_count=2`，并检查 `semantic_plan_validation_errors`、`semantic_plan_repair_prompt` 和最终 `semantic_plan_raw`。修复成功后错误列表应为空且角色状态应为 `resolved`；完全未输出 `character_plans` 属于语义弃权，不触发结构修复调用。
+
+若同一个触发别名反复生成角色视觉档案，对照 `semantic_plan_raw` 中 `target_character` / `outfit_source` 的候选与已有档案的 `sourceTags`。最长边界别名命中后，实际语义查询应使用已有 `sourceTags`，新鲜档案的当前请求组件也应直接来自保存的 `tags`；日志出现 `refusing duplicate outfit profile alias` 表示 LLM1/本地查询仍返回了冲突来源，但写入已被拒绝。旧版本已经形成的冲突条目不会被自动删除，以免误删人工维护档案，应在服装词库页面确认正确 canonical source 后手工合并或删除。
+
+## Identity 出现错误发色、瞳色或来源角色外貌
+
+例如爱音视觉档案是 `grey_eyes`，用户只要求 Teto 风格的粉色双钻头发型，但最终 Identity 出现 `yellow eyes`。这不是服装 tag 冲突，应分别检查三层证据：
+
+1. `danbooru_semantic_character_appearance_profiles` 或 `semantic_character_outfits[].appearance_tags` 是否仍是目标角色自己的稳定外貌，而不是 cosplay 来源角色的外貌。
+2. 给第二次 LLM 的完整提示中，`Character-scoped stable appearance authority` 是否按穿着者列出档案；命中的固定角色辅助提示是否已经被最新档案重建，不再携带陈旧瞳色。
+3. 最终 `structured_identity_blocks` 是否只保留用户明确修改的外貌维度，并恢复未提及维度的档案值。
+
+当前外貌裁决单位是“角色 × 维度”，不是整份 Identity。只改发型不会解锁瞳色，只改 A 的瞳色不会影响 B。若用户明确改成蓝眼睛，最终应保留蓝眼并排除档案灰眼；若用户没有提瞳色，则 LLM 写出的黄眼、蓝眼等冲突描述必须被删除，而不是与 `grey_eyes` 同时追加到末尾竞争。

@@ -69,8 +69,8 @@
   // 留空时使用当前聊天会话的主模型；填入后，专门用这个 Provider 来做提示词优化。
   "prompt_builder_provider_id": "",
 
-  // LLM1 只负责提出本地 Danbooru 查询候选；留空时使用插件内置系统提示词。
-  "danbooru_semantic_system_prompt": "You extract semantic lookup anchors for a local Danbooru index. Return valid JSON only. Never claim that a candidate is verified.",
+  // LLM1 优先建立逐角色服装关系，再提出本地 Danbooru 查询候选；留空时使用插件内置系统提示词。
+  "danbooru_semantic_system_prompt": "You build a character-to-wardrobe relation graph and bounded lookup anchors for a local Danbooru index. Relationship binding is the primary task: emit exactly one character_plans item for every visible target_character, preserve the wearer and its wardrobe/outfit_source even when the request also changes hair, color, pose, expression, or scene, and keep separate clauses scoped to their own wearers. Never merge overlapping source names or request-wide wardrobes. Return valid JSON only. Candidates are unverified lookup hints.",
 
   // 提示词优化模型的输出控制。
   "prompt_builder_max_tokens": 1000,
