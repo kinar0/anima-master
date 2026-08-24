@@ -10,7 +10,11 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
-from danbooru_semantic import SemanticAnchor, SemanticOutfitDirective  # noqa: E402
+from danbooru_semantic import (  # noqa: E402
+    SemanticAnchor,
+    SemanticLookupResult,
+    SemanticOutfitDirective,
+)
 from multi_person_prompt import (  # noqa: E402
     MultiPersonCharacter,
     build_multi_person_plan_prompt,
@@ -281,6 +285,72 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
     assert "Character A" not in result.final_prompt
     assert "third person" not in result.final_prompt
     assert len(resolver.calls) == 2
+
+
+def test_explicit_multi_person_uses_saved_character_appearances() -> None:
+    class _Context:
+        async def llm_generate(self, **_kwargs):
+            return _Response(_plan_json(conflicting_fixed_appearance=True))
+
+    class _Resolver:
+        async def resolve_detailed(self, **_kwargs):
+            raise AssertionError("saved profiles must bypass fresh identity lookup")
+
+    config = {"chiyo_preset": "", "prompt_optimize_enabled": True}
+    pipeline = PromptPipeline(
+        context=_Context(),
+        config=config,
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(),
+        researcher=_Researcher(),
+        get_bool=lambda key, default: bool(config.get(key, default)),
+        get_int=lambda key, default: int(config.get(key, default)),
+        get_float=lambda key, default: float(config.get(key, default)),
+        get_str=lambda key, default: str(config.get(key, default)),
+        shorten=lambda text, limit: text[:limit],
+    )
+    profiles = SemanticLookupResult(
+        character_appearance_profiles=(
+            (
+                ("若叶睦", "wakaba_mutsumi"),
+                "wakaba_mutsumi",
+                ("long_hair", "green_hair", "yellow_eyes"),
+            ),
+            (
+                ("千早爱音", "chihaya_anon"),
+                "chihaya_anon",
+                ("pink_hair", "grey_eyes"),
+            ),
+        ),
+        status="profile_cache",
+    )
+    summary = {}
+
+    result = asyncio.run(
+        pipeline._build_multi_person_prompt(
+            provider_id="provider",
+            prompt="若叶睦和千早爱音牵手",
+            prompt_config=config,
+            use_deep_thinking=False,
+            summary=summary,
+            original_user_prompt="若叶睦和千早爱音牵手",
+            semantic_result=profiles,
+        )
+    )
+
+    assert result is not None
+    statuses = result.summary["character_resolution_statuses"]
+    assert [item["status"] for item in statuses] == [
+        "profile_cache",
+        "profile_cache",
+    ]
+    assert statuses[0]["canonical_tag"] == "wakaba_mutsumi"
+    assert statuses[0]["identity_tags"] == [
+        "long_hair",
+        "green_hair",
+        "yellow_eyes",
+    ]
+    assert statuses[1]["identity_tags"] == ["pink_hair", "grey_eyes"]
 
 
 def test_multi_person_pipeline_protects_fixed_character_appearance():

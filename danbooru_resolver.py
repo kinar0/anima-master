@@ -356,14 +356,15 @@ class DanbooruResolver:
         outfit_tags: list[str] = []
         appearance_tags: list[str] = []
         scoped: list[tuple[str, str, tuple[str, ...], str]] = []
+        scoped_appearances: dict[
+            str, tuple[list[str], list[str]]
+        ] = {}
         for profile_key, profile in self._profile_data().get("profiles", {}).items():
             if not isinstance(profile, dict) or profile.get("kind") == "named_outfit":
                 continue
             variant = self._normalize_outfit_variant(
                 profile.get("qualifier"), profile_key, profile.get("aliases", [])
             )
-            if variant != requested_variant:
-                continue
             aliases = tuple(
                 dict.fromkeys(
                     self._profile_alias_key(alias)
@@ -404,21 +405,37 @@ class DanbooruResolver:
                 value = str(tag).strip()
                 if value and value not in confirmed:
                     confirmed.append(value)
-            for tag in tags:
-                if tag not in outfit_tags:
-                    outfit_tags.append(tag)
             for tag in appearances:
                 if tag not in appearance_tags:
                     appearance_tags.append(tag)
             source_tag = sources[0] if sources else ""
+            if source_tag and appearances:
+                alias_bucket, appearance_bucket = scoped_appearances.setdefault(
+                    source_tag, ([], [])
+                )
+                for alias in aliases:
+                    if alias not in alias_bucket:
+                        alias_bucket.append(alias)
+                for tag in appearances:
+                    if tag not in appearance_bucket:
+                        appearance_bucket.append(tag)
+            if variant != requested_variant:
+                continue
+            for tag in tags:
+                if tag not in outfit_tags:
+                    outfit_tags.append(tag)
             scoped.append((matched_alias, source_tag, tags, variant))
-        if not scoped:
+        if not scoped and not scoped_appearances:
             return None
         return SemanticLookupResult(
             confirmed_tags=tuple(confirmed),
             outfit_profile_tags=tuple(outfit_tags),
             appearance_profile_tags=tuple(appearance_tags),
             source_outfit_profiles=tuple(scoped),
+            character_appearance_profiles=tuple(
+                (tuple(aliases), source_tag, tuple(tags))
+                for source_tag, (aliases, tags) in scoped_appearances.items()
+            ),
             status="profile_cache",
         )
 
@@ -426,7 +443,29 @@ class DanbooruResolver:
         """Refresh only absent, legacy, or week-old character outfit evidence."""
         variant = self._outfit_variant(source_text)
         key = self._outfit_profile_key(source_text, variant)
-        profile = self._profile_data().get("profiles", {}).get(key)
+        profiles = self._profile_data().get("profiles", {})
+        profile = profiles.get(key)
+        if not isinstance(profile, dict):
+            profile = next(
+                (
+                    candidate
+                    for profile_key, candidate in profiles.items()
+                    if isinstance(candidate, dict)
+                    and candidate.get("kind") != "named_outfit"
+                    and self._normalize_outfit_variant(
+                        candidate.get("qualifier"),
+                        profile_key,
+                        candidate.get("aliases", []),
+                    )
+                    == variant
+                    and any(
+                        self._profile_alias_key(source_text)
+                        == self._profile_alias_key(alias)
+                        for alias in (profile_key, *candidate.get("aliases", []))
+                    )
+                ),
+                None,
+            )
         if not isinstance(profile, dict):
             return True
         evidence = profile.get("evidence")
@@ -1028,6 +1067,24 @@ class DanbooruResolver:
             seen_keys.add(storage_key)
             old_candidate = old_profiles.get(key, old_profiles.get(storage_key))
             old = old_candidate if isinstance(old_candidate, dict) else {}
+            old_evidence = (
+                old.get("evidence")
+                if isinstance(old.get("evidence"), dict)
+                else {}
+            )
+            old_appearance_tags = self._clean_tag_list(
+                old_evidence.get("appearance_tags", []), limit=80
+            )
+            if "appearanceTags" in item:
+                appearance_tags = self._clean_tag_list(
+                    item.get("appearanceTags"), limit=80
+                )
+                appearance_changed = appearance_tags != old_appearance_tags
+            else:
+                # Keep older API clients backward compatible: omitting the field
+                # means preserve it, while an explicit empty list means clear it.
+                appearance_tags = old_appearance_tags
+                appearance_changed = False
             record: dict[str, Any] = {
                 "kind": "character_outfit",
                 "qualifier": qualifier,
@@ -1036,8 +1093,15 @@ class DanbooruResolver:
                 "copyright_tags": list(old.get("copyright_tags", [])),
                 "outfit_tags": tags,
             }
-            if isinstance(old.get("evidence"), dict):
-                record["evidence"] = old["evidence"]
+            if old_evidence or appearance_tags or appearance_changed:
+                record["evidence"] = {
+                    **old_evidence,
+                    "appearance_tags": appearance_tags,
+                }
+                if appearance_changed or old_evidence.get(
+                    "appearance_manual_override"
+                ):
+                    record["evidence"]["appearance_manual_override"] = True
             new_profiles[storage_key] = record
 
         configured_sets: list[str] = []
@@ -1147,27 +1211,107 @@ class DanbooruResolver:
             if scoped and scoped.group(1) not in copyright_tags:
                 copyright_tags.append(scoped.group(1))
         profiles = self._profile_data().setdefault("profiles", {})
-        profiles[key] = {
+        source_tag_keys = {
+            self._profile_alias_key(tag) for tag in source_tags if str(tag).strip()
+        }
+        existing_key = next(
+            (
+                str(profile_key)
+                for profile_key, candidate in profiles.items()
+                if isinstance(candidate, dict)
+                and candidate.get("kind") != "named_outfit"
+                and self._normalize_outfit_variant(
+                    candidate.get("qualifier"), profile_key, candidate.get("aliases", [])
+                )
+                == qualifier_key
+                and source_tag_keys.intersection(
+                    self._profile_alias_key(tag)
+                    for tag in candidate.get("source_tags", [])
+                    if str(tag).strip()
+                )
+            ),
+            key,
+        )
+        existing_value = profiles.get(existing_key)
+        existing = existing_value if isinstance(existing_value, dict) else {}
+        existing_evidence = (
+            existing.get("evidence")
+            if isinstance(existing.get("evidence"), dict)
+            else {}
+        )
+        aliases = list(
+            dict.fromkeys(
+                str(alias).strip()
+                for alias in (
+                    *existing.get("aliases", []),
+                    source_text,
+                    *source_tags,
+                    *(
+                        (f"{source_text}的演出服", f"{source_text} stage outfit")
+                        if qualifier_key == "stage"
+                        else ()
+                    ),
+                )
+                if str(alias).strip()
+            )
+        )
+        stored_outfit_tags = tuple(
+            str(tag).strip()
+            for tag in existing.get("outfit_tags", [])
+            if str(tag).strip()
+        )
+        stored_appearance_tags = tuple(
+            str(tag).strip()
+            for tag in existing_evidence.get("appearance_tags", [])
+            if str(tag).strip()
+        )
+        appearance_manual_override = bool(
+            existing_evidence.get("appearance_manual_override")
+        )
+        record: dict[str, Any] = {
             "kind": "character_outfit",
             "qualifier": qualifier_key,
-            "aliases": [
-                source_text,
-                *(
-                    [f"{source_text}的演出服", f"{source_text} stage outfit"]
-                    if qualifier_key == "stage"
-                    else []
-                ),
-            ],
-            "source_tags": list(dict.fromkeys(source_tags)),
-            "copyright_tags": copyright_tags,
-            "outfit_tags": list(dict.fromkeys(outfit_tags)),
+            "aliases": aliases,
+            "source_tags": list(
+                dict.fromkeys((*existing.get("source_tags", []), *source_tags))
+            ),
+            "copyright_tags": list(
+                dict.fromkeys((*existing.get("copyright_tags", []), *copyright_tags))
+            ),
+            # Once a profile exists, its editor-visible wardrobe is authoritative.
+            # Refresh only supplies initial tags for a brand-new profile.
+            "outfit_tags": list(
+                stored_outfit_tags or tuple(dict.fromkeys(outfit_tags))
+            ),
         }
         if evidence:
-            profiles[key]["evidence"] = {
+            record["evidence"] = {
                 **evidence,
+                "appearance_tags": list(
+                    stored_appearance_tags
+                    if appearance_manual_override
+                    else stored_appearance_tags
+                    or tuple(
+                        dict.fromkeys(
+                            str(tag).strip()
+                            for tag in evidence.get("appearance_tags", [])
+                            if str(tag).strip()
+                        )
+                    )
+                ),
+                **(
+                    {"appearance_manual_override": True}
+                    if appearance_manual_override
+                    else {}
+                ),
                 "algorithm_version": 4,
                 "updated_at": time.time(),
             }
+        elif existing_evidence:
+            record["evidence"] = dict(existing_evidence)
+        profiles[existing_key] = record
+        if key != existing_key:
+            profiles.pop(key, None)
         self._save_profile_data()
 
     def remember_named_outfit(
@@ -1353,11 +1497,7 @@ class DanbooruResolver:
             )
             if profile.tags or profile.appearance_tags:
                 self.remember_outfit_summary(
-                    (
-                        target_anchor.source_text or target_tag
-                        if target_variant != "default"
-                        else target_tag
-                    ),
+                    target_anchor.source_text or target_tag,
                     (target_tag,),
                     profile.tags,
                     {

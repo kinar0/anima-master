@@ -148,6 +148,9 @@ class SemanticLookupResult:
     source_outfit_profiles: tuple[
         tuple[str, str, tuple[str, ...], str], ...
     ] = ()
+    character_appearance_profiles: tuple[
+        tuple[tuple[str, ...], str, tuple[str, ...]], ...
+    ] = ()
     anchor_tags: tuple[tuple[str, str], ...] = ()
     character_profiles: tuple[
         tuple[str, str, tuple[str, ...], tuple[str, ...]], ...
@@ -177,6 +180,7 @@ class SemanticLookupResult:
             and not self.appearance_profile_tags
             and not self.named_outfit_tags
             and not self.source_outfit_profiles
+            and not self.character_appearance_profiles
             and not effective_outfit_tags
         ):
             return ""
@@ -243,6 +247,11 @@ class SemanticLookupResult:
                 "authoritative recurring appearance tags for this character: "
                 + ", ".join(self.appearance_profile_tags)
             )
+        if self.character_appearance_profiles:
+            lines.append("Character-scoped stable appearance profiles:")
+            for aliases, source_tag, tags in self.character_appearance_profiles:
+                label = aliases[0] if aliases else source_tag
+                lines.append(f"- {label} / {source_tag}: " + ", ".join(tags))
         if self.source_outfit_profiles:
             lines.append("Character-scoped outfit-source profiles (never mix them):")
             for alias, source_tag, tags, qualifier in self.source_outfit_profiles:
@@ -348,6 +357,17 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "outfit_source for clothes copied from a character/persona, creative_fallback "
         "when the requested look has no verified named/default wardrobe and the final "
         "writer may design compatible garment details, or none. "
+        "Any explicitly requested garment or wearable look is wardrobe intent, even "
+        "when it is an ordinary clothing anchor rather than an independently named "
+        "outfit. For such a target use creative_fallback, never none or "
+        "default_profile; the final writer will preserve the requested garments. "
+        "Resolve wardrobe scope explicitly: words and constructions meaning both, "
+        "all, everyone, the pair, 双方, 两人, 二人, 都, 各自, or 双女主 apply that "
+        "wardrobe to every target character in scope. Emit a separate matching "
+        "character_plans item for each wearer. For example, if two named characters "
+        "both wear wedding dresses, emit a wedding-dress clothing anchor and give "
+        "both character plans creative_fallback. Never leave either plan as none or "
+        "default_profile merely because the garment is shared. "
         "named_outfit and outfit_source require wardrobe.anchor_id referencing the "
         "corresponding outfit or outfit_source anchor; other kinds must omit it. "
         "directives are optional and are "
@@ -1191,6 +1211,7 @@ def merge_semantic_results(
         appearance_profile_tags=merged("appearance_profile_tags"),
         named_outfit_tags=merged("named_outfit_tags"),
         source_outfit_profiles=merged("source_outfit_profiles"),
+        character_appearance_profiles=merged("character_appearance_profiles"),
         anchor_tags=merged("anchor_tags"),
         character_profiles=merged("character_profiles"),
         anchor_outfit_profiles=merged("anchor_outfit_profiles"),

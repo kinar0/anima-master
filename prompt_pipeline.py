@@ -768,6 +768,114 @@ class CharacterEffectiveOutfit:
     effective: EffectiveOutfitPlan
 
 
+_STABLE_APPEARANCE_REQUEST_RE = re.compile(
+    r"(?:头发|发色|发型|长发|短发|眼睛|瞳色|肤色|皮肤颜色|兽耳|耳朵|尾巴|角|"
+    r"\bhair\b|\bhair\s*colou?r\b|\bhairstyle\b|\beyes?\b|"
+    r"\beye\s*colou?r\b|\bskin\s*colou?r\b|\bears?\b|\btails?\b|\bhorns?\b)",
+    re.I,
+)
+_EXPLICIT_IDENTITY_CHANGE_RE = re.compile(
+    r"(?:(?:改|变|染|换|剪|修改|设为|成为|变成|长出|戴上).{0,18}"
+    r"(?:头发|发色|发型|眼睛|瞳色|肤色|耳朵|尾巴|角)|"
+    r"(?:头发|发色|发型|眼睛|瞳色|肤色|耳朵|尾巴|角).{0,18}"
+    r"(?:改|变|染|换|剪|修改|设为|成为|变成|长出|戴上|红色|蓝色|金色|"
+    r"银色|白色|黑色|绿色|紫色|粉色|棕色|灰色|长发|短发)|"
+    r"(?:红|蓝|金|银|白|黑|绿|紫|粉|棕|灰)(?:色)?(?:长|短)?发|"
+    r"(?:红|蓝|金|银|白|黑|绿|紫|粉|棕|灰)(?:色)?(?:眼睛|瞳)|"
+    r"\b(?:change|alter|replace|dye|cut|grow|give|make|turn)\b.{0,28}"
+    r"\b(?:hair|eyes?|skin|ears?|tails?|horns?)\b|"
+    r"\b(?:long|short|red|blue|blonde|green|yellow|gold(?:en)?|silver|white|"
+    r"black|purple|pink|brown|grey|gray)\b.{0,10}"
+    r"\b(?:hair|eyes?|skin|ears?|tails?|horns?)\b)",
+    re.I,
+)
+
+
+def explicit_identity_override_requested(
+    user_prompt: str,
+    target_names: tuple[str, ...],
+    *,
+    character_count: int,
+) -> bool:
+    """Return whether the user explicitly changes this character's appearance.
+
+    Saved appearance is authoritative by default.  A single-character request can
+    state an appearance change with a pronoun, while a multi-character request must
+    identify the affected character in the same sentence to avoid leaking one
+    person's override to everyone else.
+    """
+    text = str(user_prompt or "")
+    if not _EXPLICIT_IDENTITY_CHANGE_RE.search(text):
+        return False
+    if character_count <= 1:
+        return True
+
+    def normalized(value: str) -> str:
+        return re.sub(r"[^\w]+", " ", value.lower().replace("_", " ")).strip()
+
+    aliases = tuple(
+        key for value in target_names if (key := normalized(str(value or "")))
+    )
+    for sentence in re.split(r"[。！？!?;；\n]+", text):
+        if not _EXPLICIT_IDENTITY_CHANGE_RE.search(sentence):
+            continue
+        normalized_sentence = normalized(sentence)
+        if any(alias in normalized_sentence for alias in aliases):
+            return True
+    return False
+
+
+def authoritative_profile_identity_block(
+    character_name: str, appearance_tags: tuple[str, ...]
+) -> str:
+    """Render a saved visual profile as the complete structured Identity clause."""
+    tags = tuple(dict.fromkeys(tag.strip() for tag in appearance_tags if tag.strip()))
+    return f"{character_name} has {', '.join(tags)}" if tags else ""
+
+
+def saved_appearance_for_names(
+    semantic_result: SemanticLookupResult, names: tuple[str, ...]
+) -> tuple[str, tuple[str, ...]]:
+    """Resolve one local canonical character and its stable appearance."""
+    normalized_names = {
+        re.sub(r"[^\w]+", " ", str(name).lower().replace("_", " ")).strip()
+        for name in names
+        if str(name).strip()
+    }
+    matches: list[tuple[str, tuple[str, ...]]] = []
+    for aliases, source_tag, tags in semantic_result.character_appearance_profiles:
+        profile_names = {
+            re.sub(r"[^\w]+", " ", str(value).lower().replace("_", " ")).strip()
+            for value in (*aliases, source_tag)
+            if str(value).strip()
+        }
+        if any(
+            left == right
+            or (len(left) >= 3 and left in right)
+            or (len(right) >= 3 and right in left)
+            for left in normalized_names
+            for right in profile_names
+        ):
+            matches.append((source_tag, tags))
+    unique = tuple(dict.fromkeys(matches))
+    return unique[0] if len(unique) == 1 else ("", ())
+
+
+def rebuild_nltags_with_authoritative_identities(
+    nltags: str, identity_blocks: tuple[str, ...]
+) -> str:
+    """Remove writer-guessed stable appearance prose and prepend chosen identities."""
+    kept = []
+    for sentence in re.split(r"(?<=[.!?])\s+", " ".join(str(nltags or "").split())):
+        sentence = sentence.strip()
+        if sentence and not _STABLE_APPEARANCE_REQUEST_RE.search(sentence):
+            kept.append(sentence)
+    authoritative = [
+        block.strip(" ,.;") + "." for block in identity_blocks if block.strip()
+    ]
+    return " ".join(dict.fromkeys((*authoritative, *kept)))
+
+
 def safe_global_outfit_tags(
     plans: tuple[CharacterEffectiveOutfit, ...],
 ) -> tuple[str, ...]:
@@ -785,6 +893,150 @@ def safe_global_outfit_tags(
         return tuple(plans[0].effective.effective_tags)
     shared = set.intersection(*tag_sets) if tag_sets else set()
     return tuple(tag for tag in plans[0].effective.effective_tags if tag in shared)
+
+
+@dataclass(frozen=True)
+class WardrobeAuthority:
+    """Single request-level decision about which wardrobe evidence may survive."""
+
+    has_character_plans: bool = False
+    all_creative: bool = False
+    cached_tags: tuple[str, ...] = ()
+    explicit_tags: tuple[str, ...] = ()
+    selected_tags: tuple[str, ...] = ()
+    stale_cached_tags: tuple[str, ...] = ()
+
+    @staticmethod
+    def _key(tag: str) -> str:
+        return tag.strip().lower().replace(" ", "_")
+
+    def filter_tags(self, tags: tuple[str, ...]) -> tuple[str, ...]:
+        stale = {self._key(tag) for tag in self.stale_cached_tags}
+        return tuple(
+            dict.fromkeys(tag for tag in tags if self._key(tag) not in stale)
+        )
+
+    def filter_tag_text(self, text: str) -> str:
+        return ", ".join(self.filter_tags(tuple(split_tags(text))))
+
+    def filter_prose(self, text: str) -> str:
+        result = str(text or "")
+        for tag in sorted(self.stale_cached_tags, key=len, reverse=True):
+            phrase = re.escape(self._key(tag).replace("_", " "))
+            result = re.sub(
+                rf"\b(?:(?:wears?|wearing|dressed in|in)\s+)?"
+                rf"(?:(?:a|an|the)\s+)?{phrase}\b",
+                "",
+                result,
+                flags=re.I,
+            )
+        result = re.sub(r"\bwears?\s*(?=,|;|\band\b|$)", "", result, flags=re.I)
+        result = re.sub(r"\s+,", ",", result)
+        return re.sub(r"\s{2,}", " ", result).strip(" ,;")
+
+
+def build_wardrobe_authority(
+    plans: tuple[CharacterEffectiveOutfit, ...],
+    semantic_result: SemanticLookupResult,
+    anchors: tuple[SemanticAnchor, ...],
+    *,
+    explicit_term_tags: tuple[str, ...] = (),
+) -> WardrobeAuthority:
+    cached_tags = tuple(
+        dict.fromkeys(
+            (
+                *semantic_result.outfit_profile_tags,
+                *(
+                    tag
+                    for _alias, _source_tag, tags, _qualifier
+                    in semantic_result.source_outfit_profiles
+                    for tag in tags
+                ),
+            )
+        )
+    )
+    explicit_tags = tuple(
+        dict.fromkeys(
+            (
+                *explicit_term_tags,
+                *(
+                    candidate
+                    for anchor in anchors
+                    if anchor.role in {"clothing", "outfit"}
+                    for candidate in anchor.candidates
+                ),
+            )
+        )
+    )
+    selected_tags = tuple(
+        dict.fromkeys(
+            tag
+            for plan in plans
+            for tag in (
+                plan.wardrobe_tag,
+                *plan.effective.base_tags,
+                *plan.effective.effective_tags,
+            )
+            if tag
+        )
+    )
+    allowed_keys = {
+        WardrobeAuthority._key(tag) for tag in (*explicit_tags, *selected_tags)
+    }
+    stale = (
+        tuple(
+            tag
+            for tag in cached_tags
+            if WardrobeAuthority._key(tag) not in allowed_keys
+        )
+        if plans
+        else ()
+    )
+    return WardrobeAuthority(
+        has_character_plans=bool(plans),
+        all_creative=bool(plans)
+        and all(plan.wardrobe_kind == "creative_fallback" for plan in plans),
+        cached_tags=cached_tags,
+        explicit_tags=explicit_tags,
+        selected_tags=selected_tags,
+        stale_cached_tags=stale,
+    )
+
+
+def non_wardrobe_confirmed_tags(
+    semantic_result: SemanticLookupResult,
+    plans: tuple[CharacterEffectiveOutfit, ...],
+    *,
+    include_source_anchor: bool,
+) -> tuple[str, ...]:
+    """Keep hard semantic tags without reviving an unselected cached wardrobe."""
+    selected_wardrobe_tags = {
+        tag
+        for plan in plans
+        for tag in (
+            plan.wardrobe_tag,
+            *plan.effective.base_tags,
+            *plan.effective.effective_tags,
+        )
+        if tag
+    }
+    cached_profile_outfit_tags = {
+        tag for tag in semantic_result.outfit_profile_tags if tag
+    }
+    cached_profile_outfit_tags.update(
+        tag
+        for _alias, _source_tag, tags, _qualifier
+        in semantic_result.source_outfit_profiles
+        for tag in tags
+        if tag
+    )
+    return tuple(
+        tag
+        for tag in semantic_result.confirmed_tags
+        if (include_source_anchor or tag not in semantic_result.outfit_source_tags)
+        and (not plans or tag not in selected_wardrobe_tags)
+        and (not plans or tag not in cached_profile_outfit_tags)
+    )
 
 
 _OFFICIAL_DEFAULT_OUTFIT_RE = re.compile(
@@ -899,17 +1151,15 @@ def has_explicit_wardrobe_evidence(
     plans: tuple[SemanticCharacterPlan, ...],
 ) -> bool:
     """Return whether config must yield to request-grounded wardrobe evidence."""
-    wardrobe_text_re = re.compile(
-        r"(?:穿|衣|服|裙|裤|袜|鞋|靴|帽|手套|泳装|校服|制服|套装|礼服|睡衣|内衣|"
-        r"outfit|clothes?|clothing|wear|dress|gown|skirt|pants?|shorts?|stockings?|"
-        r"shoes?|boots?|uniform|costume|pajamas?|lingerie)",
-        re.I,
-    )
+    # Anchors have already been schema-validated and their source_text is required
+    # to be an exact substring of the request. Their semantic role is therefore
+    # stronger and more extensible evidence than a language-specific garment list.
+    # This covers unknown proper-name outfits and new garment vocabulary without
+    # teaching the host every Chinese or English clothing noun.
     explicit_anchor_ids = {
         anchor.anchor_id.lower()
         for anchor in anchors
         if anchor.role in {"clothing", "outfit", "outfit_source"}
-        and wardrobe_text_re.search(anchor.source_text)
     }
     return bool(
         requested_mode
@@ -1040,12 +1290,26 @@ def build_character_effective_outfits(
         wardrobe_kind = plan.wardrobe.kind
         base_tags: tuple[str, ...] = ()
         appearance_tags: tuple[str, ...] = ()
+        # Stable appearance belongs to the target character, not to the selected
+        # wardrobe mode.  In particular, sensual/scene-adaptive requests often
+        # switch clothing to creative_fallback; that must not also discard the
+        # character's saved hair/eye/body anchors.
+        target_profile = character_profiles.get(plan.target_anchor_id.lower())
+        cached_target_profile = cached_profile_for_target(target)
+        _cached_character_tag, cached_target_appearance = saved_appearance_for_names(
+            semantic_result, (target.source_text, *target.candidates)
+        )
+        if cached_target_appearance:
+            appearance_tags = cached_target_appearance
+        elif target_profile and target_profile[2]:
+            appearance_tags = target_profile[2]
+        elif cached_target_profile:
+            appearance_tags = cached_target_profile[1]
         if plan.wardrobe.kind in {"default_profile", "casual_profile"}:
-            profile = character_profiles.get(plan.target_anchor_id.lower())
-            if profile:
-                _character_tag, base_tags, appearance_tags = profile
-            elif cached_profile := cached_profile_for_target(target):
-                base_tags, appearance_tags = cached_profile
+            if target_profile:
+                _character_tag, base_tags, _ = target_profile
+            elif cached_target_profile:
+                base_tags, _ = cached_target_profile
             elif len(plans) == 1:
                 # Older lookup results expose only one request-wide profile. It is
                 # safe to inherit solely when there is one wearer; with multiple
@@ -1179,8 +1443,11 @@ def controlled_character_outfit_detail(
     plan: CharacterEffectiveOutfit | None,
     *,
     user_prompt: str = "",
+    wardrobe_authority: WardrobeAuthority | None = None,
 ) -> str:
     """Rebuild one Details clause from non-clothing prose plus verified wardrobe data."""
+    if wardrobe_authority is not None:
+        detail = wardrobe_authority.filter_prose(detail)
     if plan is not None and plan.wardrobe_kind == "creative_fallback":
         result = " ".join(str(detail or "").split()).strip(" ,;")
         result = re.sub(
@@ -1688,6 +1955,7 @@ class PromptPipeline:
         original_user_prompt: str = "",
         semantic_anchors: tuple[SemanticAnchor, ...] = (),
         semantic_outfit_directives: tuple[SemanticOutfitDirective, ...] = (),
+        semantic_result: SemanticLookupResult = SemanticLookupResult(),
     ) -> PromptPipelineResult | None:
         """Build a hybrid tag and natural-language prompt for 2–4 people.
 
@@ -1856,6 +2124,18 @@ class PromptPipeline:
         grouped_contact = spatial_mode == "shared_contact"
         for index, character in enumerate(plan.characters):
             character_slots.append(character.slot)
+            saved_character_tag, saved_appearance_tags = saved_appearance_for_names(
+                semantic_result,
+                (character.name, character.danbooru_candidate),
+            )
+            saved_identity_override = bool(
+                saved_appearance_tags
+                and explicit_identity_override_requested(
+                    original_user_prompt or prompt,
+                    (character.name, character.danbooru_candidate, saved_character_tag),
+                    character_count=len(plan.characters),
+                )
+            )
             fixed_name = next(
                 (
                     name
@@ -1905,6 +2185,11 @@ class PromptPipeline:
                 resolved_count += 1
                 fixed_character_count += 1
                 resolution_status = "fixed"
+            elif saved_character_tag:
+                resolved_identity = saved_character_tag
+                fixed_tags = ", ".join(saved_appearance_tags)
+                resolved_count += 1
+                resolution_status = "profile_cache"
             elif character.danbooru_candidate:
                 resolution = await self._danbooru_resolver.resolve_detailed(
                     llm_content=character.danbooru_candidate,
@@ -1959,7 +2244,9 @@ class PromptPipeline:
                 for tag in character.identity_anchors
                 if str(tag).strip(" ()")
             ]
-            if fixed_name or resolution_status == "resolved":
+            if saved_appearance_tags and not saved_identity_override:
+                identity_tags = list(saved_appearance_tags[:6])
+            elif fixed_name or resolution_status == "resolved":
                 fixed_source = re.sub(
                     r"[^a-z0-9]+",
                     " ",
@@ -1977,7 +2264,10 @@ class PromptPipeline:
             if not identity_tags:
                 identity_tags = available_identity_tags[:6]
             visual_label = str(character.visual_label or "").strip().lower()
-            if visual_label and (fixed_name or resolution_status == "resolved"):
+            if visual_label and (
+                fixed_name
+                or resolution_status in {"resolved", "profile_cache"}
+            ):
                 label_terms = re.sub(
                     r"[^a-z0-9]+",
                     " ",
@@ -2052,7 +2342,7 @@ class PromptPipeline:
                     "name": character.name,
                     "status": resolution_status,
                     "canonical_tag": resolved_identity
-                    if resolution_status == "resolved"
+                    if resolution_status in {"resolved", "profile_cache"}
                     else "",
                     "identity_tags": identity_tags,
                     "emphasized_identity_tags": [
@@ -2598,13 +2888,31 @@ class PromptPipeline:
         cached_profile_result = (
             cached_profile_getter(prompt)
             if callable(cached_profile_getter)
-            and not creative_private_requested
-            and not (
+            else None
+        )
+        creative_wardrobe_without_profile_clothes = bool(
+            creative_private_requested
+            or (
                 not requested_outfit_mode
                 and implicit_wardrobe_mode == "creative_fallback"
             )
-            else None
         )
+        if (
+            cached_profile_result is not None
+            and creative_wardrobe_without_profile_clothes
+        ):
+            # A creative wardrobe opts out of saved clothing, not out of the
+            # character record itself. Keep the canonical identity, aliases, and
+            # stable appearance while removing every cached garment tag.
+            cached_profile_result = replace(
+                cached_profile_result,
+                outfit_profile_tags=(),
+                source_outfit_profiles=tuple(
+                    (alias, source_tag, (), qualifier)
+                    for alias, source_tag, _tags, qualifier
+                    in cached_profile_result.source_outfit_profiles
+                ),
+            )
         configured_character_anchor_getter = getattr(
             self._danbooru_resolver,
             "configured_character_anchors_for_prompt",
@@ -2627,11 +2935,15 @@ class PromptPipeline:
         semantic_resolve = getattr(
             self._danbooru_resolver, "resolve_semantic_anchors", None
         )
-        if (
+        semantic_lookup_ready = bool(
             callable(semantic_available)
             and semantic_available()
             and callable(semantic_resolve)
-        ):
+        )
+        # Wardrobe ownership planning only needs the chat provider. Danbooru lookup
+        # enriches/validates tags when available, but must never gate the first LLM:
+        # otherwise a temporary CLI/tool outage silently falls back to cached clothes.
+        if callable(semantic_available) and callable(semantic_resolve):
             try:
                 semantic_plan_raw = await self._generate_semantic_plan_with_llm(
                     provider_id=provider_id,
@@ -2821,28 +3133,33 @@ class PromptPipeline:
                                     candidates=tuple(source_candidates[:3]),
                                 ),
                             )
-                resolved_semantic = await semantic_resolve(semantic_anchors)
-                refined_anchors = await self._refine_unresolved_semantic_characters(
-                    provider_id=provider_id,
-                    user_prompt=prompt,
-                    anchors=semantic_anchors,
-                    result=resolved_semantic,
-                )
-                if refined_anchors != semantic_anchors:
-                    semantic_anchors = refined_anchors
+                if semantic_lookup_ready:
                     resolved_semantic = await semantic_resolve(semantic_anchors)
-                semantic_result = merge_semantic_results(
-                    cached_source_result,
-                    cached_profile_result,
-                    cached_named_result,
-                    cached_term_result,
-                    resolved_semantic,
-                )
-                if creative_private_requested:
+                    refined_anchors = await self._refine_unresolved_semantic_characters(
+                        provider_id=provider_id,
+                        user_prompt=prompt,
+                        anchors=semantic_anchors,
+                        result=resolved_semantic,
+                    )
+                    if refined_anchors != semantic_anchors:
+                        semantic_anchors = refined_anchors
+                        resolved_semantic = await semantic_resolve(semantic_anchors)
+                    semantic_result = merge_semantic_results(
+                        cached_source_result,
+                        cached_profile_result,
+                        cached_named_result,
+                        cached_term_result,
+                        resolved_semantic,
+                    )
+                if creative_wardrobe_without_profile_clothes:
                     semantic_result = replace(
                         semantic_result,
                         outfit_profile_tags=(),
-                        source_outfit_profiles=(),
+                        source_outfit_profiles=tuple(
+                            (alias, source_tag, (), qualifier)
+                            for alias, source_tag, _tags, qualifier
+                            in semantic_result.source_outfit_profiles
+                        ),
                         character_profiles=tuple(
                             (anchor_id, character_tag, (), appearance_tags)
                             for anchor_id, character_tag, _outfit_tags, appearance_tags
@@ -2851,10 +3168,9 @@ class PromptPipeline:
                     )
             except Exception as exc:
                 self.logger.warning(
-                    "[comfyui_agent] generalized Danbooru semantic lookup failed: %s",
+                    "[comfyui_agent] semantic wardrobe planning/lookup failed: %s",
                     exc,
                 )
-                semantic_result = SemanticLookupResult(status="tool_failed")
         semantic_required_tags: tuple[str, ...] = ()
         semantic_context = semantic_result.prompt_context()
         summary.update(
@@ -2881,6 +3197,15 @@ class PromptPipeline:
                 "danbooru_semantic_appearance_tags": list(
                     semantic_result.appearance_profile_tags
                 ),
+                "danbooru_semantic_character_appearance_profiles": [
+                    {
+                        "aliases": list(aliases),
+                        "source_tag": source_tag,
+                        "appearance_tags": list(tags),
+                    }
+                    for aliases, source_tag, tags
+                    in semantic_result.character_appearance_profiles
+                ],
                 "danbooru_semantic_source_outfit_profiles": [
                     {
                         "alias": alias,
@@ -2946,6 +3271,7 @@ class PromptPipeline:
                 original_user_prompt=background_intent_prompt,
                 semantic_anchors=semantic_anchors,
                 semantic_outfit_directives=semantic_outfit_directives,
+                semantic_result=semantic_result,
             )
             if multi_result is not None:
                 return multi_result
@@ -3065,30 +3391,35 @@ class PromptPipeline:
         )
         if missing_profile_fallback:
             wardrobe_source = "missing_profile_fallback"
+        wardrobe_authority = build_wardrobe_authority(
+            character_effective_outfits,
+            semantic_result,
+            semantic_anchors,
+            explicit_term_tags=explicit_term_tags,
+        )
+        # Once wearer-scoped plans exist, the request-wide summary is no longer an
+        # authority. Keeping it alive would create a second, conflicting wardrobe
+        # channel later in prompt assembly.
+        if wardrobe_authority.has_character_plans and not outfit_plan.enabled:
+            outfit_summary = ""
+            outfit_summary_source = "suppressed_by_character_authority"
+        required_profile_tags = wardrobe_authority.filter_tags(required_profile_tags)
         global_outfit_reinforcement_tags = safe_global_outfit_tags(
             character_effective_outfits
         )
-        semantic_visible_outfit_tags = tuple(
+        semantic_visible_outfit_tags = wardrobe_authority.filter_tags(tuple(
             tag
             for tag in profile_tags_for_request
             if tag not in effective_outfit.removed_tags
-        )
+        ))
         include_source_anchor = not effective_outfit.has_destructive_override
-        character_wardrobe_tags = {
-            tag
-            for character_outfit in character_effective_outfits
-            for tag in (
-                character_outfit.wardrobe_tag,
-                *character_outfit.effective.base_tags,
-                *character_outfit.effective.effective_tags,
-            )
-            if tag
-        }
-        semantic_confirmed_tags = tuple(
-            tag
-            for tag in semantic_result.confirmed_tags
-            if (include_source_anchor or tag not in semantic_result.outfit_source_tags)
-            and (not character_effective_outfits or tag not in character_wardrobe_tags)
+        semantic_confirmed_tags = non_wardrobe_confirmed_tags(
+            semantic_result,
+            character_effective_outfits,
+            include_source_anchor=include_source_anchor,
+        )
+        semantic_confirmed_tags = wardrobe_authority.filter_tags(
+            semantic_confirmed_tags
         )
         semantic_required_tags = tuple(
             dict.fromkeys(
@@ -3380,6 +3711,21 @@ class PromptPipeline:
         structured_identity_blocks: tuple[str, ...] = ()
         structured_detail_blocks: tuple[str, ...] = ()
         outfit_target_display = outfit_plan.target_character
+        if (
+            not structured_prompt_mode
+            and len(semantic_result.character_appearance_profiles) == 1
+        ):
+            aliases, source_tag, saved_tags = (
+                semantic_result.character_appearance_profiles[0]
+            )
+            if not explicit_identity_override_requested(
+                prompt,
+                (*aliases, source_tag),
+                character_count=1,
+            ):
+                semantic_required_tags = tuple(
+                    dict.fromkeys((*semantic_required_tags, source_tag, *saved_tags))
+                )
         if structured_prompt_mode:
             # Details already carries ownership-aware prose, but that is not a
             # reason to discard useful Danbooru action/pose tags from Tags.
@@ -3443,9 +3789,11 @@ class PromptPipeline:
                     structured_scene = keep_safe_creative_wardrobe_tags(
                         structured_scene
                     )
+                structured_scene = wardrobe_authority.filter_tag_text(structured_scene)
             resolution_statuses: list[dict[str, Any]] = []
             effective_detail_blocks: list[str] = []
             effective_identity_blocks: list[str] = []
+            authoritative_profile_identity_used = False
             used_fixed_names: set[str] = set()
             for character in structured_characters:
                 semantic_confirmed = character.name in semantic_character_tags
@@ -3495,6 +3843,7 @@ class PromptPipeline:
                         character.name,
                         character_outfit,
                         user_prompt=prompt,
+                        wardrobe_authority=wardrobe_authority,
                     )
                 elif (
                     effective_outfit.modified
@@ -3508,9 +3857,24 @@ class PromptPipeline:
                 effective_detail_blocks.append(detail)
                 identity_block = character.identity_tags
                 if character_outfit and character_outfit.appearance_tags:
-                    identity_block = ", ".join(
-                        (identity_block, *character_outfit.appearance_tags)
+                    identity_override = explicit_identity_override_requested(
+                        prompt,
+                        tuple(
+                            dict.fromkeys(
+                                (
+                                    character.name,
+                                    character_outfit.target_source_text,
+                                    *character_outfit.target_candidates,
+                                )
+                            )
+                        ),
+                        character_count=len(structured_characters),
                     )
+                    if not identity_override:
+                        identity_block = authoritative_profile_identity_block(
+                            character.name, character_outfit.appearance_tags
+                        )
+                        authoritative_profile_identity_used = True
                 effective_identity_blocks.append(identity_block)
                 for identity_tag in identity_tags:
                     if identity_tag and identity_tag not in structured_required_character_tags:
@@ -3544,6 +3908,10 @@ class PromptPipeline:
                 structured_nltags,
                 tuple(character.name for character in structured_characters),
             )
+            if authoritative_profile_identity_used:
+                nltags = rebuild_nltags_with_authoritative_identities(
+                    nltags, structured_identity_blocks
+                )
             if character_effective_outfits or casual_life_requested:
                 nltags = strip_outfit_narrative(nltags)
                 nltags = " ".join(
@@ -3698,6 +4066,8 @@ class PromptPipeline:
                 flags=re.IGNORECASE | re.DOTALL,
             ).strip(" ,\n")
             summary["structured_character_mode"] = False
+        llm_content = wardrobe_authority.filter_tag_text(llm_content)
+        nltags = wardrobe_authority.filter_prose(nltags)
         background_mode = ""
         background_mode_source = "not_applicable"
         if mode == "txt2img":
@@ -3765,6 +4135,7 @@ class PromptPipeline:
             required_core_tags = tuple(
                 dict.fromkeys((*required_core_tags, *semantic_required_tags))
             )
+        required_core_tags = wardrobe_authority.filter_tags(required_core_tags)
         low_cfg_harness = bool(prompt_config.get("low_cfg_harness_enabled", False))
         constraint_raw = ""
         constraint_plan = parse_constraint_plan("")
@@ -3794,7 +4165,7 @@ class PromptPipeline:
             structured_copyright_tags=structured_copyright_tags,
             structured_identity_blocks=structured_identity_blocks,
             structured_detail_blocks=structured_detail_blocks,
-            structured_tag_tags=tuple(
+            structured_tag_tags=wardrobe_authority.filter_tags(tuple(
                 dict.fromkeys(
                     (
                         *required_profile_tags,
@@ -3802,7 +4173,7 @@ class PromptPipeline:
                         *global_outfit_reinforcement_tags,
                     )
                 )
-            ),
+            )),
             preserve_structured_order=structured_prompt_mode,
             constraint_plan=constraint_plan,
             background_mode=background_mode,
@@ -3875,9 +4246,21 @@ class PromptPipeline:
                         for item in character_effective_outfits
                     )
                 ),
-                "outfit_effective_tags": list(effective_outfit.effective_tags),
+                "outfit_effective_tags": list(
+                    wardrobe_authority.filter_tags(effective_outfit.effective_tags)
+                ),
                 "outfit_removed_tags": list(effective_outfit.removed_tags),
                 "outfit_added_tags": list(effective_outfit.added_tags),
+                "wardrobe_authority": {
+                    "has_character_plans": wardrobe_authority.has_character_plans,
+                    "all_creative": wardrobe_authority.all_creative,
+                    "cached_tags": list(wardrobe_authority.cached_tags),
+                    "explicit_tags": list(wardrobe_authority.explicit_tags),
+                    "selected_tags": list(wardrobe_authority.selected_tags),
+                    "stale_cached_tags": list(
+                        wardrobe_authority.stale_cached_tags
+                    ),
+                },
                 "semantic_character_outfits": [
                     {
                         "target_anchor_id": item.target_anchor_id,
@@ -3886,6 +4269,7 @@ class PromptPipeline:
                         "wardrobe_anchor_id": item.wardrobe_anchor_id,
                         "effective_tags": list(item.effective.effective_tags),
                         "removed_tags": list(item.effective.removed_tags),
+                        "appearance_tags": list(item.appearance_tags),
                     }
                     for item in character_effective_outfits
                 ],

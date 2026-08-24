@@ -635,6 +635,182 @@ def test_editable_outfit_profile_alias_is_a_hard_tag_trigger_for_normal_prompt()
     assert cached.appearance_profile_tags == ("blue_eyes",)
 
 
+def test_refresh_preserves_editor_aliases_outfit_and_stable_appearance() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+        resolver.remember_outfit_summary(
+            "sky_striker_ace_-_raye",
+            ("sky_striker_ace_-_raye",),
+            ("two-tone_dress",),
+            {"appearance_tags": ["blonde_hair", "long_hair", "green_eyes"]},
+        )
+        snapshot = resolver.wardrobe_snapshot()
+        snapshot["outfits"][0]["aliases"].extend(["闪刀姬零衣", "零衣"])
+        snapshot["outfits"][0]["tags"] = ["manual_dress", "black_thighhighs"]
+        resolver.save_wardrobe(
+            {
+                "baseRevision": snapshot["revision"],
+                "outfits": snapshot["outfits"],
+                "outfitSets": snapshot["outfitSets"],
+                "terms": snapshot["terms"],
+            }
+        )
+
+        resolver.remember_outfit_summary(
+            "闪刀姬零衣",
+            ("sky_striker_ace_-_raye",),
+            ("refreshed_wrong_dress",),
+            {"appearance_tags": ["short_blue_hair", "blue_eyes"]},
+        )
+        saved = json.loads(path.read_text(encoding="utf-8"))["profiles"]
+        cached = resolver.cached_outfit_profiles_for_prompt("游戏王的闪刀姬零衣")
+
+    profile = saved["sky_striker_ace_-_raye"]
+    assert "闪刀姬零衣" in profile["aliases"]
+    assert "零衣" in profile["aliases"]
+    assert profile["outfit_tags"] == ["manual_dress", "black_thighhighs"]
+    assert profile["evidence"]["appearance_tags"] == [
+        "blonde_hair",
+        "long_hair",
+        "green_eyes",
+    ]
+    assert cached is not None
+    assert cached.confirmed_tags == ("sky_striker_ace_-_raye",)
+
+
+def test_wardrobe_editor_can_add_and_correct_stable_appearance() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    initial = resolver.wardrobe_snapshot()
+    saved = resolver.save_wardrobe(
+        {
+            "baseRevision": initial["revision"],
+            "outfits": [
+                {
+                    "key": "hatsune_miku",
+                    "aliases": ["初音未来"],
+                    "sourceTags": ["hatsune_miku"],
+                    "tags": ["necktie"],
+                    "appearanceTags": ["aqua_hair", "aqua_eyes"],
+                    "qualifier": "default",
+                }
+            ],
+            "outfitSets": [],
+            "terms": [],
+        }
+    )
+    saved["outfits"][0]["appearanceTags"] = ["blue_hair", "blue_eyes"]
+    corrected = resolver.save_wardrobe(
+        {
+            "baseRevision": saved["revision"],
+            "outfits": saved["outfits"],
+            "outfitSets": saved["outfitSets"],
+            "terms": saved["terms"],
+        }
+    )
+
+    evidence = resolver._profile_data()["profiles"]["hatsune_miku"]["evidence"]
+    assert corrected["outfits"][0]["appearanceTags"] == [
+        "blue_hair",
+        "blue_eyes",
+    ]
+    assert evidence["appearance_tags"] == ["blue_hair", "blue_eyes"]
+    assert evidence["appearance_manual_override"] is True
+
+
+def test_cleared_stable_appearance_is_not_relearned_on_refresh() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver.remember_outfit_summary(
+        "hatsune_miku",
+        ("hatsune_miku",),
+        ("necktie",),
+        {"appearance_tags": ["wrong_hair", "wrong_eyes"]},
+    )
+    snapshot = resolver.wardrobe_snapshot()
+    snapshot["outfits"][0]["appearanceTags"] = []
+    resolver.save_wardrobe(
+        {
+            "baseRevision": snapshot["revision"],
+            "outfits": snapshot["outfits"],
+            "outfitSets": snapshot["outfitSets"],
+            "terms": snapshot["terms"],
+        }
+    )
+    resolver.remember_outfit_summary(
+        "hatsune_miku",
+        ("hatsune_miku",),
+        ("new_outfit",),
+        {"appearance_tags": ["relearned_hair", "relearned_eyes"]},
+    )
+
+    evidence = resolver._profile_data()["profiles"]["hatsune_miku"]["evidence"]
+    assert resolver.wardrobe_snapshot()["outfits"][0]["appearanceTags"] == []
+    assert evidence["appearance_manual_override"] is True
+
+
+def test_stable_appearance_matches_when_requested_outfit_variant_is_missing() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver.remember_outfit_summary(
+        "hatsune_miku",
+        ("hatsune_miku",),
+        ("default_outfit",),
+        {"appearance_tags": ["aqua_hair", "aqua_eyes"]},
+    )
+
+    cached = resolver.cached_outfit_profiles_for_prompt("hatsune_miku in winter")
+
+    assert cached is not None
+    assert cached.outfit_profile_tags == ()
+    assert cached.character_appearance_profiles == (
+        (("hatsune_miku",), "hatsune_miku", ("aqua_hair", "aqua_eyes")),
+    )
+
+
 def test_editable_outfit_profile_does_not_match_inside_latin_word() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
