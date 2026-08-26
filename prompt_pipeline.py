@@ -42,6 +42,8 @@ try:
         extract_reference_tag_text,
         filter_outfit_tags,
         keep_only_verified_outfit_tags,
+        outfit_tag_slot,
+        parse_user_outfit_patches,
         preferred_search_prompt,
         rewrite_target_outfit_detail,
         UserOutfitPatch,
@@ -53,6 +55,8 @@ try:
         EXPLICIT_SCENE,
         enforce_user_background_intent,
         extract_background_mode,
+        framing_hidden_outfit_slots,
+        strip_unrequested_default_background_prose,
     )
     from .prompt_builder import (
         build_final_prompt,
@@ -113,6 +117,8 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         extract_reference_tag_text,
         filter_outfit_tags,
         keep_only_verified_outfit_tags,
+        outfit_tag_slot,
+        parse_user_outfit_patches,
         preferred_search_prompt,
         rewrite_target_outfit_detail,
         UserOutfitPatch,
@@ -124,6 +130,8 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         EXPLICIT_SCENE,
         enforce_user_background_intent,
         extract_background_mode,
+        framing_hidden_outfit_slots,
+        strip_unrequested_default_background_prose,
     )
     from prompt_builder import (
         build_final_prompt,
@@ -365,10 +373,12 @@ def filter_unbound_directional_tags(tag_text: str) -> tuple[str, tuple[str, ...]
 
 
 def is_chinese_model_refusal(text: str) -> bool:
-    """Return whether an expected prompt response is a Chinese refusal."""
+    """Return whether an expected prompt response is a Chinese/English refusal.
+
+    The historical public name is retained for compatibility with tests and
+    external imports, although providers may answer the Chinese task in English.
+    """
     response = re.sub(r"\s+", " ", str(text or "")).strip()
-    if len(re.findall(r"[\u3400-\u9fff]", response)) < 4:
-        return False
     refusal_patterns = (
         r"(?:抱歉|对不起|很遗憾).{0,48}(?:不能|无法|不可以|没法|不便)",
         r"(?:不能|无法|不可以|没法|不便).{0,36}"
@@ -376,7 +386,19 @@ def is_chinese_model_refusal(text: str) -> bool:
         r"(?:要求|请求|内容|指令)?",
         r"(?:拒绝|不能接受|无法接受).{0,24}(?:要求|请求|生成|创作|内容)",
     )
-    return any(re.search(pattern, response) for pattern in refusal_patterns)
+    if len(re.findall(r"[\u3400-\u9fff]", response)) >= 4 and any(
+        re.search(pattern, response) for pattern in refusal_patterns
+    ):
+        return True
+    english = response.replace("’", "'")
+    english_patterns = (
+        r"\b(?:i(?:'m| am)?\s+sorry\b.{0,80})?"
+        r"(?:i\s+)?(?:cannot|can't|won't|am unable to)\s+"
+        r"(?:help|assist|comply|fulfill|generate|create|provide|complete|process|follow)\b",
+        r"\b(?:i\s+)?(?:must|have to)\s+(?:refuse|decline)\b",
+        r"\b(?:i\s+)?(?:refuse|decline)\s+(?:this|the|your)\s+request\b",
+    )
+    return any(re.search(pattern, english, flags=re.I) for pattern in english_patterns)
 
 
 _FUTA_COUNT_KEYS = frozenset(
@@ -410,7 +432,8 @@ def normalize_anima_count_tags(
     Anima counts a futanari inside the girls count: one female plus one futa
     is `2girls, futa with female`, two females plus one futa is
     `3girls, futa with female`, and a lone futa is `1girl, futanari`. A futa
-    plus a male uses `futa with male` without a separate count tag. The
+    plus a male uses `futa with male`; rosters larger than that pair also keep
+    an explicit `Npeople` anchor. The
     previous normalization collapsed `2girls, futanari` into a bare
     `futa with female`, which dropped the people-count anchor Anima needs.
 
@@ -460,13 +483,24 @@ def normalize_anima_count_tags(
         )
     )
     if has_futa_with_male:
-        return tuple(dict.fromkeys(("futa with male", *kept)))
+        count_anchor = f"{character_count}people" if character_count > 2 else ""
+        return tuple(
+            dict.fromkeys(
+                tag for tag in (count_anchor, "futa with male", *kept) if tag
+            )
+        )
     if character_count == 1:
         return tuple(dict.fromkeys(("1girl", "futanari", *kept)))
     if boy_count and not girl_count:
         # A bare futa plus boys: the futa is not counted among boys, so the
-        # pair relation is the only count anchor Anima needs.
-        return tuple(dict.fromkeys(("futa with male", *kept)))
+        # pair relation is sufficient for two people. Larger rosters still need
+        # an explicit total-count anchor.
+        count_anchor = f"{character_count}people" if character_count > 2 else ""
+        return tuple(
+            dict.fromkeys(
+                tag for tag in (count_anchor, "futa with male", *kept) if tag
+            )
+        )
     # Anima's `Ngirls` count already includes the futa.  When the roster is
     # authoritative (`character_count` > 0) the girls total is derived from it
     # instead of blindly adding one, so `2girls, futanari` stays `2girls` and
@@ -490,6 +524,53 @@ def normalize_anima_count_tags(
     return tuple(
         dict.fromkeys(
             (_count_tag(total_girls, "girl"), "futa with female", *kept)
+        )
+    )
+
+
+def structured_count_tags_match_roster(
+    tags: tuple[str, ...], character_count: int
+) -> bool:
+    """Return whether structured Count tags encode the whole visible roster.
+
+    Mixed-gender counts are additive: ``1girl, 1boy`` is the correct count for
+    two roster entries even though neither individual tag equals two.
+    """
+    numeric_counts = tuple(
+        (int(match.group(1)), match.group(2).lower())
+        for item in tags
+        if (
+            match := re.fullmatch(
+                r"\s*(\d+)\s*(girls?|boys?|people|persons?)\s*",
+                item,
+                flags=re.IGNORECASE,
+            )
+        )
+    )
+    gender_counts = tuple(
+        (count, noun)
+        for count, noun in numeric_counts
+        if noun.startswith(("girl", "boy"))
+    )
+    people_counts = tuple(
+        (count, noun)
+        for count, noun in numeric_counts
+        if noun.startswith(("people", "person"))
+    )
+    if gender_counts:
+        return (
+            not people_counts
+            and len({noun.rstrip("s") for _count, noun in gender_counts})
+            == len(gender_counts)
+            and sum(count for count, _noun in gender_counts) == character_count
+        )
+    if people_counts:
+        return len(people_counts) == 1 and people_counts[0][0] == character_count
+    return (
+        character_count == 2
+        and any(
+            item.lower().replace("_", " ") == "futa with male"
+            for item in tags
         )
     )
 
@@ -541,6 +622,15 @@ def extract_structured_prompt(
     raw_roster_tags = tuple(
         item.strip() for item in blocks["count"].split(",") if item.strip()
     )
+    # DeepSeek occasionally returns a bare roster cardinality (``2``) even
+    # though every other field is valid. The Characters block already gives
+    # the authoritative total, so normalize the harmless shorthand locally.
+    raw_roster_tags = tuple(
+        f"{len(roster)}people"
+        if re.fullmatch(r"\d+", item) and int(item) == len(roster)
+        else item
+        for item in raw_roster_tags
+    )
     roster_tags = list(normalize_anima_count_tags(raw_roster_tags, len(roster)))
     has_count_tag = False
     for item in roster_tags:
@@ -567,6 +657,9 @@ def extract_structured_prompt(
         return (), (), (), raw, ""
 
     def sentence_for(name: str, section: str) -> str:
+        # Accept compact ``A: ... | B: ...`` as a clause separator. Ownership
+        # remains strict because each clause must begin with its roster name.
+        section = re.sub(r"\s*\|\s*", "; ", section)
         display = re.escape(name.replace("_", " "))
         source = re.escape(name)
         match = re.search(
@@ -662,55 +755,15 @@ _OUTFIT_NARRATIVE_RE = re.compile(
     re.I,
 )
 
-
-def _semantic_outfit_instruction(directive: SemanticOutfitDirective) -> str:
-    """Render one target-bound planner operation for the multi-person writer."""
-    slot_names = {
-        "upper_body.primary": "shirt or top", "lower_body.skirt": "skirt",
-        "one_piece.dress": "dress", "outerwear": "outerwear",
-        "headwear": "headwear", "face_accessory.mask": "mask",
-        "handwear": "gloves", "legwear": "legwear", "footwear": "footwear",
-    }
-    slots = [slot_names.get(slot, slot) for slot in directive.slots]
-    if directive.operation == "remove":
-        return f"wears no {slots[0]}." if slots else ""
-    if directive.operation == "damage":
-        return f"has a visibly torn and damaged {slots[0]}." if slots else ""
-    if directive.operation == "replace_color":
-        return f"wears {directive.color} {slots[0]}." if slots else ""
-    if directive.operation == "recolor_all":
-        return f"uses a {directive.color} color scheme for the outfit."
-    if directive.operation == "add":
-        return f"also wears {directive.color} {slots[0]}." if slots else ""
-    if directive.operation == "keep_only":
-        return "wears only " + " and ".join(slots) + "."
-    return ""
-
-
-def semantic_outfit_constraints_for_multi_person(
-    anchors: tuple[SemanticAnchor, ...],
-    directives: tuple[SemanticOutfitDirective, ...],
-    character_names: tuple[str, ...],
-) -> dict[int, tuple[str, ...]]:
-    """Bind semantic outfit operations to exactly one multi-person character."""
-    target_names = {
-        anchor.anchor_id.lower(): anchor.source_text.strip()
-        for anchor in anchors
-        if anchor.role == "target_character" and anchor.source_text.strip()
-    }
-    bound: dict[int, list[str]] = {}
-    for directive in directives:
-        target = target_names.get(directive.target_anchor_id.lower(), "")
-        matched = [
-            index for index, name in enumerate(character_names)
-            if target and target.lower() == str(name).strip().lower()
-        ]
-        if len(matched) != 1:
-            continue
-        instruction = _semantic_outfit_instruction(directive)
-        if instruction:
-            bound.setdefault(matched[0], []).append(instruction)
-    return {index: tuple(dict.fromkeys(items)) for index, items in bound.items()}
+_OUTFIT_ASSERTION_RE = re.compile(
+    r"\b(?:wears?|wearing|dressed|clad)\b|"
+    r"\b(?:is|are|appears?|becomes?)\s+(?:fully\s+|completely\s+)?"
+    r"(?:bottomless|topless|nude|naked)\b|"
+    r"\b(?:costume|outfit|clothing|uniform|dress|gown|skirt|shirt|"
+    r"stockings?|thighhighs?|pantyhose|boots?|shoes?)\s+"
+    r"(?:is|are|has|have|looks?|appears?)\b",
+    re.I,
+)
 
 
 def minimal_verified_outfit_nltags(
@@ -733,11 +786,16 @@ def minimal_verified_outfit_nltags(
 
 
 def strip_outfit_narrative(nltags: str) -> str:
-    """Drop untrusted wardrobe/nudity sentences from a shared narrative block."""
+    """Drop actual wardrobe assertions, not every sentence naming a garment.
+
+    Garment words can locate an unrelated requested fact (for example an erection
+    beneath a skirt).  Treating those nouns as proof that the whole sentence is
+    wardrobe prose silently discarded user semantics.
+    """
     return " ".join(
         sentence.strip()
         for sentence in re.split(r"(?<=[.!?])\s+", " ".join(str(nltags or "").split()))
-        if sentence.strip() and not _OUTFIT_NARRATIVE_RE.search(sentence)
+        if sentence.strip() and not _OUTFIT_ASSERTION_RE.search(sentence)
     )
 
 
@@ -774,6 +832,8 @@ class CharacterEffectiveOutfit:
     wardrobe_tag: str
     appearance_tags: tuple[str, ...]
     effective: EffectiveOutfitPlan
+    complete_named_profile: bool = False
+    composition_omitted_tags: tuple[str, ...] = ()
     resolution_state: str = "resolved"
     unresolved_evidence: tuple[str, ...] = ()
 
@@ -799,8 +859,6 @@ _EXPLICIT_IDENTITY_CHANGE_RE = re.compile(
     r"\b(?:hair|eyes?|skin|ears?|tails?|horns?)\b)",
     re.I,
 )
-
-
 def explicit_identity_override_requested(
     user_prompt: str,
     target_names: tuple[str, ...],
@@ -895,6 +953,51 @@ def appearance_dimension(value: str) -> str:
     return ""
 
 
+_STANDALONE_APPEARANCE_TAG_PATTERNS: dict[str, re.Pattern[str]] = {
+    "eye_color": re.compile(
+        r"(?:red|blue|green|yellow|gold(?:en)?|silver|white|black|purple|pink|"
+        r"brown|grey|gray|amber|aqua|cyan|orange|violet) eyes?",
+        re.I,
+    ),
+    "hair_color": re.compile(
+        r"(?:red|blue|green|yellow|gold(?:en)?|blonde|silver|white|black|purple|"
+        r"pink|brown|grey|gray|aqua|cyan|orange|violet) hair",
+        re.I,
+    ),
+    "hair_length": re.compile(r"(?:very long|long|medium|short) hair", re.I),
+    "hair_style": re.compile(
+        r"(?:twintails?|twin drills?|drill hair|ponytails?|braids?|braided hair|"
+        r"straight hair|wavy hair|curly hair|bob cut|hair bun|double bun)",
+        re.I,
+    ),
+    "skin_color": re.compile(
+        r"(?:pale|fair|tan(?:ned)?|dark|brown|black|white) skin", re.I
+    ),
+    "chest_size": re.compile(
+        r"(?:flat chest|(?:small|medium|large|huge) breasts?)", re.I
+    ),
+    "animal_ears": re.compile(r"(?:animal|cat|dog|fox|rabbit) ears?", re.I),
+    "tail": re.compile(r"(?:(?:animal|cat|dog|fox|rabbit) )?tails?", re.I),
+    "horns": re.compile(r"horns?", re.I),
+}
+
+
+def standalone_appearance_dimension(value: str) -> str:
+    """Classify only a complete subject-appearance tag.
+
+    Compound props and accessories such as ``red_hair_ornament``,
+    ``blue_eyes_symbol`` and ``comet_tail`` are not character appearance facts
+    and must survive shared-tag cleanup.
+    """
+    normalized = re.sub(
+        r"\s+", " ", str(value or "").strip().lower().replace("_", " ")
+    )
+    for dimension, pattern in _STANDALONE_APPEARANCE_TAG_PATTERNS.items():
+        if pattern.fullmatch(normalized):
+            return dimension
+    return ""
+
+
 def appearance_override_dimensions(
     user_prompt: str,
     target_names: tuple[str, ...],
@@ -913,17 +1016,35 @@ def appearance_override_dimensions(
         if (key := re.sub(r"[^\w]+", " ", str(name).lower().replace("_", " ")).strip())
     )
     dimensions: set[str] = set()
+    shared_scope = re.compile(
+        r"(?:双方|两人|二人|全员|所有人|都|共同|一起|\bboth\b|\ball\b)",
+        re.I,
+    )
     for sentence in re.split(r"[。！？!?;；\n]+", text):
-        normalized_sentence = re.sub(
-            r"[^\w]+", " ", sentence.lower().replace("_", " ")
-        ).strip()
-        if character_count > 1 and not any(
-            alias and alias in normalized_sentence for alias in normalized_aliases
-        ):
-            continue
-        for dimension, pattern in _APPEARANCE_DIMENSION_PATTERNS.items():
-            if pattern.search(sentence):
-                dimensions.add(dimension)
+        previous_clause = ""
+        for clause in re.split(r"[，,]+", sentence):
+            normalized_clause = re.sub(
+                r"[^\w]+", " ", clause.lower().replace("_", " ")
+            ).strip()
+            inherited_named_scope = bool(
+                previous_clause
+                and previous_clause in normalized_aliases
+            )
+            if (
+                character_count > 1
+                and not shared_scope.search(clause)
+                and not inherited_named_scope
+                and not any(
+                    alias and alias in normalized_clause
+                    for alias in normalized_aliases
+                )
+            ):
+                previous_clause = normalized_clause
+                continue
+            for dimension, pattern in _APPEARANCE_DIMENSION_PATTERNS.items():
+                if pattern.search(clause):
+                    dimensions.add(dimension)
+            previous_clause = normalized_clause
     return frozenset(dimensions)
 
 
@@ -945,9 +1066,48 @@ def merge_authoritative_identity_block(
         for item in re.split(r"\s*,\s*|\s+and\s+", body, flags=re.I)
         if item.strip(" ,.;")
     ]
+    standalone_color = re.compile(
+        r"^(?:red|blue|green|yellow|gold(?:en)?|blonde|silver|white|black|"
+        r"purple|pink|brown|grey|gray|amber|aqua|cyan|orange|violet)$",
+        re.I,
+    )
     kept: list[str] = []
-    for fragment in fragments:
+    predicate_clauses: list[str] = []
+    for index, fragment in enumerate(fragments):
+        # Identity is normally a ``<name> has ...`` sentence, but writers
+        # regularly mix predicates in one list: ``has pink hair ... and is a
+        # loli``.  Do not later place ``is a loli`` after a generated ``has``;
+        # retain its predicate and assemble a grammatical identity sentence.
+        predicate_match = re.fullmatch(r"(?:is|are)\s+(.+)", fragment, re.I)
+        if predicate_match:
+            predicate = predicate_match.group(1).strip(" ,.;")
+            if predicate:
+                predicate_clauses.append(f"is {predicate}")
+            continue
+        # A writer may also repeat the leading connective after ``and``.
+        # These are attributes, not a literal value named ``with glasses``.
+        fragment = re.sub(r"^(?:has|with)\s+", "", fragment, flags=re.I)
+        if not fragment:
+            continue
         dimension = appearance_dimension(fragment)
+        if not dimension and standalone_color.fullmatch(fragment):
+            # LLM prose often writes ``blonde and blue hair`` or ``yellow and
+            # green eyes``.  Splitting on ``and`` leaves the first colour without
+            # its noun, so inherit the adjacent explicit colour dimension rather
+            # than treating it as an unrestricted signature trait.
+            next_dimension = (
+                appearance_dimension(fragments[index + 1])
+                if index + 1 < len(fragments)
+                else ""
+            )
+            previous_dimension = (
+                appearance_dimension(fragments[index - 1]) if index else ""
+            )
+            # In ``yellow and green eyes`` the governing noun is on the right;
+            # use the previous fragment only for a trailing orphan adjective.
+            dimension = next_dimension or previous_dimension
+            if dimension not in {"hair_color", "eye_color"}:
+                dimension = ""
         if dimension and dimension not in override_dimensions:
             continue
         kept.append(fragment)
@@ -957,7 +1117,86 @@ def merge_authoritative_identity_block(
         if tag.strip() and appearance_dimension(tag) not in override_dimensions
     ]
     traits = tuple(dict.fromkeys((*kept, *stable)))
+    predicates = tuple(dict.fromkeys(predicate_clauses))
+    if predicates and traits:
+        return (
+            f"{character_name} {' and '.join(predicates)} and has "
+            f"{', '.join(traits)}"
+        )
+    if predicates:
+        return f"{character_name} {' and '.join(predicates)}"
     return f"{character_name} has {', '.join(traits)}" if traits else writer_identity
+
+
+def filter_character_appearance_prose(
+    text: str,
+    appearance_tags: tuple[str, ...],
+    override_dimensions: frozenset[str],
+) -> str:
+    """Remove LLM-authored prose for profile-locked appearance dimensions."""
+    locked_dimensions = {
+        dimension
+        for tag in appearance_tags
+        if (dimension := appearance_dimension(tag))
+        and dimension not in override_dimensions
+    }
+    result = str(text or "")
+    for dimension in locked_dimensions:
+        result = _APPEARANCE_DIMENSION_PATTERNS[dimension].sub("", result)
+    result = re.sub(r"\s+,", ",", result)
+    result = re.sub(r",\s*(?=,|;|$)", "", result)
+    result = re.sub(r"\s+and\s+(?=,|;|$)", "", result, flags=re.I)
+    return re.sub(r"\s{2,}", " ", result).strip(" ,;")
+
+
+def filter_shared_appearance_tags(
+    text: str,
+    plans: tuple[CharacterEffectiveOutfit, ...],
+    *,
+    user_prompt: str,
+) -> str:
+    """Keep character appearance out of ambiguous shared Tags fields.
+
+    With one profiled wearer, only user-opened dimensions may remain in Tags.
+    With multiple wearers, every character-specific appearance dimension belongs
+    in that wearer's Identity and is removed from the shared tag stream.
+    """
+    profiled = tuple(plan for plan in plans if plan.appearance_tags)
+    if not profiled:
+        return text
+    if len(plans) > 1:
+        per_wearer_overrides = tuple(
+            appearance_override_dimensions(
+                user_prompt,
+                (plan.target_source_text, *plan.target_candidates),
+                character_count=len(plans),
+            )
+            for plan in plans
+        )
+        shared_overrides = (
+            set.intersection(*(set(item) for item in per_wearer_overrides))
+            if per_wearer_overrides
+            else set()
+        )
+        blocked_dimensions = set(_APPEARANCE_DIMENSION_PATTERNS) - shared_overrides
+    else:
+        plan = profiled[0]
+        override_dimensions = appearance_override_dimensions(
+            user_prompt,
+            (plan.target_source_text, *plan.target_candidates),
+            character_count=1,
+        )
+        blocked_dimensions = {
+            dimension
+            for tag in plan.appearance_tags
+            if (dimension := appearance_dimension(tag))
+            and dimension not in override_dimensions
+        }
+    return ", ".join(
+        tag
+        for tag in split_tags(text)
+        if standalone_appearance_dimension(tag) not in blocked_dimensions
+    )
 
 
 def saved_appearance_for_names(
@@ -1043,7 +1282,7 @@ def safe_global_outfit_tags(
     in the wearer-bound Details and reconstructed Nltags clauses.
     """
     if not plans or any(
-        plan.wardrobe_kind == "creative_fallback"
+        plan.wardrobe_kind in {"creative_fallback", "default_reference"}
         or plan.resolution_state == "explicit_but_unresolved"
         for plan in plans
     ):
@@ -1083,6 +1322,39 @@ class WardrobeAuthority:
             return rf"{prefix}(?:\s+[a-z-]+){{0,2}}\s+school\s+uniform"
         return r"\s+".join(re.escape(word) for word in words)
 
+    @classmethod
+    def _remove_prose_tag(cls, text: str, tag: str) -> str:
+        """Remove one known-conflicting wardrobe assertion conservatively.
+
+        Match actual wearing/list grammar, not every occurrence of a garment
+        noun.  This keeps action tags and location phrases such as ``skirt
+        lift`` or ``beneath her skirt`` intact.
+        """
+        phrase = cls._prose_pattern(tag)
+        action_suffix = r"(?:lift|tug|pull|grab|adjustment|adjusting|flutter|spread)"
+        if cls._key(tag) in {"bottomless", "topless", "nude", "naked"}:
+            return re.sub(
+                rf"\b(?:and\s+)?(?:is|are|appears?|becomes?)\s+{phrase}\b",
+                "",
+                text,
+                flags=re.I,
+            )
+        result = re.sub(
+            rf"\b(?:wears?|wearing|dressed in|clad in|in)\s+"
+            rf"(?:(?:a|an|the)\s+)?{phrase}\b"
+            rf"(?!\s+{action_suffix}\b)",
+            "",
+            text,
+            flags=re.I,
+        )
+        return re.sub(
+            rf"(?:,\s*|\s+and\s+)(?:(?:a|an|the)\s+)?{phrase}\b"
+            rf"(?!\s+{action_suffix}\b)",
+            "",
+            result,
+            flags=re.I,
+        )
+
     def filter_tags(self, tags: tuple[str, ...]) -> tuple[str, ...]:
         stale = {
             self._key(tag)
@@ -1102,14 +1374,7 @@ class WardrobeAuthority:
             key=len,
             reverse=True,
         ):
-            phrase = self._prose_pattern(tag)
-            result = re.sub(
-                rf"\b(?:(?:wears?|wearing|dressed in|in)\s+)?"
-                rf"(?:(?:a|an|the)\s+)?{phrase}\b",
-                "",
-                result,
-                flags=re.I,
-            )
+            result = self._remove_prose_tag(result, tag)
         result = re.sub(r"\bwears?\s*(?=,|;|\band\b|$)", "", result, flags=re.I)
         result = re.sub(r"\s+,", ",", result)
         return re.sub(r"\s{2,}", " ", result).strip(" ,;")
@@ -1133,14 +1398,7 @@ class WardrobeAuthority:
             if self._key(tag) not in own_keys
         )
         for tag in sorted(other_tags, key=len, reverse=True):
-            phrase = self._prose_pattern(tag)
-            result = re.sub(
-                rf"\b(?:(?:wears?|wearing|dressed in|in)\s+)?"
-                rf"(?:(?:a|an|the)\s+)?{phrase}\b",
-                "",
-                result,
-                flags=re.I,
-            )
+            result = self._remove_prose_tag(result, tag)
         result = re.sub(r"\s+and\s+(?=(?:is|are)\b)", " ", result, flags=re.I)
         return re.sub(r"\s{2,}", " ", result).strip(" ,;")
 
@@ -1189,7 +1447,11 @@ def build_wardrobe_authority(
             tag
             for plan in plans
             for tag in (
-                plan.wardrobe_tag,
+                *(
+                    ()
+                    if plan.wardrobe_kind == "outfit_source"
+                    else (plan.wardrobe_tag,)
+                ),
                 *plan.effective.effective_tags,
             )
             if tag and WardrobeAuthority._key(tag) not in removed_keys
@@ -1202,7 +1464,11 @@ def build_wardrobe_authority(
                 dict.fromkeys(
                     tag
                     for tag in (
-                        plan.wardrobe_tag,
+                        *(
+                            ()
+                            if plan.wardrobe_kind == "outfit_source"
+                            else (plan.wardrobe_tag,)
+                        ),
                         *plan.effective.effective_tags,
                     )
                     if tag and WardrobeAuthority._key(tag) not in removed_keys
@@ -1377,6 +1643,9 @@ DEFAULT_SCENE_ADAPTIVE_WARDROBE_MARKERS = (
     "比赛",
     "刚跑完步",
     "正在健身",
+    "泳池边",
+    "泳池旁",
+    "在泳池",
     "游泳结束后",
     "演出结束后",
     "刚结束演出",
@@ -1389,6 +1658,9 @@ DEFAULT_SCENE_ADAPTIVE_WARDROBE_MARKERS = (
     "after the competition",
     "just finished running",
     "working out",
+    "poolside",
+    "by the pool",
+    "at the pool",
     "after swimming",
     "after performing",
 )
@@ -1406,6 +1678,81 @@ def requested_wardrobe_mode(user_prompt: str) -> str:
     if _CASUAL_PROFILE_RE.search(text):
         return "casual_profile"
     return ""
+
+
+def requested_wardrobe_modes_by_target(
+    user_prompt: str, targets: tuple[SemanticAnchor, ...]
+) -> dict[str, str]:
+    """Return explicit default/casual/private choices scoped to each wearer.
+
+    Request-level mode detection cannot represent mixed assignments such as
+    ``A穿官方常服，B穿默认服装``.  Use punctuation-delimited clauses containing
+    each target's exact source phrase so one character's choice does not unlock
+    or invalidate another character's saved profile.
+    """
+    clauses = tuple(
+        clause.strip()
+        for clause in re.split(
+            r"[，,。！？!?；;\n]+|(?<!不)(?:而(?:是)?|但(?:是)?|然后|同时)",
+            str(user_prompt or ""),
+        )
+        if clause.strip()
+    )
+    scoped_modes: dict[str, list[str]] = {}
+    shared_scope = re.compile(
+        r"(?:双方|两人|二人|全员|所有人|都|各自|\bboth\b|\ball\b)",
+        re.I,
+    )
+    for clause in clauses:
+        lowered = clause.lower()
+        present = sorted(
+            (
+                (lowered.find(source.lower()), target, source)
+                for target in targets
+                if (source := str(target.source_text or "").strip())
+                and source.lower() in lowered
+            ),
+            key=lambda item: item[0],
+        )
+        if not present:
+            continue
+        clause_mode = requested_wardrobe_mode(clause)
+        if clause_mode and shared_scope.search(clause):
+            for _position, target, _source in present:
+                scoped_modes.setdefault(target.anchor_id.lower(), []).append(
+                    clause_mode
+                )
+            continue
+        # ``A和B穿常服`` is shared even without 都.  In contrast,
+        # ``A穿常服和B在泳池边`` binds the mode only to A because the mode occurs
+        # inside A's local segment before B begins.
+        if len(present) > 1:
+            first_position = present[0][0]
+            last_position, _last_target, last_source = present[-1]
+            roster_text = lowered[first_position : last_position + len(last_source)]
+            for _position, _target, source in present:
+                roster_text = roster_text.replace(source.lower(), "")
+            if (
+                not re.sub(r"[\s、和与及跟同&+]+", "", roster_text)
+                and requested_wardrobe_mode(lowered[last_position + len(last_source) :])
+            ):
+                for _position, target, _source in present:
+                    scoped_modes.setdefault(target.anchor_id.lower(), []).append(
+                        clause_mode
+                    )
+                continue
+        for index, (position, target, source) in enumerate(present):
+            next_position = (
+                present[index + 1][0] if index + 1 < len(present) else len(clause)
+            )
+            local_segment = clause[position:next_position]
+            if mode := requested_wardrobe_mode(local_segment):
+                scoped_modes.setdefault(target.anchor_id.lower(), []).append(mode)
+    scoped: dict[str, str] = {}
+    for target_id, modes in scoped_modes.items():
+        if len(set(modes)) == 1:
+            scoped[target_id] = modes[0]
+    return scoped
 
 
 def scene_adaptive_wardrobe_marker(
@@ -1435,14 +1782,19 @@ def resolve_unspecified_wardrobe_mode(
     sensual_mode: bool = False,
     scene_marker: str = "",
 ) -> tuple[str, str]:
-    """Resolve the host-side fallback for a request with no clothing intent."""
+    """Resolve the host-side baseline for a request with no clothing intent.
+
+    Scene-adaptive mode still exposes the character's default profile as a soft
+    reference. The final writer may replace or adapt it when the scene strongly
+    suggests different clothes; explicit creative_fallback remains the opt-out.
+    """
     normalized = str(policy or "").strip().lower()
     if normalized not in UNSPECIFIED_WARDROBE_POLICIES:
         normalized = "scene_adaptive"
     if normalized == "creative_fallback":
         return "creative_fallback", "configured_creative"
     if normalized == "scene_adaptive" and (sensual_mode or scene_marker):
-        return "creative_fallback", "scene_adaptive"
+        return "default_profile", "scene_adaptive_reference"
     return "default_profile", "configured_default"
 
 
@@ -1477,6 +1829,314 @@ def has_explicit_wardrobe_evidence(
             for plan in plans
         )
     )
+
+
+_HOST_WARDROBE_CUE_RE = re.compile(
+    r"(?:穿(?:着|上)?|换(?:上|成)?|服装|衣服|衣物|套装|校服|制服|常服|私服|"
+    r"裙|裤|袜|衫|上衣|外套|夹克|礼服|婚纱|睡衣|泳装|内衣|鞋|靴|手套|"
+    r"cosplay|costume|outfit|clothes?|clothing|wear(?:s|ing)?)",
+    re.I,
+)
+
+
+def has_host_wardrobe_cue(user_prompt: str) -> bool:
+    """Conservatively detect clothing intent when the semantic planner fails."""
+    return bool(_HOST_WARDROBE_CUE_RE.search(str(user_prompt or "")))
+
+
+def fallback_target_anchors_from_semantic_evidence(
+    user_prompt: str,
+    configured_anchors: tuple[SemanticAnchor, ...],
+    semantic_result: SemanticLookupResult,
+) -> tuple[SemanticAnchor, ...]:
+    """Recover only target identities already grounded by local configuration.
+
+    This fallback never guesses an LLM1 relationship.  It merely keeps known
+    wearer identities available so an explicit clothing request can degrade to
+    ``explicit_but_unresolved`` and stale cached wardrobes can be removed.
+    """
+    targets = [
+        anchor
+        for anchor in configured_anchors
+        if anchor.role == "target_character"
+    ]
+    seen_sources = {
+        re.sub(r"\s+", " ", anchor.source_text.strip().lower())
+        for anchor in targets
+    }
+    source_profiles = tuple(
+        (aliases, source_tag)
+        for aliases, source_tag, _tags
+        in semantic_result.character_appearance_profiles
+    ) + tuple(
+        ((alias,), source_tag)
+        for alias, source_tag, _tags, _qualifier
+        in semantic_result.source_outfit_profiles
+        if source_tag not in semantic_result.outfit_source_tags
+    )
+    for aliases, source_tag in source_profiles:
+        matched_alias = next(
+            (
+                alias
+                for alias in sorted(aliases, key=len, reverse=True)
+                if alias
+                and DanbooruResolver._alias_match_spans(user_prompt, alias)
+            ),
+            "",
+        )
+        source_key = re.sub(r"\s+", " ", matched_alias.strip().lower())
+        if not matched_alias or source_key in seen_sources or not source_tag:
+            continue
+        targets.append(
+            SemanticAnchor(
+                anchor_id=f"fallback_target_{len(targets) + 1}",
+                role="target_character",
+                group="character",
+                source_text=matched_alias,
+                description=f"Locally cached character: {matched_alias}",
+                candidates=(source_tag,),
+            )
+        )
+        seen_sources.add(source_key)
+    return tuple(targets)
+
+
+def repair_single_target_cached_named_outfit_plan(
+    plans: tuple[SemanticCharacterPlan, ...],
+    anchors: tuple[SemanticAnchor, ...],
+    cached_named_result: SemanticLookupResult | None,
+    user_prompt: str,
+) -> tuple[SemanticCharacterPlan, ...]:
+    """Repair locally known named outfits from wearer-scoped explicit clauses.
+
+    A repair requires one exact cached outfit alias after a wearing verb in a
+    clause that also names the target. This supports multiple characters without
+    distributing one wearer's outfit to another or treating scene context as an
+    assignment. Existing outfit-source cosplay relations are never rewritten.
+    """
+    if cached_named_result is None or not plans:
+        return plans
+    targets = {
+        anchor.anchor_id: anchor
+        for anchor in anchors
+        if anchor.role == "target_character"
+    }
+    cached_tags = {
+        tag.lower() for tag in cached_named_result.named_outfit_tags if tag
+    }
+    outfit_anchors: dict[str, SemanticAnchor] = {}
+    for anchor in anchors:
+        if anchor.role != "outfit" or not anchor.source_text.strip():
+            continue
+        if cached_tags and not any(
+            candidate.lower() in cached_tags for candidate in anchor.candidates
+        ):
+            continue
+        source_key = re.sub(r"\s+", " ", anchor.source_text.strip().lower())
+        # Prefer the evidence-bearing cached anchor over the empty intent anchor.
+        if anchor.candidates:
+            outfit_anchors[source_key] = anchor
+    if not outfit_anchors:
+        return plans
+    clauses = tuple(
+        clause.strip()
+        for clause in re.split(r"[，。；;\n]+", user_prompt)
+        if clause.strip()
+    )
+    repaired: list[SemanticCharacterPlan] = []
+    for plan in plans:
+        target = targets.get(plan.target_anchor_id)
+        if target is None or plan.wardrobe.kind == "outfit_source":
+            repaired.append(plan)
+            continue
+        matches: dict[str, SemanticAnchor] = {}
+        for clause in clauses:
+            if not DanbooruResolver._alias_match_spans(clause, target.source_text):
+                continue
+            for source_key, outfit_anchor in outfit_anchors.items():
+                source = re.escape(outfit_anchor.source_text.strip())
+                if re.search(
+                    rf"(?:穿着?|身穿|身着|换上|换成|wears?|wearing|dressed\s+in)"
+                    rf"\s*[\"“']?{source}",
+                    clause,
+                    flags=re.I,
+                ):
+                    matches[source_key] = outfit_anchor
+        if len(matches) == 1:
+            outfit_anchor = next(iter(matches.values()))
+            plan = replace(
+                plan,
+                wardrobe=SemanticWardrobe("named_outfit", outfit_anchor.anchor_id),
+            )
+        repaired.append(plan)
+    return tuple(repaired)
+
+
+def explicit_cosplay_assignments(
+    anchors: tuple[SemanticAnchor, ...], user_prompt: str
+) -> tuple[tuple[str, str], ...]:
+    """Extract only explicit wearer/source pairs from character-scoped clauses."""
+    targets = tuple(anchor for anchor in anchors if anchor.role == "target_character")
+    clauses = tuple(
+        clause.strip()
+        for clause in re.split(r"[，。；;,;\n]+", str(user_prompt or ""))
+        if clause.strip()
+    )
+    source_token = r"[\u3400-\u9fffA-Za-z0-9_.'!:+\-]{1,40}?"
+    patterns = (
+        re.compile(
+            # Do not reinterpret the noun in ``C 的 cosplay 服装`` as a
+            # second verb whose source is the following word ``服装``.
+            rf"(?:正在|正|在)?\s*(?<!的)(?:cosplay(?:ing)?(?:\s+as)?|cos|扮演|扮成|"
+            rf"装扮成|打扮成)\s*[\"“']?(?P<source>{source_token})"
+            rf"(?=(?:的)?(?:cosplay|服装|衣服|服饰|造型|costume|outfit)|"
+            rf"[\"”'\s]|$)",
+            re.I,
+        ),
+        re.compile(
+            rf"(?:穿着?|身穿|换上|套上)\s*[\"“']?(?P<source>{source_token})"
+            rf"(?:的(?:cosplay|角色扮演)?|(?:cosplay|角色扮演))"
+            rf"(?:服装|衣服|服饰|造型|costume|outfit)",
+            re.I,
+        ),
+    )
+    assignments: list[tuple[str, str]] = []
+    for target in targets:
+        for clause in clauses:
+            if not DanbooruResolver._alias_match_spans(clause, target.source_text):
+                continue
+            target_match = re.search(re.escape(target.source_text), clause, re.I)
+            scoped = clause[target_match.end():] if target_match else clause
+            match = None
+            for pattern in patterns:
+                match = pattern.search(scoped)
+                if match:
+                    break
+            if not match:
+                continue
+            source = match.group("source").strip(" \"“”'")
+            if source and source.lower() != target.source_text.strip().lower():
+                pair = (target.anchor_id, source)
+                if pair not in assignments:
+                    assignments.append(pair)
+    return tuple(assignments)
+
+
+def add_explicit_cosplay_source_anchors(
+    anchors: tuple[SemanticAnchor, ...], user_prompt: str
+) -> tuple[SemanticAnchor, ...]:
+    """Add source-grounded anchors before local profile matching."""
+    result = list(anchors)
+    existing = {
+        re.sub(r"\s+", " ", anchor.source_text.strip().lower())
+        for anchor in anchors
+        if anchor.role == "outfit_source"
+    }
+    for _target_id, source in explicit_cosplay_assignments(anchors, user_prompt):
+        key = re.sub(r"\s+", " ", source.lower())
+        if key in existing:
+            continue
+        result.append(SemanticAnchor(
+            anchor_id=f"host_cosplay_source_{len(result) + 1}",
+            role="outfit_source",
+            group="character",
+            source_text=source,
+            description=source,
+            candidates=(),
+        ))
+        existing.add(key)
+    return tuple(result)
+
+
+def repair_explicit_cosplay_plans(
+    plans: tuple[SemanticCharacterPlan, ...],
+    anchors: tuple[SemanticAnchor, ...],
+    user_prompt: str,
+) -> tuple[SemanticCharacterPlan, ...]:
+    """Make explicit A-cosplays-C wording authoritative over a weak LLM1 enum."""
+    sources = {
+        re.sub(r"\s+", " ", anchor.source_text.strip().lower()): anchor
+        for anchor in anchors
+        if anchor.role == "outfit_source"
+    }
+    assignments = dict(explicit_cosplay_assignments(anchors, user_prompt))
+    repaired: list[SemanticCharacterPlan] = []
+    for plan in plans:
+        source_text = assignments.get(plan.target_anchor_id, "")
+        source = sources.get(re.sub(r"\s+", " ", source_text.lower()))
+        if source is not None:
+            plan = replace(
+                plan,
+                wardrobe=SemanticWardrobe("outfit_source", source.anchor_id),
+            )
+        repaired.append(plan)
+    existing = {plan.target_anchor_id for plan in repaired}
+    for target_id, source_text in assignments.items():
+        if target_id in existing:
+            continue
+        source = sources.get(re.sub(r"\s+", " ", source_text.lower()))
+        if source is not None:
+            repaired.append(SemanticCharacterPlan(
+                target_anchor_id=target_id,
+                wardrobe=SemanticWardrobe("outfit_source", source.anchor_id),
+            ))
+    return tuple(repaired)
+
+
+def add_host_outfit_changes_to_plans(
+    plans: tuple[SemanticCharacterPlan, ...],
+    anchors: tuple[SemanticAnchor, ...],
+    user_prompt: str,
+) -> tuple[SemanticCharacterPlan, ...]:
+    """Merge deterministic user clothing changes into LLM1's intent rows.
+
+    LLM1 is allowed to be terse or omit an operation object. The host already
+    has conservative, character-scoped parsing for explicit removals/recolors;
+    keeping it here prevents a valid source/profile match from being undone by
+    one weak planner response while preserving the learning/profile pipeline.
+    """
+    targets = {
+        anchor.anchor_id: anchor
+        for anchor in anchors
+        if anchor.role == "target_character"
+    }
+    known_names = tuple(anchor.source_text for anchor in targets.values())
+    by_target = {plan.target_anchor_id: plan for plan in plans}
+    ordered_ids = [plan.target_anchor_id for plan in plans]
+    for target_id, target in targets.items():
+        patches = parse_user_outfit_patches(
+            user_prompt,
+            target.source_text,
+            known_character_names=known_names,
+        )
+        directives = tuple(
+            SemanticOutfitDirective(
+                operation=(
+                    "replace_color" if patch.operation == "replace" else patch.operation
+                ),
+                slots=tuple(slot for slot in patch.slot.split(",") if slot),
+                color=patch.value,
+                source_text=patch.evidence,
+                target_anchor_id=target_id,
+            )
+            for patch in patches
+            if patch.operation in {"remove", "replace", "recolor_all", "keep_only", "add", "damage"}
+            and patch.evidence
+        )
+        if not directives:
+            continue
+        current = by_target.get(target_id)
+        if current is None:
+            current = SemanticCharacterPlan(
+                target_anchor_id=target_id,
+                wardrobe=SemanticWardrobe("default_profile"),
+            )
+            ordered_ids.append(target_id)
+        by_target[target_id] = replace(
+            current,
+            directives=tuple(dict.fromkeys((*current.directives, *directives))),
+        )
+    return tuple(by_target[target_id] for target_id in ordered_ids)
 
 
 def requests_casual_life_outfit(user_prompt: str) -> bool:
@@ -1525,6 +2185,220 @@ def apply_requested_wardrobe_mode(
             for anchor in anchors
         )
     return plans, anchors
+
+
+def apply_character_wardrobe_baselines(
+    plans: tuple[SemanticCharacterPlan, ...],
+    anchors: tuple[SemanticAnchor, ...],
+    *,
+    implicit_mode: str,
+    user_prompt: str,
+    create_missing: bool,
+) -> tuple[SemanticCharacterPlan, ...]:
+    """Choose each character's base wardrobe without flattening request scope.
+
+    ``none`` means the request did not choose clothes for that wearer.  The usual
+    fallback is a soft ``default_reference``: LLM2 sees the saved default pieces
+    but may adapt or replace them for the scene. A clothing mutation without a
+    named/default/casual or ordinary-garment base uses the same soft reference and
+    keeps the mutation mandatory. Explicit per-character modes remain stronger.
+    """
+    targets = tuple(
+        anchor for anchor in anchors if anchor.role == "target_character"
+    )
+    wardrobe_anchors = tuple(
+        anchor
+        for anchor in anchors
+        if anchor.role in {"clothing", "outfit", "outfit_source"}
+        and anchor.source_text.strip()
+    )
+    scoped_modes = requested_wardrobe_modes_by_target(user_prompt, targets)
+    explicit_anchor_targets: set[str] = set()
+    clauses = tuple(
+        clause.strip()
+        for clause in re.split(r"[，,。！？!?；;\n]+", str(user_prompt or ""))
+        if clause.strip()
+    )
+    shared_scope = re.compile(
+        r"(?:双方|两人|二人|全员|所有人|都|各自|\bboth\b|\ball\b)",
+        re.I,
+    )
+    for clause in clauses:
+        lowered = clause.lower()
+        present_targets = sorted(
+            (
+                (lowered.find(target.source_text.lower()), target)
+                for target in targets
+                if target.source_text.strip()
+                and target.source_text.lower() in lowered
+            ),
+            key=lambda item: item[0],
+        )
+        anchor_positions = tuple(
+            lowered.find(anchor.source_text.lower())
+            for anchor in wardrobe_anchors
+            if anchor.source_text.lower() in lowered
+        )
+        if not present_targets or not anchor_positions:
+            continue
+        if len(targets) == 1 or shared_scope.search(clause):
+            explicit_anchor_targets.update(
+                target.anchor_id.lower() for _position, target in present_targets
+            )
+            continue
+        if len(present_targets) > 1:
+            first_position = present_targets[0][0]
+            last_position, last_target = present_targets[-1]
+            roster_text = lowered[
+                first_position : last_position + len(last_target.source_text)
+            ]
+            for _position, target in present_targets:
+                roster_text = roster_text.replace(target.source_text.lower(), "")
+            if (
+                not re.sub(r"[\s、和与及跟同&+]+", "", roster_text)
+                and any(position > last_position for position in anchor_positions)
+            ):
+                explicit_anchor_targets.update(
+                    target.anchor_id.lower() for _position, target in present_targets
+                )
+                continue
+        for index, (position, target) in enumerate(present_targets):
+            next_position = (
+                present_targets[index + 1][0]
+                if index + 1 < len(present_targets)
+                else len(clause)
+            )
+            if any(
+                position < anchor_position < next_position
+                for anchor_position in anchor_positions
+            ):
+                explicit_anchor_targets.add(target.anchor_id.lower())
+    updated: list[SemanticCharacterPlan] = []
+    existing_ids: set[str] = set()
+    for plan in plans:
+        target_id = plan.target_anchor_id.lower()
+        existing_ids.add(target_id)
+        kind = plan.wardrobe.kind
+        scoped_mode = scoped_modes.get(target_id, "")
+        if kind not in {"named_outfit", "outfit_source"}:
+            if scoped_mode:
+                kind = scoped_mode
+            elif kind == "default_profile" and target_id not in explicit_anchor_targets:
+                # "skirt becomes blue" / "wears no top" names a mutation,
+                # not an explicit request to wear the pristine default. Expose a
+                # modified default reference while keeping the mutation mandatory.
+                # Likewise, an unscoped LLM1 default_profile is only a fallback:
+                # the strong default selection requires an explicit per-character
+                # default phrase in the user's request.
+                # creative_fallback is intentionally excluded: LLM1 uses it when
+                # the request already supplies an ordinary garment base such as a
+                # one-piece swimsuit, which must not load the saved default at all.
+                kind = "default_reference"
+            elif plan.directives and kind == "none":
+                kind = "default_reference"
+            elif kind == "none":
+                kind = (
+                    "default_reference"
+                    if implicit_mode == "default_profile"
+                    else "creative_fallback"
+                )
+        updated.append(
+            replace(plan, wardrobe=SemanticWardrobe(kind, plan.wardrobe.anchor_id))
+        )
+    for target in targets:
+        if target.anchor_id.lower() in existing_ids:
+            continue
+        scoped_mode = scoped_modes.get(target.anchor_id.lower(), "")
+        if create_missing or scoped_mode:
+            kind = scoped_mode or (
+                "default_reference"
+                if implicit_mode == "default_profile"
+                else "creative_fallback"
+            )
+            updated.append(
+                SemanticCharacterPlan(
+                    target_anchor_id=target.anchor_id,
+                    wardrobe=SemanticWardrobe(kind),
+                )
+            )
+    return tuple(updated)
+
+
+def filter_profile_tags_for_composition(
+    tags: tuple[str, ...], user_prompt: str
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Omit saved wardrobe components that cannot be visible in the crop.
+
+    This applies only to local profile evidence before user patches. Explicitly
+    requested additions are synthesized afterwards and therefore remain intact.
+    """
+    hidden_slots = framing_hidden_outfit_slots(user_prompt)
+    if not hidden_slots:
+        return tags, ()
+    kept: list[str] = []
+    omitted: list[str] = []
+    for tag in tags:
+        if outfit_tag_slot(tag) in hidden_slots:
+            omitted.append(tag)
+        else:
+            kept.append(tag)
+    return tuple(kept), tuple(omitted)
+
+
+def apply_framing_to_character_outfits(
+    plans: tuple[CharacterEffectiveOutfit, ...], framing_text: str
+) -> tuple[CharacterEffectiveOutfit, ...]:
+    """Apply an LLM-selected crop to profile components without erasing patches.
+
+    The first pass sees user-authored framing before LLM2. This second reusable
+    pass also handles framing chosen by LLM2 itself. Tags explicitly synthesized
+    by a user patch remain protected even when their saved-profile slot is outside
+    the crop; only inherited profile components are optional composition evidence.
+    """
+    hidden_slots = framing_hidden_outfit_slots(framing_text)
+    if not hidden_slots:
+        return plans
+    updated: list[CharacterEffectiveOutfit] = []
+    for plan in plans:
+        added_keys = {
+            WardrobeAuthority._key(tag) for tag in plan.effective.added_tags
+        }
+        omitted = tuple(
+            tag
+            for tag in plan.effective.base_tags
+            if outfit_tag_slot(tag) in hidden_slots
+            and WardrobeAuthority._key(tag) not in added_keys
+        )
+        if not omitted:
+            updated.append(plan)
+            continue
+        omitted_keys = {WardrobeAuthority._key(tag) for tag in omitted}
+        effective = replace(
+            plan.effective,
+            base_tags=tuple(
+                tag
+                for tag in plan.effective.base_tags
+                if WardrobeAuthority._key(tag) not in omitted_keys
+            ),
+            effective_tags=tuple(
+                tag
+                for tag in plan.effective.effective_tags
+                if WardrobeAuthority._key(tag) not in omitted_keys
+            ),
+            removed_tags=tuple(
+                dict.fromkeys((*plan.effective.removed_tags, *omitted))
+            ),
+        )
+        updated.append(
+            replace(
+                plan,
+                effective=effective,
+                composition_omitted_tags=tuple(
+                    dict.fromkeys((*plan.composition_omitted_tags, *omitted))
+                ),
+            )
+        )
+    return tuple(updated)
 
 
 def build_character_effective_outfits(
@@ -1576,6 +2450,32 @@ def build_character_effective_outfits(
         )
         return matches[0], appearances
 
+    def cached_profile_for_wardrobe(
+        wardrobe_anchor: SemanticAnchor,
+    ) -> tuple[str, tuple[str, ...]] | None:
+        """Bind a prompt-matched saved outfit profile back to its LLM1 anchor.
+
+        Prompt-wide cache matching can resolve an editor alias even when local
+        Danbooru lookup classifies the same phrase differently or cannot produce
+        an ``anchor_outfit_profiles`` row.  The saved profile is still scoped to
+        the exact source phrase and must not be demoted to request-wide context.
+        """
+        source_text = re.sub(
+            r"\s+", " ", wardrobe_anchor.source_text.strip().lower()
+        )
+        candidates = {candidate.lower() for candidate in wardrobe_anchor.candidates}
+        matches = [
+            (source_tag, tags)
+            for alias, source_tag, tags, _qualifier
+            in semantic_result.source_outfit_profiles
+            if (
+                (source_text and re.sub(r"\s+", " ", alias.strip().lower()) == source_text)
+                or (source_tag and source_tag.lower() in candidates)
+            )
+        ]
+        unique = tuple(dict.fromkeys(matches))
+        return unique[0] if len(unique) == 1 else None
+
     built: list[CharacterEffectiveOutfit] = []
     scoped_character_names = tuple(dict.fromkeys((
         *known_character_names,
@@ -1593,6 +2493,7 @@ def build_character_effective_outfits(
         wardrobe_kind = plan.wardrobe.kind
         base_tags: tuple[str, ...] = ()
         appearance_tags: tuple[str, ...] = ()
+        complete_named_profile = False
         # Stable appearance belongs to the target character, not to the selected
         # wardrobe mode.  In particular, sensual/scene-adaptive requests often
         # switch clothing to creative_fallback; that must not also discard the
@@ -1608,7 +2509,11 @@ def build_character_effective_outfits(
             appearance_tags = target_profile[2]
         elif cached_target_profile:
             appearance_tags = cached_target_profile[1]
-        if plan.wardrobe.kind in {"default_profile", "casual_profile"}:
+        if plan.wardrobe.kind in {
+            "default_profile",
+            "default_reference",
+            "casual_profile",
+        }:
             if target_profile:
                 _character_tag, base_tags, _ = target_profile
             elif cached_target_profile:
@@ -1623,11 +2528,52 @@ def build_character_effective_outfits(
             profile = outfit_profiles.get(plan.wardrobe.anchor_id.lower())
             if profile:
                 wardrobe_tag, profile_tags, _qualifier = profile
-                base_tags = tuple(dict.fromkeys((wardrobe_tag, *profile_tags)))
+                base_tags = tuple(dict.fromkeys(
+                    profile_tags
+                    if plan.wardrobe.kind == "outfit_source"
+                    else (wardrobe_tag, *profile_tags)
+                ))
+                complete_named_profile = bool(profile_tags)
             else:
-                wardrobe_tag = anchor_tags.get(plan.wardrobe.anchor_id.lower(), "")
-                if wardrobe_tag:
-                    base_tags = (wardrobe_tag,)
+                wardrobe_anchor = by_id.get(plan.wardrobe.anchor_id.lower())
+                cached_wardrobe = (
+                    cached_profile_for_wardrobe(wardrobe_anchor)
+                    if wardrobe_anchor is not None
+                    else None
+                )
+                if cached_wardrobe:
+                    wardrobe_tag, profile_tags = cached_wardrobe
+                    base_tags = tuple(dict.fromkeys(
+                        profile_tags
+                        if plan.wardrobe.kind == "outfit_source"
+                        else (wardrobe_tag, *profile_tags)
+                    ))
+                    complete_named_profile = bool(profile_tags)
+                else:
+                    wardrobe_tag = anchor_tags.get(plan.wardrobe.anchor_id.lower(), "")
+                    if wardrobe_tag and plan.wardrobe.kind != "outfit_source":
+                        base_tags = (wardrobe_tag,)
+            named_outfit_keys = {
+                WardrobeAuthority._key(tag)
+                for tag in semantic_result.named_outfit_tags
+            }
+            if (
+                wardrobe_kind == "outfit_source"
+                and named_outfit_keys
+                and any(
+                    WardrobeAuthority._key(tag) in named_outfit_keys
+                    for tag in base_tags
+                )
+            ):
+                # LLM1 can mislabel a proper named uniform as a character
+                # outfit_source.  Locally confirmed named-outfit evidence is
+                # stronger than that soft relation kind and has complete saved
+                # components, so it must use named-set semantics rather than
+                # open-ended cosplay completion.
+                wardrobe_kind = "named_outfit"
+        base_tags, composition_omitted_tags = filter_profile_tags_for_composition(
+            base_tags, user_prompt
+        )
         patches = tuple(
             UserOutfitPatch(
                 subject=target.source_text,
@@ -1666,6 +2612,8 @@ def build_character_effective_outfits(
             wardrobe_tag=wardrobe_tag,
             appearance_tags=appearance_tags,
             effective=effective,
+            complete_named_profile=complete_named_profile,
+            composition_omitted_tags=composition_omitted_tags,
         ))
     return tuple(built)
 
@@ -1677,15 +2625,15 @@ def complete_character_wardrobe_states(
     *,
     explicit_wardrobe_evidence: bool,
     requested_mode: str = "",
+    user_prompt: str = "",
 ) -> tuple[CharacterEffectiveOutfit, ...]:
     """Represent every visible target with one explicit wardrobe resolution state.
 
-    A missing LLM1 edge is never reconstructed in code. When wardrobe evidence is
-    present elsewhere in the request, the target abstains as
-    ``explicit_but_unresolved``: cached default clothes are suppressed and LLM2
-    receives the unbound evidence plus the original request. With no explicit
-    wardrobe evidence, the already selected implicit policy is marked
-    ``unspecified`` instead.
+    A real missing LLM1 edge is never reconstructed in code. An existing ``none``
+    edge, however, has already established the wearer and is represented as a soft
+    default reference even when another character has explicit clothing. This is
+    distinct from ``explicit_but_unresolved``, where the planner failed to bind
+    request evidence to any wearer.
     """
     targets = tuple(anchor for anchor in anchors if anchor.role == "target_character")
     wardrobe_anchors = tuple(
@@ -1694,22 +2642,35 @@ def complete_character_wardrobe_states(
         if anchor.role in {"clothing", "outfit", "outfit_source"}
     )
     wardrobe_roles = {anchor.role for anchor in wardrobe_anchors}
+    scoped_requested_modes = requested_wardrobe_modes_by_target(
+        user_prompt, targets
+    )
 
     def accepted_explicit_plan(plan: CharacterEffectiveOutfit) -> bool:
         kind = plan.wardrobe_kind
+        scoped_mode = scoped_requested_modes.get(
+            plan.target_anchor_id.lower(), ""
+        )
         if kind in {"named_outfit", "outfit_source"}:
             return bool(plan.wardrobe_anchor_id)
+        if kind == "default_reference":
+            return True
         if kind == "creative_fallback":
+            if scoped_mode == "creative_fallback":
+                return True
             return (
                 requested_mode == "creative_fallback" and not wardrobe_roles
             ) or bool(wardrobe_roles and wardrobe_roles <= {"clothing"})
         if kind in {"default_profile", "casual_profile"}:
+            if scoped_mode:
+                return scoped_mode == kind
+            if kind == "default_profile" and plan.effective.modified:
+                return True
             return requested_mode == kind and (
                 not wardrobe_roles or plan.effective.modified
             )
         return False
 
-    state_for_existing = "resolved" if explicit_wardrobe_evidence else "unspecified"
     completed: list[CharacterEffectiveOutfit] = []
     existing_ids = {plan.target_anchor_id.lower() for plan in plans}
 
@@ -1739,7 +2700,9 @@ def complete_character_wardrobe_states(
 
     unresolved_evidence = tuple(evidence_for(anchor) for anchor in wardrobe_anchors)
     for plan in plans:
-        if explicit_wardrobe_evidence and not accepted_explicit_plan(plan):
+        if plan.wardrobe_kind == "default_reference":
+            completed.append(replace(plan, resolution_state="unspecified"))
+        elif explicit_wardrobe_evidence and not accepted_explicit_plan(plan):
             completed.append(
                 replace(
                     plan,
@@ -1752,7 +2715,17 @@ def complete_character_wardrobe_states(
                 )
             )
         else:
-            completed.append(replace(plan, resolution_state=state_for_existing))
+            completed.append(
+                replace(
+                    plan,
+                    resolution_state=(
+                        "resolved"
+                        if explicit_wardrobe_evidence
+                        or plan.effective.modified
+                        else "unspecified"
+                    ),
+                )
+            )
     for target in targets:
         if target.anchor_id.lower() in existing_ids:
             continue
@@ -1792,12 +2765,20 @@ def fallback_missing_unspecified_profiles(
     explicit_wardrobe_evidence: bool,
 ) -> tuple[tuple[CharacterEffectiveOutfit, ...], bool]:
     """Let the writer design clothes when an implicit default profile is absent."""
-    if explicit_wardrobe_evidence:
-        return plans, False
     changed = False
     updated: list[CharacterEffectiveOutfit] = []
     for plan in plans:
-        if plan.wardrobe_kind == "default_profile" and not plan.effective.effective_tags:
+        if (
+            plan.wardrobe_kind in {"default_profile", "default_reference"}
+            and not plan.effective.effective_tags
+            and (
+                plan.resolution_state == "unspecified"
+                or (
+                    plan.wardrobe_kind == "default_profile"
+                    and not explicit_wardrobe_evidence
+                )
+            )
+        ):
             updated.append(replace(plan, wardrobe_kind="creative_fallback"))
             changed = True
         else:
@@ -1920,31 +2901,6 @@ def controlled_character_outfit_detail(
         result = " ".join(str(detail or "").split()).strip(" ,;")
         writer_has_outfit = raw_writer_has_outfit
         if (
-            plan.wardrobe_kind == "creative_fallback"
-            and plan.resolution_state == "resolved"
-        ):
-            # Creative fallback may design ordinary garments, but never invent a
-            # proper school/academy uniform identity that was not assigned to it.
-            result = re.sub(
-                r"\b(?:bottomless|topless|nude|naked)\b",
-                "",
-                result,
-                flags=re.I,
-            )
-            result = re.sub(
-                r"\b(?:[a-z][a-z'-]*\s+){0,4}(?:school|academy)\s+"
-                r"(?:(?:summer|winter)\s+)?uniform\b",
-                "",
-                result,
-                flags=re.I,
-            )
-            result = re.sub(
-                r"\b[A-Z][A-Za-z'-]*(?:\s+[A-Za-z'-]+){0,3}\s+"
-                r"(?:costume|outfit|uniform)\b",
-                "",
-                result,
-            )
-        if (
             plan.resolution_state != "explicit_but_unresolved"
             and plan.effective.effective_tags
             and not (
@@ -1972,7 +2928,7 @@ def controlled_character_outfit_detail(
         return "; ".join(
             dict.fromkeys(clause for clause in clauses if clause)
         ) or character_name
-    return strip_untrusted_outfit_detail(detail)
+    return " ".join(str(detail or "").split()).strip(" ,;")
 
 
 def outfit_patch_narratives(
@@ -2012,7 +2968,7 @@ def character_wardrobe_authority_context(
     """
     if not plans:
         return ""
-    lines = ["Character-scoped wardrobe authority (never mix characters):"]
+    lines = ["Per-character clothing evidence:"]
     for plan in plans:
         mutations = "; ".join(
             f"{patch.operation} {patch.slot} (user evidence: {patch.evidence})"
@@ -2020,9 +2976,15 @@ def character_wardrobe_authority_context(
             if patch.operation and patch.slot
         )
         mutation_rule = (
-            f" User-authored final mutations = {mutations}; render these final "
-            "visible states even when they differ from the pristine source evidence."
+            f" Changes: {mutations}."
             if mutations
+            else ""
+        )
+        crop_rule = (
+            " Out of frame: "
+            + ", ".join(plan.composition_omitted_tags)
+            + "."
+            if plan.composition_omitted_tags
             else ""
         )
         if plan.resolution_state == "explicit_but_unresolved":
@@ -2030,47 +2992,58 @@ def character_wardrobe_authority_context(
                 "the request has explicit wardrobe intent but no accepted binding"
             )
             lines.append(
-                f"- {plan.target_source_text}: EXPLICIT BUT UNRESOLVED; LLM1 abstained "
-                "from assigning the request's wardrobe evidence to this wearer. Do not "
-                "restore this character's cached/default wardrobe. Read the complete user "
-                "request and decide this character's final clothing in its own Details "
-                f"clause. Unbound evidence (not an assignment): {evidence}"
+                f"- {plan.target_source_text}: explicit clothing unresolved; infer only "
+                f"from the user request, never restore defaults. Evidence: {evidence}"
             )
-        elif plan.resolution_state == "unspecified":
+        elif plan.wardrobe_kind == "default_reference":
             tags = ", ".join(plan.effective.effective_tags) or "creative fallback"
             lines.append(
-                f"- {plan.target_source_text}: UNSPECIFIED FALLBACK = {tags}; LLM1 "
-                "found no explicit wardrobe relation for this wearer. Re-read the full "
-                "user request yourself. Use this fallback only if the request truly leaves "
-                "the character's clothing unspecified; if the raw request specifies or "
-                "implies clothing that LLM1 missed, write that user-requested final outfit "
-                "in this character's Details instead."
+                f"- {plan.target_source_text}: default reference = {tags}. Use when "
+                f"context fits; otherwise adapt to the scene.{mutation_rule}{crop_rule}"
+            )
+        elif plan.resolution_state == "unspecified":
+            lines.append(
+                f"- {plan.target_source_text}: clothing unstated; choose from context."
             )
         elif plan.wardrobe_kind == "creative_fallback":
             lines.append(
-                f"- {plan.target_source_text}: CREATIVE WARDROBE; design only this "
-                "character's compatible garment details from the user's requested look."
-                f"{mutation_rule}"
+                f"- {plan.target_source_text}: explicit ordinary clothing; complete its "
+                "visible details without inventing a named uniform."
+                f"{mutation_rule}{crop_rule}"
+            )
+        elif plan.wardrobe_kind == "named_outfit" and plan.complete_named_profile:
+            tags = ", ".join(plan.effective.effective_tags) or "no grounded garments"
+            lines.append(
+                f"- {plan.target_source_text}: named outfit = {tags}. Keep these visible "
+                "components; do not substitute another outfit."
+                f"{mutation_rule}{crop_rule}"
             )
         elif plan.wardrobe_kind == "outfit_source":
             tags = ", ".join(plan.effective.effective_tags) or "no verified garments"
+            source = plan.wardrobe_tag or "unresolved source"
             lines.append(
-                f"- {plan.target_source_text}: SOURCE-GROUNDED WARDROBE = {tags}; "
-                "these are verified minimum anchors, not necessarily a complete costume. "
-                "Use your knowledge of the explicitly named cosplay/source character to "
-                "complete recognizable visible garment details in this character's own "
-                "Details clause. Never substitute the wearer's default outfit or another "
-                "named uniform, and do not place character-specific additions in Tags."
-                f"{mutation_rule}"
+                f"- {plan.target_source_text}: cosplay source = {source}; "
+                f"verified outfit anchors = {tags}. "
+                "Complete recognizable source clothing only; keep the wearer's own face, "
+                "hair, body and identity."
+                f"{mutation_rule}{crop_rule}"
+            )
+        elif plan.wardrobe_kind in {"default_profile", "casual_profile"}:
+            tags = ", ".join(plan.effective.effective_tags) or "no grounded garments"
+            label = (
+                "EXPLICIT DEFAULT WARDROBE"
+                if plan.wardrobe_kind == "default_profile"
+                else "EXPLICIT CASUAL WARDROBE"
+            )
+            lines.append(
+                f"- {plan.target_source_text}: {label.lower()} = {tags}."
+                f"{mutation_rule}{crop_rule}"
             )
         else:
             tags = ", ".join(plan.effective.effective_tags) or "no grounded garments"
             lines.append(
-                f"- {plan.target_source_text}: GROUNDED WARDROBE FLOOR = {tags}; the "
-                "program preserves these evidence-backed anchors, but they are not a "
-                "closed allowlist. Complete or modify this character's visible clothing "
-                "when required by the full user request; never restore stale defaults."
-                f"{mutation_rule}"
+                f"- {plan.target_source_text}: verified clothing anchors = {tags}."
+                f"{mutation_rule}{crop_rule}"
             )
     return "\n".join(lines)
 
@@ -2189,20 +3162,6 @@ class PromptPipeline:
         Returns:
             Provider completion text normalized across supported response shapes.
         """
-        if character_name:
-            character_rule = f"不要输出固定角色“{character_name}”的固有外观设定。"
-        else:
-            character_rule = (
-                "用户没有使用固定角色时，如果用户明确点名现有作品角色，"
-                "第一项必须输出最可信的标准 Danbooru 角色 tag，使用罗马字和下划线，必要时带作品消歧括号；"
-                "禁止省略角色 tag 而只写外观，后续程序会联网查询 character 分类并校正。"
-                "之后可以并且应该输出主体所需的固有外观设定。"
-            )
-        creative_rule = (
-            "默认采用自由创作策略：在保留用户明确要求和角色身份的前提下，"
-            "可以主动发展统一主题并补充有助于最终画面表现的可见内容，但不得在用户未提背景时创造场景；"
-            "以协调、精致和好看为优先，不机械追求固定tag数量。"
-        )
         kwargs: dict[str, Any] = {
             "chat_provider_id": provider_id,
             "prompt": llm_prompt,
@@ -2219,10 +3178,10 @@ class PromptPipeline:
                 "`2girls, futa with female`, two females plus one futa is "
                 "`3girls, futa with female`, a lone futa is `1girl, futanari`, "
                 "and one futa plus one male is `futa with male`. Never write "
-                "`futanari` instead of a people-count tag, and never omit Count "
-                "or merge it into Characters. Characters contains names only."
-                f"{character_rule}"
-                f"{creative_rule}"
+                "a bare number, never write `futanari` instead of a people-count "
+                "tag, and never omit Count or merge it into Characters. Characters "
+                "contains names only. Every character appears exactly once in both "
+                "Identity and Details; keep its clothing in its own Details clause."
             ),
             "max_tokens": self._int("prompt_builder_max_tokens", 700),
             "thinking": {
@@ -2575,9 +3534,6 @@ class PromptPipeline:
         use_deep_thinking: bool,
         summary: dict[str, Any],
         original_user_prompt: str = "",
-        semantic_anchors: tuple[SemanticAnchor, ...] = (),
-        semantic_outfit_directives: tuple[SemanticOutfitDirective, ...] = (),
-        semantic_result: SemanticLookupResult = SemanticLookupResult(),
     ) -> PromptPipelineResult | None:
         """Build a hybrid tag and natural-language prompt for 2–4 people.
 
@@ -2599,23 +3555,10 @@ class PromptPipeline:
             for name, tags in configured_characters.items()
             if name and name in prompt
         }
-        target_names = {
-            anchor.anchor_id.lower(): anchor.source_text
-            for anchor in semantic_anchors
-            if anchor.role == "target_character" and anchor.source_text
-        }
-        prompt_outfit_constraints = "\n".join(
-            f"- {target_names.get(directive.target_anchor_id.lower())}: "
-            f"{_semantic_outfit_instruction(directive)}"
-            for directive in semantic_outfit_directives
-            if target_names.get(directive.target_anchor_id.lower())
-            and _semantic_outfit_instruction(directive)
-        )
         plan_prompt = build_multi_person_plan_prompt(
             prompt,
             fixed_characters=mentioned_fixed_characters,
             original_user_prompt=original_user_prompt,
-            outfit_constraints=prompt_outfit_constraints,
         )
         keyword_rules = match_keyword_prompt_rules(
             original_user_prompt or prompt, prompt_config
@@ -2705,16 +3648,6 @@ class PromptPipeline:
             )
             return None
 
-        multi_outfit_constraints = semantic_outfit_constraints_for_multi_person(
-            semantic_anchors,
-            semantic_outfit_directives,
-            tuple(character.name for character in plan.characters),
-        )
-        summary["semantic_multi_outfit_constraints"] = {
-            str(index): list(constraints)
-            for index, constraints in multi_outfit_constraints.items()
-        }
-
         character_blocks: list[str] = []
         character_entity_names: list[set[str]] = []
         resolved_count = 0
@@ -2746,15 +3679,6 @@ class PromptPipeline:
         grouped_contact = spatial_mode == "shared_contact"
         for index, character in enumerate(plan.characters):
             character_slots.append(character.slot)
-            saved_character_tag, saved_appearance_tags = saved_appearance_for_names(
-                semantic_result,
-                (character.name, character.danbooru_candidate),
-            )
-            identity_override_dimensions = appearance_override_dimensions(
-                original_user_prompt or prompt,
-                (character.name, character.danbooru_candidate, saved_character_tag),
-                character_count=len(plan.characters),
-            )
             fixed_name = next(
                 (
                     name
@@ -2804,11 +3728,6 @@ class PromptPipeline:
                 resolved_count += 1
                 fixed_character_count += 1
                 resolution_status = "fixed"
-            elif saved_character_tag:
-                resolved_identity = saved_character_tag
-                fixed_tags = ", ".join(saved_appearance_tags)
-                resolved_count += 1
-                resolution_status = "profile_cache"
             elif character.danbooru_candidate:
                 resolution = await self._danbooru_resolver.resolve_detailed(
                     llm_content=character.danbooru_candidate,
@@ -2863,22 +3782,7 @@ class PromptPipeline:
                 for tag in character.identity_anchors
                 if str(tag).strip(" ()")
             ]
-            if saved_appearance_tags:
-                stable_identity_tags = [
-                    tag
-                    for tag in saved_appearance_tags
-                    if appearance_dimension(tag) not in identity_override_dimensions
-                ]
-                requested_identity_tags = [
-                    tag
-                    for tag in proposed_identity_tags
-                    if not appearance_dimension(tag)
-                    or appearance_dimension(tag) in identity_override_dimensions
-                ]
-                identity_tags = list(
-                    dict.fromkeys((*requested_identity_tags, *stable_identity_tags))
-                )[:6]
-            elif fixed_name or resolution_status == "resolved":
+            if fixed_name or resolution_status == "resolved":
                 fixed_source = re.sub(
                     r"[^a-z0-9]+",
                     " ",
@@ -3011,7 +3915,7 @@ class PromptPipeline:
                     # interaction out of pose, so retaining pose here does not
                     # duplicate the relationship.
                     include_pose=True,
-                    outfit_constraints=multi_outfit_constraints.get(index, ()),
+                    outfit_constraints=(),
                 )
             )
 
@@ -3033,7 +3937,14 @@ class PromptPipeline:
             if character_count == 1 and futa_count == 1:
                 deterministic_count_tags = ("1girl", "futanari")
             elif futa_count == 1 and boy_count and not girl_count:
-                deterministic_count_tags = ("futa with male",)
+                deterministic_count_tags = tuple(
+                    tag
+                    for tag in (
+                        f"{character_count}people" if character_count > 2 else "",
+                        "futa with male",
+                    )
+                    if tag
+                )
             elif futa_count and not boy_count:
                 # Anima counts a futa inside the girls count.
                 total_girls = girl_count + futa_count
@@ -3060,7 +3971,7 @@ class PromptPipeline:
                 if tag.lower().replace("_", " ")
                 in {"futa with female", "futa with male"}
             )
-            deterministic_count_tags = tuple(
+            numeric_count_tags = tuple(
                 tag
                 for tag in normalized_plan_count_tags
                 if (
@@ -3073,7 +3984,16 @@ class PromptPipeline:
                     )
                     and int(match.group(1)) == character_count
                 )
-            )[:1] or relationship_count_tags[:1] or (f"{character_count}people",)
+            )[:1]
+            deterministic_count_tags = (
+                tuple(
+                    dict.fromkeys(
+                        (*numeric_count_tags, *relationship_count_tags[:1])
+                    )
+                )
+                if numeric_count_tags
+                else relationship_count_tags[:1] or (f"{character_count}people",)
+            )
         filtered_common_tags = tuple(
             tag
             for tag in plan.common_tags
@@ -3128,6 +4048,10 @@ class PromptPipeline:
         constraint_raw = ""
         constraint_plan = parse_constraint_plan("")
         if low_cfg_harness:
+            # DEFERRED(Turbo wardrobe authority): constraint-plan tags are not
+            # post-filtered through the ordinary LLM1/WardrobeAuthority graph.
+            # Keep this compatibility behavior until Turbo is deliberately
+            # redesigned and covered by dedicated ownership/conflict tests.
             try:
                 constraint_raw = await self._generate_constraint_plan_with_llm(
                     provider_id=provider_id,
@@ -3454,6 +4378,14 @@ class PromptPipeline:
             fixed_character_name,
             tuple(local_character_hints),
         )
+        # Ordinary "A cosplays/wears C" text belongs to the per-character LLM1
+        # graph and local profile resolver. The legacy transfer path is only for
+        # explicit reference-image or search workflows; running both paths makes
+        # one detected target masquerade as the sole fixed subject in group art.
+        if outfit_plan.enabled and not (
+            outfit_plan.source_from_reference or outfit_plan.source_from_search
+        ):
+            outfit_plan = OutfitTransferPlan(directive_prompt=outfit_plan.directive_prompt)
         outfit_plan = bind_explicit_outfit_patch_target(
             outfit_plan,
             user_prompt=prompt,
@@ -3464,18 +4396,47 @@ class PromptPipeline:
         provider_id = await self._current_chat_provider_id(event)
         if not provider_id:
             self.logger.warning(
-                "[comfyui_agent] prompt builder has no provider; using original prompt"
+                "[comfyui_agent] prompt builder has no provider; aborting optimized generation"
             )
             summary.update(
                 {
                     "skipped_reason": "no_chat_provider",
                     "llm_failed": True,
                     "llm_error": "no_chat_provider",
-                    "final_prompt_head": self._shorten(prompt, 600),
-                    "final_prompt_chars": len(prompt),
+                    "final_prompt_head": "",
+                    "final_prompt_chars": 0,
                 }
             )
-            return PromptPipelineResult(prompt, summary)
+            return PromptPipelineResult("", summary)
+
+        if multi_person:
+            # `/anm 多人` is the original independent compatibility route.  It
+            # plans anonymous Character A/B/C/D visual blocks directly and must
+            # not inherit the newer LLM1 character/wardrobe graph.  Mixing the
+            # two planners changes its identity model and makes a failed name
+            # join capable of leaking unscoped clothing into a character block.
+            multi_research_plan = self._researcher.plan(prompt)
+            multi_result = await self._build_multi_person_prompt(
+                provider_id=provider_id,
+                prompt=prompt,
+                prompt_config=prompt_config,
+                use_deep_thinking=multi_research_plan.use_deep_thinking,
+                summary=summary,
+                original_user_prompt=background_intent_prompt,
+            )
+            if multi_result is not None:
+                return multi_result
+            summary.setdefault("multi_person_mode", True)
+            summary.setdefault("multi_person_plan_failed", True)
+            summary.setdefault("multi_person_error", "invalid_plan")
+            summary.update(
+                {
+                    "skipped_reason": "multi_person_plan_failed",
+                    "final_prompt_head": "",
+                    "final_prompt_chars": 0,
+                }
+            )
+            return PromptPipelineResult("", summary)
 
         semantic_result = SemanticLookupResult()
         semantic_plan_raw = ""
@@ -3567,19 +4528,31 @@ class PromptPipeline:
                     semantic_plan_raw, prompt
                 )
                 if semantic_plan_validation_errors:
-                    repaired_plan = await self._repair_semantic_plan_with_llm(
-                        provider_id=provider_id,
-                        user_prompt=prompt,
-                        previous_raw=semantic_plan_raw,
-                        issues=semantic_plan_validation_errors,
-                    )
                     semantic_plan_attempt_count = 2
-                    repaired_errors = semantic_plan_validation_issues(
-                        repaired_plan, prompt
-                    )
-                    if len(repaired_errors) < len(semantic_plan_validation_errors):
-                        semantic_plan_raw = repaired_plan
-                        semantic_plan_validation_errors = repaired_errors
+                    try:
+                        repaired_plan = await self._repair_semantic_plan_with_llm(
+                            provider_id=provider_id,
+                            user_prompt=prompt,
+                            previous_raw=semantic_plan_raw,
+                            issues=semantic_plan_validation_errors,
+                        )
+                    except Exception as repair_exc:
+                        # Keep the usable, source-grounded subset of the first
+                        # response. A failed repair must not discard it.
+                        self.logger.warning(
+                            "[comfyui_agent] semantic planner repair failed; "
+                            "keeping initial plan: %s",
+                            repair_exc,
+                        )
+                    else:
+                        repaired_errors = semantic_plan_validation_issues(
+                            repaired_plan, prompt
+                        )
+                        # Never replace a partially usable first response with
+                        # a merely 'less invalid' second response.
+                        if not repaired_errors:
+                            semantic_plan_raw = repaired_plan
+                            semantic_plan_validation_errors = ()
                 semantic_anchors = prefer_configured_character_anchors(
                     configured_character_anchors,
                     (
@@ -3590,6 +4563,10 @@ class PromptPipeline:
                         *parse_semantic_plan(semantic_plan_raw, prompt),
                     ),
                 )
+                semantic_anchors = add_explicit_cosplay_source_anchors(
+                    semantic_anchors, prompt
+                )
+                cached_complete_anchor_ids: set[str] = set()
                 if cached_named_result is not None:
                     for cached_anchor in cached_named_result.anchors:
                         cached_source_key = re.sub(
@@ -3633,6 +4610,18 @@ class PromptPipeline:
                 semantic_character_plans = parse_semantic_character_plans(
                     semantic_plan_raw, prompt, semantic_anchors
                 )
+                semantic_character_plans = repair_explicit_cosplay_plans(
+                    semantic_character_plans, semantic_anchors, prompt
+                )
+                semantic_character_plans = add_host_outfit_changes_to_plans(
+                    semantic_character_plans, semantic_anchors, prompt
+                )
+                semantic_character_plans = repair_single_target_cached_named_outfit_plan(
+                    semantic_character_plans,
+                    semantic_anchors,
+                    cached_named_result,
+                    prompt,
+                )
                 if self._bool("debug_prompt_enabled", False):
                     self.logger.info(
                         "[comfyui_agent] semantic planner parsed anchors:\n%r",
@@ -3668,14 +4657,13 @@ class PromptPipeline:
                         wardrobe_source = "explicit_named_outfit"
                     else:
                         wardrobe_source = "explicit_clothing"
-                else:
-                    semantic_character_plans, semantic_anchors = (
-                        apply_requested_wardrobe_mode(
-                            semantic_character_plans,
-                            semantic_anchors,
-                            implicit_wardrobe_mode,
-                        )
-                    )
+                semantic_character_plans = apply_character_wardrobe_baselines(
+                    semantic_character_plans,
+                    semantic_anchors,
+                    implicit_mode=implicit_wardrobe_mode,
+                    user_prompt=prompt,
+                    create_missing=not explicit_wardrobe_evidence,
+                )
                 if semantic_character_plans:
                     semantic_outfit_directives = tuple(
                         directive
@@ -3700,7 +4688,6 @@ class PromptPipeline:
                     cached_named_keys = {
                         tag.lower() for tag in cached_named_result.named_outfit_tags
                     }
-
                     def cached_named_anchor_is_complete(
                         anchor: SemanticAnchor,
                     ) -> bool:
@@ -3725,14 +4712,12 @@ class PromptPipeline:
                             and refresh_getter(anchor.source_text)
                         )
 
-                    semantic_anchors = tuple(
-                        anchor
+                    cached_complete_anchor_ids = {
+                        anchor.anchor_id
                         for anchor in semantic_anchors
-                        if not (
-                            anchor.role in {"outfit", "clothing"}
-                            and cached_named_anchor_is_complete(anchor)
-                        )
-                    )
+                        if anchor.role in {"outfit", "clothing"}
+                        and cached_named_anchor_is_complete(anchor)
+                    }
                 if outfit_plan.enabled and outfit_plan.source_subject:
                     source_text = outfit_plan.source_subject.strip()
                     source_candidates: list[str] = []
@@ -3788,7 +4773,12 @@ class PromptPipeline:
                                 ),
                             )
                 if semantic_lookup_ready:
-                    resolved_semantic = await semantic_resolve(semantic_anchors)
+                    lookup_anchors = tuple(
+                        anchor
+                        for anchor in semantic_anchors
+                        if anchor.anchor_id not in cached_complete_anchor_ids
+                    )
+                    resolved_semantic = await semantic_resolve(lookup_anchors)
                     refined_anchors = await self._refine_unresolved_semantic_characters(
                         provider_id=provider_id,
                         user_prompt=prompt,
@@ -3797,7 +4787,12 @@ class PromptPipeline:
                     )
                     if refined_anchors != semantic_anchors:
                         semantic_anchors = refined_anchors
-                        resolved_semantic = await semantic_resolve(semantic_anchors)
+                        lookup_anchors = tuple(
+                            anchor
+                            for anchor in semantic_anchors
+                            if anchor.anchor_id not in cached_complete_anchor_ids
+                        )
+                        resolved_semantic = await semantic_resolve(lookup_anchors)
                     semantic_result = merge_semantic_results(
                         cached_source_result,
                         cached_profile_result,
@@ -3810,6 +4805,25 @@ class PromptPipeline:
                     "[comfyui_agent] semantic wardrobe planning/lookup failed: %s",
                     exc,
                 )
+        semantic_fallback_used = False
+        if has_host_wardrobe_cue(prompt) and not semantic_character_plans:
+            if not any(
+                anchor.role == "target_character" for anchor in semantic_anchors
+            ):
+                fallback_targets = fallback_target_anchors_from_semantic_evidence(
+                    prompt,
+                    configured_character_anchors,
+                    semantic_result,
+                )
+                semantic_anchors = tuple(
+                    dict.fromkeys((*semantic_anchors, *fallback_targets))
+                )
+            if any(
+                anchor.role == "target_character" for anchor in semantic_anchors
+            ):
+                explicit_wardrobe_evidence = True
+                wardrobe_source = "explicit_but_unresolved"
+                semantic_fallback_used = True
         semantic_required_tags: tuple[str, ...] = ()
         semantic_context = semantic_result.prompt_context()
         summary.update(
@@ -3819,6 +4833,7 @@ class PromptPipeline:
                 "semantic_plan_validation_errors": list(
                     semantic_plan_validation_errors
                 ),
+                "semantic_wardrobe_fallback_used": semantic_fallback_used,
                 "danbooru_semantic_confirmed_tags": list(
                     semantic_result.confirmed_tags
                 ),
@@ -3902,33 +4917,6 @@ class PromptPipeline:
             if research_plan.use_web_search
             else ""
         )
-        if multi_person:
-            # Preserve the explicit legacy command while ordinary generation uses
-            # the unified character-first response protocol below.
-            multi_result = await self._build_multi_person_prompt(
-                provider_id=provider_id,
-                prompt=prompt,
-                prompt_config=prompt_config,
-                use_deep_thinking=research_plan.use_deep_thinking,
-                summary=summary,
-                original_user_prompt=background_intent_prompt,
-                semantic_anchors=semantic_anchors,
-                semantic_outfit_directives=semantic_outfit_directives,
-                semantic_result=semantic_result,
-            )
-            if multi_result is not None:
-                return multi_result
-            summary.setdefault("multi_person_mode", True)
-            summary.setdefault("multi_person_plan_failed", True)
-            summary.setdefault("multi_person_error", "invalid_plan")
-            summary.update(
-                {
-                    "skipped_reason": "multi_person_plan_failed",
-                    "final_prompt_head": "",
-                    "final_prompt_chars": 0,
-                }
-            )
-            return PromptPipelineResult("", summary)
         outfit_summary = ""
         outfit_summary_source = ""
         reference_tag_text = (
@@ -4032,6 +5020,7 @@ class PromptPipeline:
             semantic_result,
             explicit_wardrobe_evidence=explicit_wardrobe_evidence,
             requested_mode=requested_outfit_mode,
+            user_prompt=prompt,
         )
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
@@ -4084,6 +5073,10 @@ class PromptPipeline:
             not effective_outfit.has_destructive_override
             and not any(
                 item.resolution_state == "explicit_but_unresolved"
+                for item in character_effective_outfits
+            )
+            and not any(
+                item.wardrobe_kind == "outfit_source"
                 for item in character_effective_outfits
             )
         )
@@ -4291,6 +5284,11 @@ class PromptPipeline:
             self.logger.info(
                 "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
             )
+        # The background control marker is specified as the final item in the
+        # LLM response, so it commonly sits outside the seven brace blocks.
+        # Extract it before structured parsing, which intentionally retains
+        # only the declared field values and would otherwise discard it.
+        llm_content, llm_background_mode = extract_background_mode(llm_content)
         (
             structured_roster_tags,
             structured_copyright_tags,
@@ -4337,6 +5335,9 @@ class PromptPipeline:
                 )
                 if is_chinese_model_refusal(retry_content):
                     return self._model_refusal_result(summary, retry_content)
+                retry_content, retry_background_mode = extract_background_mode(
+                    retry_content
+                )
                 (
                     structured_roster_tags,
                     structured_copyright_tags,
@@ -4350,6 +5351,7 @@ class PromptPipeline:
                 )
                 if retry_structured_prompt_mode:
                     llm_content = retry_content
+                    llm_background_mode = retry_background_mode
                     structured_prompt_mode = True
                     summary["structured_format_retry"] = True
                 else:
@@ -4392,6 +5394,41 @@ class PromptPipeline:
                 if self._bool("debug_prompt_enabled", False):
                     summary["llm_raw_content"] = llm_content
                 return PromptPipelineResult("", summary)
+        llm_framing_text = ", ".join(
+            part
+            for part in (
+                prompt,
+                structured_scene if structured_prompt_mode else llm_content,
+            )
+            if part
+        )
+        framed_character_outfits = apply_framing_to_character_outfits(
+            character_effective_outfits, llm_framing_text
+        )
+        if framed_character_outfits != character_effective_outfits:
+            character_effective_outfits = framed_character_outfits
+            wardrobe_authority = build_wardrobe_authority(
+                character_effective_outfits,
+                semantic_result,
+                semantic_anchors,
+                explicit_term_tags=explicit_term_tags,
+            )
+            required_profile_tags = wardrobe_authority.filter_tags(
+                required_profile_tags
+            )
+            semantic_required_tags = wardrobe_authority.filter_tags(
+                semantic_required_tags
+            )
+            semantic_visible_outfit_tags = wardrobe_authority.filter_tags(
+                tuple(
+                    tag
+                    for tag in profile_tags_for_request
+                    if tag not in effective_outfit.removed_tags
+                )
+            )
+            global_outfit_reinforcement_tags = safe_global_outfit_tags(
+                character_effective_outfits
+            )
         semantic_character_tags = confirmed_semantic_character_tags(semantic_result)
         structured_characters, structured_nltags = (
             bind_single_confirmed_semantic_character(
@@ -4434,11 +5471,11 @@ class PromptPipeline:
             # Preserve the structured Tags block and let only the regular exact
             # deduplication/conflict cleaner process it.
             removed_unbound_tags: tuple[str, ...] = ()
-            creative_tags_are_shared_safe = bool(character_effective_outfits) and all(
-                item.wardrobe_kind == "creative_fallback"
-                for item in character_effective_outfits
+            structured_scene = filter_shared_appearance_tags(
+                structured_scene,
+                character_effective_outfits,
+                user_prompt=prompt,
             )
-            multiple_scoped_wardrobes = len(character_effective_outfits) > 1
             if (
                 effective_outfit.modified
                 or outfit_plan.enabled
@@ -4468,24 +5505,15 @@ class PromptPipeline:
                         )
                     ),
                     effective_outfit.forbidden_slots,
-                    strict_allowlist=bool(
-                        effective_outfit.has_allowlist_override
-                        # Global Tags cannot safely own character-specific clothes
-                        # in a multi-person request. LLM2 keeps those in each
-                        # character's Details; this is ownership filtering, not a
-                        # database-derived garment allowlist.
-                        or (multiple_scoped_wardrobes and not creative_tags_are_shared_safe)
-                    ),
+                    # A valid seven-field response is authoritative. Only apply
+                    # explicit forbidden-slot removals here; database evidence is
+                    # not a whitelist for the writer's actions, props or scenery.
+                    strict_allowlist=False,
                 )
-                if creative_tags_are_shared_safe:
-                    structured_scene = keep_safe_creative_wardrobe_tags(
-                        structured_scene
-                    )
                 structured_scene = wardrobe_authority.filter_tag_text(structured_scene)
             resolution_statuses: list[dict[str, Any]] = []
             effective_detail_blocks: list[str] = []
             effective_identity_blocks: list[str] = []
-            authoritative_profile_identity_used = False
             used_fixed_names: set[str] = set()
             for character in structured_characters:
                 semantic_confirmed = character.name in semantic_character_tags
@@ -4529,6 +5557,21 @@ class PromptPipeline:
                     None,
                 )
                 detail = character.detail_tags
+                override_dimensions = frozenset()
+                if character_outfit and character_outfit.appearance_tags:
+                    override_dimensions = appearance_override_dimensions(
+                        prompt,
+                        tuple(
+                            dict.fromkeys(
+                                (
+                                    character.name,
+                                    character_outfit.target_source_text,
+                                    *character_outfit.target_candidates,
+                                )
+                            )
+                        ),
+                        character_count=len(structured_characters),
+                    )
                 if (
                     character_outfit is not None
                     and _UNTRUSTED_OUTFIT_DETAIL_RE.search(detail)
@@ -4557,26 +5600,12 @@ class PromptPipeline:
                 effective_detail_blocks.append(detail)
                 identity_block = character.identity_tags
                 if character_outfit and character_outfit.appearance_tags:
-                    override_dimensions = appearance_override_dimensions(
-                        prompt,
-                        tuple(
-                            dict.fromkeys(
-                                (
-                                    character.name,
-                                    character_outfit.target_source_text,
-                                    *character_outfit.target_candidates,
-                                )
-                            )
-                        ),
-                        character_count=len(structured_characters),
-                    )
                     identity_block = merge_authoritative_identity_block(
                         character.name,
                         identity_block,
                         character_outfit.appearance_tags,
                         override_dimensions,
                     )
-                    authoritative_profile_identity_used = True
                 effective_identity_blocks.append(identity_block)
                 for identity_tag in identity_tags:
                     if identity_tag and identity_tag not in structured_required_character_tags:
@@ -4615,11 +5644,6 @@ class PromptPipeline:
                 summary["profile_fallback_overridden_tags"] = list(
                     dict.fromkeys(profile_fallback_overridden_tags)
                 )
-            scoped_outfit_narratives = tuple(
-                narrative
-                for block in structured_detail_blocks
-                if (narrative := scoped_outfit_narrative(block))
-            )
             # Only the seventh block's Danbooru tag section goes through the
             # tag cleaner.  The other structured fields are protected sections
             # assembled in their declared order by prompt_builder.
@@ -4628,13 +5652,6 @@ class PromptPipeline:
                 structured_nltags,
                 tuple(character.name for character in structured_characters),
             )
-            if authoritative_profile_identity_used:
-                nltags = strip_writer_guessed_identity_from_nltags(nltags)
-            if character_effective_outfits or casual_life_requested:
-                nltags = strip_outfit_narrative(nltags)
-                nltags = " ".join(
-                    part for part in (*scoped_outfit_narratives, nltags) if part
-                )
             if semantic_result.outfit_source_tags and not character_effective_outfits:
                 nltags = minimal_verified_outfit_nltags(
                     nltags,
@@ -4650,12 +5667,6 @@ class PromptPipeline:
                 nltags = " ".join(
                     part for part in (nltags, outfit_constraint_narrative) if part
                 )
-            if (
-                semantic_result.missing_descriptions
-                and not semantic_result.outfit_source_tags
-            ):
-                missing_text = ". ".join(semantic_result.missing_descriptions)
-                nltags = ". ".join(part for part in (missing_text, nltags) if part)
             nltags = strip_structured_block_duplicates_from_nltags(
                 nltags,
                 structured_identity_blocks,
@@ -4693,26 +5704,9 @@ class PromptPipeline:
                 # `futa with female` / `futa with male` and relationship tags
                 # are kept, but any numeric people-count tag that disagrees
                 # with the roster is replaced by a plain people-count tag.
-                has_male_futa_pair = any(
-                    item.lower().replace("_", " ") == "futa with male"
-                    for item in required_count_tags
-                )
-                roster_count_tag = next(
-                    (
-                        item
-                        for item in required_count_tags
-                        if (
-                            match := re.fullmatch(
-                                r"\s*(\d+)\s*(girls?|boys?|people|persons?)\s*",
-                                item,
-                                flags=re.IGNORECASE,
-                            )
-                        )
-                        and int(match.group(1)) == len(structured_characters)
-                    ),
-                    "",
-                )
-                if not has_male_futa_pair and not roster_count_tag:
+                if not structured_count_tags_match_roster(
+                    required_count_tags, len(structured_characters)
+                ):
                     kept_count_tags = tuple(
                         item
                         for item in required_count_tags
@@ -4775,9 +5769,6 @@ class PromptPipeline:
                 nltags = " ".join(
                     part for part in (nltags, outfit_constraint_narrative) if part
                 )
-            if semantic_result.missing_descriptions:
-                missing_text = ". ".join(semantic_result.missing_descriptions)
-                nltags = ". ".join(part for part in (missing_text, nltags) if part)
             llm_content = re.sub(
                 r"\{\s*(?:Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:[^}]*\}",
                 "",
@@ -4804,7 +5795,7 @@ class PromptPipeline:
         background_mode = ""
         background_mode_source = "not_applicable"
         if mode == "txt2img":
-            llm_content, background_mode = extract_background_mode(llm_content)
+            background_mode = llm_background_mode
             if background_mode:
                 background_mode_source = "llm_marker"
             else:
@@ -4817,6 +5808,9 @@ class PromptPipeline:
             )
             if background_overridden:
                 background_mode_source = "user_prompt_override"
+            nltags = strip_unrequested_default_background_prose(
+                nltags, background_intent_prompt
+            )
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         if structured_prompt_mode:
             character_resolution = DanbooruResolveOutcome(text=llm_content)
@@ -4873,6 +5867,9 @@ class PromptPipeline:
         constraint_raw = ""
         constraint_plan = parse_constraint_plan("")
         if low_cfg_harness:
+            # DEFERRED(Turbo wardrobe authority): do not casually insert an
+            # extra wardrobe filter here. Constraint tags and priority tags
+            # have low-CFG semantics that need a dedicated, end-to-end fix.
             try:
                 constraint_raw = await self._generate_constraint_plan_with_llm(
                     provider_id=provider_id,
@@ -4980,10 +5977,24 @@ class PromptPipeline:
                     )
                 ),
                 "outfit_effective_tags": list(
-                    wardrobe_authority.filter_tags(effective_outfit.effective_tags)
+                    wardrobe_authority.selected_tags
+                    if character_effective_outfits
+                    else wardrobe_authority.filter_tags(effective_outfit.effective_tags)
                 ),
-                "outfit_removed_tags": list(effective_outfit.removed_tags),
-                "outfit_added_tags": list(effective_outfit.added_tags),
+                "outfit_removed_tags": list(
+                    wardrobe_authority.removed_tags
+                    if character_effective_outfits
+                    else effective_outfit.removed_tags
+                ),
+                "outfit_added_tags": list(
+                    dict.fromkeys(
+                        tag
+                        for item in character_effective_outfits
+                        for tag in item.effective.added_tags
+                    )
+                    if character_effective_outfits
+                    else effective_outfit.added_tags
+                ),
                 "wardrobe_authority": {
                     "has_character_plans": wardrobe_authority.has_character_plans,
                     "all_creative": wardrobe_authority.all_creative,
@@ -5010,6 +6021,7 @@ class PromptPipeline:
                         "effective_tags": list(item.effective.effective_tags),
                         "removed_tags": list(item.effective.removed_tags),
                         "appearance_tags": list(item.appearance_tags),
+                        "complete_named_profile": item.complete_named_profile,
                         "resolution_state": item.resolution_state,
                         "unresolved_evidence": list(item.unresolved_evidence),
                     }

@@ -333,8 +333,8 @@
       "danbooru_semantic_system_prompt": {
         "description": "LLM1 系统提示词",
         "type": "string",
-        "default": "You build a character-to-wardrobe relation graph and bounded lookup anchors for a local Danbooru index. Relationship binding is the primary task: emit exactly one character_plans item for every visible target_character, preserve the wearer and its wardrobe/outfit_source even when the request also changes hair, color, pose, expression, or scene, and keep separate clauses scoped to their own wearers. Never merge overlapping source names or request-wide wardrobes. Return valid JSON only. Candidates are unverified lookup hints.",
-        "hint": "控制第一次 LLM 的可见角色、逐角色服装归属、共享范围和本地 Danbooru 查询候选；不影响第二次七字段提示词模板。留空时使用内置默认值。",
+        "default": "Extract only what the user said about each visible character. Copy phrases exactly, use null for unknown clothing, never guess tags or lore, and return JSON only.",
+        "hint": "控制第一次 LLM 的逐角色意图 JSON：可见角色、明确服装或未知、服装修改、外貌修改。LLM1 不猜 Danbooru tag；主机随后匹配本地角色与衣柜证据。留空时使用内置默认值。",
         "collapsed": true,
         "condition": {
           "prompt_optimize_enabled": true
@@ -361,7 +361,7 @@
         }
       },
       "unspecified_wardrobe_policy": {
-        "description": "未说明服装时",
+        "description": "角色未指定基础服装时",
         "type": "string",
         "default": "scene_adaptive",
         "options": [
@@ -374,7 +374,7 @@
           "使用角色默认档案",
           "始终由模型设计"
         ],
-        "hint": "仅在用户完全没有提到服装、套装、默认/常服/私服或服装修改时生效。按场景判断会在涩气模式或下方强场景词命中时让模型设计服装，其余情况使用角色 default 视觉档案；档案不存在时自动回退模型设计。公园、在家、吃饭等普通场景不会单独触发创作。",
+        "hint": "按角色生效：该角色已有普通衣物、命名套装、来源服装或明确 default/casual 时不调用默认档案；只有修改但没有基础服装时，以 default 软参考作为修改基线。按场景判断始终把可用 default 作为参考，中性场景更倾向沿用，涩气模式或下方强场景词命中时允许模型按情境替换或补全；档案不存在时自动回退模型设计。",
         "condition": {
           "prompt_optimize_enabled": true
         }
@@ -395,6 +395,9 @@
           "比赛",
           "刚跑完步",
           "正在健身",
+          "泳池边",
+          "泳池旁",
+          "在泳池",
           "游泳结束后",
           "演出结束后",
           "刚结束演出",
@@ -407,13 +410,16 @@
           "after the competition",
           "just finished running",
           "working out",
+          "poolside",
+          "by the pool",
+          "at the pool",
           "after swimming",
           "after performing"
         ],
         "items": {
           "type": "string"
         },
-        "hint": "只在“未说明服装时”选择按场景判断时使用，采用不区分大小写的精确子串命中。建议只放入足以改变穿着逻辑的强语境，不要加入“公园、在家、吃饭”等容易误判的宽泛词。内置“比赛”会触发创作，但“看比赛、观看比赛、观赛”会排除。涩气触发词由独立的涩气配置控制。",
+        "hint": "只在某角色未指定基础服装且选择按场景判断时使用，采用不区分大小写的精确子串命中。命中后 default 仍作为软参考，但模型可以按情境替换或补全。建议只放入足以改变穿着逻辑的强语境，不要加入“公园、在家、吃饭”等宽泛词；“看比赛、观看比赛、观赛”会排除比赛触发。",
         "collapsed": true,
         "condition": {
           "prompt_optimize_enabled": true,

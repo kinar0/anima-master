@@ -193,8 +193,8 @@ def test_resolver_does_not_warn_when_next_source_resolves_timeout(
 def test_non_fixed_character_prompt_requires_queryable_character_candidate() -> None:
     prompt = build_llm_prompt("画一个被点名的现有作品角色")
 
-    assert "第一项必须是你认为最可信的标准 Danbooru 角色 tag" in prompt
-    assert "程序会联网查询 character 分类并校正候选" in prompt
+    assert "点名作品角色时使用最可信的 Danbooru 角色 tag" in prompt
+    assert "未知时不要伪造作品" in prompt
 
 
 def test_prompt_passes_all_local_character_hints_to_llm_without_reformatting() -> None:
@@ -215,8 +215,8 @@ def test_prompt_passes_all_local_character_hints_to_llm_without_reformatting() -
     assert (
         "- 千早爱音: chihaya anon, 1girl with long pink hair, grey eyes"
     ) in prompt
-    assert "不要求逐字复制" in prompt
-    assert "对于未列出的现有作品角色" in prompt
+    assert "本地角色身份/稳定外貌" in prompt
+    assert "用户原文修改优先" in prompt
 
 
 def test_custom_prompt_cannot_drop_local_character_hints() -> None:

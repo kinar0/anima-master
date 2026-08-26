@@ -5,11 +5,19 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .danbooru_semantic import (
+        DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
+        LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS,
+    )
     from .prompt_templates import (
         DEFAULT_LLM_PROMPT_TEMPLATE,
         is_legacy_builtin_template,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from danbooru_semantic import (
+        DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
+        LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS,
+    )
     from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE, is_legacy_builtin_template
 
 
@@ -26,6 +34,13 @@ def migrate_prompt_defaults(config: Any) -> dict[str, Any]:
         Configuration copy with only legacy built-in prompt fields migrated.
     """
     result = dict(config or {})
+    configured_semantic = str(
+        result.get("danbooru_semantic_system_prompt") or ""
+    ).strip()
+    if configured_semantic in LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS:
+        result["danbooru_semantic_system_prompt"] = (
+            DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
+        )
     if "danbooru_remote_lookup_enabled" in result:
         # For one release the legacy remote resolver had two serial switches.
         # Collapse their effective state into the original switch so an update

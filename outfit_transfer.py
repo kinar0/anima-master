@@ -964,8 +964,6 @@ def build_outfit_transfer_block(
     if plan.enabled:
         lines.extend(
             [
-                "本次是“来源角色/来源参考 -> 目标固定角色”的服装迁移任务。",
-                f"最终主体必须是固定角色“{plan.target_character or '目标角色'}”。",
                 "来源对象只用于提供服装结构、材质、配色和装饰；不要复制来源对象的角色身份、发色、瞳色、种族、耳朵、尾巴、角、翅膀、年龄感和体型。",
                 "请优先让目标角色穿上来源服装，并保留目标角色自己的身份设定。",
                 "如果资料不足，可以补齐服装细节，但不要擅自换成别的服装主题。",
@@ -1119,4 +1117,21 @@ def _should_drop_tag(key: str) -> bool:
 
 
 def _looks_like_outfit_tag(key: str) -> bool:
-    return any(hint in key for hint in _OUTFIT_HINTS)
+    normalized = re.sub(r"\s+", " ", str(key or "").replace("_", " ")).strip()
+    # These are actions, props, camera terms or scene nouns even when they use a
+    # garment as their object. They must not become wardrobe entities merely
+    # because they contain words such as skirt, shirt, bow or top.
+    if re.search(
+        r"\b(?:lift|tug|pull|grab|adjusting|bowing|arrow|view|focus)\b",
+        normalized,
+        re.I,
+    ):
+        return False
+    return any(
+        re.search(
+            rf"(?<![a-z0-9]){re.escape(hint.replace('_', ' '))}(?![a-z0-9])",
+            normalized,
+            re.I,
+        )
+        for hint in _OUTFIT_HINTS
+    )

@@ -25,13 +25,15 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
   `{{Details: chihaya_anon smiles and waves; togawa_sakiko looks aside and holds a book}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
   `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
-- `Count` 必须与 `Characters` 完全一致，按以下规则一步确定，禁止反复核算或自我怀疑：先在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；不要在 `Count` 里写两个数字相同的人数 tag。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- `Count` 必须与 `Characters` 完全一致，按以下规则一步确定，禁止反复核算或自我怀疑：先在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；futa相关tag不会计入总人数。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等
+- `Identity` 中每位角色写成完整、语法连贯的一句；不要把 `is ...` 直接接在 `has ...` 的属性列表里。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
 - 不要输出 masterpiece、best quality、score 等质量前缀。
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
 - 尽量使用模型容易理解的可见画面描述。
 - 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。
-- 服装只按末尾“角色服装权限”和动态服装上下文决定；除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
+- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
 - 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。
 - 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。
 - 不要为了数量重复同义词；画面已经完整时即可停止。
@@ -51,32 +53,14 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 
 BACKGROUND_POLICY_TEMPLATE = """
 
------------
-背景与立绘策略（此规则追加在自定义模板之后，必须遵守）：
-- 只根据下方“用户原始文字”判断用户是否明确要求了地点、环境或背景；不要把参考图、引用法术、图片反推或搜索摘要中的场景误当成用户要求。
-- 若用户明确要求地点、环境、天气场景或保留原背景：保留该场景，不要添加 white background，并在输出末尾追加控制标记 {explicit_marker}。
-- 若用户没有明确要求背景：使用 simple background、white background；有角色时选择与用户动作及镜头相容的 full body/upper body、居中构图、姿势和视线，无角色或仅身体局部时不得补造完整人物或 full body；不要自行创造室内、街道、自然景观、建筑、家具或前景道具，并在输出末尾追加控制标记 {default_marker}。
-- 两个控制标记只能选择一个。控制标记供程序读取，不属于 Danbooru tag，必须放在最后一项。
-
-用户原始文字：
-{original_theme}
+背景：只按用户原文判断。明确写了场景就保留且不用白底，末尾写 {explicit_marker}；未写场景就用 simple/white background，不新增地点，末尾写 {default_marker}。两个标记只写一个。
+用户原文：{original_theme}
 """
 
 
 WARDROBE_AUTHORITY_POLICY = """
 
------------
-角色服装权限（这是最终服装规则，覆盖模板中更早的通用创作建议）：
-- 用户明确指定的服装、命名套装、默认/常服/私服选择和服装修改优先；不要用场景联想覆盖它们。
-- 用户明确要求的衣物缺失、破损、改色、增减，以及发型、发色等外貌变化，都是必须在最终可见状态中逐项体现的结果，不能只保留来源服装的完好默认形态，也不能被角色数据库覆盖。
-- 每个 GROUNDED WARDROBE FLOOR 都是数据库提供的可信服装下限，不是封闭白名单。程序会保留这些锚点；你仍须结合完整用户原文，在该角色自己的 Details 中补全或修改最终可见服装，不得恢复已标记为 stale 的默认衣柜。
-- 每个 SOURCE-GROUNDED WARDROBE 表示用户明确要求模仿某个角色/persona 的服装。列出的 tags 是本地验证过的最低锚点，不保证穷举完整造型；请结合你对该来源角色的知识，在穿着者自己的 Details 中补全有辨识度且与来源一致的可见服装组件。不得换回穿着者的默认衣柜，不得改成别的命名套装，也不得把补充项写进共享 Tags。
-- 如果用户同时修改 SOURCE-GROUNDED WARDROBE，先理解完整来源造型，再输出修改后的最终状态；来源证据中的被移除衣物不得恢复，破损衣物必须仍然存在并明确写出破损状态。
-- 每个 CREATIVE WARDROBE 都允许你为该角色设计与用户要求和场景协调的普通服饰，并写在该角色自己的 Details 子句中。不得把某角色的细节移给另一角色，不得凭空创造学校/学院名称或命名套装，也不得输出 bottomless、topless、nude、naked 等裸露状态。
-- 每个 EXPLICIT BUT UNRESOLVED 表示用户明确提出了服装意图，但第一次 LLM 对该角色的归属选择弃权。不要恢复角色默认衣柜；根据完整原文自行判断归属和最终服装。随附证据只是未绑定资料，不代表所有证据都属于该角色。
-- Tags 是所有角色共享的全局区：角色各自不同的服装只写进自己的 Details；只有确实适用于全部角色的服装才写进 Tags。
-- 仅当所有可见角色都是 CREATIVE WARDROBE 时，Tags 才可写服装 tag，而且这些 tag 必须真实适用于所有角色。角色之间不同的衣物只写进各自 Details，不要放进 Tags。
-- 动作、姿势、表情、互动、道具、构图、背景、光影和特效始终可以写进 Tags。
+服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。
 """
 
 
@@ -94,6 +78,8 @@ LEGACY_BUILTIN_TEMPLATE_HASHES = {
     "b0c2da43cb583bc70db1218aa8183e46657668a981cff1c1e912782c067a437a",
     "7d27e4693a6cb355eb4c30e5e268b029402b0c2860bb1f9acba4d86d701c7c62",
     "32b76edf4da983b6a80a727deb6a592a13a7d880a3ece4df40831c671aaf502b",
+    "dea5751303e16b9b08c3be20a5848dd6257f4d57df49360c53b3eba3041863b6",
+    "168a69ca848e368ac2cec1cd0b3a2a4893787d610fb68776a269289c12b129c1",
 }
 
 
@@ -143,16 +129,8 @@ def build_llm_prompt(
             f"- {name}: {tags}" for name, tags in local_hints.items()
         )
         character_rule = (
-            "用户原始要求中命中了以下本地保存的角色辅助信息。内容可能是 "
-            "Danbooru tags 与自然语言 identity 的混合，请依靠你的理解使用，"
-            "不要求逐字复制：\n"
-            f"{hint_lines}\n"
-            "请为 Characters 输出你认为最可信的罗马音 Danbooru 角色 tag，并在 "
-            "Identity 中结合这些辅助信息写出角色的主要可见特征。不要无故生成与"
-            "辅助信息冲突的发色、瞳色、体型或固定特征；同时结合用户原始要求，"
-            "在不产生明显冲突的情况下尽可能满足其外观、服装、动作、表情和道具要求。"
-            "对于未列出的现有作品角色，仍需自行给出最可信的 Danbooru 角色 tag "
-            "和主要 identity，程序会查询 character 分类并校正候选。"
+            "本地角色身份/稳定外貌（用户原文修改优先）：\n"
+            f"{hint_lines}"
         )
     elif character_name:
         character_rule = (
@@ -161,9 +139,7 @@ def build_llm_prompt(
         )
     else:
         character_rule = (
-            "用户没有使用固定角色。若用户明确点名现有作品角色，输出的第一项必须是你认为最可信的标准 Danbooru 角色 tag，"
-            "使用罗马字和下划线，必要时带作品消歧括号；不要省略角色 tag、只写外观，也不要把角色姓名翻译成普通描述，"
-            "程序会联网查询 character 分类并校正候选。随后再列出主体必要的可识别外观特征、年龄感、发色、瞳色、配饰和标志性元素。"
+            "点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。"
             if not fixed_character
             else "最终 prompt 前缀中会拼接固定角色词，因此具体内容段不要重复列出该角色的固有设定。"
         )
@@ -209,7 +185,7 @@ def build_llm_prompt(
     if sensual_mode:
         sensual_rule = """
 -----------
-本次用户明确要求涩气、透明、魅惑、淫乱或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；CREATIVE WARDROBE 可设计普通服装，SOURCE-GROUNDED WARDROBE 围绕明确来源角色补全其可识别服装，GROUNDED WARDROBE FLOOR 是必须保留但允许按用户原文补全或修改的证据下限。
+本次用户明确要求涩气、透明、魅惑、淫乱或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；优先满足用户的明确要求，然后如果无明确要求，则可为了色气表现力，根据角色所处的情景、地点和做出的行为，自行设计合适的服装，或在要求基础上作出修改。
 这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
 可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写角色的身体部位，如胸部、penis、pussy等
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。

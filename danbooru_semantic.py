@@ -1,11 +1,10 @@
 """Semantic planner boundary and tag-trust vocabulary.
 
-The planner receives the user's image request as plain text and returns JSON with
-three kinds of records: ``anchors`` are bounded lookup questions,
-``character_plans`` bind one wardrobe choice to one visible character, and outfit
-``directives`` describe explicit slot-level changes. Planner output is never tag
-evidence; parsers first require source-text grounding and then the local Danbooru
-index or a persisted verified profile must confirm any canonical spelling.
+The planner receives the user's image request as plain text and returns compact
+per-character intent JSON. The host creates internal anchor IDs, attempts local
+character/outfit matching, and supplies verified evidence to the prompt writer.
+The former candidates/lookups and anchors/character_plans schemas remain accepted
+compatibility inputs. Planner output is never tag evidence.
 
 Terminology used by the prompt pipeline:
 
@@ -28,24 +27,37 @@ import os
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 
 DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT = (
+    "Extract only what the user said about each visible character. Copy phrases "
+    "exactly, use null for unknown clothing, never guess tags or lore, and return "
+    "JSON only."
+)
+
+LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS = frozenset({
+    "You extract semantic lookup anchors for a local Danbooru index. "
+    "Return valid JSON only. Never claim that a candidate is verified.",
     "You build a character-to-wardrobe relation graph and bounded lookup anchors "
     "for a local Danbooru index. Relationship binding is the primary task: emit "
     "exactly one character_plans item for every visible target_character, preserve "
     "the wearer and its wardrobe/outfit_source even when the request also changes "
     "hair, color, pose, expression, or scene, and keep separate clauses scoped to "
     "their own wearers. Never merge overlapping source names or request-wide "
-    "wardrobes. Return valid JSON only. Candidates are unverified lookup hints."
-)
-
-LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS = frozenset({
-    "You extract semantic lookup anchors for a local Danbooru index. "
-    "Return valid JSON only. Never claim that a candidate is verified."
+    "wardrobes. Return valid JSON only. Candidates are unverified lookup hints.",
+    "You identify visible characters, what each one wears, and a few Danbooru "
+    "lookup hints. Return the compact characters/lookups JSON requested by the "
+    "user prompt. Copy every name and evidence phrase exactly from the request. "
+    "Do not invent IDs, groups, descriptions, or cross-reference keys. Return "
+    "valid JSON only. Candidate tags are unverified lookup hints.",
+    "You only extract per-character intent from the user's request. Report each "
+    "visible character, stated clothing or unknown clothing, explicit clothing "
+    "changes, and explicit appearance changes. Copy evidence exactly; never guess "
+    "Danbooru tags, character identities, outfit contents, or missing clothes. "
+    "Return only the JSON requested by the user prompt.",
 })
 
 
@@ -314,104 +326,25 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
             source-of-truth text against which returned evidence is checked.
 
     Returns:
-        A prompt requiring JSON ``anchors`` and per-target ``character_plans``.
-        Candidate tags are explicitly defined as lookup hints, while directives
-        carry semantic slots and exact user evidence instead of invented tags.
+        A prompt requiring per-character intent JSON with no model-authored tags.
+        The host derives IDs and performs local evidence lookup afterward.
     """
     return (
-        "Analyze the image request into a small set of Danbooru lookup anchors. "
-        "Separate visible target characters from character/persona tags used only "
-        "as outfit or cosplay sources. Also include explicitly requested works, "
-        "clothing, accessories, props, poses, actions, expressions, and scenes "
-        "when their exact Danbooru spelling may matter.\n\n"
-        "Return JSON only with this schema:\n"
-        '{"anchors":[{"id":"target_1","role":"target_character",'
-        '"group":"character","source_text":"exact phrase from request",'
-        '"description":"short English visible meaning",'
-        '"candidates":["canonical_tag_guess"]},{"id":"source_1",'
-        '"role":"outfit_source","group":"character",'
-        '"source_text":"exact cosplay source phrase",'
-        '"description":"outfit donor character",'
-        '"candidates":["canonical_source_character_guess"]}],'
-        '"character_plans":[{"target_anchor_id":"target_1",'
-        '"wardrobe":{"kind":"outfit_source","anchor_id":"source_1"},'
-        '"directives":[{"operation":"keep_only",'
-        '"slots":["outerwear","headwear"],'
-        '"source_text":"exact clothing instruction from request"}]}]}\n'
-        "Relationship-first contract: before choosing tag candidates, identify every "
-        "visible wearer and write its wardrobe edge. Every target_character anchor "
-        "must have exactly one character_plans item; never omit character_plans merely "
-        "because anchors were already emitted. A later appearance, color, pose, action, "
-        "or scene sentence modifies that same target and must not erase its wardrobe "
-        "edge. Resolve each comma/semicolon-separated clause locally. Example: for "
-        "'爱音cosplay黑魔导，祥子cosplay黑魔导女孩', create two target anchors, two "
-        "outfit_source anchors, and bind 爱音 to the full source phrase 黑魔导 while "
-        "binding 祥子 to the full source phrase 黑魔导女孩. These source names overlap; "
-        "do not shorten 黑魔导女孩 or bind both wearers to one source. For '千早爱音正在"
-        "cosplay重音teto。包括双钻头在内的头发都是粉色的', keep 千早爱音 -> 重音teto "
-        "as outfit_source and add the pink-hair request separately. Before returning, "
-        "verify that the number of character_plans equals the number of target_character "
-        "anchors and every referenced ID exists with the required role.\n"
-        "Allowed roles: target_character, outfit_source, copyright, appearance, "
-        "expression, pose, action, clothing, outfit, accessory, prop, scene, lighting. "
-        "Allowed groups are the same except target_character/outfit_source use "
-        "character and copyright uses series. Use at most 12 anchors and at most "
-        "3 candidates per anchor. Candidates are untrusted lookup hints, not "
-        "answers. Use lowercase Danbooru spelling with underscores. Do not turn "
-        "an outfit_source into a visible target character. Use role outfit for a "
-        "complete independently named clothing set such as a specific school uniform, "
-        "ceremonial outfit, or named costume; use clothing for individual garments. "
-        "Keep explicit seasonal modifiers such as summer/winter or 夏季/冬季 in "
-        "source_text and description even when both variants share one canonical tag. "
-        "Wearable props or accessories mentioned beside a uniform (for example cat-paw "
-        "gloves, masks, bags, or animal accessories) must remain separate accessory/prop "
-        "anchors and must never become aliases of the uniform. "
-        "For a proper-name outfit such as XX school uniform, source_text must retain "
-        "the complete proper name from the request and candidates must target that "
-        "specific set; never shorten it to school_uniform or replace it with another "
-        "school's uniform. "
-        "Omit ordinary prose that does not need a hard tag. Emit exactly one "
-        "character_plans item for each target character. Its target_anchor_id must "
-        "reference that target_character anchor. When the request says nothing "
-        "about clothing, use none as a provisional value; the host program applies "
-        "its configured default/creative/scene-adaptive policy deterministically. "
-        "Use default_profile only when the user explicitly asks for the character's "
-        "default/canonical outfit. Use casual_profile "
-        "only for an explicitly requested official/canonical casual set such as "
-        "官方常服, 常服, casual outfit, or casual set. Use creative_fallback for "
-        "私服, 居家私服, 居家服, 日常便服, 休闲穿搭, homewear, or other requests "
-        "where the final writer should design an original private/home outfit. "
-        "named_outfit for an explicit named ensemble, "
-        "outfit_source for clothes copied from a character/persona, creative_fallback "
-        "when the requested look has no verified named/default wardrobe and the final "
-        "writer may design compatible garment details, or none. "
-        "Any explicitly requested garment or wearable look is wardrobe intent, even "
-        "when it is an ordinary clothing anchor rather than an independently named "
-        "outfit. For such a target use creative_fallback, never none or "
-        "default_profile; the final writer will preserve the requested garments. "
-        "Resolve wardrobe scope explicitly: words and constructions meaning both, "
-        "all, everyone, the pair, 双方, 两人, 二人, 都, 各自, or 双女主 apply that "
-        "wardrobe to every target character in scope. Emit a separate matching "
-        "character_plans item for each wearer. For example, if two named characters "
-        "both wear wedding dresses, emit a wedding-dress clothing anchor and give "
-        "both character plans creative_fallback. Never leave either plan as none or "
-        "default_profile merely because the garment is shared. "
-        "named_outfit and outfit_source require wardrobe.anchor_id referencing the "
-        "corresponding outfit or outfit_source anchor; other kinds must omit it. "
-        "directives are optional and are "
-        "only for an explicit modification of a character's clothes. Allowed "
-        "operations are remove, damage, replace_color, recolor_all, add, and keep_only. "
-        "Use damage when a garment remains present but is torn, ripped, broken, or visibly "
-        "damaged; never encode damage as remove. Allowed slots "
-        "are upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, "
-        "headwear, face_accessory.mask, handwear, legwear, and footwear. For "
-        "replace_color/add include a basic English color in color. recolor_all "
-        "means the user explicitly requests that the entire known outfit use one "
-        "color; it requires color and must use an empty slots list. keep_only means "
-        "the user explicitly says to retain only the listed clothing layers; never "
-        "use it for a normal outfit request. source_text must be an exact substring "
-        "of the user request. Directives inherit their enclosing character target; "
-        "do not put target_anchor_id inside them and do not emit tags in directives.\n\n"
+        "List each visible character once. A character used only as a cosplay or "
+        "clothing reference is not visible. Copy all text values exactly from the "
+        "request; never translate, guess tags, or fill missing clothes.\n\n"
+        "Return only:\n"
+        '{"characters":[{"name":"exact visible name","clothing":null,'
+        '"clothing_source":null,"clothing_changes":[],'
+        '"appearance_changes":[]}]}\n\n'
+        "clothing = the exact stated garment/set phrase, or null when unstated.\n"
+        "clothing_source = the exact character/persona whose outfit is copied, or "
+        "null. For A cosplay C, A is visible and C is clothing_source.\n"
+        "clothing_changes = explicit changes only. When useful, use objects with "
+        "operation, slots, color, source_text; source_text must be exact. Torn or "
+        "damaged clothing is a change, not removal.\n"
+        "appearance_changes = exact request phrases only. Shared words such as "
+        "both/all/双方/两人/都 must be copied onto every affected character.\n\n"
         f"User request: {user_prompt}"
     )
 
@@ -424,16 +357,9 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
     candidate spellings are safe to pass to the local Danbooru lookup CLI. An
     invalid response degrades to an empty tuple rather than aborting generation.
     """
-    text = re.sub(r"^```(?:json)?\s*", "", str(raw or "").strip(), flags=re.I)
-    text = re.sub(r"\s*```$", "", text)
-    match = re.search(r"\{.*\}", text, flags=re.S)
-    if match:
-        text = match.group(0)
-    try:
-        data = json.loads(text)
-    except (TypeError, ValueError):
-        return ()
+    data = _semantic_json(raw, user_prompt)
     items = data.get("anchors") if isinstance(data, dict) else None
+    intent_only = bool(data.get("_intent_only")) if isinstance(data, dict) else False
     if not isinstance(items, list):
         return ()
     anchors: list[SemanticAnchor] = []
@@ -479,7 +405,9 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
                 continue
             if candidate not in candidates:
                 candidates.append(candidate)
-        if not candidates:
+        if not candidates and not (
+            intent_only and role in {"target_character", "outfit", "outfit_source"}
+        ):
             continue
         anchor_id = re.sub(
             r"[^a-z0-9_-]+", "_", str(item.get("id") or f"anchor_{index}").lower()
@@ -523,7 +451,7 @@ _WARDROBE_KINDS = {
 }
 
 
-def _semantic_json(raw: str) -> dict[str, Any]:
+def _raw_semantic_json(raw: str) -> dict[str, Any]:
     """Extract one JSON object from a possibly fenced planner response.
 
     Only mappings are accepted because every semantic-plan consumer expects named
@@ -540,6 +468,220 @@ def _semantic_json(raw: str) -> dict[str, Any]:
     except (TypeError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _candidate_values(item: dict[str, Any]) -> list[Any]:
+    """Return compact-schema candidates without treating strings as lists."""
+    values = item.get("candidates", item.get("tags"))
+    if isinstance(values, list):
+        return values
+    tag = item.get("tag")
+    return [tag] if tag not in (None, "") else []
+
+
+def _simple_semantic_to_legacy(
+    data: dict[str, Any], user_prompt: str
+) -> dict[str, Any]:
+    """Normalize compact LLM1 JSON to the established internal graph schema.
+
+    The current protocol contains only per-character intent. The host creates
+    deterministic target/source anchors with empty candidate lists so later local
+    profile matching—not LLM1—supplies tag evidence. The older compact
+    characters/lookups form remains accepted for compatibility.
+    """
+    if "anchors" in data or "character_plans" in data:
+        return data
+    characters = data.get("characters")
+    lookups = data.get("lookups")
+    intent_only = "lookups" not in data
+    if not isinstance(characters, list) or (
+        not intent_only and not isinstance(lookups, list)
+    ):
+        return data
+    if intent_only:
+        lookups = []
+
+    def normalized_source(value: Any) -> str:
+        return re.sub(r"\s+", " ", str(value or "").strip().lower())
+
+    def normalized_wardrobe(item: dict[str, Any]) -> dict[str, Any]:
+        """Translate the readable intent schema into one internal wardrobe row."""
+        legacy = item.get("wardrobe")
+        if isinstance(legacy, dict):
+            return legacy
+        clothing = str(item.get("clothing") or "").strip()
+        source = str(item.get("clothing_source") or "").strip()
+        changes = item.get("clothing_changes", item.get("changes", []))
+        if source:
+            kind = "outfit_source"
+            wardrobe_source = source
+        elif re.search(r"(?:默认|原始|初始|default|original).{0,6}(?:衣|服|outfit)", clothing, re.I):
+            kind = "default_profile"
+            wardrobe_source = ""
+        elif re.search(r"(?:常服|便服|日常服|casual)", clothing, re.I):
+            kind = "casual_profile"
+            wardrobe_source = ""
+        elif clothing:
+            kind = "creative_fallback"
+            wardrobe_source = clothing
+        elif isinstance(changes, list) and changes:
+            kind = "default_profile"
+            wardrobe_source = ""
+        else:
+            kind = "none"
+            wardrobe_source = ""
+        return {"kind": kind, "source": wardrobe_source, "changes": changes}
+
+    wardrobe_role_demands: dict[str, set[str]] = {}
+    for item in characters[:4]:
+        if not isinstance(item, dict):
+            continue
+        wardrobe = normalized_wardrobe(item)
+        kind = str(wardrobe.get("kind") or "none").strip().lower()
+        if kind not in {"named_outfit", "outfit_source"}:
+            continue
+        source = normalized_source(
+            wardrobe.get("source", wardrobe.get("source_text", ""))
+        )
+        if source:
+            expected_role = "outfit" if kind == "named_outfit" else "outfit_source"
+            wardrobe_role_demands.setdefault(source, set()).add(expected_role)
+
+    wardrobe_lookup_counts: dict[str, int] = {}
+    for item in lookups[:8]:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        source = normalized_source(item.get("text", item.get("source_text", "")))
+        if role in {"outfit", "outfit_source"} and source and _candidate_values(item):
+            wardrobe_lookup_counts[source] = wardrobe_lookup_counts.get(source, 0) + 1
+
+    anchors: list[dict[str, Any]] = []
+    plans: list[dict[str, Any]] = []
+    lookup_ids: dict[tuple[str, str], list[str]] = {}
+    role_groups = {
+        "outfit_source": "character",
+        "copyright": "series",
+        "appearance": "appearance",
+        "expression": "expression",
+        "pose": "pose",
+        "action": "action",
+        "clothing": "clothing",
+        "outfit": "outfit",
+        "accessory": "accessory",
+        "prop": "prop",
+        "scene": "scene",
+        "lighting": "lighting",
+    }
+    for index, item in enumerate(lookups[:8], start=1):
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        source_text = str(
+            item.get("text", item.get("source_text", "")) or ""
+        ).strip()
+        if role not in role_groups:
+            continue
+        source_key = normalized_source(source_text)
+        demanded_roles = wardrobe_role_demands.get(source_key, set())
+        if (
+            role in {"outfit", "outfit_source"}
+            and wardrobe_lookup_counts.get(source_key) == 1
+            and len(demanded_roles) == 1
+        ):
+            role = next(iter(demanded_roles))
+        anchor_id = f"lookup_{index}"
+        anchors.append(
+            {
+                "id": anchor_id,
+                "role": role,
+                "group": role_groups[role],
+                "source_text": source_text,
+                "description": source_text,
+                "candidates": _candidate_values(item),
+            }
+        )
+        key = (role, source_key)
+        lookup_ids.setdefault(key, []).append(anchor_id)
+
+    # Intent-only LLM1 output names a source but never guesses its tag. Create a
+    # source-grounded empty anchor so cached/local profiles can bind it later.
+    if intent_only:
+        for item in characters[:4]:
+            if not isinstance(item, dict):
+                continue
+            wardrobe = normalized_wardrobe(item)
+            kind = str(wardrobe.get("kind") or "none").strip().lower()
+            if kind not in {"named_outfit", "outfit_source"}:
+                continue
+            role = "outfit" if kind == "named_outfit" else "outfit_source"
+            source_text = str(
+                wardrobe.get("source", wardrobe.get("source_text", "")) or ""
+            ).strip()
+            key = (role, normalized_source(source_text))
+            if not source_text or key in lookup_ids:
+                continue
+            anchor_id = f"intent_source_{len(anchors) + 1}"
+            anchors.append({
+                "id": anchor_id,
+                "role": role,
+                "group": role_groups[role],
+                "source_text": source_text,
+                "description": source_text,
+                "candidates": [],
+            })
+            lookup_ids[key] = [anchor_id]
+
+    for index, item in enumerate(characters[:4], start=1):
+        if not isinstance(item, dict):
+            continue
+        source_text = str(
+            item.get("name", item.get("source_text", "")) or ""
+        ).strip()
+        target_id = f"target_{index}"
+        anchors.append(
+            {
+                "id": target_id,
+                "role": "target_character",
+                "group": "character",
+                "source_text": source_text,
+                "description": source_text,
+                "candidates": _candidate_values(item),
+            }
+        )
+        wardrobe = normalized_wardrobe(item)
+        kind = str(wardrobe.get("kind") or "none").strip().lower()
+        source = str(
+            wardrobe.get("source", wardrobe.get("source_text", "")) or ""
+        ).strip()
+        legacy_wardrobe: dict[str, Any] = {"kind": kind}
+        if kind in {"named_outfit", "outfit_source"}:
+            expected_role = "outfit" if kind == "named_outfit" else "outfit_source"
+            matches = lookup_ids.get(
+                (expected_role, normalized_source(source)), []
+            )
+            if len(matches) == 1:
+                legacy_wardrobe["anchor_id"] = matches[0]
+        changes = wardrobe.get("changes", item.get(
+            "clothing_changes", item.get("changes", item.get("directives", []))
+        ))
+        plans.append(
+            {
+                "target_anchor_id": target_id,
+                "wardrobe": legacy_wardrobe,
+                "directives": changes if isinstance(changes, list) else [],
+            }
+        )
+    result = {"anchors": anchors, "character_plans": plans}
+    if intent_only:
+        result["_intent_only"] = True
+    return result
+
+
+def _semantic_json(raw: str, user_prompt: str = "") -> dict[str, Any]:
+    """Return legacy or compact planner JSON in one internal representation."""
+    data = _raw_semantic_json(raw)
+    return _simple_semantic_to_legacy(data, user_prompt) if data else {}
 
 
 def _parse_outfit_directive_item(
@@ -589,7 +731,7 @@ def parse_semantic_character_plans(
     conservative creative fallback instead of assigning one character's clothes
     to another.
     """
-    items = _semantic_json(raw).get("character_plans")
+    items = _semantic_json(raw, user_prompt).get("character_plans")
     if not isinstance(items, list):
         return ()
     validated = anchors if anchors is not None else parse_semantic_plan(raw, user_prompt)
@@ -654,11 +796,160 @@ def parse_semantic_character_plans(
 def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ...]:
     """Report structural relationship errors that warrant one planner retry.
 
-    This deliberately validates references rather than inferring them.  The repair
-    remains the planner's job, so a missing edge in a multi-character request can
-    never be filled by host-side proximity or name heuristics.
+    Compact output is checked only at its public boundary: grounded character
+    names, a supported wardrobe kind, and an exact source-to-lookup relationship.
+    Optional/unreferenced lookup details and malformed changes are simply filtered
+    later rather than making the entire response fail. Legacy graph JSON retains
+    its reference validation for backward compatibility.
     """
-    data = _semantic_json(raw)
+    raw_data = _raw_semantic_json(raw)
+    if not raw_data:
+        return ("response is not a valid JSON object",)
+    if "characters" in raw_data and "lookups" not in raw_data:
+        characters = raw_data.get("characters")
+        if not isinstance(characters, list):
+            return ("characters must be an array",)
+        readable_intent = any(
+            isinstance(item, dict)
+            and any(
+                key in item
+                for key in (
+                    "clothing", "clothing_source", "clothing_changes",
+                    "appearance_changes",
+                )
+            )
+            and "wardrobe" not in item
+            for item in characters[:4]
+        )
+        issues: list[str] = []
+        for index, item in enumerate(characters[:4], start=1):
+            if not isinstance(item, dict):
+                issues.append(f"characters[{index}] must be an object")
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name or (
+                name not in user_prompt and name.lower() not in user_prompt.lower()
+            ):
+                issues.append(
+                    f"characters[{index}].name must be an exact phrase from the request"
+                )
+            if readable_intent:
+                for field in ("clothing", "clothing_source"):
+                    value = item.get(field)
+                    if value is None:
+                        continue
+                    text = str(value).strip()
+                    if not text or (
+                        text not in user_prompt
+                        and text.lower() not in user_prompt.lower()
+                    ):
+                        issues.append(
+                            f"characters[{index}].{field} must be null or an exact "
+                            "phrase from the request"
+                        )
+                for field in ("clothing_changes", "appearance_changes"):
+                    value = item.get(field, [])
+                    if not isinstance(value, list):
+                        issues.append(f"characters[{index}].{field} must be an array")
+                continue
+            wardrobe = item.get("wardrobe")
+            if not isinstance(wardrobe, dict):
+                issues.append(f"characters[{index}].wardrobe must be an object")
+                continue
+            kind = str(wardrobe.get("kind") or "none").strip().lower()
+            if kind not in _WARDROBE_KINDS:
+                issues.append(f"characters[{index}].wardrobe.kind is invalid")
+                continue
+            source = str(wardrobe.get("source") or "").strip()
+            grounded = bool(
+                source
+                and (source in user_prompt or source.lower() in user_prompt.lower())
+            )
+            if kind in {"named_outfit", "outfit_source", "creative_fallback"}:
+                if not grounded:
+                    issues.append(
+                        f"characters[{index}].wardrobe.source must be an exact phrase "
+                        "from the request"
+                    )
+            elif source and not grounded:
+                issues.append(
+                    f"characters[{index}].wardrobe.source must be empty or grounded"
+                )
+        return tuple(dict.fromkeys(issues))
+    if "characters" in raw_data or "lookups" in raw_data:
+        characters = raw_data.get("characters")
+        lookups = raw_data.get("lookups")
+        if not isinstance(characters, list) or not isinstance(lookups, list):
+            return ("characters and lookups must both be arrays",)
+        lookup_rows = [item for item in lookups[:8] if isinstance(item, dict)]
+        issues: list[str] = []
+        wardrobe_demands: dict[str, set[str]] = {}
+        for item in characters[:4]:
+            if not isinstance(item, dict) or not isinstance(item.get("wardrobe"), dict):
+                continue
+            wardrobe = item["wardrobe"]
+            kind = str(wardrobe.get("kind") or "none").strip().lower()
+            if kind not in {"named_outfit", "outfit_source"}:
+                continue
+            source = str(wardrobe.get("source") or "").strip()
+            if source:
+                source_key = re.sub(r"\s+", " ", source.lower())
+                expected_role = "outfit" if kind == "named_outfit" else "outfit_source"
+                wardrobe_demands.setdefault(source_key, set()).add(expected_role)
+        for index, item in enumerate(characters[:4], start=1):
+            if not isinstance(item, dict):
+                issues.append(f"characters[{index}] must be an object")
+                continue
+            name = str(item.get("name") or "").strip()
+            candidates = _candidate_values(item)
+            if not name or (
+                name not in user_prompt and name.lower() not in user_prompt.lower()
+            ):
+                issues.append(
+                    f"characters[{index}].name must be an exact phrase from the request"
+                )
+            if not candidates:
+                issues.append(f"characters[{index}].candidates must not be empty")
+            wardrobe = item.get("wardrobe")
+            if wardrobe is None:
+                wardrobe = {"kind": "none"}
+            if not isinstance(wardrobe, dict):
+                issues.append(f"characters[{index}].wardrobe must be an object")
+                continue
+            kind = str(wardrobe.get("kind") or "none").strip().lower()
+            if kind not in _WARDROBE_KINDS:
+                issues.append(f"characters[{index}].wardrobe.kind is invalid")
+                continue
+            if kind not in {"named_outfit", "outfit_source"}:
+                continue
+            source = str(wardrobe.get("source") or "").strip()
+            source_key = re.sub(r"\s+", " ", source.lower())
+            matches = [
+                lookup
+                for lookup in lookup_rows
+                if re.sub(
+                    r"\s+", " ", str(lookup.get("text") or "").strip().lower()
+                ) == source_key
+                and str(lookup.get("role") or "").strip().lower()
+                in {"outfit", "outfit_source"}
+                and _candidate_values(lookup)
+            ]
+            grounded = bool(
+                source
+                and (source in user_prompt or source.lower() in user_prompt.lower())
+            )
+            if not grounded or len(matches) != 1:
+                issues.append(
+                    f"characters[{index}].wardrobe.source must exactly match one "
+                    "wardrobe lookup from the request"
+                )
+            elif len(wardrobe_demands.get(source_key, set())) != 1:
+                issues.append(
+                    f"characters[{index}].wardrobe.source has conflicting wardrobe roles"
+                )
+        return tuple(dict.fromkeys(issues))
+
+    data = _semantic_json(raw, user_prompt)
     if not data:
         return ("response is not a valid JSON object",)
     anchors = parse_semantic_plan(raw, user_prompt)
@@ -735,11 +1026,11 @@ def build_semantic_plan_repair_prompt(
         build_semantic_plan_prompt(user_prompt)
         + "\n\nYour previous response failed structural validation:\n"
         + issue_lines
-        + "\nRepair the complete JSON object. Preserve every correctly understood user "
-        "requirement, anchor, per-character directive, and appearance request. "
-        "Do not merely describe the correction. For named_outfit and outfit_source, "
-        "wardrobe.anchor_id is mandatory and must reference the corresponding anchor ID. "
-        "Return the corrected complete JSON object only.\n\nPrevious response:\n"
+        + "\nRepair the complete intent JSON object. Preserve every correctly "
+        "understood character, clothing change, and appearance request. Do not "
+        "invent tags, candidates, lookups, IDs, or unstated facts. Every name and "
+        "source_text must be copied from the request. Return the corrected complete "
+        "JSON object only.\n\nPrevious response:\n"
         + str(previous_raw or "")
     )
 
@@ -1385,8 +1676,34 @@ def prefer_configured_character_anchors(
         for anchor in configured_by_role.get("copyright", ())
         for value in terms(anchor)
     }
-    kept: list[SemanticAnchor] = list(dict.fromkeys(configured))
+    # Character plans refer to host-generated planner IDs. When a configured
+    # alias supplies authoritative identity evidence, keep that discovered ID
+    # while replacing only its candidates; otherwise the valid plan would dangle.
+    substituted_discovered: set[SemanticAnchor] = set()
+    kept: list[SemanticAnchor] = []
+    for configured_anchor in dict.fromkeys(configured):
+        equivalent = next(
+            (
+                anchor
+                for anchor in discovered
+                if anchor.role == configured_anchor.role
+                and anchor.role == "target_character"
+                and terms(anchor) & terms(configured_anchor)
+            ),
+            None,
+        )
+        if equivalent is None:
+            kept.append(configured_anchor)
+            continue
+        kept.append(replace(
+            equivalent,
+            description=configured_anchor.description,
+            candidates=configured_anchor.candidates,
+        ))
+        substituted_discovered.add(equivalent)
     for anchor in discovered:
+        if anchor in substituted_discovered:
+            continue
         anchor_terms = terms(anchor)
         if (
             anchor.role == "target_character"

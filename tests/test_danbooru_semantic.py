@@ -16,6 +16,7 @@ import danbooru_resolver as resolver_module  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
     SemanticAnchor,
     SemanticLookupResult,
+    SemanticWardrobe,
     build_semantic_plan_prompt,
     build_semantic_plan_repair_prompt,
     extract_parenthesized_character_aliases,
@@ -37,13 +38,150 @@ def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
         "爱音cosplay黑魔导，祥子cosplay黑魔导女孩"
     )
 
-    assert "Relationship-first contract" in prompt
-    assert "exactly one character_plans item" in prompt
+    assert '"characters"' in prompt
+    assert '"lookups"' not in prompt
+    assert '"appearance_changes"' in prompt
     assert "爱音cosplay黑魔导，祥子cosplay黑魔导女孩" in prompt
-    assert "do not shorten 黑魔导女孩" in prompt
-    assert "number of character_plans equals" in prompt
-    assert "add the pink-hair request separately" in prompt
-    assert '"kind":"outfit_source","anchor_id":"source_1"' in prompt
+    assert "never translate, guess tags" in prompt
+    assert "A cosplay C" in prompt
+    assert "clothing_source" in prompt
+
+
+def test_intent_only_plan_allows_unknown_tags_and_builds_local_match_anchors() -> None:
+    prompt = "千早爱音穿着羽丘夏季校服但没穿短裙，头发变成蓝色"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "wardrobe": {
+                        "kind": "named_outfit",
+                        "source": "羽丘夏季校服",
+                    },
+                    "changes": [
+                        {
+                            "operation": "remove",
+                            "slots": ["lower_body.skirt"],
+                            "source_text": "没穿短裙",
+                        }
+                    ],
+                    "appearance_changes": [
+                        {"dimension": "hair_color", "source_text": "头发变成蓝色"}
+                    ],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert [(item.role, item.source_text, item.candidates) for item in anchors] == [
+        ("outfit", "羽丘夏季校服", ()),
+        ("target_character", "千早爱音", ()),
+    ]
+    assert plans[0].wardrobe.kind == "named_outfit"
+    assert plans[0].wardrobe.anchor_id == anchors[0].anchor_id
+    assert plans[0].directives[0].operation == "remove"
+
+
+def test_intent_only_unknown_wardrobe_does_not_require_or_invent_tags() -> None:
+    prompt = "千早爱音和丰川祥子站在一起"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "wardrobe": {"kind": "none", "source": ""},
+                    "changes": [],
+                    "appearance_changes": [],
+                },
+                {
+                    "name": "丰川祥子",
+                    "wardrobe": {"kind": "none", "source": ""},
+                    "changes": [],
+                    "appearance_changes": [],
+                },
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    anchors = parse_semantic_plan(raw, prompt)
+    assert [anchor.candidates for anchor in anchors] == [(), ()]
+    assert [plan.wardrobe.kind for plan in parse_semantic_character_plans(
+        raw, prompt, anchors
+    )] == ["none", "none"]
+
+
+def test_readable_intent_schema_maps_cosplay_source_without_tag_guess() -> None:
+    prompt = "丰川祥子在cosplay初音未来，千早爱音站在旁边"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "丰川祥子",
+                    "clothing": "cosplay初音未来",
+                    "clothing_source": "初音未来",
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                },
+                {
+                    "name": "千早爱音",
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                },
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert [(anchor.role, anchor.source_text, anchor.candidates) for anchor in anchors] == [
+        ("outfit_source", "初音未来", ()),
+        ("target_character", "丰川祥子", ()),
+        ("target_character", "千早爱音", ()),
+    ]
+    assert plans[0].wardrobe == SemanticWardrobe("outfit_source", anchors[0].anchor_id)
+    assert plans[1].wardrobe == SemanticWardrobe("none")
+
+
+def test_readable_intent_only_changes_uses_default_as_modification_base() -> None:
+    prompt = "千早爱音的裙子变成蓝色"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [
+                        {
+                            "operation": "replace_color",
+                            "slots": ["lower_body.skirt"],
+                            "color": "blue",
+                            "source_text": "裙子变成蓝色",
+                        }
+                    ],
+                    "appearance_changes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    plans = parse_semantic_character_plans(raw, prompt)
+
+    assert plans[0].wardrobe == SemanticWardrobe("default_profile")
+    assert plans[0].directives[0].operation == "replace_color"
 
 
 def test_missing_outfit_source_reference_requests_llm_repair_without_guessing() -> None:
@@ -99,9 +237,174 @@ def test_missing_outfit_source_reference_requests_llm_repair_without_guessing() 
     assert issues == (
         "character_plans[1].wardrobe.anchor_id is required when kind is outfit_source",
     )
-    assert 'wardrobe.anchor_id is mandatory' in repair
+    assert "anchor_id is required" in repair
     assert '"source_text": "重音teto"' in repair
     assert '"operation": "damage"' in repair
+
+
+def test_compact_semantic_plan_builds_internal_ids_and_relationships() -> None:
+    prompt = "千早爱音cosplay重音teto，上衣也被撕破了"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "candidates": ["chihaya_anon"],
+                    "wardrobe": {
+                        "kind": "outfit_source",
+                        "source": "重音teto",
+                    },
+                    "changes": [
+                        {
+                            "operation": "damage",
+                            "slots": ["upper_body.primary"],
+                            "source_text": "上衣也被撕破了",
+                        }
+                    ],
+                }
+            ],
+            "lookups": [
+                {
+                    "text": "重音teto",
+                    "role": "outfit_source",
+                    "candidates": ["kasane_teto"],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert [(item.anchor_id, item.role) for item in anchors] == [
+        ("lookup_1", "outfit_source"),
+        ("target_1", "target_character"),
+    ]
+    assert plans[0].target_anchor_id == "target_1"
+    assert plans[0].wardrobe.anchor_id == "lookup_1"
+    assert plans[0].directives[0].operation == "damage"
+
+
+def test_compact_semantic_plan_only_repairs_missing_source_relationship() -> None:
+    prompt = "千早爱音cosplay重音teto"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "tag": "chihaya_anon",
+                    "wardrobe": {
+                        "kind": "outfit_source",
+                        "source": "重音teto",
+                    },
+                }
+            ],
+            "lookups": [],
+        },
+        ensure_ascii=False,
+    )
+
+    assert semantic_plan_validation_issues(raw, prompt) == (
+        "characters[1].wardrobe.source must exactly match one wardrobe lookup "
+        "from the request",
+    )
+
+
+def test_compact_named_outfit_normalizes_unique_outfit_source_role() -> None:
+    prompt = "丰川祥子和千早爱音穿着羽丘夏季校服"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "丰川祥子",
+                    "tag": "togawa_sakiko",
+                    "wardrobe": {"kind": "named_outfit", "source": "羽丘夏季校服"},
+                },
+                {
+                    "name": "千早爱音",
+                    "tag": "chihaya_anon",
+                    "wardrobe": {"kind": "named_outfit", "source": "羽丘夏季校服"},
+                },
+            ],
+            "lookups": [
+                {
+                    "text": "羽丘夏季校服",
+                    "role": "outfit_source",
+                    "tag": "haneoka_school_uniform",
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert [(anchor.anchor_id, anchor.role) for anchor in anchors] == [
+        ("lookup_1", "outfit"),
+        ("target_1", "target_character"),
+        ("target_2", "target_character"),
+    ]
+    assert [plan.wardrobe.anchor_id for plan in plans] == ["lookup_1", "lookup_1"]
+    assert all(plan.wardrobe.kind == "named_outfit" for plan in plans)
+
+
+def test_compact_shared_source_with_conflicting_wardrobe_kinds_is_rejected() -> None:
+    prompt = "丰川祥子穿羽丘夏季校服，千早爱音cosplay羽丘夏季校服"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "丰川祥子",
+                    "tag": "togawa_sakiko",
+                    "wardrobe": {"kind": "named_outfit", "source": "羽丘夏季校服"},
+                },
+                {
+                    "name": "千早爱音",
+                    "tag": "chihaya_anon",
+                    "wardrobe": {"kind": "outfit_source", "source": "羽丘夏季校服"},
+                },
+            ],
+            "lookups": [
+                {
+                    "text": "羽丘夏季校服",
+                    "role": "outfit_source",
+                    "tag": "haneoka_school_uniform",
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    issues = semantic_plan_validation_issues(raw, prompt)
+
+    assert len(issues) == 2
+    assert all("conflicting wardrobe roles" in issue for issue in issues)
+
+
+def test_compact_validation_ignores_unreferenced_optional_lookup_noise() -> None:
+    prompt = "千早爱音站在舞台上"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "candidates": ["chihaya_anon"],
+                    "wardrobe": {"kind": "none", "source": ""},
+                    "changes": [{"unexpected": "discard later"}],
+                }
+            ],
+            "lookups": [
+                {"text": "not grounded", "role": "unknown", "candidates": []}
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
 
 
 def test_character_plans_require_unique_role_correct_anchor_references() -> None:
@@ -214,8 +517,8 @@ def test_semantic_plan_keeps_torn_garment_as_damage_not_removal() -> None:
     plans = parse_semantic_character_plans(raw, prompt)
 
     assert plans[0].directives[0].operation == "damage"
-    assert "damage" in build_semantic_plan_prompt(prompt)
-    assert "never encode damage as remove" in build_semantic_plan_prompt(prompt)
+    assert "clothing_changes" in build_semantic_plan_prompt(prompt)
+    assert "damaged clothing is a change, not removal" in build_semantic_plan_prompt(prompt)
 
 
 def test_multi_target_outfit_directive_requires_a_valid_target_anchor() -> None:
@@ -1640,6 +1943,47 @@ def test_casual_outfit_profile_does_not_fall_back_to_default_cache() -> None:
     assert default.outfit_profile_tags == ("school_uniform",)
 
 
+def test_mixed_character_variants_are_selected_from_each_local_clause() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver.remember_outfit_summary(
+        "千早爱音", ("chihaya_anon",), ("anon_school_uniform",)
+    )
+    resolver.remember_outfit_summary(
+        "千早爱音", ("chihaya_anon",), ("pink_cardigan", "jeans"),
+        qualifier="casual",
+    )
+    resolver.remember_outfit_summary(
+        "丰川祥子", ("togawa_sakiko",), ("sakiko_school_uniform",)
+    )
+    resolver.remember_outfit_summary(
+        "丰川祥子", ("togawa_sakiko",), ("blue_cardigan", "long_skirt"),
+        qualifier="casual",
+    )
+
+    cached = resolver.cached_outfit_profiles_for_prompt(
+        "千早爱音穿官方常服，丰川祥子穿默认服装"
+    )
+
+    assert cached is not None
+    scoped = {
+        alias: (tags, qualifier)
+        for alias, _source, tags, qualifier in cached.source_outfit_profiles
+    }
+    assert scoped["千早爱音"] == (("pink_cardigan", "jeans"), "casual")
+    assert scoped["丰川祥子"] == (("sakiko_school_uniform",), "default")
+
+
 def test_target_casual_variant_uses_casual_post_query(monkeypatch) -> None:
     anchor = SemanticAnchor(
         "target",
@@ -2116,6 +2460,38 @@ def test_configured_term_mapping_is_returned_as_request_hard_tag() -> None:
     assert result.confirmed_tags == ("masquerade_mask",)
 
 
+def test_configured_term_mapping_ignores_explicitly_negated_occurrence() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={
+            "danbooru_term_mappings": [
+                "白丝袜=white_pantyhose",
+                "mask=masquerade_mask",
+            ]
+        },
+    )
+
+    assert resolver.cached_term_mappings_for_prompt("少女不要白丝袜") is None
+    positive = resolver.cached_term_mappings_for_prompt(
+        "不要白丝袜，另一名少女穿白丝袜"
+    )
+    assert positive is not None
+    assert positive.confirmed_tags == ("white_pantyhose",)
+    assert resolver.cached_term_mappings_for_prompt("not a mask") is None
+    kimono = resolver.cached_term_mappings_for_prompt("kimono mask")
+    assert kimono is not None
+    assert kimono.confirmed_tags == ("masquerade_mask",)
+
+
 def test_wardrobe_editor_round_trip_updates_profiles_and_mappings() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
@@ -2252,6 +2628,42 @@ def test_character_outfit_profile_refreshes_once_per_algorithm_window() -> None:
     evidence = saved["profiles"]["amoris"]["evidence"]
     assert evidence["algorithm_version"] == 4
     assert evidence["sample_mode"] == "single_character_anchor"
+    assert evidence["created_at"] <= evidence["updated_at"]
+
+
+def test_wardrobe_snapshot_exposes_stable_profile_creation_time() -> None:
+    resolver = DanbooruResolver(
+        logger=object(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver._profile_cache_data = {
+        "version": 3,
+        "profiles": {
+            "legacy": {
+                "kind": "character_outfit",
+                "aliases": ["旧档案"],
+                "source_tags": ["legacy_character"],
+                "outfit_tags": ["legacy_dress"],
+                "evidence": {"updated_at": 100.0},
+            },
+            "new": {
+                "kind": "character_outfit",
+                "aliases": ["新档案"],
+                "source_tags": ["new_character"],
+                "outfit_tags": ["new_dress"],
+                "evidence": {"created_at": 200.0, "updated_at": 300.0},
+            },
+        },
+    }
+
+    by_key = {item["key"]: item for item in resolver.wardrobe_snapshot()["outfits"]}
+
+    assert by_key["legacy"]["evidence"]["createdAt"] == 100.0
+    assert by_key["new"]["evidence"]["createdAt"] == 200.0
 
 
 def test_multiple_outfit_sources_are_extracted_and_persisted_separately(

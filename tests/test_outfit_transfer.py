@@ -91,6 +91,15 @@ def test_unverified_llm_outfit_tags_are_removed() -> None:
     assert filtered == "full body, standing"
 
 
+def test_outfit_filter_does_not_misclassify_actions_props_or_scenery() -> None:
+    text = (
+        "skirt lift, shirt tug, landscape, rainbow, fireplace, top-down view, "
+        "bow and arrow, elbow grab, booty focus, full body"
+    )
+
+    assert keep_only_verified_outfit_tags(text, ()) == text
+
+
 def test_only_post_verified_outfit_tags_survive() -> None:
     filtered = keep_only_verified_outfit_tags(
         "black dress, puffy sleeves, white lace, black mask, standing",

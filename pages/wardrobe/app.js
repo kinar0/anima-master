@@ -26,15 +26,19 @@ const META = {
 };
 const $ = (selector) => document.querySelector(selector);
 const elements = {
-  list: $("#list"), empty: $("#empty-state"), search: $("#search-input"), add: $("#add-button"), save: $("#save-button"), dirtySave: $("#dirty-save-button"), discard: $("#discard-button"), refresh: $("#refresh-button"), dirtyBar: $("#dirty-bar"), toast: $("#toast"), connection: $("#connection"), sectionKicker: $("#section-kicker"), sectionTitle: $("#section-title"), sectionDescription: $("#section-description"), dataStatus: $("#data-status"), revision: $("#revision-label"), tabs: [...document.querySelectorAll(".tab")],
+  list: $("#list"), empty: $("#empty-state"), search: $("#search-input"), sort: $("#outfit-sort"), sortControl: $("#outfit-sort-control"), add: $("#add-button"), save: $("#save-button"), dirtySave: $("#dirty-save-button"), discard: $("#discard-button"), refresh: $("#refresh-button"), dirtyBar: $("#dirty-bar"), toast: $("#toast"), connection: $("#connection"), sectionKicker: $("#section-kicker"), sectionTitle: $("#section-title"), sectionDescription: $("#section-description"), dataStatus: $("#data-status"), revision: $("#revision-label"), tabs: [...document.querySelectorAll(".tab")],
 };
-let state = { revision: "", outfits: [], outfitSets: [], terms: [], tab: "outfits", search: "", dirty: false, busy: false };
+let state = { revision: "", outfits: [], outfitSets: [], terms: [], tab: "outfits", search: "", outfitSort: "added_desc", dirty: false, busy: false };
 let pristine = null;
 let toastTimer = null;
 
 const clone = (value) => typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
 const splitList = (value) => [...new Set(String(value || "").split(/[,，\n]+/).map((item) => item.trim()).filter(Boolean))];
 const matches = (item) => !state.search || JSON.stringify(item).toLowerCase().includes(state.search.toLowerCase());
+const addedAt = (item) => {
+  const value = Number(item?.evidence?.createdAt ?? item?.evidence?.updatedAt ?? 0);
+  return Number.isFinite(value) ? value : 0;
+};
 function node(tag, className, text) { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; }
 function showToast(message) { clearTimeout(toastTimer); elements.toast.textContent = message; elements.toast.hidden = false; toastTimer = setTimeout(() => elements.toast.hidden = true, 3800); }
 function errorText(error) { return error instanceof Error ? error.message : String(error); }
@@ -76,8 +80,13 @@ function renderCounts() {
 }
 function render() {
   const meta = META[state.tab]; elements.sectionKicker.textContent = meta.kicker; elements.sectionTitle.textContent = meta.title; elements.sectionDescription.textContent = meta.description;
-  elements.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === state.tab)); elements.list.replaceChildren();
-  const indexed = state[state.tab].map((item, index) => ({ item, index })).filter(({ item }) => matches(item)); indexed.forEach(({ item, index }) => elements.list.append(state.tab === "outfits" ? outfitEntry(item, index) : mappingEntry(item, index, state.tab === "outfitSets")));
+  elements.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === state.tab)); elements.sortControl.hidden = state.tab !== "outfits"; elements.list.replaceChildren();
+  const indexed = state[state.tab].map((item, index) => ({ item, index })).filter(({ item }) => matches(item));
+  if (state.tab === "outfits") {
+    const direction = state.outfitSort === "added_asc" ? 1 : -1;
+    indexed.sort((left, right) => direction * (addedAt(left.item) - addedAt(right.item)) || left.index - right.index);
+  }
+  indexed.forEach(({ item, index }) => elements.list.append(state.tab === "outfits" ? outfitEntry(item, index) : mappingEntry(item, index, state.tab === "outfitSets")));
   elements.empty.hidden = indexed.length > 0; renderCounts(); updateDirty();
 }
 function hydrate(data) {
@@ -109,6 +118,7 @@ async function save() {
 function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新服装档案", aliases: ["新别名"], sourceTags: [], tags: [], appearanceTags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新服装套组", aliases: ["新服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", variant: "default", origin: "configured", profileKey: "" }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
 
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; render(); }));
+elements.sort.addEventListener("change", () => { state.outfitSort = elements.sort.value; render(); });
 elements.search.addEventListener("input", () => { state.search = elements.search.value.trim(); render(); }); elements.add.addEventListener("click", addEntry); elements.save.addEventListener("click", save); elements.dirtySave.addEventListener("click", save); elements.refresh.addEventListener("click", load); elements.discard.addEventListener("click", () => pristine && hydrate(pristine));
 window.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); save(); } }); window.addEventListener("beforeunload", (event) => { if (state.dirty) { event.preventDefault(); event.returnValue = ""; } });
 

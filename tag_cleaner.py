@@ -327,8 +327,15 @@ def clean_content_tags(
     strip_character_tags: bool = True,
     protected_core_tags: tuple[str, ...] = (),
     allow_multi_character: bool = False,
+    trusted_structured: bool = False,
 ) -> str:
-    """Clean LLM-generated content tags before final prompt composition."""
+    """Clean LLM-generated content tags before final prompt composition.
+
+    A valid seven-field response has already separated roster, identity,
+    character details, shared tags, and narrative.  In that trusted structured
+    path we only remove reserved quality/artist tags and exact duplicates; the
+    host must not reinterpret or truncate the writer's visual choices.
+    """
     tags = split_tags(text)
     seen: set[str] = set()
     cleaned: list[str] = []
@@ -347,24 +354,40 @@ def clean_content_tags(
             continue
         if key in QUALITY_BLOCKLIST:
             continue
-        if strip_character_tags and key in CHARACTER_BLOCKLIST:
-            continue
-        if strip_character_tags and is_character_identity_tag(key):
-            continue
-        if not allow_multi_character and key in MULTI_CHARACTER_BLOCKLIST:
+        if (
+            not trusted_structured
+            and strip_character_tags
+            and key in CHARACTER_BLOCKLIST
+        ):
             continue
         if (
-            protected
+            not trusted_structured
+            and strip_character_tags
+            and is_character_identity_tag(key)
+        ):
+            continue
+        if (
+            not trusted_structured
+            and not allow_multi_character
+            and key in MULTI_CHARACTER_BLOCKLIST
+        ):
+            continue
+        if (
+            not trusted_structured
+            and protected
             and parenthesized_core_re.fullmatch(key)
             and key not in protected
         ):
             continue
         if artist_re.match(tag.strip()):
             continue
-        if len(tag) > 80:
+        if not trusted_structured and len(tag) > 80:
             continue
         seen.add(key)
         cleaned.append(tag)
+
+    if trusted_structured:
+        return ", ".join(cleaned)
 
     semantic_keys = [
         normalize_tag_key(_strip_wrapping_brackets(tag)) for tag in cleaned

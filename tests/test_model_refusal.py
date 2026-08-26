@@ -90,8 +90,16 @@ def _refusing_pipeline(*, multi_person: bool = False):
 def test_chinese_refusal_detection_requires_refusal_language() -> None:
     assert is_chinese_model_refusal("抱歉，我不能满足你的要求。") is True
     assert is_chinese_model_refusal("我无法协助生成这一内容。") is True
+    assert is_chinese_model_refusal(
+        "I'm sorry, but I can't help with that request."
+    ) is True
+    assert is_chinese_model_refusal(
+        "I am unable to generate that content."
+    ) is True
+    assert is_chinese_model_refusal("I must refuse this request.") is True
     assert is_chinese_model_refusal("画一个穿蓝色连衣裙的女孩") is False
     assert is_chinese_model_refusal("1girl, solo, blue dress") is False
+    assert is_chinese_model_refusal("sorry expression, unable to move") is False
 
 
 def test_normal_prompt_refusal_stops_without_structured_retry() -> None:

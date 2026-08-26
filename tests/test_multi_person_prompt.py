@@ -10,21 +10,13 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from danbooru_resolver import DanbooruResolveOutcome  # noqa: E402
-from danbooru_semantic import (  # noqa: E402
-    SemanticAnchor,
-    SemanticLookupResult,
-    SemanticOutfitDirective,
-)
 from multi_person_prompt import (  # noqa: E402
     MultiPersonCharacter,
     build_multi_person_plan_prompt,
     parse_multi_person_plan,
     render_multi_person_character,
 )
-from prompt_pipeline import (  # noqa: E402
-    PromptPipeline,
-    semantic_outfit_constraints_for_multi_person,
-)
+from prompt_pipeline import PromptPipeline  # noqa: E402
 
 
 class _Logger:
@@ -164,23 +156,6 @@ def test_character_renderer_uses_fixed_tags_as_authoritative_identity() -> None:
     assert "black dress" in block
 
 
-def test_multi_person_outfit_constraint_is_bound_to_its_target_only() -> None:
-    constraints = semantic_outfit_constraints_for_multi_person(
-        (
-            SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "", ("togawa_sakiko",)),
-            SemanticAnchor("anon", "target_character", "character", "千早爱音", "", ("chihaya_anon",)),
-        ),
-        (
-            SemanticOutfitDirective(
-                "remove", ("upper_body.primary",), source_text="爱音的上衣消失", target_anchor_id="anon"
-            ),
-        ),
-        ("丰川祥子", "千早爱音"),
-    )
-
-    assert constraints == {1: ("wears no shirt or top.",)}
-
-
 def test_renderer_keeps_bound_outfit_constraint_in_character_block() -> None:
     block = render_multi_person_character(
         MultiPersonCharacter(
@@ -211,10 +186,14 @@ def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:
 
 def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character():
     class _Context:
+        def __init__(self):
+            self.llm_calls = 0
+
         async def get_current_chat_provider_id(self, umo):
             return "provider"
 
         async def llm_generate(self, **kwargs):
+            self.llm_calls += 1
             return _Response(_plan_json())
 
     class _Resolver:
@@ -223,6 +202,12 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
 
         def required_core_tags_for_prompt(self, prompt):
             return ()
+
+        def semantic_lookup_available(self):
+            raise AssertionError("/anm 多人 must not enter the LLM1 route")
+
+        async def resolve_semantic_anchors(self, _anchors):
+            raise AssertionError("/anm 多人 must not resolve LLM1 anchors")
 
         async def resolve_detailed(
             self,
@@ -241,9 +226,10 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
             )
 
     resolver = _Resolver()
+    context = _Context()
     config = {"chiyo_preset": "", "prompt_optimize_enabled": True}
     pipeline = PromptPipeline(
-        context=_Context(),
+        context=context,
         config=config,
         logger=_Logger(),
         danbooru_resolver=resolver,
@@ -285,72 +271,7 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
     assert "Character A" not in result.final_prompt
     assert "third person" not in result.final_prompt
     assert len(resolver.calls) == 2
-
-
-def test_explicit_multi_person_uses_saved_character_appearances() -> None:
-    class _Context:
-        async def llm_generate(self, **_kwargs):
-            return _Response(_plan_json(conflicting_fixed_appearance=True))
-
-    class _Resolver:
-        async def resolve_detailed(self, **_kwargs):
-            raise AssertionError("saved profiles must bypass fresh identity lookup")
-
-    config = {"chiyo_preset": "", "prompt_optimize_enabled": True}
-    pipeline = PromptPipeline(
-        context=_Context(),
-        config=config,
-        logger=_Logger(),
-        danbooru_resolver=_Resolver(),
-        researcher=_Researcher(),
-        get_bool=lambda key, default: bool(config.get(key, default)),
-        get_int=lambda key, default: int(config.get(key, default)),
-        get_float=lambda key, default: float(config.get(key, default)),
-        get_str=lambda key, default: str(config.get(key, default)),
-        shorten=lambda text, limit: text[:limit],
-    )
-    profiles = SemanticLookupResult(
-        character_appearance_profiles=(
-            (
-                ("若叶睦", "wakaba_mutsumi"),
-                "wakaba_mutsumi",
-                ("long_hair", "green_hair", "yellow_eyes"),
-            ),
-            (
-                ("千早爱音", "chihaya_anon"),
-                "chihaya_anon",
-                ("pink_hair", "grey_eyes"),
-            ),
-        ),
-        status="profile_cache",
-    )
-    summary = {}
-
-    result = asyncio.run(
-        pipeline._build_multi_person_prompt(
-            provider_id="provider",
-            prompt="若叶睦和千早爱音牵手",
-            prompt_config=config,
-            use_deep_thinking=False,
-            summary=summary,
-            original_user_prompt="若叶睦和千早爱音牵手",
-            semantic_result=profiles,
-        )
-    )
-
-    assert result is not None
-    statuses = result.summary["character_resolution_statuses"]
-    assert [item["status"] for item in statuses] == [
-        "profile_cache",
-        "profile_cache",
-    ]
-    assert statuses[0]["canonical_tag"] == "wakaba_mutsumi"
-    assert statuses[0]["identity_tags"] == [
-        "long_hair",
-        "green_hair",
-        "yellow_eyes",
-    ]
-    assert statuses[1]["identity_tags"] == ["pink_hair", "grey_eyes"]
+    assert context.llm_calls == 1
 
 
 def test_multi_person_pipeline_protects_fixed_character_appearance():

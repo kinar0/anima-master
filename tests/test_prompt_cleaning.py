@@ -145,18 +145,59 @@ def test_structured_sections_keep_seven_block_order_and_hard_tags() -> None:
     )
 
     assert result.final_prompt.splitlines() == [
-        "masterpiece, best quality, 1girl, solo",
-        "togawa sakiko",
-        "bang dream!, @configured artist",
-        "togawa sakiko has blue hair",
-        "togawa sakiko wears black pantyhose",
-        "blue hair, black pantyhose, full body",
+        "masterpiece, best quality, 1girl, solo,",
+        "togawa sakiko,",
+        "bang dream!, @configured artist,",
+        "togawa sakiko has blue hair,",
+        "togawa sakiko wears black pantyhose,",
+        "blue hair, black pantyhose, full body, white background,",
         "Nltags: togawa sakiko stands against a white wall.",
     ]
     assert result.final_prompt.count("blue hair") == 2
     assert result.final_prompt.count("black pantyhose") == 2
     assert result.final_prompt.count("Nltags:") == 1
     assert "has blue hair" not in result.final_prompt.split("Nltags:", 1)[1]
+
+
+def test_trusted_structured_tags_are_not_reinterpreted_or_truncated() -> None:
+    rich_tags = (
+        "skirt_lift",
+        "shirt_tug",
+        "landscape",
+        "rainbow",
+        "fireplace",
+        "top-down_view",
+        "bow_and_arrow",
+        "elbow_grab",
+        "red_hair_ornament",
+        "blue_eyes_symbol",
+        *(f"useful_visual_detail_{index}" for index in range(70)),
+    )
+    result = build_final_prompt(
+        user_prompt="structured request",
+        llm_content=", ".join(rich_tags),
+        config={**_config(), "prompt_builder_max_content_tags": 8},
+        required_count_tags=("2girls",),
+        structured_character_tags=("chihaya_anon", "togawa_sakiko"),
+        structured_identity_blocks=(
+            "chihaya_anon has pink hair and grey eyes",
+            "togawa_sakiko has blue hair and yellow eyes",
+        ),
+        structured_detail_blocks=(
+            "chihaya_anon lifts her skirt while smiling",
+            "togawa_sakiko grabs her elbow and looks surprised",
+        ),
+        preserve_structured_order=True,
+        nltags=(
+            "Wind moves their hair while chihaya anon and togawa sakiko "
+            "laugh together beside the fireplace."
+        ),
+    )
+
+    normalized = result.final_prompt.lower().replace("_", " ")
+    assert all(tag.replace("_", " ") in normalized for tag in rich_tags)
+    assert "wind moves their hair" in normalized
+    assert len(result.content_tags.split(", ")) == len(rich_tags)
 
 
 def test_structured_tags_do_not_drop_appearance_or_pose_categories() -> None:

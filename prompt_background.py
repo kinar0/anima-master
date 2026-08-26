@@ -7,30 +7,220 @@ EXPLICIT_SCENE = "explicit_scene"
 DEFAULT_PORTRAIT_MARKER = "background_mode_default_portrait"
 EXPLICIT_SCENE_MARKER = "background_mode_explicit_scene"
 
-_FRAMING_TAGS = {
-    "ass focus",
-    "bust",
-    "breast focus",
-    "close-up",
-    "cowboy shot",
-    "cropped torso",
-    "eye focus",
-    "face",
-    "face focus",
-    "feet focus",
-    "foot focus",
-    "hair focus",
-    "hand focus",
-    "head out of frame",
-    "headshot",
-    "leg focus",
-    "lower body",
-    "mouth focus",
-    "navel focus",
-    "portrait",
-    "thigh focus",
-    "upper body",
+_FRAMING_TAG_GROUPS = {
+    "head": frozenset(
+        {"close up", "eye focus", "face focus", "hair focus", "headshot", "mouth focus"}
+    ),
+    "upper": frozenset({"breast focus", "bust", "cropped torso", "upper body"}),
+    "cowboy": frozenset({"cowboy shot"}),
+    "navel": frozenset({"navel focus"}),
+    "lower": frozenset({"lower body"}),
+    "thigh": frozenset({"ass focus", "thigh focus"}),
+    "leg": frozenset({"leg focus"}),
+    "foot": frozenset({"feet focus", "foot focus"}),
+    "hand": frozenset({"hand focus"}),
+    "head_out": frozenset({"head out of frame"}),
 }
+_FRAMING_TAGS = frozenset(
+    {
+        "face",
+        "portrait",
+        *(
+            tag.replace("close up", "close-up")
+            for tags in _FRAMING_TAG_GROUPS.values()
+            for tag in tags
+        ),
+    }
+)
+
+_OUTFIT_SLOT_VISIBILITY_BY_FRAME = {
+    "head": frozenset(
+        {
+            "upper_body.primary",
+            "upper_body.corset",
+            "lower_body.skirt",
+            "lower_body.pants",
+            "lower_body.underwear",
+            "one_piece.dress",
+            "outerwear",
+            "handwear",
+            "legwear",
+            "footwear",
+        }
+    ),
+    "upper": frozenset(
+        {
+            "lower_body.skirt",
+            "lower_body.pants",
+            "lower_body.underwear",
+            "legwear",
+            "footwear",
+        }
+    ),
+    "cowboy": frozenset({"legwear", "footwear"}),
+    "navel": frozenset(
+        {
+            "headwear",
+            "hair_accessory",
+            "face_accessory.mask",
+            "handwear",
+            "legwear",
+            "footwear",
+        }
+    ),
+    "lower": frozenset(
+        {
+            "upper_body.primary",
+            "upper_body.corset",
+            "headwear",
+            "hair_accessory",
+            "face_accessory.mask",
+            "handwear",
+        }
+    ),
+    "thigh": frozenset(
+        {
+            "upper_body.primary",
+            "upper_body.corset",
+            "headwear",
+            "hair_accessory",
+            "face_accessory.mask",
+            "handwear",
+            "footwear",
+        }
+    ),
+    "leg": frozenset(
+        {
+            "upper_body.primary",
+            "upper_body.corset",
+            "headwear",
+            "hair_accessory",
+            "face_accessory.mask",
+            "handwear",
+        }
+    ),
+    "foot": frozenset(
+        {
+            "upper_body.primary",
+            "upper_body.corset",
+            "outerwear",
+            "headwear",
+            "hair_accessory",
+            "face_accessory.mask",
+            "handwear",
+        }
+    ),
+    "hand": frozenset(
+        {
+            "lower_body.skirt",
+            "lower_body.pants",
+            "lower_body.underwear",
+            "headwear",
+            "hair_accessory",
+            "face_accessory.mask",
+            "legwear",
+            "footwear",
+        }
+    ),
+    "head_out": frozenset(
+        {"headwear", "hair_accessory", "face_accessory.mask"}
+    ),
+}
+
+
+def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
+    """Return garment slots that are deterministically outside the requested view.
+
+    This extends the same framing vocabulary used to prevent accidental
+    ``full body`` injection. Chinese body words require camera/visibility syntax,
+    so a clothing mutation such as ``下半身没穿`` is not mistaken for a crop.
+    Ambiguous framing such as ``portrait`` deliberately does not remove clothes.
+    """
+    raw = str(text or "")
+    normalized = re.sub(r"\s+", " ", raw.lower().replace("_", " ").replace("-", " "))
+    normalized_segments = {
+        segment.strip()
+        for segment in re.split(r"[,;\n]", normalized)
+        if segment.strip()
+    }
+
+    def english_group(group: str) -> bool:
+        for tag in _FRAMING_TAG_GROUPS[group]:
+            if group in {"upper", "lower"}:
+                # Body-region words also occur in nudity/mutation prose. Treat
+                # them as framing only when they are standalone tags or carry a
+                # camera/visibility cue.
+                if tag in normalized_segments or normalized.strip() == tag:
+                    return True
+                if re.search(
+                    rf"(?<![a-z])(?:only\s+)?(?:showing|visible|framing|view|shot)"
+                    rf"(?:\s+of)?(?:\s+(?:only|her|his|their|the)){{0,2}}"
+                    rf"\s+{re.escape(tag)}(?![a-z])|"
+                    rf"(?<![a-z]){re.escape(tag)}\s+(?:view|shot|framing|portrait)(?![a-z])",
+                    normalized,
+                    re.I,
+                ):
+                    return True
+                continue
+            if re.search(
+                rf"(?<![a-z]){re.escape(tag)}(?![a-z])", normalized, re.I
+            ):
+                return True
+        return False
+
+    chinese_view = re.compile(
+        r"(?:只(?:露出|拍|画|显示|看见)|重点(?:拍|画|显示))\s*"
+        r"(?P<part>上半身|下半身|头部|脸部|面部|眼部|嘴部|头发|手部|双手|"
+        r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)|"
+        r"(?P<part2>上半身|下半身|头部|脸部|面部|眼部|嘴部|头发|手部|双手|"
+        r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)"
+        r"(?:构图|镜头|特写|入镜|可见|出镜|聚焦)",
+        re.I,
+    )
+    chinese_parts = {
+        match.group("part") or match.group("part2")
+        for match in chinese_view.finditer(raw)
+    }
+
+    if (
+        english_group("head")
+        or "头像" in raw
+        or bool(chinese_parts & {"头部", "脸部", "面部", "眼部", "嘴部", "头发"})
+    ):
+        frame = "head"
+    elif english_group("hand") or bool(chinese_parts & {"手部", "双手"}):
+        frame = "hand"
+    elif english_group("foot") or bool(
+        chinese_parts & {"脚部", "足部", "双脚", "双足"}
+    ):
+        frame = "foot"
+    elif english_group("thigh") or bool(
+        chinese_parts & {"大腿", "臀部"}
+    ):
+        frame = "thigh"
+    elif english_group("leg") or "腿部" in chinese_parts:
+        frame = "leg"
+    elif english_group("navel") or bool(chinese_parts & {"腹部", "肚脐"}):
+        frame = "navel"
+    elif english_group("lower") or "下半身" in chinese_parts:
+        frame = "lower"
+    elif (
+        english_group("upper")
+        or "上半身" in chinese_parts
+        or any(marker in raw for marker in ("半身像", "胸像"))
+    ):
+        frame = "upper"
+    elif english_group("cowboy") or re.search(
+        r"(?:牛仔(?:镜头|构图)|膝上(?:构图|镜头)|(?:裁|截)到膝)", raw, re.I
+    ):
+        frame = "cowboy"
+    elif english_group("head_out") or re.search(
+        r"(?:头部|脑袋)(?:出框|不入镜|不在画面)", raw, re.I
+    ):
+        frame = "head_out"
+    else:
+        return frozenset()
+    return _OUTFIT_SLOT_VISIBILITY_BY_FRAME[frame]
 
 _CHINESE_SCENE_MARKERS = (
     "室内",
@@ -42,6 +232,9 @@ _CHINESE_SCENE_MARKERS = (
     "教室",
     "厨房",
     "浴室",
+    "泳池",
+    "游泳池",
+    "池畔",
     "和室",
     "庭院",
     "街道",
@@ -68,7 +261,7 @@ _CHINESE_SCENE_MARKERS = (
 
 _ENGLISH_SCENE_RE = re.compile(
     r"\b(?:indoors?|outdoors?|bedroom|living room|classroom|kitchen|bathroom|"
-    r"street|city|beach|forest|park|garden|station|stage|restaurant|cafe|"
+    r"poolside|swimming pool|pool|street|city|beach|forest|park|garden|station|stage|restaurant|cafe|"
     r"office|library|shrine|temple|castle|nightscape)\b",
     flags=re.I,
 )
@@ -129,6 +322,36 @@ def strip_unrequested_default_background_tags(text: str, user_text: str) -> str:
         if tag:
             kept.append(tag)
     return ", ".join(kept)
+
+
+def strip_unrequested_default_background_prose(text: str, user_text: str) -> str:
+    """Remove contradictory default-background phrases without dropping a sentence."""
+    request = _positive_background_text(user_text)
+    if not user_requests_explicit_background(request):
+        return str(text or "")
+    keep_white = bool(
+        re.search(r"(?:纯白|白色|白底)(?:的)?背景|\bwhite background\b", request, re.I)
+    )
+    keep_simple = bool(
+        re.search(r"(?:简单|简约|简洁)(?:的)?背景|\bsimple background\b", request, re.I)
+    )
+    descriptors: list[str] = []
+    if not keep_simple:
+        descriptors.append("simple")
+    if not keep_white:
+        descriptors.append("white")
+    if not descriptors:
+        return str(text or "")
+    descriptor = "|".join(descriptors)
+    cleaned = re.sub(
+        rf"\s*\b(?:with|against|on|before|over)\s+(?:an?\s+|the\s+)?"
+        rf"(?:(?:{descriptor})\s+)+(?:plain\s+)?background\b",
+        "",
+        str(text or ""),
+        flags=re.I,
+    )
+    cleaned = re.sub(r"\s+([,.;!?])", r"\1", cleaned)
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
 
 
 def enforce_user_background_intent(

@@ -18,3 +18,7 @@
 ## 恢复注意事项
 
 工作流要求 ComfyUI 能找到对应的基础模型、CLIP、VAE 和 Turbo LoRA。选择千代turbo 后会同时启用工作流和当前版本的低 CFG harness。修改留档原件不会直接改变运行行为；调整时应同步核对提示词模板、配置结构和测试。
+
+## 已知延后项：衣柜权限
+
+Turbo 的低 CFG constraint planner 产出的 constraint/priority tags 当前不会再经过普通结构化路径的 LLM1 / `WardrobeAuthority` 逐角色过滤。由于 Turbo 目前不常用，此差异仅记录、不在本轮修改行为。未来处理时必须同时覆盖角色归属、陈旧衣柜、显式服装冲突、优先 Tag 和动态截断测试；不要只在 `prompt_pipeline.py` 的 constraint-plan 调用后顺手加一层通用过滤，否则可能破坏低 CFG 专用语义。

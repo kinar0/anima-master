@@ -17,7 +17,9 @@ from prompt_background import (  # noqa: E402
     apply_default_portrait_tags,
     enforce_user_background_intent,
     extract_background_mode,
+    framing_hidden_outfit_slots,
     strip_unrequested_default_background_tags,
+    strip_unrequested_default_background_prose,
     user_requests_explicit_background,
 )
 from prompt_builder import build_final_prompt  # noqa: E402
@@ -43,6 +45,8 @@ def test_background_marker_is_removed_before_tag_processing() -> None:
 
 def test_user_explicit_indoor_background_overrides_default_portrait() -> None:
     assert user_requests_explicit_background("画一个女孩，日式室内背景") is True
+    assert user_requests_explicit_background("两个女孩在泳池边站在一起") is True
+    assert user_requests_explicit_background("two girls standing poolside") is True
     assert user_requests_explicit_background("画一个女孩，不要复杂背景") is False
 
     cleaned = strip_unrequested_default_background_tags(
@@ -76,6 +80,17 @@ def test_explicit_white_background_is_not_stripped() -> None:
     assert cleaned == "1girl, japanese interior"
     assert mode == EXPLICIT_SCENE
     assert overridden is True
+
+
+def test_explicit_scene_strips_only_default_background_phrase_from_nltags() -> None:
+    prose = (
+        "Anon and Sakiko stand poolside under bright sunlight with a simple white "
+        "background."
+    )
+
+    assert strip_unrequested_default_background_prose(
+        prose, "爱音和祥子在泳池边站在一起"
+    ) == "Anon and Sakiko stand poolside under bright sunlight."
 
 
 def test_nltags_is_separated_before_background_and_tag_processing() -> None:
@@ -129,6 +144,62 @@ def test_default_portrait_respects_partial_body_and_body_part_framing() -> None:
 
     # Character focus describes who is prominent, not how the body is cropped.
     assert "full body" in apply_default_portrait_tags("1girl, female focus")
+
+
+def test_framing_reuses_general_visibility_taxonomy_for_outfit_slots() -> None:
+    cases = {
+        "cowboy shot": {"legwear", "footwear"},
+        "upper body": {
+            "lower_body.skirt",
+            "lower_body.pants",
+            "lower_body.underwear",
+            "legwear",
+            "footwear",
+        },
+        "face focus": {
+            "upper_body.primary",
+            "lower_body.skirt",
+            "one_piece.dress",
+            "outerwear",
+            "handwear",
+            "legwear",
+            "footwear",
+        },
+        "lower body": {
+            "upper_body.primary",
+            "headwear",
+            "face_accessory.mask",
+            "handwear",
+        },
+        "feet focus": {
+            "upper_body.primary",
+            "outerwear",
+            "headwear",
+            "face_accessory.mask",
+            "handwear",
+        },
+        "hand focus": {
+            "lower_body.skirt",
+            "headwear",
+            "face_accessory.mask",
+            "legwear",
+            "footwear",
+        },
+        "thigh focus": {"upper_body.primary", "headwear", "footwear"},
+        "navel focus": {"headwear", "face_accessory.mask", "legwear", "footwear"},
+        "head out of frame": {"headwear", "hair_accessory", "face_accessory.mask"},
+    }
+    for framing, required_hidden in cases.items():
+        assert required_hidden <= framing_hidden_outfit_slots(framing), framing
+
+
+def test_clothing_mutation_body_words_are_not_misread_as_camera_framing() -> None:
+    assert not framing_hidden_outfit_slots("千早爱音和丰川祥子站在一起，但下半身没穿")
+    assert not framing_hidden_outfit_slots("上半身没有穿衣服")
+    assert not framing_hidden_outfit_slots("her lower body is naked")
+    assert not framing_hidden_outfit_slots("no clothes on her upper body")
+    assert framing_hidden_outfit_slots("只露出下半身双足")
+    assert framing_hidden_outfit_slots("only showing her lower body")
 
 
 def test_final_prompt_enforces_default_portrait_but_preserves_explicit_scene() -> None:
@@ -194,7 +265,7 @@ def test_custom_template_still_receives_mandatory_llm_background_protocol() -> N
     assert "自定义规则" in prompt
     assert "background_mode_default_portrait" in prompt
     assert "background_mode_explicit_scene" in prompt
-    assert "用户原始文字：\n画狐莉穿这套衣服" in prompt
+    assert "用户原文：画狐莉穿这套衣服" in prompt
 
 
 def test_multi_person_plan_uses_llm_background_mode_and_original_text() -> None:

@@ -152,6 +152,46 @@ class DanbooruResolver:
         return "default"
 
     @classmethod
+    def _outfit_variant_near_span(
+        cls, text: str, start: int, end: int
+    ) -> str:
+        """Classify the clause that owns one matched character/outfit alias.
+
+        A request may assign different saved variants to different wearers, for
+        example ``A穿常服，B穿默认服装``.  Classifying the complete request once
+        collapses both records into a single variant, so isolate the nearest
+        comma/semicolon/sentence-delimited clause around each alias instead.
+        """
+        source = str(text or "")
+        left = max(
+            (source.rfind(separator, 0, start) for separator in "，,。；;\n"),
+            default=-1,
+        )
+        right_candidates = [
+            position
+            for separator in "，,。；;\n"
+            if (position := source.find(separator, end)) >= 0
+        ]
+        right = min(right_candidates) if right_candidates else len(source)
+        return cls._outfit_variant(source[left + 1 : right])
+
+    @classmethod
+    def _mapping_alias_is_negated(
+        cls, text: str, start: int
+    ) -> bool:
+        """Return whether a configured noun occurrence is explicitly negated."""
+        prefix = str(text or "")[max(0, start - 24) : start]
+        return bool(
+            re.search(
+                r"(?:(?:不要|不穿|不戴|不带|不使用|别穿|别戴|别带|"
+                r"去掉|移除|删除|没有|并非|不是)\s*(?:任何|一切)?|"
+                r"\b(?:without|remove|delete|no|not)\b\s*(?:the|any|an?|one)?)\s*$",
+                prefix,
+                flags=re.I,
+            )
+        )
+
+    @classmethod
     def _normalize_outfit_variant(cls, value: Any, *hints: Any) -> str:
         """Keep a valid stored variant or infer one from legacy textual hints."""
         explicit = str(value or "").strip().lower()
@@ -361,7 +401,6 @@ class DanbooruResolver:
     ) -> SemanticLookupResult | None:
         """Return every editable clothing profile explicitly named in a prompt."""
         text = str(user_prompt or "")
-        requested_variant = self._outfit_variant(text)
         confirmed: list[str] = []
         outfit_tags: list[str] = []
         appearance_tags: list[str] = []
@@ -395,6 +434,7 @@ class DanbooruResolver:
                     ).append((profile_key, alias))
         accepted_spans: list[tuple[int, int]] = []
         matched_alias_by_profile: dict[str, str] = {}
+        matched_span_by_profile: dict[str, tuple[int, int]] = {}
         for (start, end, _alias), owners in sorted(
             occurrence_profiles.items(),
             key=lambda item: (-(item[0][1] - item[0][0]), item[0][0], item[0][2]),
@@ -404,6 +444,7 @@ class DanbooruResolver:
             accepted_spans.append((start, end))
             for profile_key, alias in owners:
                 matched_alias_by_profile.setdefault(profile_key, alias)
+                matched_span_by_profile.setdefault(profile_key, (start, end))
 
         for profile_key, profile in profile_items:
             if not isinstance(profile, dict) or profile.get("kind") == "named_outfit":
@@ -424,6 +465,12 @@ class DanbooruResolver:
             matched_alias = matched_alias_by_profile.get(str(profile_key), "")
             if not matched_alias:
                 continue
+            matched_span = matched_span_by_profile.get(str(profile_key))
+            requested_variant = (
+                self._outfit_variant_near_span(text, *matched_span)
+                if matched_span is not None
+                else self._outfit_variant(text)
+            )
             sources = tuple(
                 str(tag).strip()
                 for tag in profile.get("source_tags", [])
@@ -858,11 +905,21 @@ class DanbooruResolver:
                         profile_tags_for_request.append(value)
         if not matched:
             return None
+        anchor_outfit_profiles = ()
+        if len(matched_anchors) == 1 and profile_tags_for_request:
+            anchor = matched_anchors[0]
+            anchor_outfit_profiles = ((
+                anchor.anchor_id,
+                anchor.candidates[0] if anchor.candidates else "",
+                tuple(profile_tags_for_request),
+                requested_variant,
+            ),)
         return SemanticLookupResult(
             confirmed_tags=tuple(matched),
             named_outfit_tags=tuple(matched),
             outfit_profile_tags=tuple(profile_tags_for_request),
             anchors=tuple(matched_anchors),
+            anchor_outfit_profiles=anchor_outfit_profiles,
             status="profile_cache",
         )
 
@@ -1078,7 +1135,10 @@ class DanbooruResolver:
                 for alias, tag in self._configured_mappings(
                     "danbooru_term_mappings"
                 ).items()
-                if alias in text
+                if any(
+                    not self._mapping_alias_is_negated(text, start)
+                    for start, _end in self._alias_match_spans(text, alias)
+                )
             )
         )
         if not matched:
@@ -1183,6 +1243,15 @@ class DanbooruResolver:
                     "evidence": {
                         "sampleMode": str(evidence.get("sample_mode") or ""),
                         "sampleCount": int(evidence.get("focused_posts") or 0),
+                        # Older caches did not have a creation timestamp. Their
+                        # earliest available evidence time is a stable migration
+                        # baseline; newly saved/learned profiles keep a distinct
+                        # created_at even when their evidence is later refreshed.
+                        "createdAt": float(
+                            evidence.get("created_at")
+                            or evidence.get("updated_at")
+                            or 0
+                        ),
                         "updatedAt": float(evidence.get("updated_at") or 0),
                     },
                 }
@@ -1285,15 +1354,22 @@ class DanbooruResolver:
                 "copyright_tags": list(old.get("copyright_tags", [])),
                 "outfit_tags": tags,
             }
-            if old_evidence or appearance_tags or appearance_changed:
-                record["evidence"] = {
-                    **old_evidence,
-                    "appearance_tags": appearance_tags,
-                }
-                if appearance_changed or old_evidence.get(
-                    "appearance_manual_override"
-                ):
-                    record["evidence"]["appearance_manual_override"] = True
+            # Every editor-saved profile gets a creation timestamp, including
+            # a completely manual row with no learned evidence or appearance
+            # tags. It remains stable across later edits and evidence refreshes.
+            record["evidence"] = {
+                **old_evidence,
+                "appearance_tags": appearance_tags,
+                "created_at": float(
+                    old_evidence.get("created_at")
+                    or old_evidence.get("updated_at")
+                    or time.time()
+                ),
+            }
+            if appearance_changed or old_evidence.get(
+                "appearance_manual_override"
+            ):
+                record["evidence"]["appearance_manual_override"] = True
             new_profiles[storage_key] = record
 
         configured_sets: list[str] = []
@@ -1525,6 +1601,11 @@ class DanbooruResolver:
                     else {}
                 ),
                 "algorithm_version": 4,
+                "created_at": float(
+                    existing_evidence.get("created_at")
+                    or existing_evidence.get("updated_at")
+                    or time.time()
+                ),
                 "updated_at": time.time(),
             }
         elif existing_evidence:

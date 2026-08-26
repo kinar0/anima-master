@@ -191,6 +191,7 @@ def build_final_prompt(
             dict.fromkeys((*required_core_tags, *structured_tag_tags))
         ),
         allow_multi_character=allow_multi_character,
+        trusted_structured=preserve_structured_order,
     )
     constraint_result = apply_prompt_constraints(content, constraint_plan)
     content = constraint_result.content_tags
@@ -254,7 +255,12 @@ def build_final_prompt(
         tag_section = join_prompt_parts(tag_parts)
         if tag_section:
             ordered_sections.append(tag_section)
-        final_prompt = "\n".join(section for section in ordered_sections if section)
+        # A newline is visual formatting only.  ComfyUI still needs the comma
+        # delimiter between semantic sections, so render block boundaries as
+        # `,\n` rather than replacing the delimiter with a bare newline.
+        final_prompt = ",\n".join(
+            section for section in ordered_sections if section
+        )
     else:
         if required_count_tags:
             parts.append(", ".join(required_count_tags))
@@ -277,13 +283,13 @@ def build_final_prompt(
         if str(block or "").strip()
     )
     if narrative:
-        separator = "\n" if preserve_structured_order else ", "
+        separator = ",\n" if preserve_structured_order else ", "
         final_prompt += separator + ", ".join(
             display_tag_text(block) for block in narrative
         )
     nltags = " ".join(str(nltags or "").split()).strip(" ,;:")
     if nltags:
-        separator = "\n" if preserve_structured_order else ", "
+        separator = ",\n" if preserve_structured_order else ", "
         final_prompt += f"{separator}Nltags: {display_tag_text(nltags)}"
     return PromptBuildResult(
         final_prompt=final_prompt,

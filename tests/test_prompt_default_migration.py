@@ -8,6 +8,7 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from config_defaults import migrate_prompt_defaults  # noqa: E402
+from danbooru_semantic import DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT  # noqa: E402
 from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE  # noqa: E402
 
 
@@ -21,6 +22,23 @@ def test_empty_builtin_prompt_fields_migrate_to_aesthetic_defaults() -> None:
 
     assert migrated["prompt_builder_template"] == DEFAULT_LLM_PROMPT_TEMPLATE
     assert migrated["prompt_builder_max_content_tags"] == 65
+
+
+def test_stored_legacy_semantic_prompt_migrates_to_intent_only_default() -> None:
+    migrated = migrate_prompt_defaults(
+        {
+            "danbooru_semantic_system_prompt": (
+                "You extract semantic lookup anchors for a local Danbooru index. "
+                "Return valid JSON only. Never claim that a candidate is verified."
+            ),
+            "prompt_builder_template": "我的自定义模板：{theme}",
+        }
+    )
+
+    assert (
+        migrated["danbooru_semantic_system_prompt"]
+        == DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
+    )
 
 
 def test_custom_prompt_template_and_limit_are_preserved() -> None:

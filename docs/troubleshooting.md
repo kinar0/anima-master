@@ -82,12 +82,23 @@
 - 即使 LLM 输出的 `Count` 与 `Characters` 不一致，单人结构化路径也会用
   角色清单的长度做确定性兜底，把错误人数 tag 替换为 `Npeople` 后继续，
   不会再把错误的 `2girls, futanari` 折叠成缺少人数锚点的 `futa with female`。
+- 混合性别 Count 按各性别数量相加核对；`1girl, 1boy` 对两人 roster 是合法值，
+  不会仅因任一单项不是 `2` 而被误修复。
 - 若问题持续，把日志中 `prompt builder LLM returned empty content` 附近的内容
   提供给作者排查。
 
 ## 明确指定新服装，却混入角色默认衣柜
 
 例如“爱音和祥子都穿婚纱”最终仍出现 `haneoka school uniform`，不要只检查第二次 LLM 的输出。当前流程应先由第一次 LLM 为每名角色建立服装计划，再由 `WardrobeAuthority` 把未选中的角色缓存衣柜标为陈旧，并在所有后续通道中移除。
+
+先区分 default 是否本来就该被读取：
+
+- “爱音穿连体式泳装，祥子穿分体式泳装”：两人都应为 `creative_fallback/resolved`，默认衣柜都应进入 stale，不能出现在角色有效服装中。
+- “爱音穿常服，祥子站在旁边”：爱音使用明确 casual；祥子没有基础服装，应为 `default_reference/unspecified`，默认衣柜可作为祥子的软参考。
+- “爱音的裙子变蓝色”：应为 `default_reference/unspecified` 并带换色 patch；default 是修改基线，不是必须原样恢复的套装。
+- “爱音穿羽丘夏季校服但没穿短裙”：应使用命名套组及删除 patch，不应再读取爱音 default。
+
+若构图属于头部/脸部、上半身、cowboy shot、肚脐、下半身、腿/大腿/臀部、足部、手部或头部出框，`composition_omitted_tags` 应列出该视域下被省略的档案 tag；它们没有进入最终提示词是正常裁剪，不是档案读取失败。若原文只是“下半身没穿”等服装修改，则不应产生构图省略项；出现时说明 framing 误判。
 
 开启 `debug_prompt_enabled` 后检查最近任务摘要：
 
@@ -97,15 +108,19 @@
 4. 已有逐角色计划时，`outfit_summary_source` 应为 `suppressed_by_character_authority`。
 5. 给第二次 LLM 的任务书、七段输出、`required_profile_tags`、`required_core_tags` 和最终 prompt 都不应再出现陈旧校服。
 
-本地 Danbooru 查询不可用时，第一次 LLM 仍应运行；只会跳过候选 tag 的本地验证。如果更新代码后摘要仍只有 `danbooru_semantic_status=profile_cache`、且 `semantic_character_outfits=[]`，优先确认插件是否已经重载到新版本。
+本地 Danbooru 查询不可用时，第一次 LLM 仍应运行；只会跳过本地证据匹配/验证。LLM1 本身不应输出候选 tag。如果更新代码后摘要仍只有 `danbooru_semantic_status=profile_cache`、且 `semantic_character_outfits=[]`，优先确认插件是否已经重载到新版本。
 
 注意两个显式绕过入口：raw / 无优化模式不经过服装权限流程；`#` 后的手工尾缀会原样插回，也不会被 `WardrobeAuthority` 清理。若冲突 tag 来自这两处，需由用户自行删除。
 
-对于“角色 A cosplay 角色 B”，检查 `wardrobe_resolution_states`、`source_grounding_tags` 和 `unbound_grounding_tags`。若 LLM1 成功绑定，应看到 `resolved` 和角色级 `source_grounding_tags`；若它只保留目标与来源 anchors、却漏掉关系，应看到 `explicit_but_unresolved`。此时程序不得恢复绑定或注入目标默认衣柜，来源同源证据只进入 `unbound_grounding_tags`，由第二次 LLM 结合完整原文判断。
+对于“角色 A cosplay 角色 B”，检查 `wardrobe_resolution_states`、`semantic_character_outfits` 和 `source_grounding_tags`。LLM1 正常时会在 A 的 `clothing_source` 中原样返回 B；即使 LLM1 给了错误 wardrobe 意图，主机也会对明确的“A cosplay B / A 穿 B 的衣服”逐角色修复为 `outfit_source`。普通文字请求不得出现旧换装块的“最终主体必须是固定角色”；只有参考图/搜索换装仍可进入旧路线。若句式本身无法确定穿着者，才保留 `explicit_but_unresolved`，且不得恢复目标默认衣柜。
 
-若 `semantic_plan_initial_raw` 已包含 `wardrobe.kind=outfit_source` 或 `named_outfit`，但漏写/错写 `wardrobe.anchor_id`，应看到 `semantic_plan_attempt_count=2`，并检查 `semantic_plan_validation_errors`、`semantic_plan_repair_prompt` 和最终 `semantic_plan_raw`。修复成功后错误列表应为空且角色状态应为 `resolved`；完全未输出 `character_plans` 属于语义弃权，不触发结构修复调用。
+新 LLM1 原始结果应是 `characters[].name / clothing / clothing_source / clothing_changes / appearance_changes`，不应再看到 `wardrobe.kind` 指令。`semantic_plan_attempt_count=2` 只用于 JSON、原文证据或基本字段外形损坏；修复失败时仍保留初稿中可解析的部分。旧日志里的 `wardrobe.kind/source/anchor_id` 是兼容格式，不应据此修改当前提示词。
 
-若同一个触发别名反复生成角色视觉档案，对照 `semantic_plan_raw` 中 `target_character` / `outfit_source` 的候选与已有档案的 `sourceTags`。最长边界别名命中后，实际语义查询应使用已有 `sourceTags`，新鲜档案的当前请求组件也应直接来自保存的 `tags`；日志出现 `refusing duplicate outfit profile alias` 表示 LLM1/本地查询仍返回了冲突来源，但写入已被拒绝。旧版本已经形成的冲突条目不会被自动删除，以免误删人工维护档案，应在服装词库页面确认正确 canonical source 后手工合并或删除。
+新协议不再要求 LLM1 输出 lookup role 或候选 tag；它只保留 source 原文，由主机匹配命名衣柜。若调试日志仍出现带 `lookups` 的旧兼容响应，role 写反只在“唯一 lookup 且所有引用 wardrobe kind 一致”时安全归一化。命中衣柜后应看到 `complete_named_profile=true` 和完整 `effective_tags`。最终 `Nltags` 出现中文也不是 LLM2 的正常结果：resolver 的 `missing_descriptions` 只能进入 LLM2 上下文与摘要，不能由主机直接拼接到最终文本。
+
+真实模型回归位于 `tests/live/test_deepseek_prompt_e2e.py`。普通 `pytest` 会明确跳过，避免无意产生模型费用；在 AstrBot 当前 provider 和密钥可用时，用 `ANIMA_RUN_LIVE_LLM_E2E=1` 运行。它不伪造 LLM1/LLM2 输出，直接经插件 `PromptPipeline` 调用当前 DeepSeek provider，并验收最终 `final_prompt`。该组属于“真实模型提示词管线 e2e”，仍不提交 ComfyUI 生图，不能冒充包含工作流执行和图片下载的全系统 e2e。
+
+若同一个触发别名反复生成角色视觉档案，对照由 `semantic_plan_raw` 的 `name` / `clothing_source` 转换出的内部 target/source anchors 与已有档案的 `sourceTags`。最长边界别名命中后，实际语义查询应使用已有 `sourceTags`，新鲜档案的当前请求组件也应直接来自保存的 `tags`；日志出现 `refusing duplicate outfit profile alias` 表示本地查询仍返回了冲突来源，但写入已被拒绝。旧版本已经形成的冲突条目不会被自动删除，以免误删人工维护档案，应在服装词库页面确认正确 canonical source 后手工合并或删除。
 
 ## Identity 出现错误发色、瞳色或来源角色外貌
 
@@ -113,6 +128,8 @@
 
 1. `danbooru_semantic_character_appearance_profiles` 或 `semantic_character_outfits[].appearance_tags` 是否仍是目标角色自己的稳定外貌，而不是 cosplay 来源角色的外貌。
 2. 给第二次 LLM 的完整提示中，`Character-scoped stable appearance authority` 是否按穿着者列出档案；命中的固定角色辅助提示是否已经被最新档案重建，不再携带陈旧瞳色。
-3. 最终 `structured_identity_blocks` 是否只保留用户明确修改的外貌维度，并恢复未提及维度的档案值。
+3. 最终 `structured_identity_blocks` 是否只保留用户明确修改的外貌维度，并恢复未提及维度的档案值；同时检查 `structured_detail_blocks`、共享 `Tags` 和最终 prompt，确认它们没有重新带入同一未开放维度的竞争特征。
 
 当前外貌裁决单位是“角色 × 维度”，不是整份 Identity。只改发型不会解锁瞳色，只改 A 的瞳色不会影响 B。若用户明确改成蓝眼睛，最终应保留蓝眼并排除档案灰眼；若用户没有提瞳色，则 LLM 写出的黄眼、蓝眼等冲突描述必须被删除，而不是与 `grey_eyes` 同时追加到末尾竞争。
+
+若 LLM2 输出 `blonde and blue hair`、`yellow and green eyes` 这类并列描述，还要确认拆分后的孤立颜色词没有残留。程序会让孤立颜色继承右侧 `hair` / `eyes` 维度后再应用同一权限，不能把 `blonde` 或 `yellow` 当作不受约束的普通特征。
