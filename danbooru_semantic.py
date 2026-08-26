@@ -151,6 +151,15 @@ class SemanticCharacterPlan:
 
 
 @dataclass(frozen=True)
+class SemanticAppearanceChange:
+    """One LLM1-detected identity modification kept as advisory evidence only."""
+
+    character_name: str
+    source_text: str
+    dimensions: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class SemanticLookupResult:
     """Locally validated semantic evidence for one image request.
 
@@ -343,8 +352,12 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "clothing_changes = explicit changes only. When useful, use objects with "
         "operation, slots, color, source_text; source_text must be exact. Torn or "
         "damaged clothing is a change, not removal.\n"
-        "appearance_changes = exact request phrases only. Shared words such as "
-        "both/all/双方/两人/都 must be copied onto every affected character.\n\n"
+        "appearance_changes = explicit request phrases only. Prefer objects with "
+        "dimension (eye_color, hair_color, hair_length, hair_style, skin_color, "
+        "chest_size, animal_ears, tail, horns, age_presentation, or "
+        "gender_presentation) and exact source_text; do not output tags. Shared "
+        "words such as both/all/双方/两人/都 must be copied onto every affected "
+        "character.\n\n"
         f"User request: {user_prompt}"
     )
 
@@ -468,6 +481,81 @@ def _raw_semantic_json(raw: str) -> dict[str, Any]:
     except (TypeError, ValueError):
         return {}
     return data if isinstance(data, dict) else {}
+
+
+_APPEARANCE_CHANGE_DIMENSIONS = {
+    "eye_color": "eye_color",
+    "eye_traits": "eye_traits",
+    "eyes": "eye_color",
+    "heterochromia": "eye_color",
+    "hair_color": "hair_color",
+    "hair_length": "hair_length",
+    "hair_style": "hair_style",
+    "skin_color": "skin_color",
+    "chest_size": "chest_size",
+    "animal_ears": "animal_ears",
+    "tail": "tail",
+    "horns": "horns",
+    "age_presentation": "age_presentation",
+    "gender_presentation": "gender_presentation",
+}
+
+
+def parse_semantic_appearance_changes(
+    raw: str, user_prompt: str
+) -> tuple[SemanticAppearanceChange, ...]:
+    """Read LLM1 identity-change hints without making them hard tag authority.
+
+    The planner is allowed to understand wording that host regexes miss.  Its
+    result is deliberately advisory: every name and source phrase must still be
+    traceable to the user request, but an unknown dimension or malformed row is
+    retained as an LLM2 reminder rather than becoming a validation failure.
+    """
+    data = _raw_semantic_json(raw)
+    characters = data.get("characters") if isinstance(data, dict) else None
+    if not isinstance(characters, list):
+        return ()
+    changes: list[SemanticAppearanceChange] = []
+    for character in characters[:4]:
+        if not isinstance(character, dict):
+            continue
+        name = str(character.get("name") or "").strip()
+        if not name or (name not in user_prompt and name.lower() not in user_prompt.lower()):
+            continue
+        rows = character.get("appearance_changes", [])
+        if not isinstance(rows, list):
+            continue
+        for row in rows[:8]:
+            if isinstance(row, dict):
+                source_text = str(
+                    row.get("source_text") or row.get("text") or row.get("change") or ""
+                ).strip()
+                raw_dimensions = row.get("dimensions", row.get("dimension", ()))
+            else:
+                source_text = str(row or "").strip()
+                raw_dimensions = ()
+            if not source_text or (
+                source_text not in user_prompt
+                and source_text.lower() not in user_prompt.lower()
+            ):
+                continue
+            if isinstance(raw_dimensions, str):
+                raw_dimensions = (raw_dimensions,)
+            dimensions = tuple(
+                dict.fromkeys(
+                    _APPEARANCE_CHANGE_DIMENSIONS.get(
+                        str(value or "").strip().lower(), ""
+                    )
+                    for value in raw_dimensions
+                    if _APPEARANCE_CHANGE_DIMENSIONS.get(
+                        str(value or "").strip().lower(), ""
+                    )
+                )
+            ) if isinstance(raw_dimensions, (list, tuple)) else ()
+            change = SemanticAppearanceChange(name, source_text, dimensions)
+            if change not in changes:
+                changes.append(change)
+    return tuple(changes)
 
 
 def _candidate_values(item: dict[str, Any]) -> list[Any]:

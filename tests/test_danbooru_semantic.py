@@ -25,6 +25,7 @@ from danbooru_semantic import (  # noqa: E402
     merge_semantic_results,
     prefer_configured_character_anchors,
     parse_semantic_plan,
+    parse_semantic_appearance_changes,
     parse_semantic_outfit_directives,
     parse_semantic_character_plans,
     semantic_plan_validation_issues,
@@ -45,6 +46,33 @@ def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
     assert "never translate, guess tags" in prompt
     assert "A cosplay C" in prompt
     assert "clothing_source" in prompt
+
+
+def test_semantic_appearance_changes_are_source_grounded_advisory_hints() -> None:
+    prompt = "千早爱音变成异色瞳，丰川祥子保持原样"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [
+                        {"dimension": "eye_traits", "source_text": "异色瞳"}
+                    ],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    changes = parse_semantic_appearance_changes(raw, prompt)
+
+    assert len(changes) == 1
+    assert changes[0].character_name == "千早爱音"
+    assert changes[0].source_text == "异色瞳"
+    assert changes[0].dimensions == ("eye_traits",)
 
 
 def test_intent_only_plan_allows_unknown_tags_and_builds_local_match_anchors() -> None:

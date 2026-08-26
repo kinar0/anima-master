@@ -1235,7 +1235,7 @@ def test_identity_override_requires_explicit_appearance_language() -> None:
     )
 
 
-def test_appearance_authority_merges_per_dimension_instead_of_unlocking_identity() -> None:
+def test_raw_prompt_regex_does_not_unlock_identity_dimensions() -> None:
     dimensions = appearance_override_dimensions(
         "千早爱音绑着粉色的双钻头发型，就像重音teto那样",
         ("千早爱音", "chihaya_anon"),
@@ -1249,8 +1249,8 @@ def test_appearance_authority_merges_per_dimension_instead_of_unlocking_identity
         dimensions,
     )
 
-    assert dimensions == {"hair_color", "hair_style"}
-    assert "twin drills" in merged
+    assert dimensions == frozenset()
+    assert "twin drills" not in merged
     assert "grey_eyes" in merged
     assert "yellow eyes" not in merged
     assert "flat_chest" in merged
@@ -1271,7 +1271,7 @@ def test_identity_merge_preserves_mixed_is_predicate_grammar() -> None:
     assert "has is a loli" not in merged
 
 
-def test_appearance_authority_allows_only_the_explicitly_changed_dimension() -> None:
+def test_raw_prompt_regex_does_not_open_explicit_eye_change() -> None:
     dimensions = appearance_override_dimensions(
         "把角色甲的眼睛改成蓝色；角色乙站在旁边",
         ("角色甲", "character_a"),
@@ -1289,14 +1289,47 @@ def test_appearance_authority_allows_only_the_explicitly_changed_dimension() -> 
         dimensions,
     )
 
-    assert dimensions == {"eye_color"}
+    assert dimensions == frozenset()
     assert other_dimensions == frozenset()
-    assert "blue eyes" in merged
-    assert "red_eyes" not in merged
+    assert "blue eyes" not in merged
+    assert "red_eyes" in merged
     assert "black_hair" in merged
 
 
-def test_appearance_dimensions_do_not_open_for_non_modifying_mentions() -> None:
+def test_heterochromia_does_not_prescribe_or_remove_one_eye_colour() -> None:
+    dimensions = appearance_override_dimensions(
+        "千早爱音变成异色瞳",
+        ("千早爱音", "chihaya_anon"),
+        character_count=1,
+    )
+    merged = merge_authoritative_identity_block(
+        "chihaya_anon",
+        "chihaya_anon has heterochromia",
+        ("pink_hair", "grey_eyes"),
+        dimensions,
+    )
+
+    assert dimensions == frozenset()
+    assert "heterochromia" in merged
+    assert "grey_eyes" in merged
+    assert "pink_hair" in merged
+
+
+def test_llm1_appearance_hint_allows_llm2_eye_detail_without_deleting_profile() -> None:
+    merged = merge_authoritative_identity_block(
+        "chihaya_anon",
+        "chihaya_anon has golden eye and grey eye",
+        ("pink_hair", "grey_eyes"),
+        frozenset(),
+        advisory_writer_dimensions=frozenset({"eye_color"}),
+    )
+
+    assert "golden eye" in merged
+    assert "grey eye" in merged
+    assert "grey_eyes" in merged
+
+
+def test_raw_prompt_regex_is_disabled_for_all_appearance_wording() -> None:
     dimensions = appearance_override_dimensions(
         "爱音的头发被风吹起，她看着祥子的蓝色眼睛",
         ("爱音", "chihaya_anon"),
@@ -1314,8 +1347,11 @@ def test_appearance_dimensions_do_not_open_for_non_modifying_mentions() -> None:
     )
 
     assert dimensions == frozenset()
-    assert chest_dimensions == {"chest_size"}
-    assert vocative_dimensions == {"eye_color"}
+    assert chest_dimensions == frozenset()
+    assert vocative_dimensions == frozenset()
+    assert appearance_override_dimensions(
+        "丰川祥子的视角", ("丰川祥子", "togawa_sakiko"), character_count=1
+    ) == frozenset()
 
 
 def test_appearance_authority_does_not_keep_orphaned_compound_colours() -> None:
@@ -1362,7 +1398,7 @@ def test_appearance_authority_filters_locked_details_and_shared_tags() -> None:
     assert shared == "full body, warm lighting"
 
 
-def test_appearance_authority_keeps_user_opened_dimension_across_fields() -> None:
+def test_raw_prompt_regex_does_not_open_dimensions_across_fields() -> None:
     plan = CharacterEffectiveOutfit(
         target_anchor_id="anon",
         target_source_text="千早爱音",
@@ -1387,9 +1423,9 @@ def test_appearance_authority_keeps_user_opened_dimension_across_fields() -> Non
         "full body, blue eyes", (plan,), user_prompt=prompt
     )
 
-    assert dimensions == {"eye_color"}
-    assert "blue eyes" in detail
-    assert "blue eyes" in shared
+    assert dimensions == frozenset()
+    assert "blue eyes" not in detail
+    assert "blue eyes" not in shared
 
 
 def test_shared_appearance_tags_require_all_wearers_to_open_dimension() -> None:
@@ -1422,7 +1458,7 @@ def test_shared_appearance_tags_require_all_wearers_to_open_dimension() -> None:
     )
 
     assert scoped == "full body"
-    assert shared == "full body, blue eyes"
+    assert shared == "full body"
 
 
 def test_learned_appearance_replaces_stale_configured_identity_hint() -> None:

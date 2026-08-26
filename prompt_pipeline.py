@@ -12,6 +12,7 @@ try:
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS,
         SemanticAnchor,
+        SemanticAppearanceChange,
         SemanticCharacterPlan,
         SemanticWardrobe,
         SemanticOutfitDirective,
@@ -23,6 +24,7 @@ try:
         merge_semantic_results,
         prefer_configured_character_anchors,
         parse_semantic_plan,
+        parse_semantic_appearance_changes,
         parse_semantic_character_plans,
         parse_semantic_outfit_directives,
         semantic_plan_validation_issues,
@@ -87,6 +89,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
         LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS,
         SemanticAnchor,
+        SemanticAppearanceChange,
         SemanticCharacterPlan,
         SemanticWardrobe,
         SemanticOutfitDirective,
@@ -98,6 +101,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         merge_semantic_results,
         prefer_configured_character_anchors,
         parse_semantic_plan,
+        parse_semantic_appearance_changes,
         parse_semantic_character_plans,
         parse_semantic_outfit_directives,
         semantic_plan_validation_issues,
@@ -1004,48 +1008,14 @@ def appearance_override_dimensions(
     *,
     character_count: int,
 ) -> frozenset[str]:
-    """Return only appearance dimensions explicitly changed for one wearer.
+    """Disabled compatibility hook for the former raw-prompt regex parser.
 
-    In multi-character requests a sentence must name the wearer.  This keeps a
-    hairstyle request for A from unlocking B's entire visual profile.
+    User prose must not be interpreted by host regexes: words such as ``视角``
+    are not evidence that a character has horns.  LLM1's source-grounded
+    ``appearance_changes`` is the only optional identity-change hint for LLM2.
     """
-    text = str(user_prompt or "")
-    normalized_aliases = tuple(
-        key
-        for name in target_names
-        if (key := re.sub(r"[^\w]+", " ", str(name).lower().replace("_", " ")).strip())
-    )
-    dimensions: set[str] = set()
-    shared_scope = re.compile(
-        r"(?:双方|两人|二人|全员|所有人|都|共同|一起|\bboth\b|\ball\b)",
-        re.I,
-    )
-    for sentence in re.split(r"[。！？!?;；\n]+", text):
-        previous_clause = ""
-        for clause in re.split(r"[，,]+", sentence):
-            normalized_clause = re.sub(
-                r"[^\w]+", " ", clause.lower().replace("_", " ")
-            ).strip()
-            inherited_named_scope = bool(
-                previous_clause
-                and previous_clause in normalized_aliases
-            )
-            if (
-                character_count > 1
-                and not shared_scope.search(clause)
-                and not inherited_named_scope
-                and not any(
-                    alias and alias in normalized_clause
-                    for alias in normalized_aliases
-                )
-            ):
-                previous_clause = normalized_clause
-                continue
-            for dimension, pattern in _APPEARANCE_DIMENSION_PATTERNS.items():
-                if pattern.search(clause):
-                    dimensions.add(dimension)
-            previous_clause = normalized_clause
-    return frozenset(dimensions)
+    del user_prompt, target_names, character_count
+    return frozenset()
 
 
 def merge_authoritative_identity_block(
@@ -1053,8 +1023,16 @@ def merge_authoritative_identity_block(
     writer_identity: str,
     appearance_tags: tuple[str, ...],
     override_dimensions: frozenset[str],
+    *,
+    advisory_writer_dimensions: frozenset[str] = frozenset(),
 ) -> str:
-    """Merge LLM prose with stable profile facts one visual dimension at a time."""
+    """Merge LLM prose with stable profile facts one visual dimension at a time.
+
+    ``advisory_writer_dimensions`` lets LLM1 tell LLM2 that a dimension may have
+    changed without turning that hint into a host-side profile deletion.  Thus an
+    LLM2 heterochromia answer can retain a newly written gold eye while the saved
+    grey-eye fact remains available as the other eye.
+    """
     name_pattern = re.escape(character_name).replace("_", r"(?:_|\s)")
     prefix = re.compile(
         rf"^\s*{name_pattern}\s+(?:has|is|with)\s+",
@@ -1108,7 +1086,11 @@ def merge_authoritative_identity_block(
             dimension = next_dimension or previous_dimension
             if dimension not in {"hair_color", "eye_color"}:
                 dimension = ""
-        if dimension and dimension not in override_dimensions:
+        if (
+            dimension
+            and dimension not in override_dimensions
+            and dimension not in advisory_writer_dimensions
+        ):
             continue
         kept.append(fragment)
     stable = [
@@ -2835,6 +2817,35 @@ def _character_outfit_matches(
     return key in candidates
 
 
+def _semantic_appearance_changes_for_character(
+    changes: tuple[SemanticAppearanceChange, ...],
+    plan: CharacterEffectiveOutfit,
+) -> tuple[SemanticAppearanceChange, ...]:
+    """Return LLM1 advisory identity changes belonging to one profiled wearer."""
+    aliases = {
+        _normalized_character_key(value)
+        for value in (plan.target_source_text, *plan.target_candidates)
+        if str(value).strip()
+    }
+    return tuple(
+        change
+        for change in changes
+        if _normalized_character_key(change.character_name) in aliases
+    )
+
+
+def _advisory_writer_dimensions(
+    changes: tuple[SemanticAppearanceChange, ...],
+) -> frozenset[str]:
+    """Map LLM1-only identity hints to dimensions LLM2 may express in prose."""
+    return frozenset(
+        "eye_color" if dimension == "eye_traits" else dimension
+        for change in changes
+        for dimension in change.dimensions
+        if dimension in _APPEARANCE_DIMENSION_PATTERNS or dimension == "eye_traits"
+    )
+
+
 def reconcile_character_hints_with_appearance(
     hints: dict[str, str], plans: tuple[CharacterEffectiveOutfit, ...]
 ) -> dict[str, str]:
@@ -4445,6 +4456,7 @@ class PromptPipeline:
         semantic_plan_attempt_count = 0
         semantic_anchors: tuple[SemanticAnchor, ...] = ()
         semantic_character_plans: tuple[SemanticCharacterPlan, ...] = ()
+        semantic_appearance_changes: tuple[SemanticAppearanceChange, ...] = ()
         semantic_outfit_directives: tuple[SemanticOutfitDirective, ...] = ()
         semantic_outfit_patches: tuple[UserOutfitPatch, ...] = ()
         cached_source_getter = getattr(
@@ -4605,6 +4617,9 @@ class PromptPipeline:
                         prefer_cached_characters(semantic_anchors)
                     )
                 semantic_outfit_directives = parse_semantic_outfit_directives(
+                    semantic_plan_raw, prompt
+                )
+                semantic_appearance_changes = parse_semantic_appearance_changes(
                     semantic_plan_raw, prompt
                 )
                 semantic_character_plans = parse_semantic_character_plans(
@@ -5154,10 +5169,37 @@ class PromptPipeline:
                     for item in appearance_plans
                 )
                 context_lines.append(
-                    "The raw user request overrides only the appearance dimensions "
-                    "it explicitly changes; preserve every unmentioned dimension "
-                    "from the matching character profile."
+                    "Treat this as the stable profile baseline. Preserve it unless "
+                    "the user-requested identity change below calls for a visual "
+                    "adjustment."
                 )
+                advisory_change_lines = []
+                for item in appearance_plans:
+                    changes = _semantic_appearance_changes_for_character(
+                        semantic_appearance_changes, item
+                    )
+                    if not changes:
+                        continue
+                    descriptions = "; ".join(
+                        change.source_text
+                        + (
+                            f" ({', '.join(change.dimensions)})"
+                            if change.dimensions
+                            else ""
+                        )
+                        for change in changes
+                    )
+                    advisory_change_lines.append(
+                        f"- {item.target_source_text}: {descriptions}"
+                    )
+                if advisory_change_lines:
+                    context_lines.append(
+                        "LLM1 detected these explicit user identity changes. They are "
+                        "advisory evidence, not hard tags: use visual judgment to "
+                        "modify the matching stable profile rather than mechanically "
+                        "preserving a conflicting trait:"
+                    )
+                    context_lines.extend(advisory_change_lines)
             if semantic_result.missing_descriptions:
                 context_lines.append(
                     "unresolved concepts; express only when assigned by the character plan: "
@@ -5600,11 +5642,17 @@ class PromptPipeline:
                 effective_detail_blocks.append(detail)
                 identity_block = character.identity_tags
                 if character_outfit and character_outfit.appearance_tags:
+                    planner_changes = _semantic_appearance_changes_for_character(
+                        semantic_appearance_changes, character_outfit
+                    )
                     identity_block = merge_authoritative_identity_block(
                         character.name,
                         identity_block,
                         character_outfit.appearance_tags,
                         override_dimensions,
+                        advisory_writer_dimensions=_advisory_writer_dimensions(
+                            planner_changes
+                        ),
                     )
                 effective_identity_blocks.append(identity_block)
                 for identity_tag in identity_tags:

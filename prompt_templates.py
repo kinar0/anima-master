@@ -25,7 +25,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
   `{{Details: chihaya_anon smiles and waves; togawa_sakiko looks aside and holds a book}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
   `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
-- `Count` 必须与 `Characters` 完全一致，按以下规则一步确定，禁止反复核算或自我怀疑：先在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；futa相关tag不会计入总人数。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- `Count` 必须与 `Characters` 完全一致，按以下规则确定，禁止反复核算或自我怀疑：先通过后文补充信息和用户原始语句得到角色名danbooru tag，然后在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；futa相关tag不会计入总人数。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等
 - `Identity` 中每位角色写成完整、语法连贯的一句；不要把 `is ...` 直接接在 `has ...` 的属性列表里。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
