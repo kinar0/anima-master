@@ -45,7 +45,7 @@ vae_name = 你的 VAE 文件名
 
 ## 尺寸配置
 
-`width` 和 `height` 会和 `allowed_sizes` 一起生效。
+`width` 和 `height` 是默认出图尺寸。宽和高都必须在 832–1756（含边界），且为 4 的倍数。
 
 推荐用英文半角 `x`：
 
@@ -53,4 +53,4 @@ vae_name = 你的 VAE 文件名
 1024x1536
 ```
 
-如果 `width` 和 `height` 不在 `allowed_sizes` 中，插件会自动选择最接近的允许尺寸。
+聊天中明确填写 `宽x高` 时不需要先加入 `allowed_sizes`。`allowed_sizes` 只为“竖图、横图、宽屏”等比例快捷词提供候选尺寸。

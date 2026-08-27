@@ -28,6 +28,7 @@ import re
 import subprocess
 import tempfile
 from dataclasses import dataclass, replace
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +158,7 @@ class SemanticAppearanceChange:
     character_name: str
     source_text: str
     dimensions: tuple[str, ...] = ()
+    operation: str = "unspecified"
 
 
 @dataclass(frozen=True)
@@ -343,9 +345,17 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "clothing reference is not visible. Copy all text values exactly from the "
         "request; never translate, guess tags, or fill missing clothes.\n\n"
         "Return only:\n"
-        '{"characters":[{"name":"exact visible name","clothing":null,'
+        '{"characters":[{"name":"exact visible entity mention","aliases":[],'
+        '"clothing":null,'
         '"clothing_source":null,"clothing_changes":[],'
         '"appearance_changes":[]}]}\n\n'
+        "name = only the exact entity mention for the visible character, never a "
+        "whole descriptive clause. aliases = exact alternate names explicitly "
+        "paired with that same entity in A (B), otherwise []. For example, "
+        "复仇者（revenant） uses name=复仇者 and aliases=[revenant], while "
+        "巨乳（huge breasts）的粉发美少女 uses name=粉发美少女 and aliases=[]; "
+        "appearance, clothing, pose, action, and translation glosses are not "
+        "character aliases.\n"
         "clothing = the exact stated garment/set phrase, or null when unstated.\n"
         "clothing_source = the exact character/persona whose outfit is copied, or "
         "null. For A cosplay C, A is visible and C is clothing_source.\n"
@@ -355,7 +365,10 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "appearance_changes = explicit request phrases only. Prefer objects with "
         "dimension (eye_color, hair_color, hair_length, hair_style, skin_color, "
         "chest_size, animal_ears, tail, horns, age_presentation, or "
-        "gender_presentation) and exact source_text; do not output tags. Shared "
+        "gender_presentation), operation (replace or additive), and exact "
+        "source_text; do not output tags. operation=replace means the new value "
+        "supersedes the old value; operation=additive means both remain visibly "
+        "present. Shared "
         "words such as both/all/双方/两人/都 must be copied onto every affected "
         "character.\n\n"
         f"User request: {user_prompt}"
@@ -501,6 +514,44 @@ _APPEARANCE_CHANGE_DIMENSIONS = {
 }
 
 
+def _appearance_source_is_grounded(
+    source_text: str, user_prompt: str, character_name: str
+) -> bool:
+    """Ground LLM1 evidence through generic normalized clause alignment.
+
+    Exact normalized substrings remain the strongest evidence. Minor planner
+    paraphrases are accepted only when one request clause has high sequence
+    agreement with the complete source phrase. The character itself must already
+    be grounded separately; this function never infers an appearance dimension.
+    """
+
+    def normalized(value: str) -> str:
+        return re.sub(
+            r"[^\w\u4e00-\u9fff]+", "", str(value or "").casefold()
+        )
+
+    prompt_key = normalized(user_prompt)
+    source_key = normalized(source_text)
+    if not source_key:
+        return False
+    if source_key in prompt_key:
+        return True
+    if not str(character_name or "").strip() or len(source_key) < 4:
+        return False
+    clauses = tuple(
+        key
+        for clause in re.split(r"[。！？!?;；\n]+", str(user_prompt or ""))
+        if (key := normalized(clause))
+    )
+    return any(
+        SequenceMatcher(None, source_key, clause).ratio() >= 0.72
+        and SequenceMatcher(None, source_key, clause).find_longest_match().size
+        / min(len(source_key), len(clause))
+        >= 0.65
+        for clause in clauses
+    )
+
+
 def parse_semantic_appearance_changes(
     raw: str, user_prompt: str
 ) -> tuple[SemanticAppearanceChange, ...]:
@@ -531,13 +582,12 @@ def parse_semantic_appearance_changes(
                     row.get("source_text") or row.get("text") or row.get("change") or ""
                 ).strip()
                 raw_dimensions = row.get("dimensions", row.get("dimension", ()))
+                raw_operation = str(row.get("operation") or "").strip().lower()
             else:
                 source_text = str(row or "").strip()
                 raw_dimensions = ()
-            if not source_text or (
-                source_text not in user_prompt
-                and source_text.lower() not in user_prompt.lower()
-            ):
+                raw_operation = ""
+            if not _appearance_source_is_grounded(source_text, user_prompt, name):
                 continue
             if isinstance(raw_dimensions, str):
                 raw_dimensions = (raw_dimensions,)
@@ -552,7 +602,15 @@ def parse_semantic_appearance_changes(
                     )
                 )
             ) if isinstance(raw_dimensions, (list, tuple)) else ()
-            change = SemanticAppearanceChange(name, source_text, dimensions)
+            operation = {
+                "replace": "replace",
+                "replacement": "replace",
+                "additive": "additive",
+                "add": "additive",
+                "augment": "additive",
+                "coexist": "additive",
+            }.get(raw_operation, "unspecified")
+            change = SemanticAppearanceChange(name, source_text, dimensions, operation)
             if change not in changes:
                 changes.append(change)
     return tuple(changes)
@@ -910,6 +968,7 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
             for item in characters[:4]
         )
         issues: list[str] = []
+        request_has_parentheses = bool(re.search(r"[（(][^（）()]{1,120}[）)]", user_prompt))
         for index, item in enumerate(characters[:4], start=1):
             if not isinstance(item, dict):
                 issues.append(f"characters[{index}] must be an object")
@@ -922,6 +981,21 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                     f"characters[{index}].name must be an exact phrase from the request"
                 )
             if readable_intent:
+                aliases = item.get("aliases")
+                if aliases is None and request_has_parentheses:
+                    issues.append(f"characters[{index}].aliases must be an array")
+                elif aliases is not None and not isinstance(aliases, list):
+                    issues.append(f"characters[{index}].aliases must be an array")
+                elif isinstance(aliases, list):
+                    for alias_index, alias_value in enumerate(aliases[:4], start=1):
+                        alias = str(alias_value or "").strip()
+                        if not alias or not _explicit_character_alias_pair(
+                            user_prompt, name, alias
+                        ):
+                            issues.append(
+                                f"characters[{index}].aliases[{alias_index}] must "
+                                "form an explicit A (B) pair with that character name"
+                            )
                 for field in ("clothing", "clothing_source"):
                     value = item.get(field)
                     if value is None:
@@ -939,6 +1013,31 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                     value = item.get(field, [])
                     if not isinstance(value, list):
                         issues.append(f"characters[{index}].{field} must be an array")
+                        continue
+                    if field == "appearance_changes":
+                        for change_index, change in enumerate(value[:8], start=1):
+                            if not isinstance(change, dict):
+                                issues.append(
+                                    f"characters[{index}].appearance_changes"
+                                    f"[{change_index}] must be an object"
+                                )
+                                continue
+                            operation = str(change.get("operation") or "").lower()
+                            if operation not in {"replace", "additive"}:
+                                issues.append(
+                                    f"characters[{index}].appearance_changes"
+                                    f"[{change_index}].operation must be replace or "
+                                    "additive"
+                                )
+                            source_text = str(change.get("source_text") or "").strip()
+                            if not _appearance_source_is_grounded(
+                                source_text, user_prompt, name
+                            ):
+                                issues.append(
+                                    f"characters[{index}].appearance_changes"
+                                    f"[{change_index}].source_text must align with "
+                                    "the request"
+                                )
                 continue
             wardrobe = item.get("wardrobe")
             if not isinstance(wardrobe, dict):
@@ -1192,47 +1291,91 @@ def parse_semantic_outfit_directives(
     return tuple(directives)
 
 
-def extract_parenthesized_character_aliases(user_prompt: str) -> tuple[SemanticAnchor, ...]:
-    """Extract explicit English character aliases paired with a Chinese label.
+def _literal_phrase_pattern(value: str) -> str:
+    """Return a case-insensitive regex fragment for one exact copied phrase."""
+    parts = re.split(r"(\s+)", str(value or "").strip())
+    return "".join(r"\s+" if part.isspace() else re.escape(part) for part in parts)
 
-    Args:
-        user_prompt: The original image request.
 
-    Returns:
-        Character lookup anchors that do not depend on an LLM recognizing the
-        parenthesized alias convention.
+def _explicit_character_alias_pair(
+    user_prompt: str, character_name: str, alias: str
+) -> bool:
+    """Check that two planner fields are the two sides of one literal A (B)."""
+    name_pattern = _literal_phrase_pattern(character_name)
+    alias_pattern = _literal_phrase_pattern(alias)
+    if not name_pattern or not alias_pattern or character_name.strip() == alias.strip():
+        return False
+    pair_patterns = (
+        rf"{name_pattern}\s*[（(]\s*{alias_pattern}\s*[）)]",
+        rf"{alias_pattern}\s*[（(]\s*{name_pattern}\s*[）)]",
+    )
+    return any(re.search(pattern, user_prompt, re.I) for pattern in pair_patterns)
+
+
+def parse_semantic_character_aliases(
+    raw: str, user_prompt: str
+) -> tuple[tuple[str, str], ...]:
+    """Read source-grounded character alias pairs explicitly classified by LLM1."""
+    data = _raw_semantic_json(raw)
+    characters = data.get("characters") if isinstance(data, dict) else None
+    if not isinstance(characters, list):
+        return ()
+    pairs: list[tuple[str, str]] = []
+    for item in characters[:4]:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        aliases = item.get("aliases", [])
+        if not name or not isinstance(aliases, list):
+            continue
+        for value in aliases[:4]:
+            alias = str(value or "").strip()
+            pair = (name, alias)
+            if (
+                alias
+                and _explicit_character_alias_pair(user_prompt, name, alias)
+                and pair not in pairs
+            ):
+                pairs.append(pair)
+    return tuple(pairs)
+
+
+def extract_parenthesized_character_aliases(
+    user_prompt: str,
+    character_alias_pairs: tuple[tuple[str, str], ...] = (),
+) -> tuple[SemanticAnchor, ...]:
+    """Create character anchors from LLM1-classified, locally paired aliases.
+
+    The host does not guess the left edge of ``A (B)``. LLM1 supplies the exact
+    character entity and its aliases; this function independently verifies that
+    the two strings are adjacent sides of the same parenthesized pair. This keeps
+    new-character learning available without promoting appearance translations.
     """
-    prompt = str(user_prompt or "")
-    matches: list[tuple[str, str]] = []
-    chinese_label = r"[\u4e00-\u9fff][\u4e00-\u9fffA-Za-z0-9 _.-]{1,40}"
-    english_alias = r"[A-Za-z][A-Za-z0-9 _.'-]{1,78}"
-    for match in re.finditer(
-        rf"(?P<label>{chinese_label})\s*[（(]\s*(?P<alias>{english_alias})\s*[）)]",
-        prompt,
-    ):
-        matches.append((match.group("label").strip(), match.group("alias").strip()))
-    for match in re.finditer(
-        rf"(?P<alias>{english_alias})\s*[（(]\s*(?P<label>{chinese_label})\s*[）)]",
-        prompt,
-    ):
-        matches.append((match.group("label").strip(), match.group("alias").strip()))
-
     anchors: list[SemanticAnchor] = []
-    seen_aliases: set[str] = set()
-    for label, alias in matches:
-        candidate = re.sub(r"\s+", "_", alias.lower()).strip("_")
-        if not re.fullmatch(r"[a-z0-9_.'()-]{2,120}", candidate):
+    seen_candidates: set[str] = set()
+    for character_name, alias in character_alias_pairs:
+        if not _explicit_character_alias_pair(user_prompt, character_name, alias):
             continue
-        if candidate in seen_aliases:
+        lookup_text = alias
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'-]{1,119}", lookup_text):
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'-]{1,119}", character_name):
+                lookup_text = character_name
+            else:
+                continue
+        candidate = re.sub(r"\s+", "_", lookup_text.lower()).strip("_")
+        if (
+            not re.fullmatch(r"[a-z0-9_.'()-]{2,120}", candidate)
+            or candidate in seen_candidates
+        ):
             continue
-        seen_aliases.add(candidate)
+        seen_candidates.add(candidate)
         anchors.append(
             SemanticAnchor(
                 anchor_id=f"parenthesized_character_alias_{len(anchors) + 1}",
                 role="target_character",
                 group="character",
-                source_text=alias,
-                description=f"Explicit character alias for {label}",
+                source_text=lookup_text,
+                description=f"Explicit character alias for {character_name}",
                 candidates=(candidate,),
             )
         )

@@ -673,8 +673,8 @@ class ComfyUIAgentPlugin(Star):
 
         Args:
             prompt(string): Complete prompt or tags to send to ComfyUI unchanged.
-            width(number): Optional width from the allowed size list.
-            height(number): Optional height paired with width.
+            width(number): Optional width from 832 to 1756, divisible by 4.
+            height(number): Optional height from 832 to 1756, divisible by 4.
             steps(number): Optional sampling steps.
             cfg(number): Optional CFG scale.
             negative_prompt(string): Optional negative prompt to use for this generation.

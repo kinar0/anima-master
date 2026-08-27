@@ -25,6 +25,7 @@ try:
         prefer_configured_character_anchors,
         parse_semantic_plan,
         parse_semantic_appearance_changes,
+        parse_semantic_character_aliases,
         parse_semantic_character_plans,
         parse_semantic_outfit_directives,
         semantic_plan_validation_issues,
@@ -102,6 +103,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         prefer_configured_character_anchors,
         parse_semantic_plan,
         parse_semantic_appearance_changes,
+        parse_semantic_character_aliases,
         parse_semantic_character_plans,
         parse_semantic_outfit_directives,
         semantic_plan_validation_issues,
@@ -276,40 +278,107 @@ def confirmed_semantic_character_tags(
     )
 
 
-def bind_single_confirmed_semantic_character(
+def reconcile_confirmed_semantic_characters(
     characters: tuple[StructuredPromptCharacter, ...],
     nltags: str,
     confirmed_tags: tuple[str, ...],
 ) -> tuple[tuple[StructuredPromptCharacter, ...], str]:
-    """Replace a single writer-supplied identity with first-round evidence."""
-    if len(characters) != 1 or len(confirmed_tags) != 1:
+    """Canonically rewrite only writer names uniquely grounded by LLM1 evidence.
+
+    The prompt-writer already receives the locally confirmed character tags, but
+    can still decorate a name (for example, ``young_example_character``).  Keep
+    the writer's character-to-Identity/Details association and only replace a
+    name when exactly one confirmed tag is an exact or whole-token subsequence
+    match.  Unknown, ambiguous, and duplicate writer names deliberately survive
+    for the normal structured validation path instead of being deleted or
+    positionally reassigned.
+    """
+    if not characters or not confirmed_tags:
         return characters, nltags
-    character = characters[0]
-    canonical = confirmed_tags[0]
-    if character.name == canonical:
-        return characters, nltags
+
+    def tokens(value: str) -> tuple[str, ...]:
+        return tuple(re.findall(r"[a-z0-9]+", str(value or "").lower()))
+
+    def is_whole_token_subsequence(
+        writer_tokens: tuple[str, ...], canonical_tokens: tuple[str, ...]
+    ) -> bool:
+        if not canonical_tokens or len(canonical_tokens) > len(writer_tokens):
+            return False
+        width = len(canonical_tokens)
+        return any(
+            writer_tokens[index : index + width] == canonical_tokens
+            for index in range(len(writer_tokens) - width + 1)
+        )
+
+    def matching_canonicals(writer_name: str, available: tuple[str, ...]) -> tuple[str, ...]:
+        writer_key = _normalized_character_key(writer_name)
+        writer_tokens = tokens(writer_name)
+        exact = tuple(
+            tag
+            for tag in available
+            if writer_key and writer_key == _normalized_character_key(tag)
+        )
+        if exact:
+            return exact
+        return tuple(
+            tag
+            for tag in available
+            if is_whole_token_subsequence(writer_tokens, tokens(tag))
+        )
 
     def replace_name(text: str) -> str:
         result = str(text or "")
-        variants = tuple(
-            dict.fromkeys((character.name, character.name.replace("_", " ")))
-        )
-        for variant in variants:
-            result = re.sub(
-                rf"(?<!\w){re.escape(variant)}(?!\w)",
-                canonical,
-                result,
-                flags=re.I,
+        for writer_name, canonical in replacements:
+            variants = tuple(
+                dict.fromkeys((writer_name, writer_name.replace("_", " ")))
             )
+            for variant in variants:
+                result = re.sub(
+                    rf"(?<!\w){re.escape(variant)}(?!\w)",
+                    canonical,
+                    result,
+                    flags=re.I,
+                )
         return result
 
-    return (
-        (
+    available = tuple(dict.fromkeys(tag for tag in confirmed_tags if tag))
+    replacements: list[tuple[str, str]] = []
+    reconciled: list[StructuredPromptCharacter] = []
+    for character in characters:
+        # Preserve the established single-character contract: once LLM1 has
+        # confirmed the only visible character, its canonical tag wins even if
+        # the writer invented a wholly unrelated name.  Multiple characters
+        # need the stricter unique-match rule below so no one is reassigned by
+        # position or deletion.
+        matches = (
+            available
+            if len(characters) == 1 and len(available) == 1
+            else matching_canonicals(character.name, available)
+        )
+        if len(matches) != 1:
+            reconciled.append(character)
+            continue
+        canonical = matches[0]
+        available = tuple(tag for tag in available if tag != canonical)
+        replacements.append((character.name, canonical))
+        reconciled.append(
             StructuredPromptCharacter(
                 name=canonical,
+                identity_tags=character.identity_tags,
+                detail_tags=character.detail_tags,
+            )
+        )
+
+    if not replacements:
+        return characters, nltags
+    return (
+        tuple(
+            StructuredPromptCharacter(
+                name=character.name,
                 identity_tags=replace_name(character.identity_tags),
                 detail_tags=replace_name(character.detail_tags),
-            ),
+            )
+            for character in reconciled
         ),
         replace_name(nltags),
     )
@@ -948,13 +1017,34 @@ _APPEARANCE_DIMENSION_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
-def appearance_dimension(value: str) -> str:
-    """Classify one tag/prose fragment into a mutually exclusive visual dimension."""
+def appearance_dimensions(value: str) -> frozenset[str]:
+    """Classify every visual dimension expressed by one tag/prose fragment."""
     normalized = str(value or "").strip().lower().replace("_", " ")
-    for dimension, pattern in _APPEARANCE_DIMENSION_PATTERNS.items():
-        if pattern.search(normalized):
-            return dimension
-    return ""
+    dimensions = {
+        dimension
+        for dimension, pattern in _APPEARANCE_DIMENSION_PATTERNS.items()
+        if pattern.search(normalized)
+    }
+    # Natural writer prose often inserts a colour between the length and noun:
+    # ``long green hair``.  The atomic profile tag is still ``long_hair``.
+    if re.search(r"\bhair\b", normalized) and re.search(
+        r"\b(?:very\s+long|long|medium|short)\b", normalized
+    ):
+        dimensions.add("hair_length")
+    return frozenset(dimensions)
+
+
+def appearance_dimension(value: str) -> str:
+    """Return the first known dimension for compatibility with atomic-tag callers."""
+    dimensions = appearance_dimensions(value)
+    return next(
+        (
+            dimension
+            for dimension in _APPEARANCE_DIMENSION_PATTERNS
+            if dimension in dimensions
+        ),
+        "",
+    )
 
 
 _STANDALONE_APPEARANCE_TAG_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -1025,13 +1115,15 @@ def merge_authoritative_identity_block(
     override_dimensions: frozenset[str],
     *,
     advisory_writer_dimensions: frozenset[str] = frozenset(),
+    replacement_writer_dimensions: frozenset[str] = frozenset(),
 ) -> str:
-    """Merge LLM prose with stable profile facts one visual dimension at a time.
+    """Merge writer prose with only the missing stable profile dimensions.
 
-    ``advisory_writer_dimensions`` lets LLM1 tell LLM2 that a dimension may have
-    changed without turning that hint into a host-side profile deletion.  Thus an
-    LLM2 heterochromia answer can retain a newly written gold eye while the saved
-    grey-eye fact remains available as the other eye.
+    Writer facts that agree with a locked profile dimension remain in their
+    natural prose form instead of being discarded and blindly re-appended as
+    underscore tags. Dimensions explicitly classified by LLM1 as replacements
+    suppress their old profile values. Additive and legacy-unspecified changes
+    conservatively keep the saved value alongside newly written facts.
     """
     name_pattern = re.escape(character_name).replace("_", r"(?:_|\s)")
     prefix = re.compile(
@@ -1051,6 +1143,31 @@ def merge_authoritative_identity_block(
     )
     kept: list[str] = []
     predicate_clauses: list[str] = []
+    stable_by_dimension: dict[str, tuple[str, ...]] = {
+        dimension: tuple(
+            tag.strip()
+            for tag in appearance_tags
+            if tag.strip() and appearance_dimension(tag) == dimension
+        )
+        for dimension in _APPEARANCE_DIMENSION_PATTERNS
+    }
+    stable_covered_dimensions: set[str] = set()
+
+    def fact_tokens(value: str) -> set[str]:
+        return {
+            token[:-1]
+            if len(token) > 3 and token.endswith("s") and not token.endswith("ss")
+            else token
+            for token in re.findall(r"[a-z0-9]+", value.lower().replace("_", " "))
+        }
+
+    def agrees_with_stable(fragment: str, dimension: str) -> bool:
+        fragment_tokens = fact_tokens(fragment)
+        return any(
+            fact_tokens(tag) <= fragment_tokens
+            for tag in stable_by_dimension.get(dimension, ())
+        )
+
     for index, fragment in enumerate(fragments):
         # Identity is normally a ``<name> has ...`` sentence, but writers
         # regularly mix predicates in one list: ``has pink hair ... and is a
@@ -1067,8 +1184,8 @@ def merge_authoritative_identity_block(
         fragment = re.sub(r"^(?:has|with)\s+", "", fragment, flags=re.I)
         if not fragment:
             continue
-        dimension = appearance_dimension(fragment)
-        if not dimension and standalone_color.fullmatch(fragment):
+        dimensions = set(appearance_dimensions(fragment))
+        if not dimensions and standalone_color.fullmatch(fragment):
             # LLM prose often writes ``blonde and blue hair`` or ``yellow and
             # green eyes``.  Splitting on ``and`` leaves the first colour without
             # its noun, so inherit the adjacent explicit colour dimension rather
@@ -1083,20 +1200,32 @@ def merge_authoritative_identity_block(
             )
             # In ``yellow and green eyes`` the governing noun is on the right;
             # use the previous fragment only for a trailing orphan adjective.
-            dimension = next_dimension or previous_dimension
-            if dimension not in {"hair_color", "eye_color"}:
-                dimension = ""
-        if (
-            dimension
-            and dimension not in override_dimensions
-            and dimension not in advisory_writer_dimensions
+            inherited_dimension = next_dimension or previous_dimension
+            if inherited_dimension in {"hair_color", "eye_color"}:
+                dimensions.add(inherited_dimension)
+        locked_dimensions = dimensions - set(override_dimensions) - set(
+            advisory_writer_dimensions
+        )
+        if any(
+            not agrees_with_stable(fragment, dimension)
+            for dimension in locked_dimensions
         ):
             continue
         kept.append(fragment)
+        stable_covered_dimensions.update(
+            dimension
+            for dimension in dimensions
+            if agrees_with_stable(fragment, dimension)
+        )
+    replacement_dimensions = set(override_dimensions) | set(
+        replacement_writer_dimensions
+    )
     stable = [
         tag.strip()
         for tag in appearance_tags
-        if tag.strip() and appearance_dimension(tag) not in override_dimensions
+        if tag.strip()
+        and appearance_dimension(tag) not in replacement_dimensions
+        and appearance_dimension(tag) not in stable_covered_dimensions
     ]
     traits = tuple(dict.fromkeys((*kept, *stable)))
     predicates = tuple(dict.fromkeys(predicate_clauses))
@@ -1321,16 +1450,24 @@ class WardrobeAuthority:
                 text,
                 flags=re.I,
             )
+        # Writer prose commonly inserts color/material/style adjectives before a
+        # forbidden grounded garment (``green pleated skirt`` while the removed
+        # tag is ``pleated_skirt``). Consume the complete list item rather than
+        # requiring the tag phrase to begin immediately after ``wears``/a comma.
+        optional_modifiers = (
+            r"(?:(?!(?:and|or|with)\b)[a-z][a-z-]*\s+){0,3}"
+        )
         result = re.sub(
             rf"\b(?:wears?|wearing|dressed in|clad in|in)\s+"
-            rf"(?:(?:a|an|the)\s+)?{phrase}\b"
+            rf"(?:(?:a|an|the)\s+)?{optional_modifiers}{phrase}\b"
             rf"(?!\s+{action_suffix}\b)",
             "",
             text,
             flags=re.I,
         )
         return re.sub(
-            rf"(?:,\s*|\s+and\s+)(?:(?:a|an|the)\s+)?{phrase}\b"
+            rf"(?:,\s*|\s+and\s+)(?:(?:a|an|the)\s+)?"
+            rf"{optional_modifiers}{phrase}\b"
             rf"(?!\s+{action_suffix}\b)",
             "",
             result,
@@ -2846,6 +2983,19 @@ def _advisory_writer_dimensions(
     )
 
 
+def _replacement_writer_dimensions(
+    changes: tuple[SemanticAppearanceChange, ...],
+) -> frozenset[str]:
+    """Return dimensions LLM1 explicitly classified as replacing old values."""
+    return frozenset(
+        "eye_color" if dimension == "eye_traits" else dimension
+        for change in changes
+        if change.operation == "replace"
+        for dimension in change.dimensions
+        if dimension in _APPEARANCE_DIMENSION_PATTERNS or dimension == "eye_traits"
+    )
+
+
 def reconcile_character_hints_with_appearance(
     hints: dict[str, str], plans: tuple[CharacterEffectiveOutfit, ...]
 ) -> dict[str, str]:
@@ -2992,9 +3142,8 @@ def character_wardrobe_authority_context(
             else ""
         )
         crop_rule = (
-            " Out of frame: "
-            + ", ".join(plan.composition_omitted_tags)
-            + "."
+            " Saved profile components outside the requested framing were omitted; "
+            "do not restore them."
             if plan.composition_omitted_tags
             else ""
         )
@@ -4565,14 +4714,19 @@ class PromptPipeline:
                         if not repaired_errors:
                             semantic_plan_raw = repaired_plan
                             semantic_plan_validation_errors = ()
+                planner_anchors = parse_semantic_plan(semantic_plan_raw, prompt)
+                planner_character_aliases = parse_semantic_character_aliases(
+                    semantic_plan_raw, prompt
+                )
                 semantic_anchors = prefer_configured_character_anchors(
                     configured_character_anchors,
                     (
-                        # Explicit parenthesized aliases are deterministic user
-                        # evidence and therefore precede untrusted planner guesses.
                         *extract_parenthesized_copyright_aliases(prompt),
-                        *extract_parenthesized_character_aliases(prompt),
-                        *parse_semantic_plan(semantic_plan_raw, prompt),
+                        *extract_parenthesized_character_aliases(
+                            prompt,
+                            planner_character_aliases,
+                        ),
+                        *planner_anchors,
                     ),
                 )
                 semantic_anchors = add_explicit_cosplay_source_anchors(
@@ -5183,7 +5337,8 @@ class PromptPipeline:
                     descriptions = "; ".join(
                         change.source_text
                         + (
-                            f" ({', '.join(change.dimensions)})"
+                            f" ({', '.join(change.dimensions)}; "
+                            f"operation={change.operation})"
                             if change.dimensions
                             else ""
                         )
@@ -5200,6 +5355,11 @@ class PromptPipeline:
                         "preserving a conflicting trait:"
                     )
                     context_lines.extend(advisory_change_lines)
+                    context_lines.append(
+                        "Follow each change operation exactly: additive keeps the "
+                        "compatible baseline value and also states the new visible "
+                        "value; replace supersedes only that dimension."
+                    )
             if semantic_result.missing_descriptions:
                 context_lines.append(
                     "unresolved concepts; express only when assigned by the character plan: "
@@ -5473,7 +5633,7 @@ class PromptPipeline:
             )
         semantic_character_tags = confirmed_semantic_character_tags(semantic_result)
         structured_characters, structured_nltags = (
-            bind_single_confirmed_semantic_character(
+            reconcile_confirmed_semantic_characters(
                 structured_characters,
                 structured_nltags,
                 semantic_character_tags,
@@ -5651,6 +5811,9 @@ class PromptPipeline:
                         character_outfit.appearance_tags,
                         override_dimensions,
                         advisory_writer_dimensions=_advisory_writer_dimensions(
+                            planner_changes
+                        ),
+                        replacement_writer_dimensions=_replacement_writer_dimensions(
                             planner_changes
                         ),
                     )

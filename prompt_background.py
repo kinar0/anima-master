@@ -174,15 +174,37 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
         r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)|"
         r"(?P<part2>上半身|下半身|头部|脸部|面部|眼部|嘴部|头发|手部|双手|"
         r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)"
-        r"(?:构图|镜头|特写|入镜|可见|出镜|聚焦)",
+        r"(?:肖像|人像|构图|镜头|特写|入镜|可见|出镜|聚焦|视图|画面)",
         re.I,
     )
     chinese_parts = {
         match.group("part") or match.group("part2")
         for match in chinese_view.finditer(raw)
     }
+    # Boundary phrasing describes the lowest visible body region rather than
+    # naming a conventional camera tag. Keep this separate from clothing/body
+    # mutations by requiring an explicit restrictive camera verb.
+    chinese_boundary = re.compile(
+        r"(?:只|仅|画面(?:中)?只)\s*"
+        r"(?:拍|拍摄|画|显示|展示|保留|截取|裁切)\s*"
+        r"(?:到|至)?\s*(?P<boundary>肩|胸|胸部|腰|腰部|腹部|臀|臀部|"
+        r"大腿|膝|膝盖|小腿|脚踝|脚部|足部)\s*"
+        r"(?:以上|为止|位置)?",
+        re.I,
+    )
+    boundary_match = chinese_boundary.search(raw)
+    boundary = boundary_match.group("boundary") if boundary_match else ""
+    boundary_frame = ""
+    if boundary == "肩":
+        boundary_frame = "head"
+    elif boundary in {"胸", "胸部", "腰", "腰部", "腹部"}:
+        boundary_frame = "upper"
+    elif boundary in {"臀", "臀部", "大腿", "膝", "膝盖"}:
+        boundary_frame = "cowboy"
 
-    if (
+    if boundary_frame:
+        frame = boundary_frame
+    elif (
         english_group("head")
         or "头像" in raw
         or bool(chinese_parts & {"头部", "脸部", "面部", "眼部", "嘴部", "头发"})

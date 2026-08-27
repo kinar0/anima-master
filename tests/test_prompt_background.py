@@ -202,6 +202,21 @@ def test_clothing_mutation_body_words_are_not_misread_as_camera_framing() -> Non
     assert framing_hidden_outfit_slots("only showing her lower body")
 
 
+def test_chinese_portrait_and_visible_boundary_phrasing_define_the_crop() -> None:
+    lower_slots = {
+        "lower_body.skirt",
+        "lower_body.pants",
+        "lower_body.underwear",
+        "legwear",
+        "footwear",
+    }
+
+    assert lower_slots <= framing_hidden_outfit_slots("上半身肖像")
+    assert lower_slots <= framing_hidden_outfit_slots("只拍到腰部以上")
+    assert lower_slots <= framing_hidden_outfit_slots("画面中只保留到腹部为止")
+    assert not framing_hidden_outfit_slots("把裙子的腰部裁短")
+
+
 def test_final_prompt_enforces_default_portrait_but_preserves_explicit_scene() -> None:
     config = {
         "chiyo_preset_enabled": False,

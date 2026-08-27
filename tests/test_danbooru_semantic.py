@@ -26,6 +26,7 @@ from danbooru_semantic import (  # noqa: E402
     prefer_configured_character_anchors,
     parse_semantic_plan,
     parse_semantic_appearance_changes,
+    parse_semantic_character_aliases,
     parse_semantic_outfit_directives,
     parse_semantic_character_plans,
     semantic_plan_validation_issues,
@@ -42,10 +43,13 @@ def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
     assert '"characters"' in prompt
     assert '"lookups"' not in prompt
     assert '"appearance_changes"' in prompt
+    assert '"aliases"' in prompt
     assert "爱音cosplay黑魔导，祥子cosplay黑魔导女孩" in prompt
     assert "never translate, guess tags" in prompt
     assert "A cosplay C" in prompt
     assert "clothing_source" in prompt
+    assert "operation (replace or additive)" in prompt
+    assert "only the exact entity mention" in prompt
 
 
 def test_semantic_appearance_changes_are_source_grounded_advisory_hints() -> None:
@@ -59,7 +63,11 @@ def test_semantic_appearance_changes_are_source_grounded_advisory_hints() -> Non
                     "clothing_source": None,
                     "clothing_changes": [],
                     "appearance_changes": [
-                        {"dimension": "eye_traits", "source_text": "异色瞳"}
+                        {
+                            "dimension": "eye_traits",
+                            "operation": "additive",
+                            "source_text": "异色瞳",
+                        }
                     ],
                 }
             ]
@@ -73,6 +81,111 @@ def test_semantic_appearance_changes_are_source_grounded_advisory_hints() -> Non
     assert changes[0].character_name == "千早爱音"
     assert changes[0].source_text == "异色瞳"
     assert changes[0].dimensions == ("eye_traits",)
+    assert changes[0].operation == "additive"
+
+
+def test_semantic_appearance_change_accepts_leading_pronoun_for_named_character() -> None:
+    prompt = "若叶睦的黄色眼睛染上了粉色，她被催眠了"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "若叶睦",
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [
+                        {
+                            "dimension": "eye_color",
+                            "operation": "additive",
+                            "source_text": "她的黄色眼睛染上了粉色，她被催眠了",
+                        }
+                    ],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    changes = parse_semantic_appearance_changes(raw, prompt)
+
+    assert len(changes) == 1
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert changes[0].character_name == "若叶睦"
+    assert changes[0].dimensions == ("eye_color",)
+    assert changes[0].operation == "additive"
+
+
+def test_semantic_appearance_change_rejects_low_similarity_unrelated_evidence() -> None:
+    prompt = "若叶睦站在窗边，用黄色眼睛看着天空"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "若叶睦",
+                    "appearance_changes": [
+                        {
+                            "dimension": "eye_color",
+                            "operation": "additive",
+                            "source_text": "她的黄色眼睛染上了粉色，她被催眠了",
+                        }
+                    ],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    assert parse_semantic_appearance_changes(raw, prompt) == ()
+
+
+def test_semantic_appearance_change_parses_explicit_replace_operation() -> None:
+    prompt = "若叶睦的胸部变成了巨乳"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "若叶睦",
+                    "appearance_changes": [
+                        {
+                            "dimension": "chest_size",
+                            "operation": "replace",
+                            "source_text": "胸部变成了巨乳",
+                        }
+                    ],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    changes = parse_semantic_appearance_changes(raw, prompt)
+
+    assert changes[0].operation == "replace"
+
+
+def test_semantic_plan_requires_explicit_appearance_operation() -> None:
+    prompt = "若叶睦的胸部变成了巨乳"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "若叶睦",
+                    "appearance_changes": [
+                        {
+                            "dimension": "chest_size",
+                            "source_text": "胸部变成了巨乳",
+                        }
+                    ],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    assert semantic_plan_validation_issues(raw, prompt) == (
+        "characters[1].appearance_changes[1].operation must be replace or additive",
+    )
 
 
 def test_intent_only_plan_allows_unknown_tags_and_builds_local_match_anchors() -> None:
@@ -94,7 +207,11 @@ def test_intent_only_plan_allows_unknown_tags_and_builds_local_match_anchors() -
                         }
                     ],
                     "appearance_changes": [
-                        {"dimension": "hair_color", "source_text": "头发变成蓝色"}
+                        {
+                            "dimension": "hair_color",
+                            "operation": "replace",
+                            "source_text": "头发变成蓝色",
+                        }
                     ],
                 }
             ]
@@ -567,13 +684,108 @@ def test_multi_target_outfit_directive_requires_a_valid_target_anchor() -> None:
 
 def test_parenthesized_english_alias_becomes_a_character_anchor() -> None:
     anchors = extract_parenthesized_character_aliases(
-        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant），双手抱胸"
+        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant），双手抱胸",
+        (("复仇者", "revenant"),),
     )
 
     assert len(anchors) == 1
     assert anchors[0].role == "target_character"
     assert anchors[0].source_text == "revenant"
     assert anchors[0].candidates == ("revenant",)
+
+
+def test_parenthesized_appearance_translation_is_not_a_character_anchor() -> None:
+    anchors = extract_parenthesized_character_aliases(
+        "若叶睦的胸部变成了超级巨乳（huge breasts），衣服被撑破了",
+        (("若叶睦", "huge breasts"),),
+    )
+
+    assert anchors == ()
+
+
+def test_parenthesized_alias_pair_supports_reversed_notation() -> None:
+    anchors = extract_parenthesized_character_aliases(
+        "revenant（复仇者）双手抱胸",
+        (("复仇者", "revenant"),),
+    )
+
+    assert [anchor.source_text for anchor in anchors] == ["revenant"]
+
+
+def test_semantic_character_aliases_require_an_explicit_same_entity_pair() -> None:
+    prompt = "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant）双手抱胸"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "复仇者",
+                    "aliases": ["revenant"],
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    assert parse_semantic_character_aliases(raw, prompt) == (("复仇者", "revenant"),)
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+
+
+def test_anonymous_character_feature_translation_cannot_be_its_alias() -> None:
+    prompt = "画一个有着巨乳（huge breasts）的粉发美少女，露出sideboob"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "粉发美少女",
+                    "aliases": ["huge breasts"],
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    assert parse_semantic_character_aliases(raw, prompt) == ()
+    assert any("explicit A (B) pair" in issue for issue in semantic_plan_validation_issues(raw, prompt))
+
+
+def test_non_character_parentheses_stay_outside_character_flow() -> None:
+    cases = (
+        ("超级巨乳", "huge breasts"),
+        ("粉色眼睛", "pink eyes"),
+        ("绿色长发", "long green hair"),
+        ("双马尾发型", "twintails"),
+        ("白色连衣裙", "white dress"),
+        ("学校制服", "school uniform"),
+        ("黑色胸罩", "black bra"),
+        ("黑色连裤袜", "black pantyhose"),
+        ("催眠状态", "hypnosis"),
+        ("衣服破损", "torn clothes"),
+        ("温柔微笑", "gentle smile"),
+        ("伤心哭泣", "crying"),
+        ("自然站立", "standing"),
+        ("床边坐着", "sitting"),
+        ("两人牵手", "holding hands"),
+        ("上半身构图", "upper body"),
+        ("白色背景", "white background"),
+        ("深沉夜晚", "night"),
+        ("下雨天气", "rain"),
+        ("手持吉他", "holding guitar"),
+    )
+
+    for label, alias in cases:
+        prompt = f"若叶睦展示{label}（{alias}）"
+        assert extract_parenthesized_character_aliases(
+            prompt,
+            (("若叶睦", alias),),
+        ) == (), (label, alias)
 
 
 def test_parenthesized_english_title_becomes_a_copyright_anchor() -> None:
@@ -597,7 +809,8 @@ def test_parenthesized_english_title_preserves_danbooru_punctuation() -> None:
 
 def test_parenthesized_alias_does_not_treat_a_localized_title_as_a_character() -> None:
     anchors = extract_parenthesized_character_aliases(
-        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant）"
+        "《黑夜君临》（Elden Ring Nightreign）的复仇者（revenant）",
+        (("复仇者", "revenant"),),
     )
 
     assert [anchor.source_text for anchor in anchors] == ["revenant"]
@@ -776,7 +989,9 @@ def test_configured_identity_drops_weaker_duplicate_and_misclassified_work_alias
     prompt = "艾尔登法环黑夜君临(nightreign)的复仇者(revenant)"
     configured = resolver.configured_character_anchors_for_prompt(prompt)
     discovered = (
-        *extract_parenthesized_character_aliases(prompt),
+        *extract_parenthesized_character_aliases(
+            prompt, (("复仇者", "revenant"),)
+        ),
         SemanticAnchor(
             "planner_character",
             "target_character",

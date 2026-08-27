@@ -393,6 +393,37 @@ def test_variant_outfit_profile_recovers_specific_low_frequency_slots() -> None:
     ) == ()
 
 
+def test_variant_outfit_profile_keeps_all_qualified_tags() -> None:
+    learned_tags = {
+        "blue_dress",
+        "black_gloves",
+        "hair_ribbon",
+        "wide_brimmed_hat",
+        "masquerade_mask",
+        "lace_choker",
+        "bead_necklace",
+        "gold_pendant",
+        "red_necktie",
+        "striped_thighhighs",
+        "patterned_pantyhose",
+        "white_socks",
+        "black_boots",
+        "platform_shoes",
+        "waist_apron",
+        "leather_belt",
+        "frilled_bonnet",
+        "red_bow",
+        "silver_brooch",
+        "see-through_sleeves",
+    }
+    posts = [" ".join(sorted(learned_tags)) for _index in range(10)]
+
+    result = tags_module._select_variant_outfit_profile(posts)
+
+    assert len(result) > 14
+    assert set(result) == learned_tags
+
+
 def test_variant_outfit_fetch_uses_single_character_signature(monkeypatch) -> None:
     pure_posts = []
     for index in range(6):

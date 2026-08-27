@@ -7,7 +7,13 @@ from typing import Any
 
 from comfyui_history import ComfyUIHistoryRunner, history_failed
 from comfyui_http import ComfyUIHttpClient
-from comfyui_sizes import allowed_sizes, generation_size
+from comfyui_sizes import (
+    GENERATION_SIDE_MULTIPLE,
+    MAX_GENERATION_SIDE,
+    MIN_GENERATION_SIDE,
+    generation_size,
+    is_valid_generation_size,
+)
 from comfyui_workflows import (
     anima_img2img_workflow,
     remove_bg_workflow,
@@ -31,15 +37,24 @@ def generate_payload(
             "error": "unsupported_size",
             "message": "width and height must be provided together",
         }
-    width = int(args.width or config.get("width", defaults["width"]))
-    height = int(args.height or config.get("height", defaults["height"]))
-    configured_sizes = allowed_sizes(config, defaults["allowed_sizes"])
-    if explicit_size and configured_sizes and (width, height) not in configured_sizes:
+    width = int(
+        args.width
+        if args.width is not None
+        else config.get("width", defaults["width"])
+    )
+    height = int(
+        args.height
+        if args.height is not None
+        else config.get("height", defaults["height"])
+    )
+    if explicit_size and not is_valid_generation_size(width, height):
         return {
             "ok": False,
             "error": "unsupported_size",
             "requested_size": f"{width}x{height}",
-            "allowed_sizes": [f"{item[0]}x{item[1]}" for item in configured_sizes],
+            "min_side": MIN_GENERATION_SIDE,
+            "max_side": MAX_GENERATION_SIDE,
+            "side_multiple": GENERATION_SIDE_MULTIPLE,
         }
     width, height = generation_size(config, defaults["allowed_sizes"], width, height)
     steps = int(args.steps or config.get("steps", defaults["steps"]))

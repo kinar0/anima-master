@@ -19,8 +19,8 @@ ALLOWED_SIZES = [
     (1024, 1024),
     (1152, 896),
     (1216, 832),
-    (768, 1344),
-    (1344, 768),
+    (832, 1472),
+    (1472, 832),
     (1024, 1536),
 ]
 
@@ -86,7 +86,7 @@ def test_parse_generation_size_aliases_choose_closest_allowed_ratio():
     )
     assert parse_generation_size("宽屏 远景山谷", ALLOWED_SIZES) == (
         "远景山谷",
-        (1344, 768),
+        (1472, 832),
         None,
     )
 
@@ -120,14 +120,33 @@ def test_anm_size_and_prompt_are_space_separated():
     )
 
 
-def test_parse_generation_size_rejects_unavailable_explicit_size():
+def test_parse_generation_size_accepts_valid_explicit_size_outside_configured_list():
     prompt, size, error = parse_generation_size(
         "分辨率 1000x1400，白色礼服少女", ALLOWED_SIZES
     )
 
     assert prompt == "白色礼服少女"
-    assert size is None
-    assert error and "1000x1400 不可用" in error
+    assert size == (1000, 1400)
+    assert error is None
+
+
+def test_parse_generation_size_accepts_contract_boundaries():
+    assert parse_generation_size("832x1756 少女", ALLOWED_SIZES) == (
+        "少女",
+        (832, 1756),
+        None,
+    )
+
+
+def test_parse_generation_size_rejects_out_of_range_or_non_multiple():
+    for requested in ("828x1024", "832x1760", "834x1024"):
+        prompt, size, error = parse_generation_size(
+            f"{requested} 少女", ALLOWED_SIZES
+        )
+
+        assert prompt == "少女"
+        assert size is None
+        assert error and "832-1756" in error and "4 的倍数" in error
 
 
 def test_parse_generation_size_does_not_consume_alias_prefix():

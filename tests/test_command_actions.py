@@ -99,7 +99,7 @@ def test_generate_action_accepts_space_after_explicit_size():
     assert calls == [("少女站在河岸", {"width": 1216, "height": 832})]
 
 
-def test_generate_action_rejects_unavailable_size_before_generation():
+def test_generate_action_accepts_valid_size_not_in_configured_candidates():
     calls = []
 
     async def generate(event, prompt, **kwargs):
@@ -112,8 +112,8 @@ def test_generate_action_rejects_unavailable_size_before_generation():
 
     result = asyncio.run(handler.handle_action(object(), "generate", "1000x1400：少女"))
 
-    assert result == "尺寸 1000x1400 不可用。可用尺寸：1024x1024"
-    assert calls == []
+    assert result is None
+    assert calls == [("少女", {"width": 1000, "height": 1400})]
 
 
 def test_img2img_refusal_does_not_call_comfyui() -> None:

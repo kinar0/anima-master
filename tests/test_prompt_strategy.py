@@ -10,8 +10,10 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_pipeline import (  # noqa: E402
+    _replacement_writer_dimensions,
     CharacterEffectiveOutfit,
     PromptPipeline,
+    StructuredPromptCharacter,
     appearance_override_dimensions,
     filter_character_appearance_prose,
     filter_shared_appearance_tags,
@@ -40,6 +42,7 @@ from prompt_pipeline import (  # noqa: E402
     requested_wardrobe_mode,
     requested_wardrobe_modes_by_target,
     reconcile_character_hints_with_appearance,
+    reconcile_confirmed_semantic_characters,
     add_explicit_cosplay_source_anchors,
     add_host_outfit_changes_to_plans,
     explicit_cosplay_assignments,
@@ -57,6 +60,7 @@ from prompt_templates import build_llm_prompt  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
     SemanticAnchor,
+    SemanticAppearanceChange,
     SemanticCharacterPlan,
     SemanticLookupResult,
     SemanticOutfitDirective,
@@ -71,6 +75,59 @@ from task_summary import (  # noqa: E402
 
 def _shorten(text: str, limit: int = 600) -> str:
     return text[:limit]
+
+
+def test_reconcile_confirmed_semantic_characters_repairs_multiple_writer_names() -> None:
+    characters, nltags = reconcile_confirmed_semantic_characters(
+        (
+            StructuredPromptCharacter(
+                name="long_nagasaki_soyo",
+                identity_tags="long_nagasaki_soyo has brown hair",
+                detail_tags="long nagasaki soyo holds a bass",
+            ),
+            StructuredPromptCharacter(
+                name="young_takamatsu_tomori",
+                identity_tags="young takamatsu tomori has grey hair",
+                detail_tags="young_takamatsu_tomori sings",
+            ),
+        ),
+        "long nagasaki soyo stands beside young_takamatsu_tomori.",
+        ("nagasaki_soyo", "takamatsu_tomori"),
+    )
+
+    assert tuple(character.name for character in characters) == (
+        "nagasaki_soyo",
+        "takamatsu_tomori",
+    )
+    assert characters[0].identity_tags == "nagasaki_soyo has brown hair"
+    assert characters[0].detail_tags == "nagasaki_soyo holds a bass"
+    assert characters[1].identity_tags == "takamatsu_tomori has grey hair"
+    assert characters[1].detail_tags == "takamatsu_tomori sings"
+    assert nltags == "nagasaki_soyo stands beside takamatsu_tomori."
+
+
+def test_reconcile_confirmed_semantic_characters_keeps_ambiguous_and_unknown_names() -> None:
+    source = (
+        StructuredPromptCharacter(
+            name="long_nagasaki_soyo",
+            identity_tags="long_nagasaki_soyo has brown hair",
+            detail_tags="long_nagasaki_soyo holds a bass",
+        ),
+        StructuredPromptCharacter(
+            name="original_girl",
+            identity_tags="original_girl has blue hair",
+            detail_tags="original_girl smiles",
+        ),
+    )
+
+    characters, nltags = reconcile_confirmed_semantic_characters(
+        source,
+        "long_nagasaki_soyo stands beside original_girl.",
+        ("nagasaki_soyo", "soyo"),
+    )
+
+    assert characters == source
+    assert nltags == "long_nagasaki_soyo stands beside original_girl."
 
 
 def test_semantic_planner_uses_configured_system_prompt() -> None:
@@ -1265,7 +1322,7 @@ def test_identity_merge_preserves_mixed_is_predicate_grammar() -> None:
     )
 
     assert merged == (
-        "chihaya_anon is a loli and has long_hair, pink_hair, grey_eyes, "
+        "chihaya_anon is a loli and has pink hair, grey eyes, long_hair, "
         "flat_chest"
     )
     assert "has is a loli" not in merged
@@ -1293,7 +1350,8 @@ def test_raw_prompt_regex_does_not_open_explicit_eye_change() -> None:
     assert other_dimensions == frozenset()
     assert "blue eyes" not in merged
     assert "red_eyes" in merged
-    assert "black_hair" in merged
+    assert "black hair" in merged
+    assert "black_hair" not in merged
 
 
 def test_heterochromia_does_not_prescribe_or_remove_one_eye_colour() -> None:
@@ -1326,7 +1384,81 @@ def test_llm1_appearance_hint_allows_llm2_eye_detail_without_deleting_profile() 
 
     assert "golden eye" in merged
     assert "grey eye" in merged
-    assert "grey_eyes" in merged
+    assert "grey_eyes" not in merged
+    assert "pink_hair" in merged
+
+
+def test_identity_merge_keeps_stable_dimensions_and_additive_dyed_eye_colour() -> None:
+    merged = merge_authoritative_identity_block(
+        "wakaba_mutsumi",
+        "wakaba_mutsumi has long green hair in twintails, yellow eyes and "
+        "pink eyes, and huge breasts",
+        ("long_hair", "green_hair", "yellow_eyes", "hair_ornament", "small_breasts"),
+        frozenset(),
+        advisory_writer_dimensions=frozenset(
+            {"hair_style", "eye_color", "chest_size"}
+        ),
+        replacement_writer_dimensions=frozenset({"hair_style", "chest_size"}),
+    )
+
+    assert "long green hair in twintails" in merged
+    assert "yellow eyes" in merged
+    assert "pink eyes" in merged
+    assert "huge breasts" in merged
+    assert "hair_ornament" in merged
+    assert "small_breasts" not in merged
+    assert "green_hair" not in merged
+    assert "yellow_eyes" not in merged
+
+
+def test_llm1_operation_controls_replacement_without_keyword_scanning() -> None:
+    changes = (
+        SemanticAppearanceChange(
+            "若叶睦",
+            "她的黄色眼睛染上了粉色，她被催眠了",
+            ("eye_color",),
+            "additive",
+        ),
+        SemanticAppearanceChange(
+            "若叶睦",
+            "胸部也变成了超级巨乳",
+            ("chest_size",),
+            "replace",
+        ),
+    )
+
+    dimensions = _replacement_writer_dimensions(changes)
+
+    assert dimensions == frozenset({"chest_size"})
+
+
+def test_unspecified_legacy_operation_conservatively_keeps_profile_value() -> None:
+    dimensions = _replacement_writer_dimensions(
+        (
+            SemanticAppearanceChange(
+                "若叶睦",
+                "眼睛发生变化",
+                ("eye_color",),
+            ),
+        )
+    )
+
+    assert dimensions == frozenset()
+
+
+def test_identity_merge_preserves_writer_profile_facts_instead_of_blindly_appending() -> None:
+    merged = merge_authoritative_identity_block(
+        "wakaba_mutsumi",
+        "wakaba_mutsumi has long green hair and yellow eyes",
+        ("long_hair", "green_hair", "yellow_eyes", "hair_ornament"),
+        frozenset(),
+    )
+
+    assert "long green hair" in merged
+    assert "yellow eyes" in merged
+    assert "hair_ornament" in merged
+    assert "green_hair" not in merged
+    assert "yellow_eyes" not in merged
 
 
 def test_raw_prompt_regex_is_disabled_for_all_appearance_wording() -> None:
@@ -2083,6 +2215,45 @@ def test_llm_selected_framing_can_crop_already_resolved_profile_components() -> 
         "black_pantyhose",
         "brown_shoes",
     )
+
+
+def test_pre_llm_crop_hides_omitted_tags_and_filters_compound_writer_prose() -> None:
+    plan = CharacterEffectiveOutfit(
+        target_anchor_id="anon",
+        target_source_text="千早爱音",
+        target_candidates=("chihaya_anon",),
+        wardrobe_kind="named_outfit",
+        wardrobe_anchor_id="uniform",
+        wardrobe_tag="haneoka_school_uniform",
+        appearance_tags=("pink_hair",),
+        effective=EffectiveOutfitPlan(
+            subject="千早爱音",
+            base_tags=("white_shirt", "green_skirt", "pleated_skirt"),
+            effective_tags=("white_shirt", "green_skirt", "pleated_skirt"),
+        ),
+        complete_named_profile=True,
+    )
+
+    cropped = apply_framing_to_character_outfits(
+        (plan,), "上半身肖像，只拍到腰部以上"
+    )[0]
+    context = character_wardrobe_authority_context((cropped,))
+    authority = build_wardrobe_authority(
+        (cropped,), SemanticLookupResult(), ()
+    )
+    detail = controlled_character_outfit_detail(
+        "chihaya_anon wears a white shirt, green pleated skirt, and smiles",
+        "chihaya_anon",
+        cropped,
+        wardrobe_authority=authority,
+    )
+
+    assert cropped.effective.effective_tags == ("white_shirt",)
+    assert "green_skirt" not in context
+    assert "pleated_skirt" not in context
+    assert "outside the requested framing" in context
+    assert "green pleated skirt" not in detail
+    assert "white_shirt" in detail
 
 
 def test_explicit_wardrobe_evidence_prevents_config_override() -> None:

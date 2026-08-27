@@ -61,8 +61,8 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 ## 出图
 
-- `width` / `height`：默认尺寸。
-- `allowed_sizes`：允许的尺寸列表。
+- `width` / `height`：默认尺寸；宽和高都必须在 832–1756（含边界），且为 4 的倍数。
+- `allowed_sizes`：只用于“竖图、横图、宽屏”等比例快捷词的候选列表，不是明确数字尺寸的白名单。
 - `steps`：采样步数。
 - `cfg`：CFG 强度。
 - `sampler_name` / `scheduler`：采样器和调度器。

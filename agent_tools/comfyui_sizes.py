@@ -3,6 +3,24 @@ from __future__ import annotations
 from typing import Any
 
 
+MIN_GENERATION_SIDE = 832
+MAX_GENERATION_SIDE = 1756
+GENERATION_SIDE_MULTIPLE = 4
+
+
+def is_valid_generation_size(width: int, height: int) -> bool:
+    """Return whether both sides satisfy the Anima generation size contract."""
+    try:
+        sides = (int(width), int(height))
+    except (TypeError, ValueError):
+        return False
+    return all(
+        MIN_GENERATION_SIDE <= side <= MAX_GENERATION_SIDE
+        and side % GENERATION_SIDE_MULTIPLE == 0
+        for side in sides
+    )
+
+
 def parse_size(value: Any) -> tuple[int, int] | None:
     if isinstance(value, str):
         text = value.strip().lower()
@@ -36,10 +54,14 @@ def allowed_sizes(
     sizes: list[tuple[int, int]] = []
     for item in raw_sizes if isinstance(raw_sizes, list) else []:
         parsed = parse_size(item)
-        if parsed and parsed not in sizes:
+        if parsed and is_valid_generation_size(*parsed) and parsed not in sizes:
             sizes.append(parsed)
     if not sizes:
-        sizes = [item for item in (parse_size(item) for item in default_sizes) if item]
+        sizes = [
+            item
+            for item in (parse_size(item) for item in default_sizes)
+            if item and is_valid_generation_size(*item)
+        ]
     return sizes
 
 
@@ -49,7 +71,7 @@ def generation_size(
     width = int(width)
     height = int(height)
     allowed = allowed_sizes(config, default_sizes)
-    if allowed and (width, height) not in allowed:
+    if allowed and not is_valid_generation_size(width, height):
         requested_ratio = width / height
         same_orientation = [
             size for size in allowed if (size[0] >= size[1]) == (width >= height)

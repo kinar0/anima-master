@@ -452,7 +452,7 @@ def _build_variant_outfit_profile(
         sorted(
             selected,
             key=lambda tag: (_outfit_slot_rank(tag), -counts[tag], tag),
-        )[:14]
+        )
     )
     appearance_counts = Counter(
         tag for tags in focused for tag in tags if is_appearance_tag(tag)

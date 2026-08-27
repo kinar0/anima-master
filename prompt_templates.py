@@ -14,27 +14,31 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
 
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 
-请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将结果输出为英文 Danbooru-style tags。
+请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。
 
 输出要求：
-- 只输出七个单行花括号字段，字段外不得输出任何文字：
+- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：
   `{{Count: 2girls, yuri}}`
   `{{Characters: chihaya_anon, togawa_sakiko}}`
   `{{Copyright: bang_dream!}}`
   `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`
   `{{Details: chihaya_anon smiles and waves; togawa_sakiko looks aside and holds a book}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
-  `{{Nltags: chihaya_anon and togawa_sakiko ...}}`
+  `{{Nltags: chihaya_anon and togawa_sakiko are ......}}`
 - `Count` 必须与 `Characters` 完全一致，按以下规则确定，禁止反复核算或自我怀疑：先通过后文补充信息和用户原始语句得到角色名danbooru tag，然后在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；futa相关tag不会计入总人数。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+- Copyright输出角色所属作品的danbooru tag。
+- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
+- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。
+- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。
+- Tags存放画面中设计的相关元素、构图、衣物、cum和penis和breasts等、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。
+- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。
 - Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等
-- `Identity` 中每位角色写成完整、语法连贯的一句；不要把 `is ...` 直接接在 `has ...` 的属性列表里。
+- `Identity` 中每位角色写成完整、语法连贯的一句话。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
 - 不要输出 masterpiece、best quality、score 等质量前缀。
 - 不要输出画师 tags；质量词和画师组会由程序另行拼接。
 - 尽量使用模型容易理解的可见画面描述。
 - 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。
-- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
-- 用户未明确要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。
 - 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。
 - 不要为了数量重复同义词；画面已经完整时即可停止。
 - 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。
@@ -53,7 +57,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 
 BACKGROUND_POLICY_TEMPLATE = """
 
-背景：只按用户原文判断。明确写了场景就保留且不用白底，末尾写 {explicit_marker}；未写场景就用 simple/white background，不新增地点，末尾写 {default_marker}。两个标记只写一个。
+背景：只按用户原文判断。明确写了场景就保留且不用白底，Nltags末尾写 {explicit_marker}；未写场景就用 simple/white background，不新增地点，Nltags末尾写 {default_marker}。两个标记只写一个。
 用户原文：{original_theme}
 """
 
@@ -185,7 +189,7 @@ def build_llm_prompt(
     if sensual_mode:
         sensual_rule = """
 -----------
-本次用户明确要求涩气、透明、魅惑、淫乱或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；优先满足用户的明确要求，然后如果无明确要求，则可为了色气表现力，根据角色所处的情景、地点和做出的行为，自行设计合适的服装，或在要求基础上作出修改。
+本次用户明确要求涩气、透明、魅惑、淫乱、性爱场景或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；优先满足用户的明确要求，然后如果无明确要求，则可为了色气表现力，根据角色所处的情景、地点和做出的行为，自行设计合适的服装，或在要求基础上作出修改。
 这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
 可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写角色的身体部位，如胸部、penis、pussy等
 不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。

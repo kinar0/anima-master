@@ -2,8 +2,20 @@ import re
 
 try:
     from .command_catalog import build_help_text
+    from .agent_tools.comfyui_sizes import (
+        GENERATION_SIDE_MULTIPLE,
+        MAX_GENERATION_SIDE,
+        MIN_GENERATION_SIDE,
+        is_valid_generation_size,
+    )
 except ImportError:  # pragma: no cover - direct script-style import.
     from command_catalog import build_help_text
+    from agent_tools.comfyui_sizes import (
+        GENERATION_SIDE_MULTIPLE,
+        MAX_GENERATION_SIDE,
+        MIN_GENERATION_SIDE,
+        is_valid_generation_size,
+    )
 
 _ROUTE_PREFIX_RE = re.compile(r"^\s*/?", re.IGNORECASE)
 _SPACES_RE = re.compile(r"\s+")
@@ -27,8 +39,8 @@ DEFAULT_GENERATION_SIZES = [
     "1024x1024",
     "1152x896",
     "1216x832",
-    "768x1344",
-    "1344x768",
+    "832x1472",
+    "1472x832",
     "1024x1536",
 ]
 
@@ -52,7 +64,9 @@ def parse_generation_size(
 
     Args:
         text: Prompt text after the generation command.
-        allowed: Width and height pairs allowed by the active configuration.
+        allowed: Configured size candidates used to resolve natural-language
+            aliases such as ``竖图``. Explicit numeric sizes do not need to be
+            present in this list.
 
     Returns:
         Cleaned prompt, selected size, and an optional user-facing error.
@@ -83,10 +97,13 @@ def parse_generation_size(
             size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
             if size_match:
                 break
-        if size_match and allowed:
+        valid_candidates = [
+            size for size in allowed if is_valid_generation_size(*size)
+        ]
+        if size_match and valid_candidates:
             target_ratio = _SIZE_ALIASES[size_match.group("alias")]
             selected = min(
-                allowed,
+                valid_candidates,
                 key=lambda size: (
                     abs((size[0] / size[1]) - target_ratio),
                     abs(size[0] * size[1] - 1024 * 1024),
@@ -100,12 +117,13 @@ def parse_generation_size(
     cleaned = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", cleaned)
     cleaned = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", cleaned)
     cleaned = _SPACES_RE.sub(" ", cleaned)
-    if selected and allowed and selected not in allowed:
-        options = "、".join(f"{width}x{height}" for width, height in allowed)
+    if selected and not is_valid_generation_size(*selected):
         return (
             cleaned,
             None,
-            f"尺寸 {selected[0]}x{selected[1]} 不可用。可用尺寸：{options}",
+            f"尺寸 {selected[0]}x{selected[1]} 不可用。宽和高都必须在 "
+            f"{MIN_GENERATION_SIDE}-{MAX_GENERATION_SIDE} 之间，且为 "
+            f"{GENERATION_SIDE_MULTIPLE} 的倍数。",
         )
     if selected is None:
         return cleaned, None, "当前没有配置可用尺寸。"

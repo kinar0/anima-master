@@ -98,7 +98,7 @@
 - “爱音的裙子变蓝色”：应为 `default_reference/unspecified` 并带换色 patch；default 是修改基线，不是必须原样恢复的套装。
 - “爱音穿羽丘夏季校服但没穿短裙”：应使用命名套组及删除 patch，不应再读取爱音 default。
 
-若构图属于头部/脸部、上半身、cowboy shot、肚脐、下半身、腿/大腿/臀部、足部、手部或头部出框，`composition_omitted_tags` 应列出该视域下被省略的档案 tag；它们没有进入最终提示词是正常裁剪，不是档案读取失败。若原文只是“下半身没穿”等服装修改，则不应产生构图省略项；出现时说明 framing 误判。
+若构图属于头部/脸部、上半身、cowboy shot、肚脐、下半身、腿/大腿/臀部、足部、手部或头部出框，`composition_omitted_tags` 应列出该视域下被省略的档案 tag；“上半身肖像”“只拍到腰部以上”等表达也应在 LLM2 前产生省略项。具体省略 tag 不应再出现在 LLM2 的 `Per-character clothing evidence` 中；最终 `Details` 若仍出现 `green pleated skirt` 一类带修饰词的画外服装，说明后置 prose 权限过滤失效。若原文只是“下半身没穿”等服装修改，则不应产生构图省略项；出现时说明 framing 误判。
 
 开启 `debug_prompt_enabled` 后检查最近任务摘要：
 
@@ -114,7 +114,7 @@
 
 对于“角色 A cosplay 角色 B”，检查 `wardrobe_resolution_states`、`semantic_character_outfits` 和 `source_grounding_tags`。LLM1 正常时会在 A 的 `clothing_source` 中原样返回 B；即使 LLM1 给了错误 wardrobe 意图，主机也会对明确的“A cosplay B / A 穿 B 的衣服”逐角色修复为 `outfit_source`。普通文字请求不得出现旧换装块的“最终主体必须是固定角色”；只有参考图/搜索换装仍可进入旧路线。若句式本身无法确定穿着者，才保留 `explicit_but_unresolved`，且不得恢复目标默认衣柜。
 
-新 LLM1 原始结果应是 `characters[].name / clothing / clothing_source / clothing_changes / appearance_changes`，不应再看到 `wardrobe.kind` 指令。`semantic_plan_attempt_count=2` 只用于 JSON、原文证据或基本字段外形损坏；修复失败时仍保留初稿中可解析的部分。旧日志里的 `wardrobe.kind/source/anchor_id` 是兼容格式，不应据此修改当前提示词。
+新 LLM1 原始结果应是 `characters[].name / aliases / clothing / clothing_source / clothing_changes / appearance_changes`，不应再看到 `wardrobe.kind` 指令。`name` 应是原文中的角色实体短语；`aliases` 只列与它明确构成同一 `A（B）` 对的别名。`semantic_plan_attempt_count=2` 只用于 JSON、原文证据或基本字段外形损坏；修复失败时仍保留初稿中可解析的部分。旧日志里的 `wardrobe.kind/source/anchor_id` 是兼容格式，不应据此修改当前提示词。
 
 新协议不再要求 LLM1 输出 lookup role 或候选 tag；它只保留 source 原文，由主机匹配命名衣柜。若调试日志仍出现带 `lookups` 的旧兼容响应，role 写反只在“唯一 lookup 且所有引用 wardrobe kind 一致”时安全归一化。命中衣柜后应看到 `complete_named_profile=true` 和完整 `effective_tags`。最终 `Nltags` 出现中文也不是 LLM2 的正常结果：resolver 的 `missing_descriptions` 只能进入 LLM2 上下文与摘要，不能由主机直接拼接到最终文本。
 
@@ -130,6 +130,8 @@
 2. 给第二次 LLM 的完整提示中，`Character-scoped stable appearance authority` 是否按穿着者列出档案；命中的固定角色辅助提示是否已经被最新档案重建，不再携带陈旧瞳色。
 3. 最终 `structured_identity_blocks` 是否只保留用户明确修改的外貌维度，并恢复未提及维度的档案值；同时检查 `structured_detail_blocks`、共享 `Tags` 和最终 prompt，确认它们没有重新带入同一未开放维度的竞争特征。
 
-当前外貌裁决单位是“角色 × 维度”，不是整份 Identity。只改发型不会解锁瞳色，只改 A 的瞳色不会影响 B。若用户明确改成蓝眼睛，最终应保留蓝眼并排除档案灰眼；若用户没有提瞳色，则 LLM 写出的黄眼、蓝眼等冲突描述必须被删除，而不是与 `grey_eyes` 同时追加到末尾竞争。
+当前外貌裁决单位是“角色 × 维度”，不是整份 Identity。只改发型不会解锁瞳色，只改 A 的瞳色不会影响 B。检查 LLM1 对每条修改给出的 `operation`：`replace` 应排除该维度旧值，`additive` 应保留兼容旧值并加入新值；主机不再靠固定中文关键词决定两者。用户没有提瞳色时，LLM 写出的黄眼、蓝眼等冲突描述必须被删除。writer 已正确表达的稳定外貌应保留自然语言，主机只补缺失维度，不应在最终提示词末尾再次盲目拼入整份档案。
 
 若 LLM2 输出 `blonde and blue hair`、`yellow and green eyes` 这类并列描述，还要确认拆分后的孤立颜色词没有残留。程序会让孤立颜色继承右侧 `hair` / `eyes` 维度后再应用同一权限，不能把 `blonde` 或 `yellow` 当作不受约束的普通特征。
+
+若括号英文翻译被误识别成额外角色，同时检查 `semantic_plan_raw.characters[].name` 与 `aliases`。角色实体和别名必须在原文中精确构成 `name（alias）` 或 `alias（name）`；仅仅出现在同一句、作为 `name` 的子串或位于另一项特征旁边均不得升级。匿名描述如“有着巨乳（huge breasts）的粉发美少女”应得到 `name=粉发美少女, aliases=[]`。新角色仍不需要本地预先确认，只要这个语义绑定与原文相邻关系都成立，就会继续进入 resolver 与学习流程。

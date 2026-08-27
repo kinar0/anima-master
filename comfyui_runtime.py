@@ -191,7 +191,7 @@ class ComfyUIRuntime:
                 )
             return "没有拿到参考图。请直接带图发送，或引用一条包含图片的消息再使用 /anm"
         if "unsupported_size" in detail:
-            return "尺寸不在当前 Anima 预设范围内"
+            return "宽和高都必须在 832-1756 之间，且为 4 的倍数"
         return detail[:300]
 
     async def send_payload(self, event: Any, payload: dict[str, Any]) -> str:
