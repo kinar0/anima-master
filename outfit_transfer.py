@@ -403,6 +403,20 @@ def _tag_matches_slot(tag: str, slot: str) -> bool:
     return actual == slot
 
 
+def _profile_tag_matches_slot(tag: str, slot: str) -> bool:
+    """Classify unknown cached outfit components as ``misc`` only at source.
+
+    A saved outfit profile contains wardrobe evidence by construction, so an
+    unclassified component can safely belong to the catch-all slot. Free writer
+    Tags do not get this fallback: otherwise ``remove misc`` could erase poses,
+    scenery, or props merely because they are not garments.
+    """
+    actual = outfit_tag_slot(tag) or "misc"
+    if slot == "lower_body.all":
+        return actual.startswith("lower_body.") or actual == "legwear"
+    return actual == slot
+
+
 def _character_aliases(name: str) -> tuple[str, ...]:
     text = str(name or "").strip()
     aliases = [text] if text else []
@@ -595,12 +609,14 @@ def build_effective_outfit_plan(
         if patch.operation == "keep_only":
             allowed_slots = set(filter(None, patch.slot.split(",")))
             for tag in tuple(effective):
-                if outfit_tag_slot(tag) not in allowed_slots:
+                if (outfit_tag_slot(tag) or "misc") not in allowed_slots:
                     effective.remove(tag)
                     if tag not in removed:
                         removed.append(tag)
             continue
-        matching = [tag for tag in effective if _tag_matches_slot(tag, patch.slot)]
+        matching = [
+            tag for tag in effective if _profile_tag_matches_slot(tag, patch.slot)
+        ]
         if patch.operation in {"remove", "replace"}:
             for tag in matching:
                 effective.remove(tag)

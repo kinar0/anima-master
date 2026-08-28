@@ -340,3 +340,26 @@ def test_standalone_no_skirt_binds_target_without_enabling_strict_allowlist() ->
         strict_allowlist=False,
     )
     assert filtered == "red shirt, blue jacket, standing"
+
+
+def test_misc_patch_removes_only_unclassified_cached_outfit_components() -> None:
+    effective = build_effective_outfit_plan(
+        detect_outfit_transfer("角色去掉难以分类的装饰"),
+        user_prompt="角色去掉难以分类的装饰",
+        base_tags=("red_shirt", "black_skirt", "cross_motif", "gold_trim"),
+        semantic_patches=(
+            UserOutfitPatch(
+                "角色", "remove", "misc", evidence="去掉难以分类的装饰"
+            ),
+        ),
+    )
+
+    assert effective.effective_tags == ("red_shirt", "black_skirt")
+    assert effective.removed_tags == ("cross_motif", "gold_trim")
+    assert effective.forbidden_slots == ("misc",)
+    assert keep_only_verified_outfit_tags(
+        "standing, dramatic lighting, holding sword",
+        (),
+        effective.forbidden_slots,
+        strict_allowlist=False,
+    ) == "standing, dramatic lighting, holding sword"

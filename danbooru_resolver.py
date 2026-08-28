@@ -446,6 +446,51 @@ class DanbooruResolver:
                 matched_alias_by_profile.setdefault(profile_key, alias)
                 matched_span_by_profile.setdefault(profile_key, (start, end))
 
+        # A character-owned variant must not require one contiguous composite
+        # alias such as ``千早爱音演出服``.  Once a character alias is grounded in
+        # its local clause, use the requested qualifier to select the unique
+        # sibling profile with the same canonical source tag.  This turns
+        # ``千早爱音穿着演出服`` into (chihaya_anon, stage) while keeping
+        # ``千早爱音站在舞台上`` on the default profile.
+        directly_matched = tuple(matched_alias_by_profile.items())
+        profile_by_key = dict(profile_items)
+        for matched_key, matched_alias in directly_matched:
+            matched_profile = profile_by_key.get(matched_key)
+            matched_span = matched_span_by_profile.get(matched_key)
+            if not isinstance(matched_profile, dict) or matched_span is None:
+                continue
+            requested_variant = self._outfit_variant_near_span(
+                text, *matched_span
+            )
+            matched_sources = {
+                self._profile_alias_key(tag)
+                for tag in matched_profile.get("source_tags", [])
+                if str(tag).strip()
+            }
+            if not matched_sources:
+                continue
+            sibling_keys = [
+                candidate_key
+                for candidate_key, candidate in profile_items
+                if candidate_key != matched_key
+                and self._normalize_outfit_variant(
+                    candidate.get("qualifier"),
+                    candidate_key,
+                    candidate.get("aliases", []),
+                )
+                == requested_variant
+                and matched_sources.intersection(
+                    self._profile_alias_key(tag)
+                    for tag in candidate.get("source_tags", [])
+                    if str(tag).strip()
+                )
+            ]
+            if len(sibling_keys) != 1:
+                continue
+            sibling_key = sibling_keys[0]
+            matched_alias_by_profile.setdefault(sibling_key, matched_alias)
+            matched_span_by_profile.setdefault(sibling_key, matched_span)
+
         for profile_key, profile in profile_items:
             if not isinstance(profile, dict) or profile.get("kind") == "named_outfit":
                 continue

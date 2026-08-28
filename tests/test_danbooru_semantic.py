@@ -50,6 +50,83 @@ def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
     assert "clothing_source" in prompt
     assert "operation (replace or additive)" in prompt
     assert "only the exact entity mention" in prompt
+    assert "operation MUST be one of remove" in prompt
+    assert "face_accessory.mask" in prompt
+    assert "footwear" in prompt
+
+
+def test_llm1_past_tense_operations_and_plain_slots_are_not_discarded() -> None:
+    prompt = (
+        "丰川祥子穿着oblivionis的衣服，她的面具没有戴，"
+        "丰川祥子的靴子被脱了下来丢在一边"
+    )
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "丰川祥子",
+                    "aliases": [],
+                    "clothing": "oblivionis的衣服",
+                    "clothing_source": "oblivionis",
+                    "clothing_changes": [
+                        {
+                            "operation": "removed",
+                            "slots": ["mask"],
+                            "source_text": "她的面具没有戴",
+                        },
+                        {
+                            "operation": "removed",
+                            "slots": ["boots"],
+                            "source_text": "丰川祥子的靴子被脱了下来丢在一边",
+                        },
+                    ],
+                    "appearance_changes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert [(item.operation, item.slots, item.source_text) for item in plans[0].directives] == [
+        ("remove", ("face_accessory.mask",), "她的面具没有戴"),
+        ("remove", ("footwear",), "丰川祥子的靴子被脱了下来丢在一边"),
+    ]
+
+
+def test_unknown_llm1_clothing_slot_falls_back_to_misc_instead_of_discarding() -> None:
+    prompt = "丰川祥子的未知衣物消失了"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "丰川祥子",
+                    "aliases": [],
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [
+                        {
+                            "operation": "removed",
+                            "slots": ["mystery_layer"],
+                            "source_text": "未知衣物消失了",
+                        }
+                    ],
+                    "appearance_changes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert plans[0].directives[0].operation == "remove"
+    assert plans[0].directives[0].slots == ("misc",)
 
 
 def test_semantic_appearance_changes_are_source_grounded_advisory_hints() -> None:
@@ -327,6 +404,37 @@ def test_readable_intent_only_changes_uses_default_as_modification_base() -> Non
 
     assert plans[0].wardrobe == SemanticWardrobe("default_profile")
     assert plans[0].directives[0].operation == "replace_color"
+
+
+def test_readable_stage_intent_preserves_explicit_clothing_and_profile_kind() -> None:
+    prompt = "千早爱音穿着演出服"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": "千早爱音",
+                    "aliases": [],
+                    "clothing": "演出服",
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    plans = parse_semantic_character_plans(raw, prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert [(anchor.role, anchor.source_text) for anchor in anchors] == [
+        ("clothing", "演出服"),
+        ("target_character", "千早爱音"),
+    ]
+    assert len(plans) == 1
+    assert plans[0].target_anchor_id == "target_1"
+    assert plans[0].wardrobe == SemanticWardrobe("stage_profile")
 
 
 def test_missing_outfit_source_reference_requests_llm_repair_without_guessing() -> None:
@@ -2184,6 +2292,49 @@ def test_casual_outfit_profile_does_not_fall_back_to_default_cache() -> None:
     assert casual.outfit_profile_tags == ("blue_cardigan", "jeans")
     assert default is not None
     assert default.outfit_profile_tags == ("school_uniform",)
+
+
+def test_character_stage_profile_uses_owner_and_qualifier_without_composite_alias() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver.remember_outfit_summary(
+        "千早爱音", ("chihaya_anon",), ("haneoka_school_uniform",)
+    )
+    resolver.remember_outfit_summary(
+        "千早爱音演出服",
+        ("chihaya_anon",),
+        ("blue_jacket", "cropped_jacket", "white_skirt"),
+        qualifier="stage",
+    )
+
+    natural = resolver.cached_outfit_profiles_for_prompt("千早爱音穿着演出服")
+    redundant = resolver.cached_outfit_profiles_for_prompt(
+        "千早爱音穿着千早爱音演出服"
+    )
+    stage_scene = resolver.cached_outfit_profiles_for_prompt("千早爱音站在舞台上")
+    post_performance = resolver.cached_outfit_profiles_for_prompt(
+        "千早爱音演出结束后坐在后台"
+    )
+
+    assert natural is not None and redundant is not None
+    assert natural.outfit_profile_tags == redundant.outfit_profile_tags == (
+        "blue_jacket", "cropped_jacket", "white_skirt"
+    )
+    assert natural.source_outfit_profiles[0][3] == "stage"
+    assert stage_scene is not None
+    assert stage_scene.outfit_profile_tags == ("haneoka_school_uniform",)
+    assert post_performance is not None
+    assert post_performance.outfit_profile_tags == ("haneoka_school_uniform",)
 
 
 def test_mixed_character_variants_are_selected_from_each_local_clause() -> None:

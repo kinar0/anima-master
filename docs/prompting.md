@@ -10,7 +10,7 @@
 
 第一阶段语义规划 LLM 的 system prompt 可以通过 `danbooru_semantic_system_prompt` 修改。该配置控制逐角色意图抽取，不允许要求模型猜 tag 或生成 lookup；本地匹配发生在其后。它不会替换第二阶段的 `prompt_builder_template`；留空时使用插件内置默认值。
 
-第一阶段的主要职责已经从“为查询列关键词”扩展为“明确谁穿什么”。它必须为每个可见角色输出一条 wardrobe 计划，并把“双方、两人、都、双女主、both、all”等共享服装范围展开到所有穿着者。Danbooru 查询临时不可用时仍会执行这一步，只跳过候选验证，避免直接把角色默认衣柜当作保底注入。
+第一阶段的主要职责已经从“为查询列关键词”扩展为“明确谁穿什么”。它必须为每个可见角色输出一条 wardrobe 计划，并把“双方、两人、都、双女主、both、all”等共享服装范围展开到所有穿着者。任务书会明确要求服装修改使用 `upper_body.primary / lower_body.skirt / one_piece.dress / outerwear / headwear / face_accessory.mask / handwear / legwear / footwear / lower_body.all / misc`，不好分类的组件统一放入 `misc`。程序会把常见过去式操作、mask/boots 等普通名称和未知非空槽位归一化，而不是静默丢弃整条 LLM1 修改；精确的原文 `source_text` 会继续交给第二阶段理解。Danbooru 查询临时不可用时仍会执行这一步，只跳过候选验证，避免直接把角色默认衣柜当作保底注入。
 
 ## 两次 LLM、角色档案与衣柜
 
@@ -19,8 +19,12 @@
 1. 第一次 LLM 只理解请求，识别可见角色和每个人的服装选择。
 2. 角色视觉档案提供 canonical 角色、稳定外貌和 default/casual/stage 等候选衣柜；衣柜只是候选资料，稳定外貌则是未被用户显式修改维度的基线。
 3. 程序用统一的 `WardrobeAuthority` 决定哪些衣服本次有效，哪些历史衣柜已经失效。
-4. 第二次 LLM 同时看到完整原文、逐角色稳定外貌和服装权限，并编写 Identity、动作、构图、背景和服装表达。`outfit_source` / cosplay 使用“来源约束补全”：数据库组件是最低可信锚点，模型可以补足来源角色有辨识度的服装，但不能换回穿着者的默认衣柜。
+4. 第二次 LLM 同时看到完整原文、逐角色稳定外貌和服装权限，并编写 Identity、动作、构图、背景和服装表达。`outfit_source` / cosplay 使用来源档案帮助理解，但数据库组件不会被主机自动追加到最终 `Details` 或共享 Tags；模型按用户原文选择需要的可见组件，后处理只阻止被删除、陈旧或属于其他穿着者的内容复活。
 5. 程序最后再次过滤第二次 LLM 的 Tags、Details 和 Nltags，并逐角色重建 Identity：LLM1 以可定位的 `appearance_changes` 提醒 LLM2 理解用户的外貌修改，稳定外貌档案仍是基线。主机不再用正则从用户原文猜测外貌维度；角色 `Details` 和共享 `Tags` 不能绕过这套外貌权限。
+
+角色自有的 default/casual/summer/winter/stage 变体使用“穿着者 + qualifier”选择。用户可自然写“千早爱音穿着演出服”，无需重复成“千早爱音穿着千早爱音演出服”。普通衣物原文也会保留成显式 clothing anchor，因此不会因没有命名套组 tag 而被当成“衣服未指定”。
+
+七字段外壳和有效人数锚点仍是硬格式要求。Identity/Details 内部则按自然语言宽松归属：角色名可出现在照片分镜等句子中而不必机械位于段首，后续无角色名的分号句继承上一明确角色，无法可靠归属的补充文字转入 `Nltags` 原样保留。模板仍要求每个角色段以 canonical 名开头，这是降低多人歧义的写作约定，不再是会截断内容或判整份回复无效的解析条件。
 
 例如：
 

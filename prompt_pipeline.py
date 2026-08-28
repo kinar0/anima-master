@@ -263,6 +263,27 @@ class StructuredPromptCharacter:
     detail_tags: str
 
 
+@dataclass(frozen=True)
+class StructuredPromptParseResult:
+    """Lossless best-effort parse of the seven-field writer response.
+
+    Field-envelope and count failures are validation errors. Character scope is
+    deliberately advisory: clauses are assigned when possible, continuations
+    inherit the previous explicit owner, and still-unscoped text is preserved
+    in Nltags instead of invalidating or discarding the response.
+    """
+
+    roster_tags: tuple[str, ...]
+    copyright_tags: tuple[str, ...]
+    characters: tuple[StructuredPromptCharacter, ...]
+    scene: str
+    nltags: str
+    validation_errors: tuple[str, ...] = ()
+    scope_warnings: tuple[str, ...] = ()
+    unscoped_identity: tuple[str, ...] = ()
+    unscoped_details: tuple[str, ...] = ()
+
+
 def confirmed_semantic_character_tags(
     result: SemanticLookupResult,
 ) -> tuple[str, ...]:
@@ -648,36 +669,10 @@ def structured_count_tags_match_roster(
     )
 
 
-def extract_structured_prompt(
-    text: str,
-) -> tuple[
-    tuple[str, ...],
-    tuple[str, ...],
-    tuple[StructuredPromptCharacter, ...],
-    str,
-    str,
-]:
-    """Parse the unified character-first LLM response format.
-
-    Args:
-        text: LLM completion containing Count, Characters, Copyright,
-            per-character sections, shared tags, and Nltags.
-
-    Returns:
-        Roster count/relationship tags, copyright tags, character sections,
-        shared scene tags, and natural-language tags. Empty character sections
-        signal that a legacy tag-only completion was returned.
-    """
+def _parse_structured_prompt(text: str) -> StructuredPromptParseResult:
+    """Parse seven fields without treating natural-language scope as syntax."""
     raw = str(text or "").replace("\r\n", "\n").strip()
-    blocks = {
-        key.lower(): value.strip()
-        for key, value in re.findall(
-            r"\{\s*(Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:\s*(.*?)\s*\}",
-            raw,
-            flags=re.IGNORECASE | re.DOTALL,
-        )
-    }
-    if set(blocks) != {
+    field_names = {
         "count",
         "characters",
         "copyright",
@@ -685,8 +680,29 @@ def extract_structured_prompt(
         "details",
         "tags",
         "nltags",
-    }:
-        return (), (), (), raw, ""
+    }
+    matches = re.findall(
+        r"\{\s*(Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:\s*(.*?)\s*\}",
+        raw,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    values_by_field: dict[str, list[str]] = {}
+    for key, value in matches:
+        values_by_field.setdefault(key.lower(), []).append(value.strip())
+    missing = sorted(field_names - set(values_by_field))
+    duplicates = sorted(
+        key for key, values in values_by_field.items() if len(values) != 1
+    )
+    validation_errors: list[str] = []
+    if missing:
+        validation_errors.append("missing fields: " + ", ".join(missing))
+    if duplicates:
+        validation_errors.append("duplicate fields: " + ", ".join(duplicates))
+    if validation_errors:
+        return StructuredPromptParseResult(
+            (), (), (), raw, "", tuple(validation_errors)
+        )
+    blocks = {key: values[0] for key, values in values_by_field.items()}
     roster = [
         item.strip()
         for item in blocks["characters"].split(",")
@@ -726,42 +742,137 @@ def extract_structured_prompt(
     has_no_humans = any(
         item.lower().replace("_", " ") == "no humans" for item in roster_tags
     )
-    if not has_count_tag or (not roster and not has_no_humans):
-        return (), (), (), raw, ""
-
-    def sentence_for(name: str, section: str) -> str:
-        # Accept compact ``A: ... | B: ...`` as a clause separator. Ownership
-        # remains strict because each clause must begin with its roster name.
-        section = re.sub(r"\s*\|\s*", "; ", section)
-        display = re.escape(name.replace("_", " "))
-        source = re.escape(name)
-        match = re.search(
-            # A role name mentioned inside somebody else's clause (for example
-            # "chihaya_anon lies in togawa_sakiko's arms") is not that
-            # character's own Details entry.  Require a clause to *start* with
-            # the role name, either at the section start or after a semicolon.
-            rf"(?:^|;)\s*(?:{source}|{display})(?!\w)[^;]*",
-            section,
-            flags=re.IGNORECASE,
+    if not has_count_tag:
+        validation_errors.append(
+            "Count must include a valid people-count tag such as 1girl, "
+            "2girls, 1boy, Npeople, or no humans"
         )
-        return match.group(0).strip(" ,;") if match else ""
+    if not roster and not has_no_humans:
+        validation_errors.append(
+            "Characters is empty but Count is not no humans"
+        )
+    if validation_errors:
+        return StructuredPromptParseResult(
+            (), (), (), raw, "", tuple(validation_errors)
+        )
+
+    def name_pattern(name: str) -> str:
+        variants = tuple(dict.fromkeys((name, name.replace("_", " "))))
+        return "(?:" + "|".join(re.escape(item) for item in variants) + ")"
+
+    def scoped_section(
+        section_name: str, section: str
+    ) -> tuple[dict[str, list[str]], tuple[str, ...], tuple[str, ...]]:
+        # A pipe is an established alternate role separator. Semicolons split
+        # clauses, but do not imply that an unlabelled continuation has lost
+        # its owner: it inherits the preceding explicit/unique role.
+        clauses = [
+            clause.strip()
+            for clause in re.split(r"\s*(?:;|\|)\s*", section)
+            if clause.strip()
+        ]
+        assigned = {name: [] for name in roster}
+        unscoped: list[str] = []
+        current_owner = ""
+        for clause in clauses:
+            starts = [
+                name
+                for name in roster
+                if re.match(
+                    rf"^\s*{name_pattern(name)}(?!\w)",
+                    clause,
+                    flags=re.IGNORECASE,
+                )
+            ]
+            mentions = [
+                name
+                for name in roster
+                if re.search(
+                    rf"(?<!\w){name_pattern(name)}(?!\w)",
+                    clause,
+                    flags=re.IGNORECASE,
+                )
+            ]
+            owner = starts[0] if len(starts) == 1 else ""
+            if not owner and len(mentions) == 1:
+                # Handles framing such as ``photo one shows hatsune_miku``
+                # without forcing a rewrite or losing the surrounding words.
+                owner = mentions[0]
+            if not owner and current_owner:
+                # Pronouns, photo-by-photo narration, and other continuation
+                # clauses keep the last unambiguous role scope.
+                owner = current_owner
+            if owner:
+                assigned[owner].append(clause)
+                current_owner = owner
+            else:
+                unscoped.append(clause)
+
+        warnings = [
+            f"{section_name} has no attributable clause for {name}"
+            for name, clauses_for_name in assigned.items()
+            if not clauses_for_name
+        ]
+        if unscoped:
+            warnings.append(
+                f"{section_name} preserved {len(unscoped)} unscoped clause(s) in Nltags"
+            )
+        return assigned, tuple(unscoped), tuple(warnings)
+
+    identity_by_name, unscoped_identity, identity_warnings = scoped_section(
+        "Identity", blocks["identity"]
+    )
+    details_by_name, unscoped_details, details_warnings = scoped_section(
+        "Details", blocks["details"]
+    )
 
     characters = tuple(
         StructuredPromptCharacter(
             name=name,
-            identity_tags=sentence_for(name, blocks["identity"]),
-            detail_tags=sentence_for(name, blocks["details"]),
+            identity_tags="; ".join(identity_by_name[name]),
+            detail_tags="; ".join(details_by_name[name]),
         )
         for name in roster
     )
-    if any(not character.identity_tags or not character.detail_tags for character in characters):
-        return (), (), (), raw, ""
-    return (
+    preserved_nltags = "; ".join(
+        part
+        for part in (
+            blocks["nltags"],
+            *unscoped_identity,
+            *unscoped_details,
+        )
+        if part
+    )
+    return StructuredPromptParseResult(
         tuple(roster_tags),
         copyright_tags,
         characters,
         blocks["tags"],
-        blocks["nltags"],
+        preserved_nltags,
+        (),
+        (*identity_warnings, *details_warnings),
+        unscoped_identity,
+        unscoped_details,
+    )
+
+
+def extract_structured_prompt(
+    text: str,
+) -> tuple[
+    tuple[str, ...],
+    tuple[str, ...],
+    tuple[StructuredPromptCharacter, ...],
+    str,
+    str,
+]:
+    """Return the established five-part public structured-prompt tuple."""
+    parsed = _parse_structured_prompt(text)
+    return (
+        parsed.roster_tags,
+        parsed.copyright_tags,
+        parsed.characters,
+        parsed.scene,
+        parsed.nltags,
     )
 
 
@@ -1385,24 +1496,15 @@ def strip_writer_guessed_identity_from_nltags(nltags: str) -> str:
 def safe_global_outfit_tags(
     plans: tuple[CharacterEffectiveOutfit, ...],
 ) -> tuple[str, ...]:
-    """Return wardrobe tags safe to reinforce without cross-character leakage.
+    """Never promote cached wardrobe components into final global hard tags.
 
-    A single wearer has no attribution ambiguity, so all verified tags are safe.
-    With multiple wearers, only tags shared by every verified per-character plan
-    may enter the global tag stream. Character-specific tags remain exclusively
-    in the wearer-bound Details and reconstructed Nltags clauses.
+    Per-character profile tags are evidence for LLM2 and a conflict-removal
+    boundary, not content the host may independently add to the image. Even a
+    component shared by every wearer can be irrelevant to the user's requested
+    variation, and automatic promotion previously restored masks and accessories
+    the writer deliberately omitted.
     """
-    if not plans or any(
-        plan.wardrobe_kind in {"creative_fallback", "default_reference"}
-        or plan.resolution_state == "explicit_but_unresolved"
-        for plan in plans
-    ):
-        return ()
-    tag_sets = [set(plan.effective.effective_tags) for plan in plans]
-    if len(tag_sets) == 1:
-        return tuple(plans[0].effective.effective_tags)
-    shared = set.intersection(*tag_sets) if tag_sets else set()
-    return tuple(tag for tag in plans[0].effective.effective_tags if tag in shared)
+    return ()
 
 
 @dataclass(frozen=True)
@@ -1417,12 +1519,20 @@ class WardrobeAuthority:
     source_grounding_tags: tuple[str, ...] = ()
     unbound_grounding_tags: tuple[str, ...] = ()
     removed_tags: tuple[str, ...] = ()
+    removed_slots: tuple[str, ...] = ()
     stale_cached_tags: tuple[str, ...] = ()
     character_selected_tags: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     @staticmethod
     def _key(tag: str) -> str:
         return tag.strip().lower().replace(" ", "_")
+
+    @staticmethod
+    def _matches_slot(tag: str, slot: str) -> bool:
+        actual = outfit_tag_slot(tag)
+        if slot == "lower_body.all":
+            return actual.startswith("lower_body.") or actual == "legwear"
+        return bool(actual) and actual == slot
 
     @classmethod
     def _prose_pattern(cls, tag: str) -> str:
@@ -1465,6 +1575,17 @@ class WardrobeAuthority:
             text,
             flags=re.I,
         )
+        if outfit_tag_slot(tag) == "face_accessory.mask":
+            # A removed mask must not return as a held prop. This is the common
+            # LLM2 escape hatch after "not wearing a mask" and contradicts the
+            # request-level removal authority.
+            result = re.sub(
+                rf"\b(?:holds?|holding|carries|carrying)\s+"
+                rf"(?:(?:a|an|the)\s+)?{optional_modifiers}{phrase}\b",
+                "",
+                result,
+                flags=re.I,
+            )
         return re.sub(
             rf"(?:,\s*|\s+and\s+)(?:(?:a|an|the)\s+)?"
             rf"{optional_modifiers}{phrase}\b"
@@ -1479,9 +1600,12 @@ class WardrobeAuthority:
             self._key(tag)
             for tag in (*self.stale_cached_tags, *self.removed_tags)
         }
-        return tuple(
-            dict.fromkeys(tag for tag in tags if self._key(tag) not in stale)
-        )
+        return tuple(dict.fromkeys(
+            tag
+            for tag in tags
+            if self._key(tag) not in stale
+            and not any(self._matches_slot(tag, slot) for slot in self.removed_slots)
+        ))
 
     def filter_tag_text(self, text: str) -> str:
         return ", ".join(self.filter_tags(tuple(split_tags(text))))
@@ -1560,6 +1684,12 @@ def build_wardrobe_authority(
             tag for plan in plans for tag in plan.effective.removed_tags if tag
         )
     )
+    removed_slots = tuple(dict.fromkeys(
+        slot
+        for plan in plans
+        for slot in plan.effective.forbidden_slots
+        if slot
+    ))
     removed_keys = {WardrobeAuthority._key(tag) for tag in removed_tags}
     selected_tags = tuple(
         dict.fromkeys(
@@ -1686,6 +1816,7 @@ def build_wardrobe_authority(
         source_grounding_tags=source_grounding_tags,
         unbound_grounding_tags=unbound_grounding_tags,
         removed_tags=removed_tags,
+        removed_slots=removed_slots,
         stale_cached_tags=stale,
         character_selected_tags=character_selected_tags,
     )
@@ -1742,6 +1873,37 @@ _CASUAL_PROFILE_RE = re.compile(
     r"(?![a-z0-9_]))",
     re.I,
 )
+_SUMMER_PROFILE_RE = re.compile(
+    r"(?:夏季服装|夏装|夏服|summer\s+(?:clothes?|clothing|outfit|wear|attire))",
+    re.I,
+)
+_WINTER_PROFILE_RE = re.compile(
+    r"(?:冬季服装|冬装|冬服|winter\s+(?:clothes?|clothing|outfit|wear|attire))",
+    re.I,
+)
+_STAGE_PROFILE_RE = re.compile(
+    r"(?:演出服|舞台服|舞台装|表演服|"
+    r"(?:stage|performance|concert)\s+(?:costume|outfit|wear|attire))",
+    re.I,
+)
+
+CHARACTER_PROFILE_WARDROBE_KINDS = {
+    "default_profile",
+    "default_reference",
+    "casual_profile",
+    "summer_profile",
+    "winter_profile",
+    "stage_profile",
+}
+
+WARDROBE_PROFILE_QUALIFIERS = {
+    "default_profile": "default",
+    "default_reference": "default",
+    "casual_profile": "casual",
+    "summer_profile": "summer",
+    "winter_profile": "winter",
+    "stage_profile": "stage",
+}
 
 UNSPECIFIED_WARDROBE_POLICIES = {
     "default_profile",
@@ -1786,7 +1948,7 @@ DEFAULT_SCENE_ADAPTIVE_WARDROBE_MARKERS = (
 
 
 def requested_wardrobe_mode(user_prompt: str) -> str:
-    """Classify default evidence, official casual sets, and creative private wear."""
+    """Classify an explicit character-owned wardrobe profile request."""
     text = str(user_prompt or "")
     if _OFFICIAL_DEFAULT_OUTFIT_RE.search(text):
         return "default_profile"
@@ -1796,13 +1958,19 @@ def requested_wardrobe_mode(user_prompt: str) -> str:
         return "creative_fallback"
     if _CASUAL_PROFILE_RE.search(text):
         return "casual_profile"
+    if _SUMMER_PROFILE_RE.search(text):
+        return "summer_profile"
+    if _WINTER_PROFILE_RE.search(text):
+        return "winter_profile"
+    if _STAGE_PROFILE_RE.search(text):
+        return "stage_profile"
     return ""
 
 
 def requested_wardrobe_modes_by_target(
     user_prompt: str, targets: tuple[SemanticAnchor, ...]
 ) -> dict[str, str]:
-    """Return explicit default/casual/private choices scoped to each wearer.
+    """Return explicit profile/private choices scoped to each wearer.
 
     Request-level mode detection cannot represent mixed assignments such as
     ``A穿官方常服，B穿默认服装``.  Use punctuation-delimited clauses containing
@@ -1872,6 +2040,31 @@ def requested_wardrobe_modes_by_target(
         if len(set(modes)) == 1:
             scoped[target_id] = modes[0]
     return scoped
+
+
+def annotate_requested_profile_variants(
+    anchors: tuple[SemanticAnchor, ...], user_prompt: str
+) -> tuple[SemanticAnchor, ...]:
+    """Carry wearer-scoped profile qualifiers into resolver character queries."""
+    targets = tuple(
+        anchor for anchor in anchors if anchor.role == "target_character"
+    )
+    scoped_modes = requested_wardrobe_modes_by_target(user_prompt, targets)
+    return tuple(
+        replace(
+            anchor,
+            description=(
+                f"{anchor.description} "
+                f"{WARDROBE_PROFILE_QUALIFIERS[mode]} outfit variant"
+            ).strip(),
+        )
+        if anchor.role == "target_character"
+        and (mode := scoped_modes.get(anchor.anchor_id.lower(), ""))
+        in WARDROBE_PROFILE_QUALIFIERS
+        and mode != "default_profile"
+        else anchor
+        for anchor in anchors
+    )
 
 
 def scene_adaptive_wardrobe_marker(
@@ -2269,13 +2462,17 @@ def apply_requested_wardrobe_mode(
     mode: str,
 ) -> tuple[tuple[SemanticCharacterPlan, ...], tuple[SemanticAnchor, ...]]:
     """Apply deterministic request semantics when the planning LLM is incomplete."""
-    if mode not in {"default_profile", "casual_profile", "creative_fallback"}:
+    supported_modes = {
+        "default_profile", "casual_profile", "summer_profile",
+        "winter_profile", "stage_profile", "creative_fallback",
+    }
+    if mode not in supported_modes:
         return plans, anchors
     if plans:
         plans = tuple(
             replace(plan, wardrobe=SemanticWardrobe(mode))
             if plan.wardrobe.kind
-            in {"default_profile", "casual_profile", "creative_fallback", "none"}
+            in (*supported_modes, "none")
             else plan
             for plan in plans
         )
@@ -2288,16 +2485,19 @@ def apply_requested_wardrobe_mode(
             for anchor in anchors
             if anchor.role == "target_character"
         )
-    if mode == "casual_profile":
+    if mode in WARDROBE_PROFILE_QUALIFIERS and mode != "default_profile":
         target_ids = {
             plan.target_anchor_id.lower()
             for plan in plans
-            if plan.wardrobe.kind == "casual_profile"
+            if plan.wardrobe.kind == mode
         }
+        variant = WARDROBE_PROFILE_QUALIFIERS[mode]
         anchors = tuple(
             replace(
                 anchor,
-                description=f"{anchor.description} casual outfit variant".strip(),
+                description=(
+                    f"{anchor.description} {variant} outfit variant"
+                ).strip(),
             )
             if anchor.anchor_id.lower() in target_ids
             else anchor
@@ -2543,16 +2743,16 @@ def build_character_effective_outfits(
     }
 
     def cached_profile_for_target(
-        target: SemanticAnchor,
+        target: SemanticAnchor, qualifier: str,
     ) -> tuple[tuple[str, ...], tuple[str, ...]] | None:
         """Return a cache profile only when it belongs uniquely to ``target``."""
         target_text = re.sub(r"\s+", " ", target.source_text.strip().lower())
         target_candidates = {candidate.lower() for candidate in target.candidates}
         matches = [
             tags
-            for alias, source_tag, tags, _qualifier
+            for alias, source_tag, tags, profile_qualifier
             in semantic_result.source_outfit_profiles
-            if (
+            if (not qualifier or profile_qualifier == qualifier) and (
                 source_tag.lower() in target_candidates
                 or (
                     target_text
@@ -2618,7 +2818,15 @@ def build_character_effective_outfits(
         # switch clothing to creative_fallback; that must not also discard the
         # character's saved hair/eye/body anchors.
         target_profile = character_profiles.get(plan.target_anchor_id.lower())
-        cached_target_profile = cached_profile_for_target(target)
+        requested_qualifier = WARDROBE_PROFILE_QUALIFIERS.get(
+            plan.wardrobe.kind, ""
+        )
+        cached_target_profile = (
+            cached_profile_for_target(target, requested_qualifier)
+            if requested_qualifier
+            else None
+        )
+        cached_target_appearance_profile = cached_profile_for_target(target, "")
         _cached_character_tag, cached_target_appearance = saved_appearance_for_names(
             semantic_result, (target.source_text, *target.candidates)
         )
@@ -2628,15 +2836,17 @@ def build_character_effective_outfits(
             appearance_tags = target_profile[2]
         elif cached_target_profile:
             appearance_tags = cached_target_profile[1]
-        if plan.wardrobe.kind in {
-            "default_profile",
-            "default_reference",
-            "casual_profile",
-        }:
-            if target_profile:
-                _character_tag, base_tags, _ = target_profile
-            elif cached_target_profile:
+        elif cached_target_appearance_profile:
+            appearance_tags = cached_target_appearance_profile[1]
+        if plan.wardrobe.kind in CHARACTER_PROFILE_WARDROBE_KINDS:
+            # Prompt-matched cache rows carry an explicit qualifier, so prefer
+            # them over an unqualified legacy character_profiles row. The latter
+            # remains a compatibility fallback for resolver results whose target
+            # query was already annotated with the requested variant.
+            if cached_target_profile:
                 base_tags, _ = cached_target_profile
+            elif target_profile:
+                _character_tag, base_tags, _ = target_profile
             elif len(plans) == 1:
                 # Older lookup results expose only one request-wide profile. It is
                 # safe to inherit solely when there is one wearer; with multiple
@@ -2780,7 +2990,7 @@ def complete_character_wardrobe_states(
             return (
                 requested_mode == "creative_fallback" and not wardrobe_roles
             ) or bool(wardrobe_roles and wardrobe_roles <= {"clothing"})
-        if kind in {"default_profile", "casual_profile"}:
+        if kind in CHARACTER_PROFILE_WARDROBE_KINDS - {"default_reference"}:
             if scoped_mode:
                 return scoped_mode == kind
             if kind == "default_profile" and plan.effective.modified:
@@ -3035,7 +3245,7 @@ def controlled_character_outfit_detail(
     user_prompt: str = "",
     wardrobe_authority: WardrobeAuthority | None = None,
 ) -> str:
-    """Rebuild one Details clause from non-clothing prose plus verified wardrobe data."""
+    """Filter one writer Details clause without injecting cached wardrobe tags."""
     raw_writer_has_outfit = bool(_UNTRUSTED_OUTFIT_DETAIL_RE.search(str(detail or "")))
     if wardrobe_authority is not None:
         authority_for_detail = wardrobe_authority
@@ -3060,63 +3270,9 @@ def controlled_character_outfit_detail(
         )
     if plan is not None:
         result = " ".join(str(detail or "").split()).strip(" ,;")
-        writer_has_outfit = raw_writer_has_outfit
-        if (
-            plan.resolution_state != "explicit_but_unresolved"
-            and plan.effective.effective_tags
-            and not (
-                writer_has_outfit
-                and plan.resolution_state == "unspecified"
-            )
-        ):
-            # Profiles are evidence floors, not a closed garment allowlist. Keep
-            # the writer's user-consistent completion and append grounded anchors.
-            source_subject = character_name
-            tags = tuple(
-                tag for tag in plan.effective.effective_tags if tag != "bottomless"
-            )
-            grounded = []
-            if tags:
-                grounded.append(f"{source_subject} wears " + ", ".join(tags))
-            if "bottomless" in plan.effective.effective_tags:
-                grounded.append(f"{source_subject} is bottomless")
-            result = "; ".join(
-                dict.fromkeys(part for part in (result, *grounded) if part)
-            )
         result = re.sub(r"\b(?:and\s+)?(?:is|are)\s*(?=$|[,;.])", "", result, flags=re.I)
-        clauses = [re.sub(r"\s{2,}", " ", result).strip(" ,;")]
-        clauses.extend(outfit_patch_narratives(character_name, plan.effective.patches))
-        return "; ".join(
-            dict.fromkeys(clause for clause in clauses if clause)
-        ) or character_name
+        return re.sub(r"\s{2,}", " ", result).strip(" ,;") or character_name
     return " ".join(str(detail or "").split()).strip(" ,;")
-
-
-def outfit_patch_narratives(
-    subject: str, patches: tuple[UserOutfitPatch, ...]
-) -> tuple[str, ...]:
-    """Render final visible states for request-scoped wardrobe mutations."""
-    labels = {
-        "upper_body.primary": "upper garment",
-        "lower_body.skirt": "skirt",
-        "one_piece.dress": "dress",
-        "outerwear": "outerwear",
-        "headwear": "headwear",
-        "face_accessory.mask": "mask",
-        "handwear": "gloves",
-        "legwear": "legwear",
-        "footwear": "footwear",
-    }
-    narratives: list[str] = []
-    for patch in patches:
-        label = labels.get(
-            patch.slot, patch.slot.rsplit(".", 1)[-1].replace("_", " ")
-        )
-        if patch.operation == "remove" and patch.slot != "lower_body.all":
-            narratives.append(f"{subject} wears no {label}")
-        elif patch.operation == "damage":
-            narratives.append(f"{subject}'s {label} is visibly torn and ripped")
-    return tuple(dict.fromkeys(narratives))
 
 
 def character_wardrobe_authority_context(
@@ -3188,13 +3344,12 @@ def character_wardrobe_authority_context(
                 "hair, body and identity."
                 f"{mutation_rule}{crop_rule}"
             )
-        elif plan.wardrobe_kind in {"default_profile", "casual_profile"}:
+        elif plan.wardrobe_kind in CHARACTER_PROFILE_WARDROBE_KINDS - {
+            "default_reference"
+        }:
             tags = ", ".join(plan.effective.effective_tags) or "no grounded garments"
-            label = (
-                "EXPLICIT DEFAULT WARDROBE"
-                if plan.wardrobe_kind == "default_profile"
-                else "EXPLICIT CASUAL WARDROBE"
-            )
+            qualifier = WARDROBE_PROFILE_QUALIFIERS[plan.wardrobe_kind]
+            label = f"EXPLICIT {qualifier.upper()} WARDROBE"
             lines.append(
                 f"- {plan.target_source_text}: {label.lower()} = {tags}."
                 f"{mutation_rule}{crop_rule}"
@@ -4755,6 +4910,9 @@ class PromptPipeline:
                         ):
                             continue
                         semantic_anchors = (*semantic_anchors, cached_anchor)
+                semantic_anchors = annotate_requested_profile_variants(
+                    semantic_anchors, prompt
+                )
                 prefer_cached_characters = getattr(
                     self._danbooru_resolver,
                     "prefer_cached_character_anchors",
@@ -4817,6 +4975,10 @@ class PromptPipeline:
                         wardrobe_source = "explicit_default_profile"
                     elif requested_outfit_mode == "casual_profile":
                         wardrobe_source = "explicit_casual_profile"
+                    elif requested_outfit_mode in {
+                        "summer_profile", "winter_profile", "stage_profile"
+                    }:
+                        wardrobe_source = f"explicit_{requested_outfit_mode}"
                     elif requested_outfit_mode == "creative_fallback":
                         wardrobe_source = "explicit_creative"
                     elif outfit_plan.enabled or any(
@@ -5482,27 +5644,46 @@ class PromptPipeline:
             )
             return PromptPipelineResult("", summary)
 
+        initial_llm_content = llm_content
+        retry_llm_content = ""
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
-                "[comfyui_agent] prompt builder LLM output:\n%s", llm_content
+                "[comfyui_agent] prompt builder LLM initial output:\n%s", llm_content
             )
         # The background control marker is specified as the final item in the
         # LLM response, so it commonly sits outside the seven brace blocks.
         # Extract it before structured parsing, which intentionally retains
         # only the declared field values and would otherwise discard it.
         llm_content, llm_background_mode = extract_background_mode(llm_content)
-        (
-            structured_roster_tags,
-            structured_copyright_tags,
-            structured_characters,
-            structured_scene,
-            structured_nltags,
-        ) = (
-            extract_structured_prompt(llm_content)
-        )
+        structured_parse = _parse_structured_prompt(llm_content)
+        structured_roster_tags = structured_parse.roster_tags
+        structured_copyright_tags = structured_parse.copyright_tags
+        structured_characters = structured_parse.characters
+        structured_scene = structured_parse.scene
+        structured_nltags = structured_parse.nltags
         structured_prompt_mode = bool(structured_characters) or any(
             tag.lower().replace("_", " ") == "no humans"
             for tag in structured_roster_tags
+        )
+        summary.update(
+            {
+                "prompt_llm_attempt_count": 1,
+                "prompt_llm_accepted_attempt": (
+                    "initial" if structured_prompt_mode else ""
+                ),
+                "structured_initial_validation_errors": list(
+                    structured_parse.validation_errors
+                ),
+                "structured_scope_warnings": list(
+                    structured_parse.scope_warnings
+                ),
+                "structured_unscoped_identity": list(
+                    structured_parse.unscoped_identity
+                ),
+                "structured_unscoped_details": list(
+                    structured_parse.unscoped_details
+                ),
+            }
         )
         structured_field_pattern = (
             r"\{\s*(?:Count|Characters|Copyright|Identity|Details|Tags|Nltags)\s*:"
@@ -5518,9 +5699,16 @@ class PromptPipeline:
         if not structured_prompt_mode and (
             has_structured_fields or "_(" not in llm_content
         ):
+            validation_reasons = structured_parse.validation_errors or (
+                "response did not contain a complete valid seven-field envelope",
+            )
             strict_format_prompt = (
                 llm_prompt
-                + "\n\nYour previous response was invalid. Return exactly the seven "
+                + "\n\nYour previous response was invalid for these exact reasons:\n- "
+                + "\n- ".join(validation_reasons)
+                + "\n\nPrevious response:\n"
+                + initial_llm_content
+                + "\n\nReturn exactly the seven "
                 "brace blocks {Count: ...} {Characters: ...} {Copyright: ...} "
                 "{Identity: ...} {Details: ...} {Tags: ...} {Nltags: ...}; Count "
                 "must include an exact people-count tag, Copyright must contain "
@@ -5528,34 +5716,53 @@ class PromptPipeline:
                 "in both Identity and Details."
             )
             try:
-                retry_content = await self._generate_prompt_tags_with_llm(
+                retry_llm_content = await self._generate_prompt_tags_with_llm(
                     provider_id=provider_id,
                     llm_prompt=strict_format_prompt,
                     use_deep_thinking=False,
                     fixed_character=False,
                     character_name="",
                 )
-                if is_chinese_model_refusal(retry_content):
-                    return self._model_refusal_result(summary, retry_content)
+                summary["prompt_llm_attempt_count"] = 2
+                if self._bool("debug_prompt_enabled", False):
+                    self.logger.info(
+                        "[comfyui_agent] prompt builder LLM retry output:\n%s",
+                        retry_llm_content,
+                    )
+                if is_chinese_model_refusal(retry_llm_content):
+                    return self._model_refusal_result(summary, retry_llm_content)
+                retry_content = retry_llm_content
                 retry_content, retry_background_mode = extract_background_mode(
                     retry_content
                 )
-                (
-                    structured_roster_tags,
-                    structured_copyright_tags,
-                    structured_characters,
-                    structured_scene,
-                    structured_nltags,
-                ) = extract_structured_prompt(retry_content)
+                retry_parse = _parse_structured_prompt(retry_content)
+                structured_roster_tags = retry_parse.roster_tags
+                structured_copyright_tags = retry_parse.copyright_tags
+                structured_characters = retry_parse.characters
+                structured_scene = retry_parse.scene
+                structured_nltags = retry_parse.nltags
                 retry_structured_prompt_mode = bool(structured_characters) or any(
                     tag.lower().replace("_", " ") == "no humans"
                     for tag in structured_roster_tags
+                )
+                summary["structured_retry_validation_errors"] = list(
+                    retry_parse.validation_errors
                 )
                 if retry_structured_prompt_mode:
                     llm_content = retry_content
                     llm_background_mode = retry_background_mode
                     structured_prompt_mode = True
                     summary["structured_format_retry"] = True
+                    summary["prompt_llm_accepted_attempt"] = "retry"
+                    summary["structured_scope_warnings"] = list(
+                        retry_parse.scope_warnings
+                    )
+                    summary["structured_unscoped_identity"] = list(
+                        retry_parse.unscoped_identity
+                    )
+                    summary["structured_unscoped_details"] = list(
+                        retry_parse.unscoped_details
+                    )
                 else:
                     summary["structured_format_retry"] = False
             except Exception as exc:
@@ -5563,6 +5770,7 @@ class PromptPipeline:
                     "[comfyui_agent] structured prompt format retry failed: %s", exc
                 )
                 summary["structured_format_retry"] = False
+                summary["structured_retry_error"] = str(exc)
         if not structured_prompt_mode:
             # Never reinterpret a failed seven-field response as a flat legacy
             # tag stream.  The legacy cleanup below deliberately strips brace
@@ -5594,7 +5802,11 @@ class PromptPipeline:
                     }
                 )
                 if self._bool("debug_prompt_enabled", False):
-                    summary["llm_raw_content"] = llm_content
+                    summary["prompt_llm_initial_content"] = initial_llm_content
+                    summary["prompt_llm_retry_content"] = retry_llm_content
+                    summary["llm_raw_content"] = (
+                        retry_llm_content or initial_llm_content
+                    )
                 return PromptPipelineResult("", summary)
         llm_framing_text = ", ".join(
             part
@@ -6290,6 +6502,8 @@ class PromptPipeline:
                     ),
                     "semantic_plan_raw": semantic_plan_raw,
                     "llm_prompt": llm_prompt,
+                    "prompt_llm_initial_content": initial_llm_content,
+                    "prompt_llm_retry_content": retry_llm_content,
                     "outfit_summary": outfit_summary,
                     "constraint_plan": constraint_raw,
                     "llm_content": llm_content,

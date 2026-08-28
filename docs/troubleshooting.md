@@ -87,6 +87,27 @@
 - 若问题持续，把日志中 `prompt builder LLM returned empty content` 附近的内容
   提供给作者排查。
 
+## 生图提示 `invalid_structured_prompt`
+
+这表示 LLM2 的七字段外壳或人数锚点不完整，不是 ComfyUI 工作流的
+`node_errors`。当前硬校验只检查七个命名字段是否各出现一次，以及 `Count`
+是否包含有效人数 tag；七个字段是 `Count`、`Characters`、`Copyright`、
+`Identity`、`Details`、`Tags` 和 `Nltags`。
+Identity/Details 不会再因为角色名没有位于分句开头而令整份回复失败：照片分镜
+中的唯一角色名可用于归属，无角色名的后续分号句继承上一明确角色，仍无法归属
+的文字会保留到 Nltags。
+
+结构确实不完整时会带着具体错误和第一次回复重试一次。开启
+`debug_prompt_enabled` 后检查：
+
+- `prompt_llm_initial_content`：第一次 LLM2 回复；
+- `structured_initial_validation_errors`：初次结构错误；
+- `prompt_llm_retry_content`：格式重试回复；
+- `structured_retry_validation_errors`：重试结构错误；
+- `prompt_llm_accepted_attempt`：最终采用 `initial` 还是 `retry`。
+
+这样查看 final prompt 时，不会再把被拒绝的初稿误认为它的直接输入。
+
 ## 明确指定新服装，却混入角色默认衣柜
 
 例如“爱音和祥子都穿婚纱”最终仍出现 `haneoka school uniform`，不要只检查第二次 LLM 的输出。当前流程应先由第一次 LLM 为每名角色建立服装计划，再由 `WardrobeAuthority` 把未选中的角色缓存衣柜标为陈旧，并在所有后续通道中移除。
@@ -116,11 +137,17 @@
 
 新 LLM1 原始结果应是 `characters[].name / aliases / clothing / clothing_source / clothing_changes / appearance_changes`，不应再看到 `wardrobe.kind` 指令。`name` 应是原文中的角色实体短语；`aliases` 只列与它明确构成同一 `A（B）` 对的别名。`semantic_plan_attempt_count=2` 只用于 JSON、原文证据或基本字段外形损坏；修复失败时仍保留初稿中可解析的部分。旧日志里的 `wardrobe.kind/source/anchor_id` 是兼容格式，不应据此修改当前提示词。
 
+`clothing_changes` 的标准槽位是 `upper_body.primary / lower_body.skirt / one_piece.dress / outerwear / headwear / face_accessory.mask / handwear / legwear / footwear / lower_body.all / misc`。例如真实返回中的 `operation=removed, slots=[mask]` 与 `slots=[boots]` 会分别归一为 `remove face_accessory.mask` 和 `remove footwear`；未知但非空的槽位归入 `misc`。若操作、颜色或 `source_text` 仍无法校验，`semantic_plan_validation_errors` 必须出现具体错误并触发一次修复，不能只在最终计划中悄悄消失。检查给 LLM2 的 `Per-character clothing evidence` 是否保留 `Changes:` 和原始用户证据。
+
+若最终出现一整段 `character wears <档案全部组件>`，或 `global_outfit_reinforcement_tags` 非空，说明仍运行着旧的自动注入代码。当前结构化路径必须让 `global_outfit_reinforcement_tags=[]`，并且 `controlled_character_outfit_detail` 只过滤 LLM2 的原始 Details，不再拼接 `effective_tags`。`effective_tags` 留在摘要中仅用于证明 LLM2 看到了什么证据、以及本地应过滤哪些冲突，不等于最终必须输出。
+
 新协议不再要求 LLM1 输出 lookup role 或候选 tag；它只保留 source 原文，由主机匹配命名衣柜。若调试日志仍出现带 `lookups` 的旧兼容响应，role 写反只在“唯一 lookup 且所有引用 wardrobe kind 一致”时安全归一化。命中衣柜后应看到 `complete_named_profile=true` 和完整 `effective_tags`。最终 `Nltags` 出现中文也不是 LLM2 的正常结果：resolver 的 `missing_descriptions` 只能进入 LLM2 上下文与摘要，不能由主机直接拼接到最终文本。
 
 真实模型回归位于 `tests/live/test_deepseek_prompt_e2e.py`。普通 `pytest` 会明确跳过，避免无意产生模型费用；在 AstrBot 当前 provider 和密钥可用时，用 `ANIMA_RUN_LIVE_LLM_E2E=1` 运行。它不伪造 LLM1/LLM2 输出，直接经插件 `PromptPipeline` 调用当前 DeepSeek provider，并验收最终 `final_prompt`。该组属于“真实模型提示词管线 e2e”，仍不提交 ComfyUI 生图，不能冒充包含工作流执行和图片下载的全系统 e2e。
 
 若同一个触发别名反复生成角色视觉档案，对照由 `semantic_plan_raw` 的 `name` / `clothing_source` 转换出的内部 target/source anchors 与已有档案的 `sourceTags`。最长边界别名命中后，实际语义查询应使用已有 `sourceTags`，新鲜档案的当前请求组件也应直接来自保存的 `tags`；日志出现 `refusing duplicate outfit profile alias` 表示本地查询仍返回了冲突来源，但写入已被拒绝。旧版本已经形成的冲突条目不会被自动删除，以免误删人工维护档案，应在服装词库页面确认正确 canonical source 后手工合并或删除。
+
+若“角色穿演出服/夏装/冬装”只得到泛化服装描述，检查 `requested_outfit_mode` 和 `semantic_character_outfits`。前者应分别是 `stage_profile / summer_profile / winter_profile`，后者应保持同一 wardrobe kind、`resolution_state=resolved`，并在 `effective_tags` 中出现该角色相应 qualifier 档案的组件。`danbooru_semantic_source_outfit_profiles` 中的 qualifier 也应一致。只有日志显示档案命中、但逐角色计划仍是 `creative_fallback`，说明运行的仍是旧版变体绑定流程；保存代码后重载插件再复现。“站在舞台上”和“演出结束后”不应产生 `stage_profile`。
 
 ## Identity 出现错误发色、瞳色或来源角色外貌
 

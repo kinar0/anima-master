@@ -62,6 +62,12 @@ def build_strategy_summary(
             "llm_ok",
             not bool(prompt_summary.get("llm_failed")),
         ),
+        "prompt_llm_attempt_count": (
+            prompt_summary.get("prompt_llm_attempt_count") or 0
+        ),
+        "prompt_llm_accepted_attempt": (
+            prompt_summary.get("prompt_llm_accepted_attempt") or ""
+        ),
         "outfit_summary_ok": prompt_summary.get("outfit_summary_ok", True),
         "web_search": bool(prompt_summary.get("web_search")),
         "deep_thinking": bool(prompt_summary.get("deep_thinking")),
@@ -138,6 +144,24 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
     if not isinstance(stage_events, list):
         stage_events = []
     event_text = _format_stage_events(stage_events[-6:])
+    prompt_attempt_count = strategy_summary.get(
+        "prompt_llm_attempt_count",
+        prompt_summary.get("prompt_llm_attempt_count", 0),
+    )
+    prompt_accepted_attempt = strategy_summary.get(
+        "prompt_llm_accepted_attempt",
+        prompt_summary.get("prompt_llm_accepted_attempt", ""),
+    )
+    initial_validation_errors = prompt_summary.get(
+        "structured_initial_validation_errors"
+    )
+    if not isinstance(initial_validation_errors, list):
+        initial_validation_errors = []
+    retry_validation_errors = prompt_summary.get(
+        "structured_retry_validation_errors"
+    )
+    if not isinstance(retry_validation_errors, list):
+        retry_validation_errors = []
     return [
         "",
         "上次任务摘要：",
@@ -177,6 +201,13 @@ def build_last_task_debug_lines(last_task: dict[str, Any]) -> list[str]:
             "- 提示词健康："
             f"llm={strategy_summary.get('llm_ok', True)} "
             f"outfit={strategy_summary.get('outfit_summary_ok', True)}"
+        ),
+        (
+            "- LLM2："
+            f"attempts={prompt_attempt_count} "
+            f"accepted={prompt_accepted_attempt or '无'} "
+            f"initial_errors={'; '.join(initial_validation_errors) or '无'} "
+            f"retry_errors={'; '.join(retry_validation_errors) or '无'}"
         ),
         (
             "- 自检："

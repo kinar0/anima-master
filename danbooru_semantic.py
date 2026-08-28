@@ -359,9 +359,17 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "clothing = the exact stated garment/set phrase, or null when unstated.\n"
         "clothing_source = the exact character/persona whose outfit is copied, or "
         "null. For A cosplay C, A is visible and C is clothing_source.\n"
-        "clothing_changes = explicit changes only. When useful, use objects with "
-        "operation, slots, color, source_text; source_text must be exact. Torn or "
-        "damaged clothing is a change, not removal.\n"
+        "clothing_changes = explicit changes only. Every item MUST be an object "
+        "with operation, slots, color, source_text; source_text must be exact. "
+        "operation MUST be one of remove, damage, replace_color, recolor_all, add, "
+        "keep_only. slots MUST use only upper_body.primary, lower_body.skirt, "
+        "one_piece.dress, outerwear, headwear, face_accessory.mask, handwear, "
+        "legwear, footwear, lower_body.all, misc. If an item does not clearly fit "
+        "a named slot, ALWAYS use misc instead of inventing another slot. Use "
+        "remove (never removed/removal) for an item the character no longer wears; "
+        "use damage for torn/ripped clothing, not remove. Torn or damaged clothing "
+        "is a change, not removal. Use [] only when there is no explicit clothing "
+        "change.\n"
         "appearance_changes = explicit request phrases only. Prefer objects with "
         "dimension (eye_color, hair_color, hair_length, hair_style, skin_color, "
         "chest_size, animal_ears, tail, horns, age_presentation, or "
@@ -432,7 +440,10 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
             if candidate not in candidates:
                 candidates.append(candidate)
         if not candidates and not (
-            intent_only and role in {"target_character", "outfit", "outfit_source"}
+            intent_only
+            and role in {
+                "target_character", "outfit", "outfit_source", "clothing"
+            }
         ):
             continue
         anchor_id = re.sub(
@@ -465,15 +476,55 @@ _OUTFIT_DIRECTIVE_SLOTS = {
     "legwear",
     "footwear",
     "lower_body.all",
+    "misc",
 }
 _OUTFIT_DIRECTIVE_COLORS = {
     "pink", "red", "white", "black", "blue", "green", "yellow", "purple",
     "grey", "brown", "gold", "silver", "orange", "beige", "navy",
 }
 
+# LLM1 output is untrusted, but harmless morphology and everyday garment names
+# are not ambiguity. Normalize those values before validation so a grounded user
+# instruction is not silently lost merely because the model wrote ``removed``
+# instead of ``remove`` or ``boots`` instead of ``footwear``.
+_OUTFIT_DIRECTIVE_OPERATION_ALIASES = {
+    "remove": "remove", "removed": "remove", "removal": "remove",
+    "delete": "remove", "deleted": "remove", "omit": "remove",
+    "omitted": "remove", "take_off": "remove", "taken_off": "remove",
+    "damage": "damage", "damaged": "damage", "torn": "damage",
+    "ripped": "damage",
+    "replace_color": "replace_color", "replace_colour": "replace_color",
+    "recolor": "replace_color", "recolored": "replace_color",
+    "recoloured": "replace_color", "change_color": "replace_color",
+    "change_colour": "replace_color",
+    "recolor_all": "recolor_all", "recolour_all": "recolor_all",
+    "add": "add", "added": "add",
+    "keep_only": "keep_only", "only_keep": "keep_only",
+}
+_OUTFIT_DIRECTIVE_SLOT_ALIASES = {
+    "shirt": "upper_body.primary", "top": "upper_body.primary",
+    "upper_garment": "upper_body.primary", "upper_body": "upper_body.primary",
+    "skirt": "lower_body.skirt",
+    "dress": "one_piece.dress", "one_piece": "one_piece.dress",
+    "coat": "outerwear", "jacket": "outerwear", "cloak": "outerwear",
+    "cape": "outerwear",
+    "hat": "headwear", "headdress": "headwear",
+    "mask": "face_accessory.mask", "face_mask": "face_accessory.mask",
+    "glove": "handwear", "gloves": "handwear",
+    "stocking": "legwear", "stockings": "legwear", "sock": "legwear",
+    "socks": "legwear", "pantyhose": "legwear",
+    "boot": "footwear", "boots": "footwear", "shoe": "footwear",
+    "shoes": "footwear", "heels": "footwear",
+    "lower_body": "lower_body.all", "lower_body_clothing": "lower_body.all",
+    "accessory": "misc", "accessories": "misc", "ornament": "misc",
+    "jewelry": "misc", "jewellery": "misc", "other": "misc",
+    "unknown": "misc", "miscellaneous": "misc",
+}
+
 _WARDROBE_KINDS = {
-    "default_profile", "casual_profile", "named_outfit", "outfit_source",
-    "creative_fallback", "none"
+    "default_profile", "casual_profile", "summer_profile", "winter_profile",
+    "stage_profile", "named_outfit", "outfit_source", "creative_fallback",
+    "none"
 }
 
 
@@ -667,6 +718,15 @@ def _simple_semantic_to_legacy(
         elif re.search(r"(?:常服|便服|日常服|casual)", clothing, re.I):
             kind = "casual_profile"
             wardrobe_source = ""
+        elif re.search(r"(?:夏季服装|夏装|夏服|summer\s+(?:clothes?|clothing|outfit|wear|attire))", clothing, re.I):
+            kind = "summer_profile"
+            wardrobe_source = clothing
+        elif re.search(r"(?:冬季服装|冬装|冬服|winter\s+(?:clothes?|clothing|outfit|wear|attire))", clothing, re.I):
+            kind = "winter_profile"
+            wardrobe_source = clothing
+        elif re.search(r"(?:演出服|舞台服|舞台装|表演服|(?:stage|performance|concert)\s+(?:costume|outfit|wear|attire))", clothing, re.I):
+            kind = "stage_profile"
+            wardrobe_source = clothing
         elif clothing:
             kind = "creative_fallback"
             wardrobe_source = clothing
@@ -750,17 +810,29 @@ def _simple_semantic_to_legacy(
         key = (role, source_key)
         lookup_ids.setdefault(key, []).append(anchor_id)
 
-    # Intent-only LLM1 output names a source but never guesses its tag. Create a
-    # source-grounded empty anchor so cached/local profiles can bind it later.
+    # Intent-only LLM1 output names clothing but never guesses its tag. Preserve
+    # that exact phrase as a source-grounded anchor even for ordinary garments
+    # and character-owned profile variants. Besides making explicit wardrobe
+    # evidence observable, this prevents a valid clothing request from being
+    # mistaken for an unspecified creative fallback.
     if intent_only:
         for item in characters[:4]:
             if not isinstance(item, dict):
                 continue
             wardrobe = normalized_wardrobe(item)
             kind = str(wardrobe.get("kind") or "none").strip().lower()
-            if kind not in {"named_outfit", "outfit_source"}:
+            if kind not in {
+                "named_outfit", "outfit_source", "creative_fallback",
+                "summer_profile", "winter_profile", "stage_profile",
+            }:
                 continue
-            role = "outfit" if kind == "named_outfit" else "outfit_source"
+            role = (
+                "outfit"
+                if kind == "named_outfit"
+                else "outfit_source"
+                if kind == "outfit_source"
+                else "clothing"
+            )
             source_text = str(
                 wardrobe.get("source", wardrobe.get("source_text", "")) or ""
             ).strip()
@@ -830,6 +902,27 @@ def _semantic_json(raw: str, user_prompt: str = "") -> dict[str, Any]:
     return _simple_semantic_to_legacy(data, user_prompt) if data else {}
 
 
+def _normalize_outfit_directive_operation(value: Any) -> str:
+    key = re.sub(r"[\s-]+", "_", str(value or "").strip().lower())
+    return _OUTFIT_DIRECTIVE_OPERATION_ALIASES.get(key, "")
+
+
+def _normalize_outfit_directive_slots(
+    value: Any, *, unknown_to_misc: bool = True
+) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        return ()
+    normalized: list[str] = []
+    for raw_slot in value[:4]:
+        slot = re.sub(r"[\s-]+", "_", str(raw_slot or "").strip().lower())
+        slot = _OUTFIT_DIRECTIVE_SLOT_ALIASES.get(slot, slot)
+        if unknown_to_misc and slot and slot not in _OUTFIT_DIRECTIVE_SLOTS:
+            slot = "misc"
+        if slot and slot not in normalized:
+            normalized.append(slot)
+    return tuple(normalized)
+
+
 def _parse_outfit_directive_item(
     item: Any, *, user_prompt: str, target_anchor_id: str
 ) -> SemanticOutfitDirective | None:
@@ -841,12 +934,12 @@ def _parse_outfit_directive_item(
     """
     if not isinstance(item, dict):
         return None
-    operation = str(item.get("operation") or "").strip().lower()
+    operation = _normalize_outfit_directive_operation(item.get("operation"))
     source_text = str(item.get("source_text") or "").strip()
     raw_slots = item.get("slots")
     if not isinstance(raw_slots, list):
         return None
-    slots = tuple(dict.fromkeys(str(slot or "").strip().lower() for slot in raw_slots[:4]))
+    slots = _normalize_outfit_directive_slots(raw_slots)
     color = str(item.get("color") or "").strip().lower()
     if (
         operation not in _OUTFIT_DIRECTIVE_OPERATIONS
@@ -1014,7 +1107,19 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                     if not isinstance(value, list):
                         issues.append(f"characters[{index}].{field} must be an array")
                         continue
-                    if field == "appearance_changes":
+                    if field == "clothing_changes":
+                        for change_index, change in enumerate(value[:8], start=1):
+                            if _parse_outfit_directive_item(
+                                change,
+                                user_prompt=user_prompt,
+                                target_anchor_id=f"target_{index}",
+                            ) is None:
+                                issues.append(
+                                    f"characters[{index}].clothing_changes"
+                                    f"[{change_index}] must use a supported grounded "
+                                    "operation, slot, color, and exact source_text"
+                                )
+                    else:
                         for change_index, change in enumerate(value[:8], start=1):
                             if not isinstance(change, dict):
                                 issues.append(
@@ -1252,7 +1357,7 @@ def parse_semantic_outfit_directives(
     for item in items[:6]:
         if not isinstance(item, dict):
             continue
-        operation = str(item.get("operation") or "").strip().lower()
+        operation = _normalize_outfit_directive_operation(item.get("operation"))
         source_text = str(item.get("source_text") or "").strip()
         target_anchor_id = str(item.get("target_anchor_id") or "").strip().lower()
         if not target_anchor_id and len(target_anchor_ids) == 1:
@@ -1260,11 +1365,7 @@ def parse_semantic_outfit_directives(
         raw_slots = item.get("slots")
         if not isinstance(raw_slots, list):
             continue
-        slots = tuple(
-            dict.fromkeys(
-                str(slot or "").strip().lower() for slot in raw_slots[:4]
-            )
-        )
+        slots = _normalize_outfit_directive_slots(raw_slots, unknown_to_misc=False)
         color = str(item.get("color") or "").strip().lower()
         if (
             operation not in _OUTFIT_DIRECTIVE_OPERATIONS
