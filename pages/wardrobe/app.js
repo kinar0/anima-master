@@ -6,7 +6,7 @@ const demoData = {
   ],
   outfitSets: [
     { alias: "月之森校服", aliases: ["月之森校服", "tsukinomori school uniform"], tag: "tsukinomori_school_uniform", variant: "default", origin: "configured", profileKey: "" },
-    { alias: "羽丘冬季校服", aliases: ["羽丘冬季校服", "haneoka school winter uniform"], tag: "haneoka_school_uniform", variant: "winter", origin: "learned", profileKey: "羽丘冬季校服" },
+    { alias: "羽丘冬季校服", aliases: ["羽丘冬季校服", "haneoka school winter uniform"], tag: "haneoka_school_uniform", componentTags: ["grey_jacket", "white_shirt", "green_skirt", "green_necktie"], variant: "winter", origin: "learned", profileKey: "羽丘冬季校服" },
   ],
   terms: [{ alias: "百褶裙", tag: "pleated_skirt" }, { alias: "舞会面具", tag: "masquerade_mask" }],
 };
@@ -20,8 +20,8 @@ const fallbackBridge = {
 const bridge = window.AstrBotPluginPage || fallbackBridge;
 
 const META = {
-  outfits: { kicker: "VISUAL PROFILES", title: "角色视觉档案", description: "从角色或服装来源帖子中学习的默认服装与稳定外观锚点。它们会作为本次生成的硬约束。" },
-  outfitSets: { kicker: "NAMED OUTFIT SETS", title: "服装套组", description: "每一行都是独立套组实体，可有任意数量别名；不同套组允许指向同一个 canonical tag，不会再按 tag 强行合并。" },
+  outfits: { kicker: "CHARACTER WARDROBES", title: "角色自己的变体衣柜", description: "只保存角色/persona 本人的 default、casual、summer、winter、stage 服装与稳定外观；通用校服和命名套组请放到右侧分类。" },
+  outfitSets: { kicker: "NAMED OUTFIT SETS", title: "通用服装套组", description: "可由任意角色穿着的命名套组。每套独立保存 canonical tag、可见组件和别名；不会进入任何角色自己的变体衣柜。" },
   terms: { kicker: "TERM TRANSLATIONS", title: "名词翻译", description: "将常用中文名词稳定映射为 canonical Danbooru tag，命中提示词时直接使用。" },
 };
 const $ = (selector) => document.querySelector(selector);
@@ -71,7 +71,7 @@ function mappingEntry(item, index, isSet) {
     : inputField("中文名词 / 触发词", item.alias, (value) => item.alias = value, { placeholder: "百褶裙" });
   if (isSet) left.append(chips(setAliases, "mint"));
   const right = inputField("Canonical Danbooru Tag", item.tag, (value) => item.tag = value, { placeholder: isSet ? "tsukinomori_school_uniform" : "pleated_skirt", className: "wide" }); right.append(chips(item.tag ? [item.tag] : []));
-  const meta = node("div", "field-stack"); if (isSet) { const variantField = node("div", "field"); variantField.append(node("label", "", "套组变体")); const variantSelect = node("select"); [["default","通用 / 未区分"],["casual","官方常服 / Casual"],["summer","夏季"],["winter","冬季"],["stage","演出 / 舞台"]].forEach(([value,label]) => { const option = node("option", "", label); option.value = value; option.selected = (item.variant || "default") === value; variantSelect.append(option); }); variantSelect.addEventListener("change", () => { item.variant = variantSelect.value; markDirty(); }); variantField.append(variantSelect); const line = node("div", "meta-line"); line.append(node("span", `pill ${item.origin === "learned" ? "learned" : ""}`, item.origin === "learned" ? "自动学习" : "手动配置")); meta.append(variantField, line); } else meta.append(node("p", "mapping-note", "用户提示词出现左侧名词时，右侧 tag 会直接加入 hard tags。"));
+  const meta = node("div", "field-stack"); if (isSet) { const variantField = node("div", "field"); variantField.append(node("label", "", "套组变体")); const variantSelect = node("select"); [["default","通用 / 未区分"],["casual","官方常服 / Casual"],["summer","夏季"],["winter","冬季"],["stage","演出 / 舞台"]].forEach(([value,label]) => { const option = node("option", "", label); option.value = value; option.selected = (item.variant || "default") === value; variantSelect.append(option); }); variantSelect.addEventListener("change", () => { item.variant = variantSelect.value; markDirty(); }); variantField.append(variantSelect); const components = inputField("套组组件 Tags", (item.componentTags || []).join(", "), (value) => item.componentTags = splitList(value), { textarea: true, placeholder: "grey_jacket, white_shirt, green_skirt, ..." }); components.append(node("p", "mapping-note", "这些组件属于套组本身，可绑定给任何穿着者；不要在这里保存角色外貌。"), chips(item.componentTags || [])); const line = node("div", "meta-line"); line.append(node("span", `pill ${item.origin === "learned" ? "learned" : ""}`, item.origin === "learned" ? "自动学习" : "手动配置")); meta.append(variantField, components, line); } else meta.append(node("p", "mapping-note", "用户提示词出现左侧名词时，右侧 tag 会直接加入 hard tags。"));
   card.append(left, right, meta, deleteButton(index)); return card;
 }
 function renderCounts() {
@@ -115,7 +115,7 @@ async function save() {
     setBusy(false);
   }
 }
-function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新服装档案", aliases: ["新别名"], sourceTags: [], tags: [], appearanceTags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新服装套组", aliases: ["新服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", variant: "default", origin: "configured", profileKey: "" }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
+function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新角色服装档案", aliases: ["角色名"], sourceTags: ["canonical_character_tag"], tags: [], appearanceTags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新通用服装套组", aliases: ["新通用服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", componentTags: [], variant: "default", origin: "learned", profileKey: `manual_named_${Date.now()}` }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
 
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; render(); }));
 elements.sort.addEventListener("change", () => { state.outfitSort = elements.sort.value; render(); });

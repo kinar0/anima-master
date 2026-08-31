@@ -232,6 +232,9 @@ def test_live_shared_named_uniform_is_complete_and_nltags_stays_english(
     )
     final = _assert_successful_english_prompt(result)
     outfits = result.summary["semantic_character_outfits"]
+    writer_call = next(
+        call for call in calls if "只输出七个单行花括号字段" in call["prompt"]
+    )
 
     assert len(calls) in {2, 3}, result.summary
     assert len(outfits) == 2, outfits
@@ -246,10 +249,81 @@ def test_live_shared_named_uniform_is_complete_and_nltags_stays_english(
             "pleated_skirt",
             "diagonal-striped_necktie",
         } <= tags
-    assert final.count("brown sweater vest") >= 2
-    assert final.count("green skirt") >= 2
+    assert writer_call["prompt"].count(
+        "named outfit = haneoka_school_uniform"
+    ) == 2
+    assert writer_call["prompt"].count("brown_sweater_vest") >= 2
+    assert writer_call["prompt"].count("green_skirt") >= 2
+    assert "haneoka school uniform" in final
     assert "futa" in final
     assert any(word in final for word in ("erect", "erection", "penis", "cock"))
+
+
+def test_live_haneoka_winter_uniform_reaches_writer_as_generic_named_set(
+    live_pipeline,
+) -> None:
+    result, calls = _build(
+        live_pipeline,
+        "竖屏，上半身特写。高松灯穿着羽丘冬季校服站在学校走廊里，"
+        "微笑着看着自己指间的粉色光晕。不要写looking at viewer。不要改动衣物。",
+    )
+    final = _assert_successful_english_prompt(result)
+    outfit = result.summary["semantic_character_outfits"][0]
+    writer_call = next(
+        call for call in calls if "只输出七个单行花括号字段" in call["prompt"]
+    )
+    tags = set(outfit["effective_tags"])
+
+    assert len(calls) == 2, calls
+    assert outfit["target"] == "高松灯"
+    assert outfit["wardrobe_kind"] == "named_outfit"
+    assert outfit["resolution_state"] == "resolved"
+    assert outfit["complete_named_profile"] is True
+    assert {
+        "haneoka_school_uniform",
+        "winter_uniform",
+        "green_necktie",
+    } <= tags
+    assert "named outfit = haneoka_school_uniform" in writer_call["prompt"]
+    assert "grey_jacket" in writer_call["prompt"]
+    assert "white_shirt" in writer_call["prompt"]
+    assert "tsukinomori_school_uniform" not in writer_call["prompt"]
+    assert "stale cached wardrobes" not in writer_call["prompt"].lower()
+    assert "looking at viewer" not in final
+    assert "school hallway" in final or "school corridor" in final
+    assert any(word in final for word in ("grey jacket", "gray jacket", "winter uniform"))
+
+
+def test_live_character_stage_profile_and_generic_uniform_remain_separate(
+    live_pipeline,
+) -> None:
+    result, calls = _build(
+        live_pipeline,
+        "千早爱音穿着演出服站在左边，高松灯穿着羽丘冬季校服站在右边，"
+        "两人在学校走廊合影",
+    )
+    final = _assert_successful_english_prompt(result)
+    outfits = {
+        item["target"]: item for item in result.summary["semantic_character_outfits"]
+    }
+    writer_call = next(
+        call for call in calls if "只输出七个单行花括号字段" in call["prompt"]
+    )
+
+    assert outfits["千早爱音"]["wardrobe_kind"] == "stage_profile"
+    assert outfits["千早爱音"]["resolution_state"] == "resolved"
+    assert outfits["高松灯"]["wardrobe_kind"] == "named_outfit"
+    assert outfits["高松灯"]["resolution_state"] == "resolved"
+    assert outfits["高松灯"]["complete_named_profile"] is True
+    assert "haneoka_school_uniform" not in set(
+        outfits["千早爱音"]["effective_tags"]
+    )
+    assert "haneoka_school_uniform" in set(outfits["高松灯"]["effective_tags"])
+    assert "explicit stage wardrobe" in writer_call["prompt"].lower()
+    assert "named outfit = haneoka_school_uniform" in writer_call["prompt"]
+    assert "chihaya anon" in final
+    assert "takamatsu tomori" in final
+    assert "school hallway" in final or "school corridor" in final
 
 
 def test_live_explicit_swimwear_does_not_restore_default_uniforms(live_pipeline) -> None:

@@ -14,8 +14,8 @@
         <div class="hero-copy">
           <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
           <p class="eyebrow">ANIMA / WARDROBE LIBRARY</p>
-          <h1>角色视觉档案</h1>
-          <p class="lead">管理角色默认服装、从帖子学习的稳定外观锚点、独立服装套组，以及中文名词到 Danbooru tag 的翻译。</p>
+          <h1>角色与通用服装词库</h1>
+          <p class="lead">角色自己的变体衣柜与任意角色可穿的通用套组分开管理；同时维护稳定外观和中文名词翻译。</p>
         </div>
         <div class="hero-actions">
           <div id="connection" class="connection"><i></i><span>正在连接</span></div>
@@ -25,8 +25,8 @@
       </header>
 
       <section class="overview" aria-label="词库概览">
-        <article><span>服装档案</span><strong id="outfit-count">0</strong><small>按角色或来源维护</small></article>
-        <article><span>服装套组</span><strong id="set-count">0</strong><small>完整 canonical anchors</small></article>
+        <article><span>角色衣柜</span><strong id="outfit-count">0</strong><small>仅限角色本人变体</small></article>
+        <article><span>通用套组</span><strong id="set-count">0</strong><small>可绑定任意角色</small></article>
         <article><span>名词翻译</span><strong id="term-count">0</strong><small>中文到 Danbooru tags</small></article>
         <article class="revision-card"><span>数据状态</span><strong id="data-status">同步中</strong><small id="revision-label">revision —</small></article>
       </section>
@@ -34,8 +34,8 @@
       <main class="library">
         <div class="library-toolbar">
           <nav class="tabs" aria-label="词库分类">
-            <button class="tab is-active" data-tab="outfits" type="button"><span>服装档案</span><b id="outfit-badge">0</b></button>
-            <button class="tab" data-tab="outfitSets" type="button"><span>服装套组</span><b id="set-badge">0</b></button>
+            <button class="tab is-active" data-tab="outfits" type="button"><span>角色衣柜</span><b id="outfit-badge">0</b></button>
+            <button class="tab" data-tab="outfitSets" type="button"><span>通用套组</span><b id="set-badge">0</b></button>
             <button class="tab" data-tab="terms" type="button"><span>名词翻译</span><b id="term-badge">0</b></button>
           </nav>
           <div class="toolbar-actions">
@@ -47,7 +47,7 @@
 
         <section class="section-intro">
           <div><p id="section-kicker">OUTFIT PROFILES</p><h2 id="section-title">服装档案</h2></div>
-          <p id="section-description">从角色或服装来源帖子中整理出的可见服饰结构。修改后会直接影响服装迁移。</p>
+          <p id="section-description">角色本人拥有的 default、casual、summer、winter、stage 变体；不在这里保存通用校服或命名套组。</p>
         </section>
 
         <div id="list" class="entry-list"></div>

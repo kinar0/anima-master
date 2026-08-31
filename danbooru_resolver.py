@@ -291,11 +291,13 @@ class DanbooruResolver:
         """Load the versioned profile cache once, or return an empty v3 cache.
 
         Version 3 stores ``{"version": 3, "profiles": {key: record}}``. A
-        ``character_outfit`` record contains ``qualifier``, trigger ``aliases``,
-        donor-identity ``source_tags``, related ``copyright_tags``, copyable
-        ``outfit_tags``, and optional post-derived ``evidence``. A ``named_outfit``
-        record contains ``variant``, learned ``aliases``, editor-owned
-        ``manual_aliases``, and one complete ensemble tag in ``outfit_tags``.
+        ``character_outfit`` record contains a character/persona owner in
+        ``source_tags``, a ``qualifier``, stable appearance evidence, and that
+        owner's wardrobe components. A reusable ``named_outfit`` instead contains
+        an explicit ``canonical_tag``, ``variant``, aliases, and its own
+        ``component_tags``; it has no wearer identity and may bind to any target.
+        Legacy named sets accidentally saved as ``character_outfit`` are split in
+        memory when their source tag is also one of their garment tags.
         Non-default character profiles use ``source::variant`` keys so summer,
         winter, stage, and casual evidence cannot overwrite the default wardrobe.
 
@@ -318,8 +320,116 @@ class DanbooruResolver:
                     data = loaded
             except (OSError, ValueError):
                 pass
+        self._split_legacy_universal_outfit_profiles(data)
         self._profile_cache_data = data
         return data
+
+    @classmethod
+    def _legacy_universal_outfit_tag(cls, profile: Any) -> str:
+        """Return the canonical set tag for a misclassified reusable outfit.
+
+        Older named-outfit learning stored the sampled components through
+        ``remember_outfit_summary``.  That produced a ``character_outfit`` row
+        whose alleged donor tag was also one of its garment tags.  A real
+        character wardrobe never has the character identity tag among its
+        garments, so this intersection is a stable, language-independent split
+        between wearer-owned profiles and reusable outfit sets.
+        """
+        if not isinstance(profile, dict) or profile.get("kind") == "named_outfit":
+            return ""
+        sources = [
+            str(tag).strip().lower()
+            for tag in profile.get("source_tags", [])
+            if str(tag).strip()
+        ]
+        garments = {
+            str(tag).strip().lower()
+            for tag in profile.get("outfit_tags", [])
+            if str(tag).strip()
+        }
+        intersecting = [tag for tag in sources if tag in garments]
+        if not intersecting:
+            return ""
+        generic = {
+            "uniform", "school_uniform", "summer_uniform", "winter_uniform",
+            "stage_outfit", "casual_outfit",
+        }
+        specific = [tag for tag in intersecting if tag not in generic]
+        return (specific or intersecting)[-1]
+
+    @classmethod
+    def _named_component_tags(cls, profile: dict[str, Any], canonical: str) -> list[str]:
+        values = profile.get("component_tags", profile.get("outfit_tags", []))
+        return list(dict.fromkeys(
+            str(tag).strip().lower()
+            for tag in values
+            if str(tag).strip() and str(tag).strip().lower() != canonical
+        ))
+
+    @classmethod
+    def _split_legacy_universal_outfit_profiles(cls, data: dict[str, Any]) -> None:
+        """Normalize legacy reusable sets without touching genuine character rows."""
+        profiles = data.get("profiles")
+        if not isinstance(profiles, dict):
+            return
+        for legacy_key, raw in tuple(profiles.items()):
+            canonical = cls._legacy_universal_outfit_tag(raw)
+            if not canonical:
+                continue
+            variant = cls._normalize_outfit_variant(
+                raw.get("qualifier"), legacy_key, raw.get("aliases", [])
+            )
+            aliases = list(dict.fromkeys(
+                cls._profile_alias_key(value)
+                for value in (
+                    str(legacy_key).split("::", 1)[0],
+                    *raw.get("aliases", []),
+                )
+                if cls._profile_alias_key(value)
+            ))
+            components = cls._named_component_tags(raw, canonical)
+            existing_key = next(
+                (
+                    str(key)
+                    for key, candidate in profiles.items()
+                    if key != legacy_key
+                    and isinstance(candidate, dict)
+                    and candidate.get("kind") == "named_outfit"
+                    and cls._named_profile_variant(str(key), candidate) == variant
+                    and canonical == str(
+                        candidate.get("canonical_tag")
+                        or next(iter(candidate.get("outfit_tags", [])), "")
+                    ).strip().lower()
+                ),
+                "",
+            )
+            existing = profiles.get(existing_key) if existing_key else None
+            if isinstance(existing, dict):
+                existing["canonical_tag"] = canonical
+                existing["outfit_tags"] = [canonical]
+                existing["aliases"] = list(dict.fromkeys((
+                    *existing.get("aliases", []), *aliases,
+                )))
+                existing["component_tags"] = list(dict.fromkeys((
+                    *cls._named_component_tags(existing, canonical), *components,
+                )))
+                if raw.get("evidence") and not existing.get("evidence"):
+                    existing["evidence"] = raw["evidence"]
+            else:
+                profiles[legacy_key] = {
+                    "kind": "named_outfit",
+                    "variant": variant,
+                    "aliases": aliases,
+                    "manual_aliases": list(raw.get("manual_aliases", [])),
+                    "canonical_tag": canonical,
+                    "source_tags": [],
+                    "copyright_tags": list(raw.get("copyright_tags", [])),
+                    "outfit_tags": [canonical],
+                    "component_tags": components,
+                    **({"evidence": raw["evidence"]} if raw.get("evidence") else {}),
+                }
+            if existing_key:
+                profiles.pop(legacy_key, None)
 
     def _save_profile_data(self) -> None:
         """Best-effort persist the in-memory profile cache via file replacement."""
@@ -894,17 +1004,21 @@ class DanbooruResolver:
         for alias, profile in profiles.items():
             if not isinstance(profile, dict) or profile.get("kind") != "named_outfit":
                 continue
-            profile_tags = tuple(
+            legacy_profile_tags = tuple(
                 str(tag).strip().lower()
                 for tag in profile.get("outfit_tags", [])
                 if str(tag).strip()
             )
+            canonical = str(
+                profile.get("canonical_tag")
+                or (legacy_profile_tags[0] if legacy_profile_tags else "")
+            ).strip().lower()
+            profile_tags = (canonical,) if canonical else ()
             # Legacy planners could persist the generic alias 校服 ->
             # school_uniform as though it were an independently named set. Ignore
             # that poisoned entry so it cannot match every later school request.
             if set(profile_tags).issubset({"school_uniform", "uniform"}):
                 continue
-            canonical = profile_tags[0] if profile_tags else ""
             variant = self._named_profile_variant(str(alias), profile)
             aliases = self._safe_learned_outfit_aliases(
                 str(alias), profile, canonical, variant, trusted_uniforms
@@ -927,10 +1041,9 @@ class DanbooruResolver:
                 str(alias).split("::", 1)[0],
             )
             register_match(matched_alias, canonical, variant)
-            for tag in profile.get("outfit_tags", []):
-                value = str(tag).strip()
-                if value and value not in matched:
-                    matched.append(value)
+            for value in self._named_component_tags(profile, canonical):
+                if value not in profile_tags_for_request:
+                    profile_tags_for_request.append(value)
             for candidate in profiles.values():
                 if not isinstance(candidate, dict) or candidate.get("kind") == "named_outfit":
                     continue
@@ -1236,7 +1349,9 @@ class DanbooruResolver:
                 if str(item).strip()
             ]
             if kind == "named_outfit":
-                canonical = tags[0] if tags else ""
+                canonical = str(
+                    raw.get("canonical_tag") or (tags[0] if tags else "")
+                ).strip().lower()
                 if not canonical or canonical in {"school_uniform", "uniform"}:
                     continue
                 variant = self._named_profile_variant(str(key), raw)
@@ -1258,6 +1373,7 @@ class DanbooruResolver:
                             variant=variant,
                         ),
                         "tag": canonical,
+                        "componentTags": self._named_component_tags(raw, canonical),
                         "variant": variant,
                         "origin": "learned",
                         "profileKey": str(key),
@@ -1463,9 +1579,13 @@ class DanbooruResolver:
                     "variant": variant,
                     "aliases": list(aliases),
                     "manual_aliases": list(aliases),
+                    "canonical_tag": tag,
                     "source_tags": [],
                     "copyright_tags": [],
                     "outfit_tags": [tag],
+                    "component_tags": self._clean_tag_list(
+                        item.get("componentTags", []), limit=80
+                    ),
                 }
             else:
                 configured_sets.append(f"{' | '.join(aliases)}={tag}")
@@ -1720,7 +1840,19 @@ class DanbooruResolver:
             ),
             "source_tags": [],
             "copyright_tags": [],
+            "canonical_tag": tag,
             "outfit_tags": [tag],
+            "component_tags": list(dict.fromkeys(
+                str(item).strip().lower()
+                for item in (
+                    *(
+                        profiles.get(target_key, {}).get("component_tags", [])
+                        if isinstance(profiles.get(target_key), dict)
+                        else []
+                    ),
+                )
+                if str(item).strip() and str(item).strip().lower() != tag
+            )),
         }
         if manual_aliases:
             new_profile["manual_aliases"] = list(dict.fromkeys(manual_aliases))
@@ -1729,6 +1861,75 @@ class DanbooruResolver:
         if profiles.get(target_key) == new_profile and not removed_duplicate:
             return
         profiles[target_key] = new_profile
+        self._save_profile_data()
+
+    def remember_named_outfit_profile(
+        self,
+        alias: str,
+        canonical_tag: str,
+        component_tags: tuple[str, ...],
+        evidence: dict[str, Any] | None = None,
+        variant: str | None = None,
+    ) -> None:
+        """Persist reusable set components on the named outfit itself.
+
+        This deliberately does not call ``remember_outfit_summary``: that API is
+        reserved for a character/persona's own wardrobe variants.  Keeping the
+        components here lets any visible character select the set by its alias
+        without making the set look like a wearer identity.
+        """
+        self.remember_named_outfit(alias, canonical_tag, variant)
+        profiles = self._profile_data().setdefault("profiles", {})
+        canonical = str(canonical_tag or "").strip().lower()
+        variant_key = self._normalize_outfit_variant(variant, alias)
+        matching_key = next(
+            (
+                str(key)
+                for key, profile in profiles.items()
+                if isinstance(profile, dict)
+                and profile.get("kind") == "named_outfit"
+                and self._named_profile_variant(str(key), profile) == variant_key
+                and canonical == str(
+                    profile.get("canonical_tag")
+                    or next(iter(profile.get("outfit_tags", [])), "")
+                ).strip().lower()
+                and any(
+                    self._profile_alias_key(alias)
+                    == self._profile_alias_key(item)
+                    for item in profile.get("aliases", [])
+                )
+            ),
+            "",
+        )
+        profile = profiles.get(matching_key)
+        if not isinstance(profile, dict):
+            return
+        existing = self._named_component_tags(profile, canonical)
+        profile["canonical_tag"] = canonical
+        profile["outfit_tags"] = [canonical]
+        profile["component_tags"] = list(dict.fromkeys((
+            *existing,
+            *(
+                str(tag).strip().lower()
+                for tag in component_tags
+                if str(tag).strip() and str(tag).strip().lower() != canonical
+            ),
+        )))
+        if evidence:
+            old_evidence = (
+                profile.get("evidence")
+                if isinstance(profile.get("evidence"), dict)
+                else {}
+            )
+            profile["evidence"] = {
+                **evidence,
+                "created_at": float(
+                    old_evidence.get("created_at")
+                    or old_evidence.get("updated_at")
+                    or time.time()
+                ),
+                "updated_at": time.time(),
+            }
         self._save_profile_data()
 
     def required_core_tags_for_prompt(self, user_prompt: str) -> tuple[str, ...]:
@@ -1921,9 +2122,9 @@ class DanbooruResolver:
                 anchor_outfit_profiles.append(
                     (anchor.anchor_id, tag, profile.tags, variant)
                 )
-                self.remember_outfit_summary(
+                self.remember_named_outfit_profile(
                     anchor.source_text,
-                    (tag,),
+                    tag,
                     profile.tags,
                     {
                         "sample_mode": profile.sample_mode,

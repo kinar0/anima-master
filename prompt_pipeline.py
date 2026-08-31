@@ -5019,28 +5019,45 @@ class PromptPipeline:
                     cached_named_keys = {
                         tag.lower() for tag in cached_named_result.named_outfit_tags
                     }
+                    cached_named_profiles_by_anchor = {
+                        anchor_id.lower(): tuple(profile_tags)
+                        for anchor_id, _tag, profile_tags, _variant
+                        in cached_named_result.anchor_outfit_profiles
+                        if profile_tags
+                    }
+                    cached_named_profiles_by_tag = {
+                        tag.lower(): tuple(profile_tags)
+                        for _anchor_id, tag, profile_tags, _variant
+                        in cached_named_result.anchor_outfit_profiles
+                        if tag and profile_tags
+                    }
+
                     def cached_named_anchor_is_complete(
                         anchor: SemanticAnchor,
                     ) -> bool:
-                        """Skip lookup only for a fresh, complete cached profile."""
+                        """Skip lookup when the generic named set has components.
+
+                        Named sets no longer live in the character-outfit cache, so
+                        asking ``cached_outfit_source`` about their display alias
+                        always returns ``None``.  Completeness belongs to the
+                        named-set profile row itself.
+                        """
+                        candidates = tuple(
+                            candidate.lower() for candidate in anchor.candidates
+                        )
                         if not any(
-                            candidate.lower() in cached_named_keys
-                            for candidate in anchor.candidates
+                            candidate in cached_named_keys
+                            for candidate in candidates
                         ):
                             return False
-                        cached_detail = (
-                            cached_source_getter(anchor.source_text)
-                            if callable(cached_source_getter)
-                            else None
-                        )
-                        refresh_getter = getattr(
-                            self._danbooru_resolver,
-                            "outfit_source_refresh_needed",
-                            None,
-                        )
-                        return cached_detail is not None and not (
-                            callable(refresh_getter)
-                            and refresh_getter(anchor.source_text)
+                        return bool(
+                            cached_named_profiles_by_anchor.get(
+                                anchor.anchor_id.lower()
+                            )
+                            or any(
+                                cached_named_profiles_by_tag.get(candidate)
+                                for candidate in candidates
+                            )
                         )
 
                     cached_complete_anchor_ids = {

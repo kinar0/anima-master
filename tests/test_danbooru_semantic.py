@@ -2220,6 +2220,80 @@ def test_seasonal_named_outfits_remain_separate_and_drop_poisoned_aliases() -> N
     assert saved["revision"] == saved_again["revision"]
 
 
+def test_legacy_universal_outfit_profile_is_split_from_character_wardrobes() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        path.write_text(
+            json.dumps(
+                {
+                    "version": 3,
+                    "profiles": {
+                        "高松灯": {
+                            "kind": "character_outfit",
+                            "qualifier": "default",
+                            "aliases": ["高松灯", "takamatsu_tomori"],
+                            "source_tags": ["takamatsu_tomori"],
+                            "outfit_tags": ["haneoka_school_uniform", "green_necktie"],
+                        },
+                        "羽丘高一校服::winter": {
+                            "kind": "character_outfit",
+                            "qualifier": "winter",
+                            "aliases": ["羽丘冬季校服", "羽丘校服冬季"],
+                            "source_tags": ["haneoka_school_uniform"],
+                            "outfit_tags": [
+                                "haneoka_school_uniform",
+                                "grey_jacket",
+                                "white_shirt",
+                                "green_skirt",
+                            ],
+                        },
+                    },
+                },
+                ensure_ascii=False,
+            ),
+            encoding="utf-8",
+        )
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+        )
+
+        snapshot = resolver.wardrobe_snapshot()
+        cached = resolver.cached_named_outfits_for_prompt(
+            "高松灯穿着羽丘冬季校服"
+        )
+        profiles = resolver._profile_data()["profiles"]
+
+    assert [item["key"] for item in snapshot["outfits"]] == ["高松灯"]
+    winter = next(
+        item for item in snapshot["outfitSets"] if item["variant"] == "winter"
+    )
+    assert winter["tag"] == "haneoka_school_uniform"
+    assert winter["componentTags"] == [
+        "grey_jacket",
+        "white_shirt",
+        "green_skirt",
+    ]
+    assert cached is not None
+    assert cached.named_outfit_tags == ("haneoka_school_uniform",)
+    assert cached.anchor_outfit_profiles[0][2] == (
+        "grey_jacket",
+        "white_shirt",
+        "green_skirt",
+    )
+    assert profiles["高松灯"]["kind"] == "character_outfit"
+    assert profiles["羽丘高一校服::winter"]["kind"] == "named_outfit"
+
+
 def test_seasonal_outfit_profiles_use_distinct_keys_and_cache_entries() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
@@ -2985,6 +3059,64 @@ def test_wardrobe_editor_rekeys_manual_casual_profile() -> None:
         "pinafore_dress",
         "grey_belt",
     )
+
+
+def test_wardrobe_editor_persists_generic_set_components_separately() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "profiles.json"
+        resolver = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            config={},
+        )
+        initial = resolver.wardrobe_snapshot()
+        saved = resolver.save_wardrobe(
+            {
+                "baseRevision": initial["revision"],
+                "outfits": [],
+                "outfitSets": [
+                    {
+                        "alias": "羽丘冬季校服",
+                        "aliases": ["羽丘冬季校服", "haneoka school winter uniform"],
+                        "tag": "haneoka_school_uniform",
+                        "componentTags": ["grey_jacket", "white_shirt", "green_skirt"],
+                        "variant": "winter",
+                        "origin": "learned",
+                        "profileKey": "haneoka_winter_set",
+                    }
+                ],
+                "terms": [],
+            }
+        )
+        reloaded = DanbooruResolver(
+            logger=_Logger(),
+            cache={},
+            profile_cache_path=path,
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            config={},
+        ).wardrobe_snapshot()
+
+    assert saved["outfits"] == []
+    assert saved["outfitSets"][0]["componentTags"] == [
+        "grey_jacket",
+        "white_shirt",
+        "green_skirt",
+    ]
+    assert reloaded["outfitSets"][0]["componentTags"] == saved["outfitSets"][0][
+        "componentTags"
+    ]
 
 
 def test_character_outfit_profile_refreshes_once_per_algorithm_window() -> None:

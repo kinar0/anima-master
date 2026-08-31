@@ -1734,6 +1734,58 @@ def test_multi_target_cached_named_outfit_repairs_only_explicit_wearer_clauses()
     assert repaired[2].wardrobe == SemanticWardrobe("creative_fallback")
 
 
+def test_generic_named_outfit_components_reach_writer_for_arbitrary_wearer() -> None:
+    target = SemanticAnchor(
+        "tomori", "target_character", "character", "高松灯", "", ("takamatsu_tomori",)
+    )
+    outfit = SemanticAnchor(
+        "haneoka_winter",
+        "outfit",
+        "outfit",
+        "羽丘冬季校服",
+        "winter reusable named outfit",
+        ("haneoka_school_uniform",),
+    )
+    cached = SemanticLookupResult(
+        confirmed_tags=("haneoka_school_uniform",),
+        named_outfit_tags=("haneoka_school_uniform",),
+        anchors=(outfit,),
+        anchor_outfit_profiles=((
+            "haneoka_winter",
+            "haneoka_school_uniform",
+            ("grey_jacket", "white_shirt", "green_skirt", "green_necktie"),
+            "winter",
+        ),),
+    )
+    repaired = repair_single_target_cached_named_outfit_plan(
+        (SemanticCharacterPlan("tomori", SemanticWardrobe("creative_fallback")),),
+        (target, outfit),
+        cached,
+        "高松灯穿着羽丘冬季校服",
+    )
+    effective = build_character_effective_outfits(
+        (target, outfit),
+        repaired,
+        cached,
+        user_prompt="高松灯穿着羽丘冬季校服",
+    )
+    context = character_wardrobe_authority_context(effective)
+
+    assert repaired[0].wardrobe == SemanticWardrobe(
+        "named_outfit", "haneoka_winter"
+    )
+    assert effective[0].target_source_text == "高松灯"
+    assert effective[0].wardrobe_kind == "named_outfit"
+    assert effective[0].effective.effective_tags == (
+        "haneoka_school_uniform",
+        "grey_jacket",
+        "white_shirt",
+        "green_skirt",
+        "green_necktie",
+    )
+    assert "named outfit = haneoka_school_uniform, grey_jacket" in context
+
+
 def test_explicit_cosplay_wording_is_repaired_per_wearer() -> None:
     targets = (
         SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "", ("togawa_sakiko",)),
