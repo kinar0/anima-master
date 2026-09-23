@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 
 try:
     from .prompt_background import (
@@ -19,19 +20,19 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 输出要求：
 - 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：
   `{{Count: 2girls, yuri}}`
-  `{{Characters: chihaya_anon, togawa_sakiko}}`
-  `{{Copyright: bang_dream!}}`
-  `{{Identity: chihaya_anon has pink hair and grey eyes; togawa_sakiko has blue hair and yellow eyes}}`
-  `{{Details: chihaya_anon smiles and waves; togawa_sakiko looks aside and holds a book}}`
+  `{{Characters: hatsune_miku, kagamine_rin}}`
+  `{{Copyright: vocaloid}}`
+  `{{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}}`
+  `{{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}}`
   `{{Tags: full body, composition, lighting, background, creative visual details}}`
-  `{{Nltags: chihaya_anon and togawa_sakiko are ......}}`
-- `Count` 必须与 `Characters` 完全一致，按以下规则确定，禁止反复核算或自我怀疑：先通过后文补充信息和用户原始语句得到角色名danbooru tag，然后在 `Characters` 里用英文逗号列出每个角色名，同一角色只写一次；`Count` 的人数就等于 `Characters` 的项数。无人物时写 `no humans` 且 `Characters` 留空；仅 1 人时按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`），如果是双性扶她再加上`, futanari`；2 人及以上按性别组合直接查表：全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。一名扶她加一名女性必须写 `2girls, futa with female`（禁止写成 `2girls, futanari`，后者会被 Anima 理解为三人）；一名扶她加一名男性写 `futa with male`，一名扶她加两名女性则是`3girls, futa with female`；futa相关tag不会计入总人数。`Characters` 只能含角色名；`Copyright` 只能含这些角色所属作品的标准 Danbooru copyright tags，同一作品只写一次。原创或无法确认作品时将 `Copyright` 留空，不要猜测。每个角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
+  `{{Nltags: hatsune_miku and kagamine_rin are ......}}`
+- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - Copyright输出角色所属作品的danbooru tag。
 - 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
 - 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。
 - Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。
 - 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。
-- Tags存放画面中设计的相关元素、构图、衣物、cum和penis和breasts等、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。
+- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。
 - Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。
 - Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等
 - `Identity` 中每位角色写成完整、语法连贯的一句话。
@@ -69,7 +70,18 @@ WARDROBE_AUTHORITY_POLICY = """
 """
 
 
+FUTA_COUNT_POLICY = """
+
+本次用户正向明确要求扶她设定。仅在这种情况下使用相应性征，并按 Anima 人数语义写 Count：图片中有且只有一名扶她写 `1girl, futanari`；否则，一名扶她加一名女性写 `2girls, futa with female`；一名扶她加一名男性写 `futa with male`；一名扶她加两名女性写 `3girls, futa with female`。扶她计入 girls 总数，关系 tag 不额外增加人数。扶她X女不要写hetero。
+"""
+
+
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    # Stored six/seven-field built-in used by existing installations before
+    # sexual-trait guidance became request-scoped.
+    "773a70a0cd55bfcf02f3ac4ba3451b0948c5be5d58533674c9dcfc9ce998ae93",
+    "a44d65bc5a6baacd7c97e7f62e5334f78a66e9850f9661022730087b47944281",
+    "9ddf7ad1d03b199bb40427e5c4e01321ac5fb2dd93b9a59da66d86d334041481",
     "adbc9d2f63b6431709610ebf18549ca81da79e2978d1c10b0371bbe462be9b83",
     "e847b2ef55b0d19ff1db7ca92285966b39419e7a81a7a8e839d53ce7f44fd731",
     "1ca427c3208fc3d59f66d0a4c033a6ce19745d7df1858c96d009cc5a3460fa1c",
@@ -86,6 +98,24 @@ LEGACY_BUILTIN_TEMPLATE_HASHES = {
     "dea5751303e16b9b08c3be20a5848dd6257f4d57df49360c53b3eba3041863b6",
     "168a69ca848e368ac2cec1cd0b3a2a4893787d610fb68776a269289c12b129c1",
 }
+
+
+_FUTA_REQUEST_RE = re.compile(r"扶她|(?<![a-z])futa(?:nari)?(?![a-z])", re.I)
+_FUTA_NEGATION_BEFORE_RE = re.compile(
+    r"(?:不是(?:一个)?|并非|不要(?:出现|包含|带有)?|禁止(?:出现|包含)?|不许|不能|别|没有|无|"
+    r"not(?:\s+(?:a|an))?|no|without|never|exclude|remove)\s*$",
+    re.I,
+)
+
+
+def has_positive_futa_request(text: str) -> bool:
+    """Return whether the user positively and explicitly requested futa traits."""
+    value = str(text or "")
+    for match in _FUTA_REQUEST_RE.finditer(value):
+        prefix = value[max(0, match.start() - 16) : match.start()]
+        if not _FUTA_NEGATION_BEFORE_RE.search(prefix):
+            return True
+    return False
 
 
 def build_llm_prompt(
@@ -192,8 +222,8 @@ def build_llm_prompt(
 -----------
 本次用户明确要求涩气、透明、魅惑、淫乱、性爱场景或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；优先满足用户的明确要求，然后如果无明确要求，则可为了色气表现力，根据角色所处的情景、地点和做出的行为，自行设计合适的服装，或在要求基础上作出修改。
 这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
-可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写角色的身体部位，如胸部、penis、pussy等
-不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。
+可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写用户正向明确要求的身体部位。
+不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。只描写用户正向明确要求或可靠角色证据支持的身体特征，不得从色情行为推断额外性征。
 """
     configured_template = str(prompt_builder_template or "").strip()
     template = (
@@ -220,6 +250,8 @@ def build_llm_prompt(
         # must still reach the LLM, so append it without requiring users to
         # migrate their stored template.
         prompt += f"\n\n-----------\n角色辅助信息：\n{character_rule}"
+    if has_positive_futa_request(original_theme or theme):
+        prompt += FUTA_COUNT_POLICY
     prompt += build_keyword_rule_block(tuple(keyword_prompt_rules))
     if mode == "txt2img":
         prompt += BACKGROUND_POLICY_TEMPLATE.format(

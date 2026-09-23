@@ -794,10 +794,10 @@
         }
       },
       "upscale_factor": {
-        "description": "默认放大倍率",
+        "description": "改图 / 放大倍率",
         "type": "float",
         "default": 2.0,
-        "hint": "示例：2.0",
+        "hint": "改图时先按“输入图最长边”限制基准尺寸，再将宽高乘以此倍率写入缩放图像节点。示例：1.5",
         "collapsed": true
       },
       "remove_bg_model": {

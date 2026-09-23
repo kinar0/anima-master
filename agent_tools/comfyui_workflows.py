@@ -84,10 +84,15 @@ def anima_t2i_workflow(
             "class_type": "VAEDecode",
             "inputs": {"samples": ["19", 0], "vae": ["15", 0]},
         },
+        "46": {
+            "class_type": "easy cleanGpuUsed",
+            "inputs": {"anything": ["8", 0]},
+            "_meta": {"title": "清理显存占用"},
+        },
         "9": {
             "class_type": "SaveImage",
             "inputs": {
-                "images": ["8", 0],
+                "images": ["46", 0],
                 "filename_prefix": t2i_filename_prefix(),
             },
         },

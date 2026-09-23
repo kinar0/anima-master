@@ -212,9 +212,7 @@ def test_prompt_passes_all_local_character_hints_to_llm_without_reformatting() -
         "- 长崎素世: nagasaki soyo, 1girl with long brown hair, "
         "blue eyes and large breasts"
     ) in prompt
-    assert (
-        "- 千早爱音: chihaya anon, 1girl with long pink hair, grey eyes"
-    ) in prompt
+    assert ("- 千早爱音: chihaya anon, 1girl with long pink hair, grey eyes") in prompt
     assert "本地角色身份/稳定外貌" in prompt
     assert "用户原文修改优先" in prompt
 
@@ -223,9 +221,7 @@ def test_custom_prompt_cannot_drop_local_character_hints() -> None:
     prompt = build_llm_prompt(
         "长崎素世挥手",
         prompt_builder_template="用户原始要求：{theme}",
-        fixed_character_hints={
-            "长崎素世": "nagasaki soyo, long brown hair, blue eyes"
-        },
+        fixed_character_hints={"长崎素世": "nagasaki soyo, long brown hair, blue eyes"},
     )
 
     assert "用户原始要求：长崎素世挥手" in prompt
@@ -344,9 +340,10 @@ def test_common_scoped_free_tags_do_not_request_character_resolution() -> None:
 
 
 def test_variant_profiles_are_not_hardcoded_per_character() -> None:
-    assert tags_module.required_profile_tags_for_prompt(
-        "穿着Oblivionis服装的丰川祥子"
-    ) == ()
+    assert (
+        tags_module.required_profile_tags_for_prompt("穿着Oblivionis服装的丰川祥子")
+        == ()
+    )
 
 
 def test_variant_outfit_profile_recovers_specific_low_frequency_slots() -> None:
@@ -370,7 +367,9 @@ def test_variant_outfit_profile_recovers_specific_low_frequency_slots() -> None:
         if index < 4:
             tags.update(("mask", "masquerade_mask", "black_mask"))
         if index < 3:
-            tags.update(("brooch", "pantyhose", "black_pantyhose", "boots", "black_boots"))
+            tags.update(
+                ("brooch", "pantyhose", "black_pantyhose", "boots", "black_boots")
+            )
         posts.append(" ".join(tags))
 
     result = tags_module._select_variant_outfit_profile(posts)
@@ -388,9 +387,7 @@ def test_variant_outfit_profile_recovers_specific_low_frequency_slots() -> None:
         "black_pantyhose",
         "black_boots",
     )
-    assert tags_module.required_profile_tags_for_prompt(
-        "穿着Mortis服装的若叶睦"
-    ) == ()
+    assert tags_module.required_profile_tags_for_prompt("穿着Mortis服装的若叶睦") == ()
 
 
 def test_variant_outfit_profile_keeps_all_qualified_tags() -> None:
@@ -437,9 +434,7 @@ def test_variant_outfit_fetch_uses_single_character_signature(monkeypatch) -> No
         pure_posts.append(
             {
                 "tag_string_general": " ".join(tags),
-                "tag_string_character": (
-                    "amoris_(bang_dream!) yuutenji_nyamu"
-                ),
+                "tag_string_character": ("amoris_(bang_dream!) yuutenji_nyamu"),
             }
         )
     contaminated_posts = [
@@ -545,7 +540,7 @@ def test_variant_outfit_fetch_refines_small_pure_cluster_by_anchor(monkeypatch) 
     )
 
     assert profile.sample_mode == "single_character_anchor"
-    assert profile.selected_posts == 10
+    assert profile.selected_posts == 14
     assert profile.tags == (
         "black_corset",
         "red_shorts",
@@ -602,6 +597,7 @@ def test_named_uniform_fetch_filters_summer_and_winter_profiles(monkeypatch) -> 
 
     summer = tags_module.fetch_variant_outfit_profile(
         "haneoka_school_uniform",
+        source_kind="named_outfit",
         outfit_kind="summer",
         timeout=2.0,
         user_agent="test",
@@ -610,6 +606,7 @@ def test_named_uniform_fetch_filters_summer_and_winter_profiles(monkeypatch) -> 
     )
     winter = tags_module.fetch_variant_outfit_profile(
         "haneoka_school_uniform",
+        source_kind="named_outfit",
         outfit_kind="winter",
         timeout=2.0,
         user_agent="test",
@@ -819,3 +816,177 @@ def test_remote_core_lookup_is_disabled_by_default(monkeypatch) -> None:
 
     assert outcome.text == "unknown_character, 1girl, solo"
     assert outcome.status == "not_requested"
+
+
+def _learning_post(
+    post_id,
+    general="1girl solo casual blue_dress blue_hair yellow_eyes",
+    characters="togawa_sakiko",
+):
+    return {
+        "id": post_id,
+        "tag_string_general": general,
+        "tag_string_character": characters,
+    }
+
+
+def _mock_learning_http(monkeypatch, respond):
+    class Response:
+        status_code = 200
+        text = "<posts/>"
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def json(self):
+            return self.payload
+
+    def get(url, *, params, **kwargs):
+        return Response([] if "index.php" in url else respond(params))
+
+    monkeypatch.setattr(tags_module.requests, "get", get)
+
+
+def _learn_sakiko():
+    return tags_module.fetch_variant_outfit_profile(
+        "togawa_sakiko",
+        outfit_kind="casual",
+        timeout=1,
+        user_agent="test",
+        cache={},
+        donmai_base_urls=("https://example.invalid",),
+    )
+
+
+def test_learning_rejects_repeated_two_character_signature(monkeypatch):
+    posts = [
+        _learning_post(
+            i,
+            "2girls casual black_jacket red_shirt blonde_hair blue_hair",
+            "togawa_sakiko misumi_uika",
+        )
+        for i in range(12)
+    ]
+    _mock_learning_http(monkeypatch, lambda params: posts)
+    result = _learn_sakiko()
+    assert result.tags == result.appearance_tags == ()
+    assert result.sample_mode == "casual_evidence_insufficient"
+    assert result.rejected_posts == 12
+
+
+def test_learning_rejects_mixed_gender_and_solo_focus(monkeypatch):
+    posts = [
+        _learning_post(i, f"{count} casual red_dress")
+        for i, count in enumerate(
+            [
+                "1girl 1boy",
+                "solo 2girls",
+                "solo_focus 2girls",
+                "1girl 1other",
+                "solo crowd",
+                "solo no_humans",
+            ]
+        )
+    ]
+    _mock_learning_http(monkeypatch, lambda params: posts)
+    assert _learn_sakiko().selected_posts == 0
+
+
+def test_three_posts_cannot_be_inflated_by_queries_or_mirrors(monkeypatch):
+    posts = [_learning_post(i) for i in range(3)]
+    _mock_learning_http(monkeypatch, lambda params: posts)
+    result = _learn_sakiko()
+    assert result.tags == result.appearance_tags == ()
+    assert result.total_posts == result.selected_posts == result.focused_posts == 3
+    assert len(result.sample_ids) == 3
+
+
+def test_learning_paginates_past_contaminated_first_page(monkeypatch):
+    calls = []
+
+    def respond(params):
+        calls.append(dict(params))
+        if params["page"] == 1:
+            return [
+                _learning_post(
+                    i, "2girls casual red_dress", "togawa_sakiko misumi_uika"
+                )
+                for i in range(100)
+            ]
+        return [_learning_post(i) for i in range(100, 130)]
+
+    _mock_learning_http(monkeypatch, respond)
+    result = _learn_sakiko()
+    assert result.focused_posts == 30
+    assert result.total_posts == 130
+    assert "blue_dress" in result.tags and "red_dress" not in result.tags
+    assert calls[1]["page"] == 2
+
+
+def test_learning_solo_supplement_keeps_casual_and_target_identity(monkeypatch):
+    def respond(params):
+        if params["tags"] != "togawa_sakiko solo":
+            return [_learning_post(i) for i in range(3)]
+        return (
+            [_learning_post(i) for i in range(3, 10)]
+            + [_learning_post(i, "1girl solo red_dress") for i in range(10, 20)]
+            + [_learning_post(i, characters="misumi_uika") for i in range(20, 30)]
+        )
+
+    _mock_learning_http(monkeypatch, respond)
+    result = _learn_sakiko()
+    assert result.focused_posts == 10
+    assert "red_dress" not in result.tags
+    assert "togawa_sakiko solo" in result.queries
+    assert "togawa_sakiko casual blue_dress" in result.queries
+
+
+def test_learning_deduplicates_same_image_under_different_post_ids(monkeypatch):
+    posts = [dict(_learning_post(i), md5=f"image-{i % 3}") for i in range(12)]
+    _mock_learning_http(monkeypatch, lambda params: posts)
+    result = _learn_sakiko()
+    assert result.total_posts == 3
+    assert not result.tags
+
+
+def test_appearance_excludes_clothes_and_minority_colors():
+    posts = ["blue_dress hair_ribbon blue_hair yellow_eyes" for _ in range(8)]
+    posts += ["blue_dress hair_ribbon blonde_hair blue_eyes" for _ in range(2)]
+    result = tags_module._build_variant_outfit_profile(posts)
+    assert set(result.appearance_tags) == {"blue_hair", "yellow_eyes"}
+    assert "hair_ribbon" in result.tags
+
+
+def test_specific_school_anchor_does_not_merge_two_uniforms():
+    posts = [
+        "school_uniform haneoka_school_uniform grey_jacket green_skirt"
+        for _ in range(12)
+    ]
+    posts += [
+        "school_uniform tsukinomori_school_uniform blue_shirt plaid_skirt"
+        for _ in range(8)
+    ]
+    result = tags_module._build_variant_outfit_profile(posts)
+    assert result.anchor_tag == "haneoka_school_uniform"
+    assert "tsukinomori_school_uniform" not in result.tags
+    assert "blue_shirt" not in result.tags
+
+
+def test_wardrobe_save_invalidates_positive_and_negative_learning_cache():
+    cache = {
+        "outfit-profile-v7:character_a:casual:character": (time.monotonic(), tags_module.VariantOutfitProfile()),
+        "outfit-profile-v7:character_b:default:character": (time.monotonic(), tags_module.VariantOutfitProfile(tags=("white_shirt",))),
+        "character_a": [TagRecord("character_a", 4, 100)],
+    }
+    resolver = DanbooruResolver(
+        logger=__import__("logging").getLogger(__name__), cache=cache,
+        get_bool=lambda key, default: default,
+        get_int=lambda key, default: default,
+        get_float=lambda key, default: default,
+        get_str=lambda key, default: default, config={},
+    )
+    resolver.remember_outfit_summary("角色甲", ("character_a",), ("white_shirt",))
+    snapshot = resolver.wardrobe_snapshot()
+    resolver.save_wardrobe({"baseRevision": snapshot["revision"], "outfits": [], "outfitSets": [], "terms": []})
+    assert resolver.wardrobe_snapshot()["outfits"] == []
+    assert list(cache) == ["character_a"]

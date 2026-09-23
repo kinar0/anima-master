@@ -8,7 +8,11 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_builder import build_final_prompt  # noqa: E402
-from tag_cleaner import clean_content_tags, join_prompt_parts  # noqa: E402
+from tag_cleaner import (  # noqa: E402
+    clean_content_tags,
+    display_tag_text,
+    join_prompt_parts,
+)
 
 
 def _config() -> dict:
@@ -254,9 +258,49 @@ def test_final_prompt_uses_spaces_for_danbooru_word_separators() -> None:
     )
 
     assert "_" not in result.final_prompt
-    assert "togawa sakiko (bang dream!)" in result.final_prompt
+    assert r"togawa sakiko \(bang dream!\)" in result.final_prompt
     assert "hair ornament" in result.final_prompt
     assert "black dress" in result.final_prompt
+
+
+def test_final_prompt_escapes_literal_anima_syntax_in_danbooru_names() -> None:
+    result = build_final_prompt(
+        user_prompt="character",
+        llm_content="standing",
+        config=_config(),
+        required_core_tags=("s:p_little_knight", "character_(series)"),
+    )
+
+    assert r"s\:p little knight" in result.final_prompt
+    assert r"character \(series\)" in result.final_prompt
+
+
+def test_anima_syntax_escaping_is_idempotent_and_preserves_weights() -> None:
+    assert display_tag_text(r"s\:p_little_knight") == r"s\:p little knight"
+    assert display_tag_text("(watercolor:2)") == "(watercolor:2)"
+    assert display_tag_text("(s:p_little_knight:1.2)") == (
+        r"(s\:p little knight:1.2)"
+    )
+    assert display_tag_text(
+        "chihaya_anon has (flat_chest:1.4) and grey_eyes"
+    ) == "chihaya anon has (flat chest:1.4) and grey eyes"
+
+
+def test_structured_identity_keeps_embedded_anima_weight_syntax() -> None:
+    result = build_final_prompt(
+        user_prompt="structured request",
+        llm_content="standing",
+        config=_config(),
+        required_count_tags=("1girl", "solo"),
+        structured_character_tags=("chihaya_anon",),
+        structured_identity_blocks=(
+            "chihaya_anon has pink_hair, grey_eyes, (flat_chest:1.4)",
+        ),
+        preserve_structured_order=True,
+    )
+
+    assert "(flat chest:1.4)" in result.final_prompt
+    assert r"\(flat chest\:1.4\)" not in result.final_prompt
 
 
 def test_raw_mode_does_not_apply_content_tag_limit() -> None:

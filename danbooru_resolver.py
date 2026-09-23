@@ -20,10 +20,13 @@ try:
         required_core_tags_for_prompt,
         required_profile_tags_for_prompt,
         resolve_core_tags,
+        _fetch_tag_records,
     )
     from .danbooru_semantic import (
         SemanticAnchor,
         SemanticLookupResult,
+        SemanticCharacterPlan,
+        SemanticWardrobe,
         lookup_semantic_anchors,
         resolve_local_cli_path,
     )
@@ -37,10 +40,13 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         required_core_tags_for_prompt,
         required_profile_tags_for_prompt,
         resolve_core_tags,
+        _fetch_tag_records,
     )
     from danbooru_semantic import (
         SemanticAnchor,
         SemanticLookupResult,
+        SemanticCharacterPlan,
+        SemanticWardrobe,
         lookup_semantic_anchors,
         resolve_local_cli_path,
     )
@@ -102,6 +108,153 @@ class DanbooruResolver:
     def _profile_alias_key(value: str) -> str:
         return re.sub(r"\s+", " ", str(value or "").strip().lower())
 
+    @staticmethod
+    def _literal_scoped_tag(value: str) -> str:
+        text = str(value or "").strip().replace("（", "(").replace("）", ")")
+        if not re.fullmatch(r"[A-Za-z0-9_ .!:'\-]+[_ ]*\([A-Za-z0-9_ .!:'\-]+\)", text):
+            return ""
+        return re.sub(r"_*\(", "_(", re.sub(r"\s+", "_", text.lower()))
+
+    async def classify_literal_targets(self, anchors: tuple[SemanticAnchor, ...]) -> tuple[SemanticAnchor, ...]:
+        """Distinguish a literal costume tag from a character/persona tag."""
+        result = []
+        for anchor in anchors:
+            literal = self._literal_scoped_tag(anchor.literal_name or anchor.source_text)
+            if anchor.role != "target_character" or not literal:
+                result.append(anchor)
+                continue
+            known = [row for row in self._profile_data().get("profiles", {}).values()
+                     if isinstance(row, dict) and literal in row.get("source_tags", [])]
+            category = next((row.get("evidence", {}).get("source_category") for row in known
+                             if row.get("evidence", {}).get("source_category") is not None), 4 if known else None)
+            if category is None:
+                records = await asyncio.to_thread(
+                    _fetch_tag_records, literal, donmai_base_urls=self._base_urls(),
+                    timeout=min(2.5, max(1.0, self._float("danbooru_tag_lookup_timeout", 6.0))),
+                    user_agent=self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT), cache=self._cache,
+                )
+                record = next((row for row in records if row.name == literal and row.category in {0, 4}
+                               and not row.deprecated and row.post_count > 0), None)
+                category = record.category if record else None
+            result.append(replace(anchor, source_category=category, candidates=(literal,)))
+        return tuple(result)
+
+    def bind_character_wardrobes(
+        self, anchors: tuple[SemanticAnchor, ...], plans: tuple[SemanticCharacterPlan, ...]
+    ) -> tuple[tuple[SemanticAnchor, ...], tuple[SemanticCharacterPlan, ...]]:
+        """Select an explicitly named, owner-scoped wardrobe without a fixed enum.
+
+        profile_key carries the exact editor row to sampling and postprocessing;
+        source_tags remain evidence sources, owner_tags identify the wearer/donor.
+        """
+        profiles = {
+            key: value for key, value in self._profile_data().get("profiles", {}).items()
+            if isinstance(value, dict) and value.get("kind") != "named_outfit"
+        }
+        by_id = {anchor.anchor_id: anchor for anchor in anchors}
+        retired_ids: set[str] = set()
+        updated = []
+        for plan in plans:
+            target = by_id.get(plan.target_anchor_id)
+            if target is None:
+                updated.append(plan)
+                continue
+            # An explicit qualified name of a locally known base character can
+            # name a costume (general tag), not an additional visible identity.
+            literal = self._literal_scoped_tag(target.literal_name or target.source_text)
+            base = literal.split("_(", 1)[0] if literal else ""
+            base_known = base and any(
+                base in row.get("owner_tags", row.get("source_tags", []))
+                for row in profiles.values()
+            )
+            if base_known and target.source_category == 0 and plan.wardrobe.kind in {"none", "default_profile"}:
+                source_id = f"{target.anchor_id}_explicit_variant"
+                by_id[source_id] = SemanticAnchor(
+                    source_id, "outfit_source", "character", target.literal_name or target.source_text,
+                    target.literal_name or target.source_text, (literal,), source_category=0,
+                )
+                by_id[target.anchor_id] = replace(
+                    target, source_text=target.source_text if target.literal_name and target.source_text != target.literal_name else base.replace("_", " "),
+                    candidates=(base,), literal_name="", source_category=4,
+                )
+                target = by_id[target.anchor_id]
+                plan = replace(plan, wardrobe=SemanticWardrobe("outfit_source", source_id))
+            wardrobe = by_id.get(plan.wardrobe.anchor_id or plan.clothing_anchor_id)
+            if wardrobe is None:
+                updated.append(plan)
+                continue
+            phrase = self._profile_alias_key(f"{wardrobe.source_text} {wardrobe.description}")
+            owner = wardrobe if plan.wardrobe.kind == "outfit_source" else target
+            owner_tags = set(owner.candidates)
+            known_owner_tags = owner_tags.intersection(
+                tag for row in profiles.values()
+                for tag in (row.get("owner_tags") or row.get("source_tags", []))
+            )
+            matches = []
+            for key, row in profiles.items():
+                variant = self._normalize_outfit_variant(row.get("qualifier"), key)
+                if variant in {"default", "casual", "summer", "winter", "stage"} and plan.wardrobe.kind == f"{variant}_profile":
+                    continue
+                row_owners = set(row.get("owner_tags") or row.get("source_tags", []))
+                names = [str(key).split("::", 1)[0], *row.get("aliases", [])]
+                if variant not in {"default", "casual", "summer", "winter", "stage"}:
+                    owner_names = {
+                        self._profile_alias_key(name)
+                        for other_key, other in profiles.items()
+                        if self._normalize_outfit_variant(other.get("qualifier"), other_key) == "default"
+                        and row_owners.intersection(other.get("owner_tags") or other.get("source_tags", []))
+                        for name in [str(other_key).split("::", 1)[0], *other.get("aliases", [])]
+                    }
+                    names = [name for name in names if self._profile_alias_key(name) not in owner_names]
+                    names.append(variant)
+                hits = [name for name in names if self._text_mentions_alias(phrase, name)]
+                if not hits:
+                    continue
+                if plan.wardrobe.kind != "outfit_source" and not owner_tags.intersection(row_owners):
+                    continue
+                if plan.wardrobe.kind == "outfit_source" and known_owner_tags and not known_owner_tags.intersection(
+                    row_owners | set(row.get("source_tags", []))
+                ):
+                    continue
+                # A donor name alone must not choose one arbitrary sibling outfit.
+                if not any(self._profile_alias_key(name) not in {
+                    self._profile_alias_key(tag) for tag in row_owners
+                } for name in hits) and variant != self._outfit_variant(phrase):
+                    continue
+                if variant in {"default", "casual", "summer", "winter", "stage"} and variant != self._outfit_variant(phrase):
+                    continue
+                if not row.get("source_tags"):
+                    continue
+                matches.append((max(map(len, hits)), key, row))
+            if matches:
+                longest = max(item[0] for item in matches)
+                matches = [item for item in matches if item[0] == longest]
+            if len(matches) == 1:
+                _, key, row = matches[0]
+                selected_id = f"{wardrobe.anchor_id}_{target.anchor_id}_profile"
+                by_id[selected_id] = replace(
+                    wardrobe, anchor_id=selected_id, role="outfit_source", group="character",
+                    candidates=tuple(row["source_tags"]), profile_key=key,
+                )
+                retired_ids.add(wardrobe.anchor_id)
+                plan = replace(plan, wardrobe=SemanticWardrobe("outfit_source", selected_id),
+                               clothing_anchor_id=selected_id)
+            updated.append(plan)
+        referenced = {value for plan in updated for value in (plan.wardrobe.anchor_id, plan.clothing_anchor_id)}
+        return tuple(anchor for key, anchor in by_id.items() if key not in retired_ids or key in referenced), tuple(updated)
+
+    def cached_bound_wardrobes(self, anchors: tuple[SemanticAnchor, ...]) -> SemanticLookupResult:
+        rows = []
+        for anchor in anchors:
+            row = self._profile_data().get("profiles", {}).get(anchor.profile_key)
+            if not anchor.profile_key or not isinstance(row, dict):
+                continue
+            tags, _appearance = self._stored_profile_components(row)
+            if row.get("source_tags"):
+                rows.append((anchor.anchor_id, row["source_tags"][0], tags,
+                             self._normalize_outfit_variant(row.get("qualifier"), anchor.profile_key)))
+        return SemanticLookupResult(anchor_outfit_profiles=tuple(rows), status="profile_cache" if rows else "empty_plan")
+
     @classmethod
     def _alias_match_spans(cls, text: str, alias: str) -> tuple[tuple[int, int], ...]:
         """Return trigger spans without letting short Latin aliases hit in words."""
@@ -120,6 +273,10 @@ class DanbooruResolver:
                 rf"(?<![a-z0-9_]){re.escape(needle)}(?![a-z0-9_])",
                 haystack,
                 flags=re.I,
+            )
+            if not (
+                "(" not in needle
+                and re.match(r"[_\s]*[（(][A-Za-z0-9_ .!:'\-]+[）)]", haystack[match.end():])
             )
         )
 
@@ -195,7 +352,7 @@ class DanbooruResolver:
     def _normalize_outfit_variant(cls, value: Any, *hints: Any) -> str:
         """Keep a valid stored variant or infer one from legacy textual hints."""
         explicit = str(value or "").strip().lower()
-        if explicit in {"default", "casual", "summer", "winter", "stage"}:
+        if explicit:
             return explicit
         return cls._outfit_variant(" ".join(str(hint or "") for hint in hints))
 
@@ -291,8 +448,9 @@ class DanbooruResolver:
         """Load the versioned profile cache once, or return an empty v3 cache.
 
         Version 3 stores ``{"version": 3, "profiles": {key: record}}``. A
-        ``character_outfit`` record contains a character/persona owner in
-        ``source_tags``, a ``qualifier``, stable appearance evidence, and that
+        ``character_outfit`` record contains a character/persona in ``owner_tags``
+        (legacy fallback: ``source_tags``), an exact evidence source in
+        ``source_tags``, a free-name ``qualifier``, stable appearance, and that
         owner's wardrobe components. A reusable ``named_outfit`` instead contains
         an explicit ``canonical_tag``, ``variant``, aliases, and its own
         ``component_tags``; it has no wearer identity and may bind to any target.
@@ -646,7 +804,10 @@ class DanbooruResolver:
                 for tag in evidence.get("appearance_tags", [])
                 if str(tag).strip()
             )
-            for tag in (*sources, *profile.get("copyright_tags", [])):
+            identity_sources = tuple(profile.get("owner_tags") or sources)
+            if evidence.get("source_category") == 0 and not profile.get("owner_tags"):
+                identity_sources = ()
+            for tag in (*identity_sources, *profile.get("copyright_tags", [])):
                 value = str(tag).strip()
                 if value and value not in confirmed:
                     confirmed.append(value)
@@ -654,9 +815,9 @@ class DanbooruResolver:
                 if tag not in appearance_tags:
                     appearance_tags.append(tag)
             source_tag = sources[0] if sources else ""
-            if source_tag and appearances:
+            if identity_sources and appearances:
                 alias_bucket, appearance_bucket = scoped_appearances.setdefault(
-                    source_tag, ([], [])
+                    identity_sources[0], ([], [])
                 )
                 for alias in aliases:
                     if alias not in alias_bucket:
@@ -700,17 +861,14 @@ class DanbooruResolver:
             if anchor.role not in {"target_character", "outfit_source"}:
                 preferred.append(anchor)
                 continue
+            literal = self._literal_scoped_tag(anchor.literal_name or anchor.source_text)
+            if literal:
+                preferred.append(replace(anchor, candidates=(literal,)))
+                continue
             source_key = self._profile_alias_key(anchor.source_text)
-            qualifier = self._outfit_variant(
-                f"{anchor.source_text} {anchor.description}"
-            )
             matches: list[tuple[int, str, dict[str, Any]]] = []
             for profile_key, profile in profiles.items():
                 if not isinstance(profile, dict) or profile.get("kind") == "named_outfit":
-                    continue
-                if self._normalize_outfit_variant(
-                    profile.get("qualifier"), profile_key, profile.get("aliases", [])
-                ) != qualifier:
                     continue
                 aliases = {
                     self._profile_alias_key(str(profile_key).split("::", 1)[0]),
@@ -735,10 +893,19 @@ class DanbooruResolver:
             longest = max(length for length, _profile_key, _profile in matches)
             matches = [match for match in matches if match[0] == longest]
 
+            # Identity ownership is independent of wardrobe variant. A target
+            # anchor contains only the character name even when its description
+            # asks for a stage profile, and a stage row may have only a composite
+            # alias such as "千早爱音演出服". Ground the owner from any sibling
+            # profile first; the requested qualifier is applied later when the
+            # concrete wardrobe row is selected.
             distinct_sources = {
                 tuple(
                     str(tag).strip().lower()
-                    for tag in profile.get("source_tags", [])
+                    for tag in (profile.get("owner_tags") or profile.get("source_tags", []))
+                    if str(tag).strip()
+                ) if anchor.role == "target_character" else tuple(
+                    str(tag).strip().lower() for tag in profile.get("source_tags", [])
                     if str(tag).strip()
                 )
                 for _length, _profile_key, profile in matches
@@ -1392,6 +1559,9 @@ class DanbooruResolver:
                         for item in raw.get("source_tags", [])
                         if str(item).strip()
                     ],
+                    "ownerTags": list(raw.get("owner_tags") or (
+                        raw.get("source_tags", []) if evidence.get("source_category") != 0 else []
+                    )),
                     "tags": tags,
                     "appearanceTags": [
                         str(item).strip()
@@ -1478,10 +1648,14 @@ class DanbooruResolver:
             key = self._profile_alias_key(self._clean_alias(item.get("key"), label="档案名称"))
             aliases = [self._clean_alias(value, label="档案别名") for value in item.get("aliases", [])]
             source_tags = self._clean_tag_list(item.get("sourceTags", []), limit=20)
+            owner_tags = self._clean_tag_list(item.get("ownerTags", source_tags), limit=20)
             tags = self._clean_tag_list(item.get("tags", []), limit=80)
             qualifier = self._normalize_outfit_variant(
                 item.get("qualifier"), key, aliases
             )
+            qualifier = self._clean_alias(qualifier, label="服装名称 / 变体")
+            if "::" in qualifier:
+                raise WardrobeValidationError("服装名称不能包含 ::。")
             base_key = key.split("::", 1)[0]
             storage_key = self._outfit_profile_key(base_key, qualifier)
             if storage_key in seen_keys:
@@ -1512,6 +1686,7 @@ class DanbooruResolver:
                 "qualifier": qualifier,
                 "aliases": list(dict.fromkeys(aliases or [key])),
                 "source_tags": source_tags,
+                "owner_tags": owner_tags or source_tags,
                 "copyright_tags": list(old.get("copyright_tags", [])),
                 "outfit_tags": tags,
             }
@@ -1618,6 +1793,12 @@ class DanbooruResolver:
         self._config["danbooru_term_mappings"] = term_entries
         self._profile_cache_data = {"version": 3, "profiles": new_profiles}
         self._save_profile_data()
+        # A successful editor save can delete a learned profile so the next
+        # request learns it again. Do not resurrect a positive cached sample
+        # or replay the ten-minute negative cache after that deliberate edit.
+        for cache_key in tuple(self._cache):
+            if isinstance(cache_key, str) and cache_key.startswith("outfit-profile-"):
+                self._cache.pop(cache_key, None)
         return self.wardrobe_snapshot()
 
     def remember_outfit_summary(
@@ -1639,7 +1820,7 @@ class DanbooruResolver:
         if not key or not source_tags:
             return
         copyright_tags: list[str] = []
-        for source_tag in source_tags:
+        for source_tag in source_tags if (evidence or {}).get("source_category") != 0 else ():
             scoped = re.fullmatch(r".+_\(([^)]+)\)", source_tag)
             if scoped and scoped.group(1) not in copyright_tags:
                 copyright_tags.append(scoped.group(1))
@@ -1732,6 +1913,8 @@ class DanbooruResolver:
         record: dict[str, Any] = {
             "kind": "character_outfit",
             "qualifier": qualifier_key,
+            **({"owner_tags": existing.get("owner_tags") or evidence["owner_tags"]}
+               if existing.get("owner_tags") or (evidence or {}).get("owner_tags") else {}),
             "aliases": aliases,
             "source_tags": list(
                 dict.fromkeys((*existing.get("source_tags", []), *source_tags))
@@ -1989,6 +2172,32 @@ class DanbooruResolver:
             cli_path=cli_path,
             timeout=timeout,
         )
+        # The local CSV may predate a named costume. Only exact, literal source
+        # names can use this online fallback. General-category costume tags are
+        # evidence sources, never visible character identities or global tags.
+        online_source_categories: dict[str, int] = {}
+        known_ids = dict(result.anchor_tags)
+        for anchor in anchors:
+            literal = self._literal_scoped_tag(anchor.source_text)
+            if anchor.role != "outfit_source" or not literal or anchor.anchor_id in known_ids:
+                continue
+            records = await asyncio.to_thread(
+                _fetch_tag_records, literal, donmai_base_urls=self._base_urls(),
+                timeout=min(2.5, timeout), user_agent=self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT),
+                cache=self._cache,
+            )
+            record = next((row for row in records if row.name == literal
+                           and row.category in {0, 4} and not row.deprecated and row.post_count > 0), None)
+            if record is None:
+                continue
+            online_source_categories[literal] = record.category
+            result = replace(
+                result, status="resolved",
+                anchor_tags=(*result.anchor_tags, (anchor.anchor_id, literal)),
+                outfit_source_tags=tuple(dict.fromkeys((*result.outfit_source_tags, literal))),
+                missing_descriptions=tuple(value for value in result.missing_descriptions
+                                           if value not in {anchor.source_text, anchor.description}),
+            )
         anchor_tag_map = dict(result.anchor_tags)
         for anchor in anchors:
             if anchor.role != "target_character" or anchor.anchor_id in anchor_tag_map:
@@ -2068,6 +2277,10 @@ class DanbooruResolver:
                         "focused_posts": profile.focused_posts,
                         "anchor_tag": profile.anchor_tag,
                         "tag_counts": dict(profile.tag_counts),
+                        "sample_ids": list(profile.sample_ids),
+                        "queries": list(profile.queries),
+                        "rejected_posts": profile.rejected_posts,
+                        "request_errors": list(profile.request_errors),
                         "appearance_tags": list(profile.appearance_tags),
                     },
                     target_variant,
@@ -2108,6 +2321,7 @@ class DanbooruResolver:
                     fetch_variant_outfit_profile,
                     tag,
                     outfit_kind=variant,
+                    source_kind="named_outfit",
                     timeout=min(2.5, timeout),
                     user_agent=(
                         self._str("danbooru_tag_user_agent", DEFAULT_USER_AGENT).strip()
@@ -2133,6 +2347,10 @@ class DanbooruResolver:
                         "focused_posts": profile.focused_posts,
                         "anchor_tag": profile.anchor_tag,
                         "tag_counts": dict(profile.tag_counts),
+                        "sample_ids": list(profile.sample_ids),
+                        "queries": list(profile.queries),
+                        "rejected_posts": profile.rejected_posts,
+                        "request_errors": list(profile.request_errors),
                     },
                     variant,
                 )
@@ -2191,8 +2409,17 @@ class DanbooruResolver:
             # Seasonal wording belongs to the outfit-source identity too.  A
             # winter lookup must not replace the character/source's default or
             # summer profile merely because the canonical source tag is equal.
-            qualifier = self._outfit_variant(qualifier_text)
-            stored_record = self._stored_profile_for_source_tag(source_tag, qualifier)
+            selected_record = self._profile_data().get("profiles", {}).get(
+                source_anchor.profile_key if source_anchor else ""
+            )
+            qualifier = (
+                self._normalize_outfit_variant(selected_record.get("qualifier"))
+                if isinstance(selected_record, dict) else
+                source_tag.split("_(", 1)[1][:-1].replace("_", " ")
+                if online_source_categories.get(source_tag) == 0 and "_(" in source_tag else
+                self._outfit_variant(qualifier_text)
+            )
+            stored_record = selected_record if isinstance(selected_record, dict) else self._stored_profile_for_source_tag(source_tag, qualifier)
             stored_outfit, _stored_appearance = (
                 self._stored_profile_components(stored_record)
                 if stored_record is not None
@@ -2204,6 +2431,8 @@ class DanbooruResolver:
                     fetch_variant_outfit_profile,
                     source_tag,
                     outfit_kind=qualifier,
+                    source_kind="named_outfit" if online_source_categories.get(source_tag) == 0
+                    or (stored_record or {}).get("evidence", {}).get("source_category") == 0 else "character",
                     timeout=min(2.5, timeout),
                     user_agent=user_agent,
                     cache=self._cache,
@@ -2220,14 +2449,26 @@ class DanbooruResolver:
                 anchor_outfit_profiles.append(
                     (source_anchor.anchor_id, source_tag, effective_outfit, qualifier)
                 )
-            if profile is not None:
+            if profile is not None and profile.tags:
+                base_owner = source_tag.split("_(", 1)[0]
+                known_owner = any(
+                    base_owner in row.get("owner_tags", row.get("source_tags", []))
+                    for row in self._profile_data().get("profiles", {}).values()
+                    if isinstance(row, dict) and row.get("kind") != "named_outfit"
+                )
                 profile_evidence = {
+                    **({"owner_tags": [base_owner]} if known_owner and online_source_categories.get(source_tag) == 0 else {}),
+                    **({"source_category": online_source_categories[source_tag]} if source_tag in online_source_categories else {}),
                     "sample_mode": profile.sample_mode,
                     "total_posts": profile.total_posts,
                     "selected_posts": profile.selected_posts,
                     "focused_posts": profile.focused_posts,
                     "anchor_tag": profile.anchor_tag,
                     "tag_counts": dict(profile.tag_counts),
+                    "sample_ids": list(profile.sample_ids),
+                    "queries": list(profile.queries),
+                    "rejected_posts": profile.rejected_posts,
+                    "request_errors": list(profile.request_errors),
                 }
                 self.remember_outfit_summary(
                     source_alias,

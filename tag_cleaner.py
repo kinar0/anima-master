@@ -196,6 +196,12 @@ ARTIST_FUNCTION_RE = re.compile(
     re.I,
 )
 
+ANIMA_WEIGHTED_TAG_RE = re.compile(
+    r"(?<!\\)\((?P<body>[^()\r\n]+):"
+    r"(?P<weight>[-+]?(?:\d+(?:\.\d*)?|\.\d+))\)"
+)
+ANIMA_LITERAL_SYNTAX_CHARS = frozenset(":()[]")
+
 
 def split_tags(text: str) -> list[str]:
     """Split mixed LLM output into tag-like fragments."""
@@ -301,9 +307,41 @@ def display_tag_text(tag: str) -> str:
         tag: Canonical tag retained by the internal prompt pipeline.
 
     Returns:
-        The tag with Danbooru word separators rendered as spaces.
+        The tag with Danbooru word separators rendered as spaces and literal
+        Anima/ComfyUI attention syntax escaped. Weight expressions such as
+        ``(watercolor:2)`` keep their intentional syntax, including when they
+        occur inside a longer character description.
     """
-    return re.sub(r"\s+", " ", str(tag or "").replace("_", " ")).strip()
+    value = re.sub(r"\s+", " ", str(tag or "").replace("_", " ")).strip()
+    rendered: list[str] = []
+    previous_end = 0
+    for weighted in ANIMA_WEIGHTED_TAG_RE.finditer(value):
+        rendered.append(
+            _escape_anima_literal_syntax(value[previous_end : weighted.start()])
+        )
+        body = _escape_anima_literal_syntax(weighted.group("body"))
+        rendered.append(f"({body}:{weighted.group('weight')})")
+        previous_end = weighted.end()
+    rendered.append(_escape_anima_literal_syntax(value[previous_end:]))
+    return "".join(rendered)
+
+
+def _escape_anima_literal_syntax(text: str) -> str:
+    """Escape literal attention characters once without double escaping."""
+    escaped: list[str] = []
+    index = 0
+    value = str(text or "")
+    while index < len(value):
+        char = value[index]
+        if char == "\\" and index + 1 < len(value):
+            escaped.extend((char, value[index + 1]))
+            index += 2
+            continue
+        if char in ANIMA_LITERAL_SYNTAX_CHARS:
+            escaped.append("\\")
+        escaped.append(char)
+        index += 1
+    return "".join(escaped)
 
 
 def normalize_artist_tags_text(text: str) -> str:

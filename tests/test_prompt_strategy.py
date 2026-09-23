@@ -5,11 +5,14 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_pipeline import (  # noqa: E402
+    _parse_structured_prompt,
     _replacement_writer_dimensions,
     CharacterEffectiveOutfit,
     PromptPipeline,
@@ -18,6 +21,7 @@ from prompt_pipeline import (  # noqa: E402
     filter_character_appearance_prose,
     filter_shared_appearance_tags,
     explicit_identity_override_requested,
+    enforce_structured_sexual_trait_authority,
     extract_structured_prompt,
     filter_unbound_directional_tags,
     minimal_verified_outfit_nltags,
@@ -57,7 +61,7 @@ from prompt_pipeline import (  # noqa: E402
 )
 from outfit_transfer import EffectiveOutfitPlan, UserOutfitPatch  # noqa: E402
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
-from prompt_templates import build_llm_prompt  # noqa: E402
+from prompt_templates import build_llm_prompt, has_positive_futa_request  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
     SemanticAnchor,
@@ -340,6 +344,7 @@ def test_prompt_builder_controls_thinking_and_output_budget() -> None:
             llm_prompt="test",
             use_deep_thinking=True,
             fixed_character=False,
+            allow_futa=True,
         )
     )
 
@@ -349,6 +354,8 @@ def test_prompt_builder_controls_thinking_and_output_budget() -> None:
     assert context.calls[1]["max_tokens"] == 640
     assert context.calls[1]["thinking"] == {"type": "enabled"}
     assert context.calls[1]["reasoning_effort"] == "high"
+    assert "futanari" not in context.calls[0]["system_prompt"]
+    assert "1girl, futanari" in context.calls[1]["system_prompt"]
 
 
 class _Logger:
@@ -531,7 +538,7 @@ def test_prompt_pipeline_uses_default_creative_generation():
     assert len(context.calls) == 2
     assert "只输出七个单行花括号字段" in context.calls[0]["prompt"]
     assert "wardrobe.kind" not in context.calls[0]["prompt"]
-    assert "Count must contain the exact Danbooru people-count tag" in context.calls[0]["system_prompt"]
+    assert "Count must contain an exact Danbooru people-count tag" in context.calls[0]["system_prompt"]
     assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
 
 
@@ -895,7 +902,7 @@ def test_configured_character_anchors_enter_first_round_semantic_lookup() -> Non
         "prompt"
     ]
     assert "revenant_(elden_ring_nightreign)" not in result.final_prompt
-    assert "revenant (elden ring)" in result.final_prompt
+    assert r"revenant \(elden ring\)" in result.final_prompt
     assert resolver.second_round_resolution_calls == 0
     assert result.summary["character_resolution_statuses"][0]["status"] == (
         "semantic_confirmed"
@@ -1040,7 +1047,7 @@ def test_unresolved_localized_character_is_refined_and_exactly_rechecked() -> No
         "prompt"
     ]
     assert "tracker" not in result.final_prompt
-    assert "wylder (elden ring)" in result.final_prompt
+    assert r"wylder \(elden ring\)" in result.final_prompt
     assert result.summary["danbooru_semantic_confirmed_tags"] == [
         "wylder_(elden_ring)",
         "elden_ring",
@@ -2109,6 +2116,54 @@ def test_stage_profile_prefers_matching_cached_variant_over_default_character_ro
     assert "explicit stage wardrobe" in character_wardrobe_authority_context(
         completed
     )
+
+
+@pytest.mark.parametrize(
+    "source_description",
+    ("千早爱音的演出服", "千早爱音演出服"),
+)
+def test_cross_character_stage_source_selects_stage_not_default(
+    source_description: str,
+) -> None:
+    anchors = (
+        SemanticAnchor(
+            "sakiko", "target_character", "character", "丰川祥子", "Sakiko",
+            ("togawa_sakiko",),
+        ),
+        SemanticAnchor(
+            "anon_source", "outfit_source", "character", "千早爱音",
+            source_description, ("chihaya_anon",),
+        ),
+    )
+    semantic = SemanticLookupResult(
+        source_outfit_profiles=(
+            (
+                "千早爱音", "chihaya_anon",
+                ("haneoka_school_uniform", "green_skirt"), "default",
+            ),
+            (
+                source_description, "chihaya_anon",
+                ("blue_jacket", "cropped_jacket", "white_skirt"), "stage",
+            ),
+        ),
+    )
+    plans = (
+        SemanticCharacterPlan(
+            "sakiko", SemanticWardrobe("outfit_source", "anon_source")
+        ),
+    )
+
+    effective = build_character_effective_outfits(
+        anchors,
+        plans,
+        semantic,
+        user_prompt=f"丰川祥子穿着{source_description}",
+    )
+
+    assert effective[0].effective.effective_tags == (
+        "blue_jacket", "cropped_jacket", "white_skirt"
+    )
+    assert "haneoka_school_uniform" not in effective[0].effective.effective_tags
 
 
 def test_unspecified_wardrobe_policy_uses_only_strong_scene_cues() -> None:
@@ -4789,7 +4844,7 @@ def test_named_character_uses_evidence_candidate_and_stable_anchors():
         "blue eyes",
         "long hair",
     ]
-    assert "correct name (example work)" in result.final_prompt
+    assert r"correct name \(example work\)" in result.final_prompt
     assert "blue hair" in result.final_prompt
     assert "blue eyes" in result.final_prompt
     assert "black hair" not in result.final_prompt
@@ -5122,6 +5177,74 @@ def test_structured_count_validation_adds_mixed_gender_counts() -> None:
     assert not structured_count_tags_match_roster(("2girls", "2people"), 2)
 
 
+def test_unrequested_futa_and_male_genitals_are_removed_from_structured_output() -> None:
+    parsed = _parse_structured_prompt(
+        "{Count: 1girl, futanari}\n"
+        "{Characters: chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: chihaya_anon is a futanari girl with pink hair}\n"
+        "{Details: chihaya_anon lies on a bed, masturbating, strokes her erect penis}\n"
+        "{Tags: solo, masturbation, pussy, penis, erection, hand_on_penis}\n"
+        "{Nltags: chihaya_anon fingers her pussy, then strokes her erect penis.}"
+    )
+
+    filtered, removed = enforce_structured_sexual_trait_authority(
+        parsed,
+        "千早爱音躺在床上抠着小穴自慰。千早爱音不是扶她",
+    )
+
+    assert filtered.roster_tags == ("1girl",)
+    combined = " ".join(
+        (
+            filtered.characters[0].identity_tags,
+            filtered.characters[0].detail_tags,
+            filtered.scene,
+            filtered.nltags,
+        )
+    ).lower()
+    assert "futanari" not in combined
+    assert "penis" not in combined
+    assert "erection" not in combined
+    assert "masturbat" in combined
+    assert "pussy" in combined
+    assert removed
+
+
+def test_explicit_futa_request_preserves_structured_futa_traits() -> None:
+    parsed = _parse_structured_prompt(
+        "{Count: 1girl, futanari}\n"
+        "{Characters: chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: chihaya_anon is a futanari girl with pink hair}\n"
+        "{Details: chihaya_anon has an erect penis and masturbates}\n"
+        "{Tags: solo, futanari, penis, erection}\n"
+        "{Nltags: chihaya_anon strokes her erect penis.}"
+    )
+
+    filtered, removed = enforce_structured_sexual_trait_authority(
+        parsed, "千早爱音长出了扶她肉棒并自慰"
+    )
+
+    assert filtered == parsed
+    assert removed == ()
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    (
+        ("千早爱音是扶她", True),
+        ("千早爱音不是扶她", False),
+        ("tag不要出现扶她", False),
+        ("futanari chihaya anon", True),
+        ("not futanari", False),
+    ),
+)
+def test_positive_futa_request_requires_non_negated_user_evidence(
+    text: str, expected: bool
+) -> None:
+    assert has_positive_futa_request(text) is expected
+
+
 def test_llm_prompt_uses_configured_seven_field_template_without_english_suffix() -> None:
     prompt = build_llm_prompt(
         "一张白色的大床，穿红黑礼服的丰川祥子抱着穿黑色风衣的千早爱音",
@@ -5129,11 +5252,26 @@ def test_llm_prompt_uses_configured_seven_field_template_without_english_suffix(
     )
 
     assert "只输出七个单行花括号字段" in prompt
-    assert "Count` 必须与 `Characters` 完全一致" in prompt
+    assert "Count` 统计画面中所有可见人物" in prompt
+    assert "Characters` 只列能确认 canonical 名称的角色" in prompt
     assert "禁止反复核算或自我怀疑" in prompt
     assert "{Copyright:" in prompt
     assert "Return exactly seven single-line brace blocks" not in prompt
     assert "List the actor/holder/supporter before the recipient" not in prompt
+    assert "futanari" not in prompt
+    assert "futa with female" not in prompt
+
+
+def test_llm_prompt_adds_futa_count_policy_only_for_positive_request() -> None:
+    positive = build_llm_prompt("千早爱音是扶她", original_theme="千早爱音是扶她")
+    negated = build_llm_prompt(
+        "千早爱音不是扶她", original_theme="千早爱音不是扶她"
+    )
+
+    assert "1girl, futanari" in positive
+    assert "futa with female" in positive
+    assert "1girl, futanari" not in negated
+    assert "futa with female" not in negated
 
 
 def test_structured_prompt_preserves_actor_first_bidirectional_details() -> None:
@@ -5208,16 +5346,38 @@ def test_characterless_structured_prompt_accepts_no_humans_count() -> None:
     assert nltags == "exactly two feet are visible with their soles facing upward."
 
 
-def test_characterless_pipeline_keeps_tags_without_chinese_fallback() -> None:
+def test_anonymous_people_structured_prompt_accepts_count_without_characters() -> None:
+    roster_tags, copyright_tags, characters, scene, nltags = extract_structured_prompt(
+        "{Count: 2girls}\n"
+        "{Characters:}\n"
+        "{Copyright:}\n"
+        "{Identity:}\n"
+        "{Details:}\n"
+        "{Tags: close-up, two pairs of feet, black pantyhose feet, "
+        "white pantyhose feet, blurred background}\n"
+        "{Nltags: The image focuses solely on two pairs of feet while their "
+        "anonymous owners are blurred in the background.}"
+    )
+
+    assert roster_tags == ("2girls",)
+    assert copyright_tags == ()
+    assert characters == ()
+    assert "two pairs of feet" in scene
+    assert "anonymous owners" in nltags
+
+
+def test_anonymous_people_pipeline_keeps_tags_without_format_retry() -> None:
     class _Response:
         completion_text = (
-            "{Count: no_humans}\n"
+            "{Count: 2girls}\n"
             "{Characters:}\n"
             "{Copyright:}\n"
             "{Identity:}\n"
             "{Details:}\n"
-            "{Tags: black_pantyhose, soles, feet}\n"
-            "{Nltags: exactly two feet are visible with their soles facing upward.}\n"
+            "{Tags: close-up, two pairs of feet, black pantyhose feet, "
+            "white pantyhose feet, blurred background}\n"
+            "{Nltags: The image focuses solely on two pairs of feet while their "
+            "owners are blurred in the background.}\n"
             "background_mode_explicit_scene"
         )
 
@@ -5244,7 +5404,7 @@ def test_characterless_pipeline_keeps_tags_without_chinese_fallback() -> None:
 
         async def resolve_detailed(self, **_kwargs):
             raise AssertionError(
-                "valid no-humans structure must bypass character resolution"
+                "valid anonymous-people structure must bypass character resolution"
             )
 
     pipeline = PromptPipeline(
@@ -5261,19 +5421,26 @@ def test_characterless_pipeline_keeps_tags_without_chinese_fallback() -> None:
     )
 
     event = type("_Event", (), {"unified_msg_origin": "session"})()
-    result = asyncio.run(pipeline.build(event, "无角色, 只有两只踮起的黑丝足底"))
+    result = asyncio.run(
+        pipeline.build(
+            event,
+            "2girls。一对收拢的黑丝脚和一对收拢的白丝脚，主人在背景中模糊可见",
+        )
+    )
 
-    assert "no humans" in result.final_prompt
-    assert "black pantyhose" in result.final_prompt
-    assert "soles" in result.final_prompt
-    assert "Nltags: exactly two feet" in result.final_prompt
-    assert "无角色" not in result.final_prompt
+    assert "2girls" in result.final_prompt
+    assert "black pantyhose feet" in result.final_prompt
+    assert "white pantyhose feet" in result.final_prompt
+    assert "Nltags: The image focuses solely on two pairs of feet" in result.final_prompt
+    assert "收拢" not in result.final_prompt
     assert "full body" not in result.final_prompt
     assert "centered" not in result.final_prompt
     assert "simple background" not in result.final_prompt
     assert "white background" not in result.final_prompt
     assert result.summary["structured_prompt_mode"] is True
     assert result.summary["structured_character_mode"] is False
+    assert result.summary["prompt_llm_attempt_count"] == 1
+    assert result.summary["structured_initial_validation_errors"] == []
     assert result.summary["background_mode"] == "explicit_scene"
     assert result.summary["background_mode_source"] == "llm_marker"
 

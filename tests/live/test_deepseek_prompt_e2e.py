@@ -221,6 +221,49 @@ def _assert_successful_english_prompt(result) -> str:
     return result.final_prompt.lower()
 
 
+@pytest.mark.parametrize("order", ("alias_first", "alias_last"))
+def test_live_cached_alias_keeps_qualified_character_identity(live_pipeline, tmp_path, order):
+    names = (
+        ("粥祥", "丰川祥子", "千早爱音") if order == "alias_first"
+        else ("千早爱音", "丰川祥子", "粥祥")
+    )
+    prompt = (
+        f"3girls，{names[0]}站在左边，{names[1]}坐在中间，{names[2]}站在右边。"
+        "三人在室内客厅合影。丰川祥子穿着oblivionis的衣服，粥祥穿默认服装，"
+        "千早爱音穿白色连衣裙。粥祥头上有一对角，丰川祥子头上没有角。"
+    )
+    result, calls = _build(live_pipeline, prompt)
+    report = {
+        "prompt": prompt, "provider_id": live_pipeline[1].provider_id,
+        "calls": calls, "summary": result.summary, "final_prompt": result.final_prompt,
+    }
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"cached_alias_{order}.json"
+    report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Live identity evidence: {report_path}")
+
+    final = _assert_successful_english_prompt(result)
+    canonical = "togawa_sakiko_(master_of_melodia)"
+    expected = {"chihaya_anon", "togawa_sakiko", canonical}
+    bindings = {row["source"]: row["canonical_tag"]
+                for row in result.summary["confirmed_character_bindings"]}
+    assert bindings["粥祥"] == canonical
+    statuses = result.summary["character_resolution_statuses"]
+    assert len(statuses) == 3, statuses
+    assert {row["canonical_tag"] for row in statuses} == expected
+    assert all(row["status"] == "semantic_confirmed" for row in statuses)
+    assert not re.search(r"zhou[ _-]*xiang|togawa[ _]saiko", final)
+    # The identity must occupy the primary roster, not just a shared hard tag.
+    assert r"togawa sakiko \(master of melodia\)" in final.splitlines()[1]
+    assert any(f"粥祥 => {canonical}" in call["prompt"] for call in calls)
+    assert any("characters" in call["response"] for call in calls)
+    assert any("{Characters:" in call["response"] for call in calls)
+    outfits = {row["target"]: row for row in result.summary["semantic_character_outfits"]}
+    assert outfits["粥祥"]["effective_tags"]
+    assert outfits["丰川祥子"]["wardrobe_kind"] == "outfit_source"
+
+
 def test_live_shared_named_uniform_is_complete_and_nltags_stays_english(
     live_pipeline,
 ) -> None:

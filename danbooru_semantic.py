@@ -110,6 +110,9 @@ class SemanticAnchor:
     source_text: str
     description: str
     candidates: tuple[str, ...]
+    profile_key: str = ""
+    literal_name: str = ""
+    source_category: int | None = None
 
 
 @dataclass(frozen=True)
@@ -149,6 +152,7 @@ class SemanticCharacterPlan:
     target_anchor_id: str
     wardrobe: SemanticWardrobe
     directives: tuple[SemanticOutfitDirective, ...] = ()
+    clothing_anchor_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -836,6 +840,7 @@ def _simple_semantic_to_legacy(
             source_text = str(
                 wardrobe.get("source", wardrobe.get("source_text", "")) or ""
             ).strip()
+            clothing_text = str(item.get("clothing") or "").strip()
             key = (role, normalized_source(source_text))
             if not source_text or key in lookup_ids:
                 continue
@@ -845,7 +850,15 @@ def _simple_semantic_to_legacy(
                 "role": role,
                 "group": role_groups[role],
                 "source_text": source_text,
-                "description": source_text,
+                # Keep source identity and outfit qualifier as separate facts.
+                # For "A wears B's stage outfit", source_text must remain B so
+                # the character alias is grounded, while the full clothing phrase
+                # carries "stage" into variant selection.
+                "description": (
+                    clothing_text
+                    if kind == "outfit_source" and clothing_text
+                    else source_text
+                ),
                 "candidates": [],
             })
             lookup_ids[key] = [anchor_id]
@@ -887,6 +900,11 @@ def _simple_semantic_to_legacy(
             {
                 "target_anchor_id": target_id,
                 "wardrobe": legacy_wardrobe,
+                "clothing_anchor_id": next(iter(lookup_ids.get((
+                    "outfit_source" if kind == "outfit_source" else
+                    "outfit" if kind == "named_outfit" else "clothing",
+                    normalized_source(source),
+                ), [])), ""),
                 "directives": changes if isinstance(changes, list) else [],
             }
         )
@@ -1026,6 +1044,8 @@ def parse_semantic_character_plans(
             target_anchor_id=target_id,
             wardrobe=SemanticWardrobe(kind=kind, anchor_id=wardrobe_anchor_id),
             directives=tuple(dict.fromkeys(directives)),
+            clothing_anchor_id=(str(item.get("clothing_anchor_id") or "")
+                                if str(item.get("clothing_anchor_id") or "") in by_id else ""),
         ))
         referenced_targets.append(target_id)
     ambiguous = {target for target in referenced_targets if referenced_targets.count(target) > 1}
@@ -1458,14 +1478,14 @@ def extract_parenthesized_character_aliases(
         if not _explicit_character_alias_pair(user_prompt, character_name, alias):
             continue
         lookup_text = alias
-        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'-]{1,119}", lookup_text):
-            if re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'-]{1,119}", character_name):
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'():!\-]{1,119}", lookup_text):
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'():!\-]{1,119}", character_name):
                 lookup_text = character_name
             else:
                 continue
         candidate = re.sub(r"\s+", "_", lookup_text.lower()).strip("_")
         if (
-            not re.fullmatch(r"[a-z0-9_.'()-]{2,120}", candidate)
+            not re.fullmatch(r"[a-z0-9_.'():!\-]{2,120}", candidate)
             or candidate in seen_candidates
         ):
             continue
@@ -1481,6 +1501,46 @@ def extract_parenthesized_character_aliases(
             )
         )
     return tuple(anchors)
+
+
+def bind_parenthesized_character_aliases(
+    anchors: tuple[SemanticAnchor, ...],
+    user_prompt: str,
+    pairs: tuple[tuple[str, str], ...],
+) -> tuple[SemanticAnchor, ...]:
+    """Attach verified alias syntax to its owner's existing wardrobe-plan ID."""
+    result = list(anchors)
+    for name, alias in pairs:
+        aliases = extract_parenthesized_character_aliases(user_prompt, ((name, alias),))
+        if not aliases:
+            continue
+        evidence = aliases[0]
+        owners = [i for i, anchor in enumerate(result)
+                  if anchor.role == "target_character"
+                  and anchor.source_text.casefold() == name.casefold()]
+        if len(owners) == 1:
+            index = owners[0]
+            # Two Latin sides may be a canonical qualified name, not a
+            # translation pair. Keep the literal whole name for exact lookup;
+            # never silently reduce ``name (costume)`` to the base character.
+            if re.fullmatch(r"[A-Za-z][A-Za-z0-9 _.'!:()\-]{1,119}", name) and re.fullmatch(
+                r"[A-Za-z][A-Za-z0-9 _.'!:()\-]{1,119}", alias
+            ):
+                whole = re.search(
+                    rf"{_literal_phrase_pattern(name)}\s*[（(]\s*{_literal_phrase_pattern(alias)}\s*[）)]",
+                    user_prompt, re.I,
+                )
+                if whole:
+                    literal = whole.group().replace("（", "(").replace("）", ")")
+                    candidate = re.sub(r"\s+", "_", literal.lower())
+                    candidate = re.sub(r"_*\(", "_(", candidate)
+                    result[index] = replace(result[index], source_text=literal, literal_name=literal, candidates=(candidate,))
+                    continue
+            result[index] = replace(result[index], candidates=evidence.candidates,
+                                    literal_name=evidence.source_text if "_(" in evidence.candidates[0] else "")
+        elif not owners:
+            result.append(replace(evidence, anchor_id=f"parenthesized_character_alias_{len(result) + 1}"))
+    return tuple(result)
 
 
 def extract_parenthesized_copyright_aliases(user_prompt: str) -> tuple[SemanticAnchor, ...]:

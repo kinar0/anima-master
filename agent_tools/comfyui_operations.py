@@ -108,7 +108,12 @@ def edit_payload(
     prompt: str,
 ) -> dict[str, Any]:
     image = resolve_image(args.input)
-    width, height = _image_size(image, int(config.get("max_image_side", 1024)))
+    scale_factor = float(config.get("upscale_factor", 2.0))
+    width, height = _image_size(
+        image,
+        int(config.get("max_image_side", 1024)),
+        scale_factor,
+    )
     image_name = ComfyUIHttpClient(config).upload_image(image)
     steps = int(args.steps or config.get("steps", 20))
     cfg = float(args.cfg or config.get("cfg", 4.0))
@@ -139,6 +144,7 @@ def edit_payload(
         "steps": steps,
         "cfg": cfg,
         "denoise": denoise,
+        "scale": scale_factor,
         "outputs": [str(path) for path in outputs],
         "raw_image_count": raw_image_count,
         "error": None if outputs else "no image found in history",
@@ -221,13 +227,19 @@ def _save_history_images(
     return ComfyUIHistoryRunner(config, image_outputs).save_history_images(history)
 
 
-def _image_size(path: Path, max_side: int) -> tuple[int, int]:
+def _image_size(
+    path: Path,
+    max_side: int,
+    scale_factor: float = 1.0,
+) -> tuple[int, int]:
+    """Return the edit canvas after input limiting and configured scaling."""
+    if scale_factor <= 0:
+        raise ValueError("upscale_factor must be greater than zero")
     image = ImageOps.exif_transpose(Image.open(path))
     width, height = image.size
+    resize_factor = scale_factor
     if max(width, height) > max_side > 0:
-        scale = max_side / max(width, height)
-        width = max(8, int(width * scale))
-        height = max(8, int(height * scale))
-    width = max(64, (width // 8) * 8)
-    height = max(64, (height // 8) * 8)
+        resize_factor *= max_side / max(width, height)
+    width = max(64, (int(width * resize_factor) // 8) * 8)
+    height = max(64, (int(height * resize_factor) // 8) * 8)
     return width, height

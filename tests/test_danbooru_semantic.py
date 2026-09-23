@@ -6,6 +6,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
@@ -374,6 +376,38 @@ def test_readable_intent_schema_maps_cosplay_source_without_tag_guess() -> None:
     ]
     assert plans[0].wardrobe == SemanticWardrobe("outfit_source", anchors[0].anchor_id)
     assert plans[1].wardrobe == SemanticWardrobe("none")
+
+
+@pytest.mark.parametrize(
+    "clothing",
+    ("千早爱音的演出服", "千早爱音演出服"),
+)
+def test_outfit_source_anchor_preserves_clothing_qualifier_in_description(
+    clothing: str,
+) -> None:
+    prompt = f"丰川祥子穿着{clothing}"
+    raw = json.dumps(
+        {
+            "characters": [{
+                "name": "丰川祥子",
+                "aliases": [],
+                "clothing": clothing,
+                "clothing_source": "千早爱音",
+                "clothing_changes": [],
+                "appearance_changes": [],
+            }]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, prompt)
+    source = next(anchor for anchor in anchors if anchor.role == "outfit_source")
+
+    assert source.source_text == "千早爱音"
+    assert source.description == clothing
+    assert parse_semantic_character_plans(raw, prompt, anchors)[0].wardrobe == (
+        SemanticWardrobe("outfit_source", source.anchor_id)
+    )
 
 
 def test_readable_intent_only_changes_uses_default_as_modification_base() -> None:
@@ -2411,6 +2445,45 @@ def test_character_stage_profile_uses_owner_and_qualifier_without_composite_alia
     assert post_performance.outfit_profile_tags == ("haneoka_school_uniform",)
 
 
+def test_character_identity_anchor_is_grounded_across_outfit_variants() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(),
+        cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+    )
+    resolver.remember_outfit_summary(
+        "千早爱音", ("chihaya_anon",), ("haneoka_school_uniform",)
+    )
+    resolver.remember_outfit_summary(
+        "千早爱音演出服",
+        ("chihaya_anon",),
+        ("blue_jacket", "white_skirt"),
+        qualifier="stage",
+    )
+    anchors = (
+        SemanticAnchor(
+            "target", "target_character", "character", "千早爱音",
+            "千早爱音 stage outfit variant", (),
+        ),
+        SemanticAnchor(
+            "source", "outfit_source", "character", "千早爱音",
+            "千早爱音的演出服", (),
+        ),
+    )
+
+    preferred = resolver.prefer_cached_character_anchors(anchors)
+
+    assert preferred[0].candidates == ("chihaya_anon",)
+    assert preferred[1].candidates == ("chihaya_anon",)
+
+
 def test_mixed_character_variants_are_selected_from_each_local_clause() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
@@ -3389,3 +3462,44 @@ def test_modified_cached_outfit_uses_effective_tags_without_hard_source_anchor()
     assert "context only; do not emit as a hard tag" in context
     assert "pink_shirt, black_skirt" in context
     assert "never restore: red_shirt" in context
+
+
+def test_parenthesized_character_alias_preserves_canonical_punctuation():
+    cases = (
+        ("S:P小夜丸", "S:P little knight", "s:p_little_knight"),
+        ("I:P莱娜", "I:P masquerena", "i:p_masquerena"),
+        ("角色甲", "character_(series!)", "character_(series!)"),
+    )
+    for name, alias, expected in cases:
+        for prompt in (f"{name}（{alias}）站立", f"{alias}（{name}）站立"):
+            raw = json.dumps({"characters": [{"name": name, "aliases": [alias]}]})
+            pairs = parse_semantic_character_aliases(raw, prompt)
+            anchors = extract_parenthesized_character_aliases(prompt, pairs)
+            assert len(anchors) == 1
+            assert anchors[0].candidates == (expected,)
+
+
+def test_punctuation_alias_still_requires_the_same_character_pair():
+    prompt = "角色甲在旁边，S:P小夜丸（S:P little knight）站立"
+    assert extract_parenthesized_character_aliases(
+        prompt, (("角色甲", "S:P little knight"),)
+    ) == ()
+
+
+def test_colon_alias_reaches_local_lookup_without_cached_profile(monkeypatch):
+    prompt = "S:P小夜丸（S:P little knight）站立"
+    raw = json.dumps({"characters": [{"name": "S:P小夜丸", "aliases": ["S:P little knight"], "clothing": None, "clothing_source": None, "clothing_changes": [], "appearance_changes": []}]})
+    anchors = semantic_module.bind_parenthesized_character_aliases(
+        parse_semantic_plan(raw, prompt), prompt, parse_semantic_character_aliases(raw, prompt),
+    )
+    assert len(anchors) == 1
+    assert anchors[0].anchor_id == "target_1"
+    queried = []
+    def fake_batch(queries, **kwargs):
+        queried.extend(queries)
+        return {"results": {q["id"]: {"confirmed_tags": {"characters": [{"tag": "s:p_little_knight"}]}} for q in queries if q["keyword"].lower().replace(" ", "_") == "s:p_little_knight"}}
+    monkeypatch.setattr(semantic_module, "_run_cli_batch", fake_batch)
+    result = lookup_semantic_anchors(anchors, cli_path=Path("fake.exe"))
+    assert any(q["keyword"] == "s:p_little_knight" for q in queried)
+    assert "s:p_little_knight" in result.confirmed_tags
+    assert result.missing_descriptions == ()

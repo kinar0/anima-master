@@ -19,7 +19,7 @@ try:
         SemanticLookupResult,
         build_semantic_plan_prompt,
         build_semantic_plan_repair_prompt,
-        extract_parenthesized_character_aliases,
+        bind_parenthesized_character_aliases,
         extract_parenthesized_copyright_aliases,
         merge_semantic_results,
         prefer_configured_character_anchors,
@@ -82,7 +82,7 @@ try:
         match_keyword_prompt_rules,
     )
     from .prompt_research import PromptResearcher
-    from .prompt_templates import build_llm_prompt
+    from .prompt_templates import build_llm_prompt, has_positive_futa_request
     from .tag_cleaner import clean_content_tags, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
@@ -97,7 +97,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         SemanticLookupResult,
         build_semantic_plan_prompt,
         build_semantic_plan_repair_prompt,
-        extract_parenthesized_character_aliases,
+        bind_parenthesized_character_aliases,
         extract_parenthesized_copyright_aliases,
         merge_semantic_results,
         prefer_configured_character_anchors,
@@ -160,7 +160,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         match_keyword_prompt_rules,
     )
     from prompt_research import PromptResearcher
-    from prompt_templates import build_llm_prompt
+    from prompt_templates import build_llm_prompt, has_positive_futa_request
     from tag_cleaner import clean_content_tags, split_tags
 
 
@@ -299,6 +299,32 @@ def confirmed_semantic_character_tags(
     )
 
 
+def bind_confirmed_character_anchors(
+    result: SemanticLookupResult, anchors: tuple[SemanticAnchor, ...]
+) -> SemanticLookupResult:
+    """Bind exact locally confirmed owner candidates even when lookup missed them."""
+    tags = dict(result.anchor_tags)
+    confirmed = set(result.confirmed_tags)
+    for anchor in anchors:
+        if anchor.role != "target_character" or anchor.anchor_id in tags:
+            continue
+        matches = set(anchor.candidates).intersection(confirmed)
+        if len(matches) == 1:
+            tags[anchor.anchor_id] = matches.pop()
+    resolved_sources = {
+        anchor.source_text for anchor in anchors
+        if anchor.role == "target_character" and anchor.anchor_id in tags
+    }
+    return replace(
+        result,
+        anchors=anchors,
+        anchor_tags=tuple(tags.items()),
+        missing_descriptions=tuple(
+            item for item in result.missing_descriptions if item not in resolved_sources
+        ),
+    )
+
+
 def reconcile_confirmed_semantic_characters(
     characters: tuple[StructuredPromptCharacter, ...],
     nltags: str,
@@ -309,10 +335,10 @@ def reconcile_confirmed_semantic_characters(
     The prompt-writer already receives the locally confirmed character tags, but
     can still decorate a name (for example, ``young_example_character``).  Keep
     the writer's character-to-Identity/Details association and only replace a
-    name when exactly one confirmed tag is an exact or whole-token subsequence
-    match.  Unknown, ambiguous, and duplicate writer names deliberately survive
-    for the normal structured validation path instead of being deleted or
-    positionally reassigned.
+    name when exactly one confirmed tag matches. Reserve exact matches before
+    decorated names. A complete roster with one unmatched name and one missing
+    identity has a unique remaining association; never assign multiple unknowns
+    by position.
     """
     if not characters or not confirmed_tags:
         return characters, nltags
@@ -348,24 +374,37 @@ def reconcile_confirmed_semantic_characters(
         )
 
     def replace_name(text: str) -> str:
-        result = str(text or "")
-        for writer_name, canonical in replacements:
-            variants = tuple(
-                dict.fromkeys((writer_name, writer_name.replace("_", " ")))
-            )
-            for variant in variants:
-                result = re.sub(
-                    rf"(?<!\w){re.escape(variant)}(?!\w)",
-                    canonical,
-                    result,
-                    flags=re.I,
-                )
-        return result
+        # One pass prevents a base name from rewriting an already replaced
+        # qualified name (or a replacement from being substituted again).
+        variants = {
+            variant.lower(): canonical
+            for writer_name, canonical in replacements
+            for variant in (writer_name, writer_name.replace("_", " "))
+        }
+        pattern = "|".join(
+            re.escape(value) for value in sorted(variants, key=len, reverse=True)
+        )
+        return re.sub(
+            rf"(?<!\w)(?:{pattern})(?!\w)",
+            lambda match: variants[match.group(0).lower()],
+            str(text or ""), flags=re.I,
+        )
 
     available = tuple(dict.fromkeys(tag for tag in confirmed_tags if tag))
     replacements: list[tuple[str, str]] = []
-    reconciled: list[StructuredPromptCharacter] = []
-    for character in characters:
+    assignments: dict[int, str] = {}
+    # Reserve exact identities globally, independent of writer ordering.
+    for index, character in enumerate(characters):
+        matches = tuple(
+            tag for tag in available
+            if _normalized_character_key(tag) == _normalized_character_key(character.name)
+        )
+        if len(matches) == 1:
+            assignments[index] = matches[0]
+            available = tuple(tag for tag in available if tag != matches[0])
+    for index, character in enumerate(characters):
+        if index in assignments:
+            continue
         # Preserve the established single-character contract: once LLM1 has
         # confirmed the only visible character, its canonical tag wins even if
         # the writer invented a wholly unrelated name.  Multiple characters
@@ -377,18 +416,26 @@ def reconcile_confirmed_semantic_characters(
             else matching_canonicals(character.name, available)
         )
         if len(matches) != 1:
-            reconciled.append(character)
             continue
         canonical = matches[0]
         available = tuple(tag for tag in available if tag != canonical)
-        replacements.append((character.name, canonical))
-        reconciled.append(
-            StructuredPromptCharacter(
-                name=canonical,
-                identity_tags=character.identity_tags,
-                detail_tags=character.detail_tags,
-            )
-        )
+        assignments[index] = canonical
+
+    unmatched = [index for index in range(len(characters)) if index not in assignments]
+    if (
+        len(characters) == len(set(confirmed_tags))
+        and len(unmatched) == len(available) == 1
+        and len({_normalized_character_key(item.name) for item in characters}) == len(characters)
+    ):
+        assignments[unmatched[0]] = available[0]
+    replacements = [
+        (character.name, assignments[index])
+        for index, character in enumerate(characters) if index in assignments
+    ]
+    reconciled = tuple(
+        replace(character, name=assignments.get(index, character.name))
+        for index, character in enumerate(characters)
+    )
 
     if not replacements:
         return characters, nltags
@@ -402,6 +449,24 @@ def reconcile_confirmed_semantic_characters(
             for character in reconciled
         ),
         replace_name(nltags),
+    )
+
+
+def validate_confirmed_character_roster(
+    parsed: StructuredPromptParseResult, confirmed_tags: tuple[str, ...]
+) -> StructuredPromptParseResult:
+    """Repair unique identities, then reject missing confirmed visible owners."""
+    characters, nltags = reconcile_confirmed_semantic_characters(
+        parsed.characters, parsed.nltags, confirmed_tags
+    )
+    missing = set(confirmed_tags).difference(item.name for item in characters)
+    errors = list(parsed.validation_errors)
+    if missing:
+        errors.append(
+            "Characters is missing confirmed visible identities: " + ", ".join(sorted(missing))
+        )
+    return replace(
+        parsed, characters=characters, nltags=nltags, validation_errors=tuple(errors)
     )
 
 
@@ -669,6 +734,124 @@ def structured_count_tags_match_roster(
     )
 
 
+_MALE_GENITAL_REQUEST_RE = re.compile(
+    r"阴茎|肉棒|鸡巴|(?<![a-z])(?:penis|cock|dick|phallus|erection)(?![a-z])",
+    re.I,
+)
+_SEXUAL_TRAIT_NEGATION_BEFORE_RE = re.compile(
+    r"(?:不是(?:一个)?|并非|不要(?:出现|包含|带有)?|禁止(?:出现|包含)?|不许|不能|别|没有|无|"
+    r"not(?:\s+(?:a|an))?|no|without|never|exclude|remove)\s*$",
+    re.I,
+)
+_FUTA_OUTPUT_RE = re.compile(
+    r"(?<![a-z])(?:female|male)\s+with\s+futa(?:nari)?(?![a-z])|"
+    r"(?<![a-z])futa(?:nari)?\s+with\s+(?:female|male)(?![a-z])|"
+    r"(?<![a-z])(?:1\s*)?futa(?:nari)?(?![a-z])",
+    re.I,
+)
+_MALE_GENITAL_OUTPUT_RE = re.compile(
+    r"(?<![a-z])(?:penis|cock|dick|phallus|erection|erect|precum|scrotum|testicles?)"
+    r"(?![a-z])",
+    re.I,
+)
+
+
+def has_positive_male_genital_request(text: str) -> bool:
+    """Return whether the user positively requested visible male genital anatomy."""
+    value = str(text or "")
+    for match in _MALE_GENITAL_REQUEST_RE.finditer(value):
+        prefix = value[max(0, match.start() - 16) : match.start()]
+        if not _SEXUAL_TRAIT_NEGATION_BEFORE_RE.search(prefix):
+            return True
+    return has_positive_futa_request(value)
+
+
+def _strip_unrequested_sexual_trait_text(
+    text: str, *, allow_futa: bool, allow_male_genitals: bool
+) -> tuple[str, tuple[str, ...]]:
+    """Remove unsupported writer inventions while preserving surrounding content."""
+    removed: list[str] = []
+    kept: list[str] = []
+    for fragment in re.split(r"\s*[,;]\s*", str(text or "")):
+        fragment = fragment.strip()
+        if not fragment:
+            continue
+        searchable = fragment.replace("_", " ")
+        if not allow_male_genitals and _MALE_GENITAL_OUTPUT_RE.search(searchable):
+            removed.append(fragment)
+            continue
+        cleaned = fragment
+        if not allow_futa and _FUTA_OUTPUT_RE.search(searchable):
+            cleaned = _FUTA_OUTPUT_RE.sub("", searchable)
+            cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,;:-")
+            removed.append(fragment)
+        if cleaned:
+            kept.append(cleaned)
+    return ", ".join(kept), tuple(removed)
+
+
+def enforce_structured_sexual_trait_authority(
+    parsed: StructuredPromptParseResult, user_prompt: str
+) -> tuple[StructuredPromptParseResult, tuple[str, ...]]:
+    """Require positive user evidence for futa and male-genital LLM2 output."""
+    allow_futa = has_positive_futa_request(user_prompt)
+    allow_male_genitals = has_positive_male_genital_request(user_prompt)
+    if allow_futa and allow_male_genitals:
+        return parsed, ()
+
+    removed: list[str] = []
+    roster_tags: list[str] = []
+    for tag in parsed.roster_tags:
+        searchable = tag.lower().replace("_", " ")
+        if not allow_futa and (
+            searchable in _FUTA_COUNT_KEYS
+            or searchable in _FUTA_WITH_FEMALE_KEYS
+            or searchable in _FUTA_WITH_MALE_KEYS
+        ):
+            removed.append(tag)
+            continue
+        roster_tags.append(tag)
+    if not roster_tags and parsed.characters:
+        roster_tags.append(f"{len(parsed.characters)}people")
+
+    characters: list[StructuredPromptCharacter] = []
+    for character in parsed.characters:
+        identity, identity_removed = _strip_unrequested_sexual_trait_text(
+            character.identity_tags,
+            allow_futa=allow_futa,
+            allow_male_genitals=allow_male_genitals,
+        )
+        detail, detail_removed = _strip_unrequested_sexual_trait_text(
+            character.detail_tags,
+            allow_futa=allow_futa,
+            allow_male_genitals=allow_male_genitals,
+        )
+        removed.extend((*identity_removed, *detail_removed))
+        characters.append(replace(character, identity_tags=identity, detail_tags=detail))
+
+    scene, scene_removed = _strip_unrequested_sexual_trait_text(
+        parsed.scene,
+        allow_futa=allow_futa,
+        allow_male_genitals=allow_male_genitals,
+    )
+    nltags, nltags_removed = _strip_unrequested_sexual_trait_text(
+        parsed.nltags,
+        allow_futa=allow_futa,
+        allow_male_genitals=allow_male_genitals,
+    )
+    removed.extend((*scene_removed, *nltags_removed))
+    return (
+        replace(
+            parsed,
+            roster_tags=tuple(roster_tags),
+            characters=tuple(characters),
+            scene=scene,
+            nltags=nltags,
+        ),
+        tuple(dict.fromkeys(removed)),
+    )
+
+
 def _parse_structured_prompt(text: str) -> StructuredPromptParseResult:
     """Parse seven fields without treating natural-language scope as syntax."""
     raw = str(text or "").replace("\r\n", "\n").strip()
@@ -739,17 +922,10 @@ def _parse_structured_prompt(text: str) -> StructuredPromptParseResult:
         for item in blocks["copyright"].split(",")
         if item.strip()
     )
-    has_no_humans = any(
-        item.lower().replace("_", " ") == "no humans" for item in roster_tags
-    )
     if not has_count_tag:
         validation_errors.append(
             "Count must include a valid people-count tag such as 1girl, "
             "2girls, 1boy, Npeople, or no humans"
-        )
-    if not roster and not has_no_humans:
-        validation_errors.append(
-            "Characters is empty but Count is not no humans"
         )
     if validation_errors:
         return StructuredPromptParseResult(
@@ -2783,11 +2959,18 @@ def build_character_effective_outfits(
             r"\s+", " ", wardrobe_anchor.source_text.strip().lower()
         )
         candidates = {candidate.lower() for candidate in wardrobe_anchor.candidates}
+        requested_mode = requested_wardrobe_mode(
+            f"{wardrobe_anchor.source_text} {wardrobe_anchor.description}"
+        )
+        requested_qualifier = WARDROBE_PROFILE_QUALIFIERS.get(
+            requested_mode, ""
+        )
         matches = [
             (source_tag, tags)
-            for alias, source_tag, tags, _qualifier
+            for alias, source_tag, tags, qualifier
             in semantic_result.source_outfit_profiles
-            if (
+            if (not requested_qualifier or qualifier == requested_qualifier)
+            and (
                 (source_text and re.sub(r"\s+", " ", alias.strip().lower()) == source_text)
                 or (source_tag and source_tag.lower() in candidates)
             )
@@ -3464,6 +3647,7 @@ class PromptPipeline:
         use_deep_thinking: bool,
         fixed_character: bool,
         character_name: str = "",
+        allow_futa: bool = False,
     ) -> str:
         """Ask the configured provider for the seven-block Anima prompt payload.
 
@@ -3473,10 +3657,21 @@ class PromptPipeline:
             use_deep_thinking: Whether to request provider reasoning controls.
             fixed_character: Whether a configured fixed character is active.
             character_name: Fixed identity whose built-in appearance must be omitted.
+            allow_futa: Whether the user's own text positively requests futa traits.
 
         Returns:
             Provider completion text normalized across supported response shapes.
         """
+        sexual_trait_rule = (
+            " When the user explicitly requests a futa character, count that "
+            "character inside the girls total: a lone futa is `1girl, futanari`; "
+            "one futa plus one female is `2girls, futa with female`; one futa "
+            "plus one male is `futa with male`."
+            if allow_futa
+            else " Never invent sex characteristics or genital anatomy that the "
+            "user did not positively request; erotic acts and masturbation are "
+            "not evidence for them, and explicitly negated traits are forbidden."
+        )
         kwargs: dict[str, Any] = {
             "chat_provider_id": provider_id,
             "prompt": llm_prompt,
@@ -3488,15 +3683,11 @@ class PromptPipeline:
                 "严格按用户原始文字判断背景；未提背景时使用白底立绘。"
                 "按用户是否明确要求场景，在最后输出且只输出一个背景控制标记。"
                 "Follow the user prompt's seven-brace-block response format exactly. "
-                "Count must contain the exact Danbooru people-count tag. A futa "
-                "is counted inside the girls count: one female plus one futa is "
-                "`2girls, futa with female`, two females plus one futa is "
-                "`3girls, futa with female`, a lone futa is `1girl, futanari`, "
-                "and one futa plus one male is `futa with male`. Never write "
-                "a bare number, never write `futanari` instead of a people-count "
-                "tag, and never omit Count or merge it into Characters. Characters "
+                "Count must contain an exact Danbooru people-count tag; never write "
+                "a bare number, omit Count, or merge it into Characters. Characters "
                 "contains names only. Every character appears exactly once in both "
                 "Identity and Details; keep its clothing in its own Details clause."
+                + sexual_trait_rule
             ),
             "max_tokens": self._int("prompt_builder_max_tokens", 700),
             "thinking": {
@@ -3667,6 +3858,7 @@ class PromptPipeline:
             if (
                 anchor.role != "target_character"
                 or confirmed_tag_for(anchor)
+                or any("_(" in candidate for candidate in anchor.candidates)
                 or refinement_attempts >= 4
             ):
                 refined.append(anchor)
@@ -4812,6 +5004,7 @@ class PromptPipeline:
             if callable(configured_character_anchor_getter)
             else ()
         )
+        bound_wardrobe_result = None
         semantic_result = merge_semantic_results(
             cached_source_result,
             cached_profile_result,
@@ -4877,11 +5070,9 @@ class PromptPipeline:
                     configured_character_anchors,
                     (
                         *extract_parenthesized_copyright_aliases(prompt),
-                        *extract_parenthesized_character_aliases(
-                            prompt,
-                            planner_character_aliases,
+                        *bind_parenthesized_character_aliases(
+                            planner_anchors, prompt, planner_character_aliases,
                         ),
-                        *planner_anchors,
                     ),
                 )
                 semantic_anchors = add_explicit_cosplay_source_anchors(
@@ -4949,6 +5140,15 @@ class PromptPipeline:
                     cached_named_result,
                     prompt,
                 )
+                bind_wardrobes = getattr(self._danbooru_resolver, "bind_character_wardrobes", None)
+                if callable(bind_wardrobes):
+                    if semantic_lookup_ready:
+                        semantic_anchors = await self._danbooru_resolver.classify_literal_targets(semantic_anchors)
+                    semantic_anchors, semantic_character_plans = bind_wardrobes(
+                        semantic_anchors, semantic_character_plans
+                    )
+                    bound_wardrobe_result = self._danbooru_resolver.cached_bound_wardrobes(semantic_anchors)
+                    semantic_result = merge_semantic_results(semantic_result, bound_wardrobe_result)
                 if self._bool("debug_prompt_enabled", False):
                     self.logger.info(
                         "[comfyui_agent] semantic planner parsed anchors:\n%r",
@@ -5060,12 +5260,17 @@ class PromptPipeline:
                             )
                         )
 
-                    cached_complete_anchor_ids = {
+                    cached_complete_anchor_ids |= {
                         anchor.anchor_id
                         for anchor in semantic_anchors
                         if anchor.role in {"outfit", "clothing"}
                         and cached_named_anchor_is_complete(anchor)
                     }
+                if bound_wardrobe_result is not None:
+                    cached_complete_anchor_ids.update(
+                        anchor_id for anchor_id, _tag, _tags, _variant
+                        in bound_wardrobe_result.anchor_outfit_profiles
+                    )
                 if outfit_plan.enabled and outfit_plan.source_subject:
                     source_text = outfit_plan.source_subject.strip()
                     source_candidates: list[str] = []
@@ -5147,6 +5352,7 @@ class PromptPipeline:
                         cached_named_result,
                         cached_term_result,
                         resolved_semantic,
+                        bound_wardrobe_result,
                     )
             except Exception as exc:
                 self.logger.warning(
@@ -5172,6 +5378,14 @@ class PromptPipeline:
                 explicit_wardrobe_evidence = True
                 wardrobe_source = "explicit_but_unresolved"
                 semantic_fallback_used = True
+        semantic_result = bind_confirmed_character_anchors(semantic_result, semantic_anchors)
+        semantic_character_tags = confirmed_semantic_character_tags(semantic_result)
+        confirmed_anchor_tags = dict(semantic_result.anchor_tags)
+        summary["confirmed_character_bindings"] = [
+            {"source": anchor.source_text, "canonical_tag": confirmed_anchor_tags[anchor.anchor_id]}
+            for anchor in semantic_anchors
+            if anchor.role == "target_character" and anchor.anchor_id in confirmed_anchor_tags
+        ]
         semantic_required_tags: tuple[str, ...] = ()
         semantic_context = semantic_result.prompt_context()
         summary.update(
@@ -5487,6 +5701,11 @@ class PromptPipeline:
                     (
                         "confirmed visible character roster (authoritative):",
                         ", ".join(visible_roster),
+                        "Use these exact canonical names in Characters, Identity, Details and Nltags; do not translate aliases into pinyin or shorten qualified names.",
+                        *(
+                            f"- {item['source']} => {item['canonical_tag']}"
+                            for item in summary["confirmed_character_bindings"]
+                        ),
                     )
                 )
             appearance_plans = tuple(
@@ -5575,6 +5794,7 @@ class PromptPipeline:
             original_theme=background_intent_prompt,
             keyword_prompt_rules=keyword_rules,
         )
+        allow_futa = has_positive_futa_request(prompt)
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
                 "[comfyui_agent] prompt builder LLM prompt:\n%s", llm_prompt
@@ -5588,6 +5808,7 @@ class PromptPipeline:
                 use_deep_thinking=research_plan.use_deep_thinking,
                 fixed_character=False,
                 character_name="",
+                allow_futa=allow_futa,
             )
         except Exception as exc:
             if not research_plan.use_deep_thinking:
@@ -5608,6 +5829,7 @@ class PromptPipeline:
                         use_deep_thinking=False,
                         fixed_character=False,
                         character_name="",
+                        allow_futa=allow_futa,
                     )
                 except Exception as retry_exc:
                     self.logger.warning(
@@ -5636,6 +5858,7 @@ class PromptPipeline:
                     use_deep_thinking=False,
                     fixed_character=False,
                     character_name="",
+                    allow_futa=allow_futa,
                 )
             except Exception as retry_exc:
                 self.logger.warning(
@@ -5672,16 +5895,18 @@ class PromptPipeline:
         # Extract it before structured parsing, which intentionally retains
         # only the declared field values and would otherwise discard it.
         llm_content, llm_background_mode = extract_background_mode(llm_content)
-        structured_parse = _parse_structured_prompt(llm_content)
+        structured_parse = validate_confirmed_character_roster(
+            _parse_structured_prompt(llm_content), semantic_character_tags
+        )
         structured_roster_tags = structured_parse.roster_tags
         structured_copyright_tags = structured_parse.copyright_tags
         structured_characters = structured_parse.characters
         structured_scene = structured_parse.scene
         structured_nltags = structured_parse.nltags
-        structured_prompt_mode = bool(structured_characters) or any(
-            tag.lower().replace("_", " ") == "no humans"
-            for tag in structured_roster_tags
-        )
+        # Characters is a roster of named/canonical identities, not a second
+        # people-count field. Anonymous, cropped, or obscured people may have a
+        # valid Count while Characters, Identity, and Details remain empty.
+        structured_prompt_mode = not structured_parse.validation_errors
         summary.update(
             {
                 "prompt_llm_attempt_count": 1,
@@ -5739,6 +5964,7 @@ class PromptPipeline:
                     use_deep_thinking=False,
                     fixed_character=False,
                     character_name="",
+                    allow_futa=allow_futa,
                 )
                 summary["prompt_llm_attempt_count"] = 2
                 if self._bool("debug_prompt_enabled", False):
@@ -5752,20 +5978,20 @@ class PromptPipeline:
                 retry_content, retry_background_mode = extract_background_mode(
                     retry_content
                 )
-                retry_parse = _parse_structured_prompt(retry_content)
+                retry_parse = validate_confirmed_character_roster(
+                    _parse_structured_prompt(retry_content), semantic_character_tags
+                )
                 structured_roster_tags = retry_parse.roster_tags
                 structured_copyright_tags = retry_parse.copyright_tags
                 structured_characters = retry_parse.characters
                 structured_scene = retry_parse.scene
                 structured_nltags = retry_parse.nltags
-                retry_structured_prompt_mode = bool(structured_characters) or any(
-                    tag.lower().replace("_", " ") == "no humans"
-                    for tag in structured_roster_tags
-                )
+                retry_structured_prompt_mode = not retry_parse.validation_errors
                 summary["structured_retry_validation_errors"] = list(
                     retry_parse.validation_errors
                 )
                 if retry_structured_prompt_mode:
+                    structured_parse = retry_parse
                     llm_content = retry_content
                     llm_background_mode = retry_background_mode
                     structured_prompt_mode = True
@@ -5825,6 +6051,20 @@ class PromptPipeline:
                         retry_llm_content or initial_llm_content
                     )
                 return PromptPipelineResult("", summary)
+        if structured_prompt_mode:
+            structured_parse, removed_sexual_traits = (
+                enforce_structured_sexual_trait_authority(structured_parse, prompt)
+            )
+            structured_roster_tags = structured_parse.roster_tags
+            structured_copyright_tags = structured_parse.copyright_tags
+            structured_characters = structured_parse.characters
+            structured_scene = structured_parse.scene
+            structured_nltags = structured_parse.nltags
+            summary["sexual_trait_authority"] = {
+                "futa_allowed": allow_futa,
+                "male_genitals_allowed": has_positive_male_genital_request(prompt),
+                "removed": list(removed_sexual_traits),
+            }
         llm_framing_text = ", ".join(
             part
             for part in (
@@ -5867,10 +6107,6 @@ class PromptPipeline:
                 structured_nltags,
                 semantic_character_tags,
             )
-        )
-        structured_prompt_mode = bool(structured_characters) or any(
-            tag.lower().replace("_", " ") == "no humans"
-            for tag in structured_roster_tags
         )
         structured_character_mode = bool(structured_characters)
         structured_required_character_tags: list[str] = []

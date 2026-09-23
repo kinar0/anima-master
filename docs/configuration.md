@@ -148,6 +148,10 @@ Canonical Tag: haneoka_school_uniform
 
 图生图、放大和去背景仍在开发中。配置项保留给后续版本使用，不建议作为稳定功能依赖。
 
+改图工作流会先用 `max_image_side` 限制输入图的基准最长边，再把基准宽高乘以
+`upscale_factor`，并将结果写入 ComfyUI 的 `ImageScale`（“缩放图像”）节点。
+例如基准尺寸为 `832x1216`、倍率为 `1.5` 时，改图尺寸为 `1248x1824`。
+
 ## 发送与权限
 
 - `send_result_to_chat`：是否把图片发回聊天。
@@ -202,3 +206,6 @@ Canonical Tag: haneoka_school_uniform
 1. 先打开带注释模板。
 2. 对照修改真实运行文件 `data/config/astrbot_plugin_anima_master_config.json`。
 3. 保存后重载插件。
+
+
+角色衣橱的“服装名称 / 变体”现支持任意名称；原五类仅作建议。所属角色与学习来源分别保存为 `ownerTags` / `sourceTags`，同一角色的每套命名服装独立选择，旧数据保持兼容。详见 [自由命名衣橱](角色与服装配置工作流.md#自由命名衣橱与完整造型标签2026-09-12)。

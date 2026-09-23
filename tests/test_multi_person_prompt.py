@@ -259,7 +259,7 @@ def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character(
     assert result.summary["interaction_count"] == 1
     assert result.summary["hybrid_prompt"] is True
     assert "2girls" in result.final_prompt
-    assert "green-eyed girl:" in result.final_prompt
+    assert r"green-eyed girl\:" in result.final_prompt
     assert "(green eyes:1.3)" in result.final_prompt
     assert "On the left" not in result.final_prompt
     assert "On the right" not in result.final_prompt
@@ -436,8 +436,10 @@ def test_close_contact_uses_one_group_and_aliases_without_forbidden_concepts():
     assert result.summary["grouped_contact"] is True
     assert result.summary["interaction_aliases_normalized"] is True
     assert result.summary["composition_source"] == "deterministic"
-    assert "white-haired fox girl: fox ears, white hair" in result.final_prompt
-    assert "silver-haired vampire girl: silver hair, red eyes" in result.final_prompt
+    assert r"white-haired fox girl\: fox ears, white hair" in result.final_prompt
+    assert r"silver-haired vampire girl\: silver hair, red eyes" in (
+        result.final_prompt
+    )
     assert "leaning forward" in result.final_prompt
     assert "lying on her back" in result.final_prompt
     assert (

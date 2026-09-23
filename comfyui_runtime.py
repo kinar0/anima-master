@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -232,20 +233,45 @@ class ComfyUIRuntime:
             for index, output in enumerate(
                 outputs[: self._int("max_send_images", 1)]
             ):
+                chain = []
+                if index == 0 and self._should_at_sender(event):
+                    chain.extend(
+                        [
+                            Comp.At(qq=str(event.get_sender_id())),
+                            Comp.Plain(
+                                " " + self._remaining_usage_text(payload) + "\n"
+                            ),
+                        ]
+                    )
+                chain.append(Comp.Image.fromFileSystem(output))
+                trace = self._delivery_trace(event, output, index, len(outputs), chain)
+                started_at = time.perf_counter()
+                self.logger.info(
+                    "[comfyui_agent] image delivery attempt platform=%s group=%s "
+                    "output=%s bytes=%s image_index=%s/%s components=%s",
+                    trace["platform"],
+                    trace["is_group"],
+                    trace["output_name"],
+                    trace["bytes"],
+                    index + 1,
+                    trace["output_count"],
+                    ",".join(trace["components"]),
+                )
                 try:
-                    chain = []
-                    if index == 0 and self._should_at_sender(event):
-                        chain.extend(
-                            [
-                                Comp.At(qq=str(event.get_sender_id())),
-                                Comp.Plain(
-                                    " " + self._remaining_usage_text(payload) + "\n"
-                                ),
-                            ]
-                        )
-                    chain.append(Comp.Image.fromFileSystem(output))
                     await event.send(event.chain_result(chain))
+                    trace["send_duration_ms"] = round(
+                        (time.perf_counter() - started_at) * 1000
+                    )
+                    self.logger.info(
+                        "[comfyui_agent] image delivery acknowledged output=%s "
+                        "duration_ms=%s",
+                        trace["output_name"],
+                        trace["send_duration_ms"],
+                    )
                 except Exception as exc:
+                    trace["send_duration_ms"] = round(
+                        (time.perf_counter() - started_at) * 1000
+                    )
                     wording = str(
                         getattr(exc, "wording", "")
                         or getattr(exc, "message", "")
@@ -262,6 +288,7 @@ class ComfyUIRuntime:
                         payload["delivery"] = ack_timeout_delivery(
                             outputs, output, exc, message
                         )
+                        payload["delivery"]["trace"] = trace
                         return message
                     self.logger.warning(
                         "[comfyui_agent] image generated but sending failed. path=%s error=%s: %s",
@@ -273,6 +300,7 @@ class ComfyUIRuntime:
                     payload["delivery"] = send_failed_delivery(
                         outputs, output, exc, message
                     )
+                    payload["delivery"]["trace"] = trace
                     try:
                         await event.send(event.plain_result(message))
                     except Exception as notice_exc:
@@ -283,6 +311,7 @@ class ComfyUIRuntime:
                     return message
             message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
             payload["delivery"] = sent_delivery(outputs, message)
+            payload["delivery"]["trace"] = trace
             return message
         message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
         payload["delivery"] = skipped_delivery(outputs, message)
@@ -295,6 +324,42 @@ class ComfyUIRuntime:
             return bool(event.get_group_id()) and bool(event.get_sender_id())
         except Exception:  # noqa: BLE001 - non-group adapters may omit these methods.
             return False
+
+    @staticmethod
+    def _delivery_trace(
+        event: Any,
+        output: str,
+        index: int,
+        output_count: int,
+        chain: list[Any],
+    ) -> dict[str, Any]:
+        """Build local-only diagnostics without making another platform request."""
+        image_path = Path(output)
+        try:
+            byte_count: int | None = image_path.stat().st_size
+        except OSError:
+            byte_count = None
+        try:
+            platform = str(event.get_platform_name() or "")
+        except Exception:  # noqa: BLE001 - adapters need not expose this method.
+            try:
+                platform = str(event.get_platform_id() or "")
+            except Exception:  # noqa: BLE001 - minimal test events omit both methods.
+                platform = "unknown"
+        try:
+            is_group = bool(event.get_group_id())
+        except Exception:  # noqa: BLE001 - private adapters may omit this method.
+            is_group = False
+        return {
+            "platform": platform,
+            "is_group": is_group,
+            "output_name": image_path.name,
+            "bytes": byte_count,
+            "suffix": image_path.suffix.lower(),
+            "image_index": index + 1,
+            "output_count": output_count,
+            "components": [type(component).__name__ for component in chain],
+        }
 
     @staticmethod
     def _remaining_usage_text(payload: dict[str, Any]) -> str:

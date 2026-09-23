@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -22,6 +23,17 @@ def test_empty_builtin_prompt_fields_migrate_to_aesthetic_defaults() -> None:
 
     assert migrated["prompt_builder_template"] == DEFAULT_LLM_PROMPT_TEMPLATE
     assert migrated["prompt_builder_max_content_tags"] == 65
+
+
+def test_schema_builtin_prompt_migrates_to_current_default() -> None:
+    schema = json.loads((PLUGIN_DIR / "_conf_schema.json").read_text(encoding="utf-8"))
+    schema_default = schema["anima_master_prompting"]["items"][
+        "prompt_builder_template"
+    ]["default"]
+
+    migrated = migrate_prompt_defaults({"prompt_builder_template": schema_default})
+
+    assert migrated["prompt_builder_template"] == DEFAULT_LLM_PROMPT_TEMPLATE
 
 
 def test_stored_legacy_semantic_prompt_migrates_to_intent_only_default() -> None:

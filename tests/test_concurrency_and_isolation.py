@@ -23,8 +23,14 @@ from task_state import TaskRecorder  # noqa: E402
 
 
 class _Logger:
+    def __init__(self) -> None:
+        self.entries: list[tuple[object, ...]] = []
+
+    def info(self, *args) -> None:
+        self.entries.append(args)
+
     def warning(self, *args) -> None:
-        pass
+        self.entries.append(args)
 
 
 class _Event:
@@ -283,6 +289,52 @@ def test_image_ack_timeout_is_recorded_without_chat_notice(
     assert payload["delivery"]["status"] == "delivery_uncertain"
     assert payload["delivery"]["sent"] is None
     assert payload["delivery"]["notice_suppressed"] is True
+    assert payload["delivery"]["trace"]["bytes"] == len(b"image")
+    assert payload["delivery"]["trace"]["send_duration_ms"] >= 0
+
+
+def test_image_delivery_records_local_transport_trace(tmp_path: Path, monkeypatch) -> None:
+    output = tmp_path / "result.png"
+    output.write_bytes(b"image")
+
+    class _SendEvent:
+        def get_platform_name(self) -> str:
+            return "aiocqhttp"
+
+        def chain_result(self, chain):
+            return chain
+
+        async def send(self, _result) -> None:
+            return None
+
+    monkeypatch.setattr(
+        runtime_module.Comp.Image,
+        "fromFileSystem",
+        staticmethod(lambda path: path),
+    )
+    runtime = ComfyUIRuntime.__new__(ComfyUIRuntime)
+    runtime._bool = lambda _key, default: default
+    runtime._int = lambda _key, default: default
+    runtime.logger = _Logger()
+    payload = {"ok": True, "outputs": [str(output)]}
+
+    asyncio.run(runtime.send_payload(_SendEvent(), payload))
+
+    trace = payload["delivery"]["trace"]
+    assert trace == {
+        "platform": "aiocqhttp",
+        "is_group": False,
+        "output_name": "result.png",
+        "bytes": len(b"image"),
+        "suffix": ".png",
+        "image_index": 1,
+        "output_count": 1,
+        "components": ["str"],
+        "send_duration_ms": trace["send_duration_ms"],
+    }
+    assert trace["send_duration_ms"] >= 0
+    assert any("image delivery attempt" in str(entry[0]) for entry in runtime.logger.entries)
+    assert any("image delivery acknowledged" in str(entry[0]) for entry in runtime.logger.entries)
 
 
 def test_delivery_sends_the_verifier_selected_output_first(

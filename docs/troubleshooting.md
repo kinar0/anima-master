@@ -96,6 +96,9 @@
 Identity/Details 不会再因为角色名没有位于分句开头而令整份回复失败：照片分镜
 中的唯一角色名可用于归属，无角色名的后续分号句继承上一明确角色，仍无法归属
 的文字会保留到 Nltags。
+`Characters` 留空也不等于 `no humans`：当画面只有匿名、裁切或被景深遮蔽的
+人物时，只要 `Count` 有有效人数锚点，七字段回复仍然合法；其可见特征可以写在
+`Tags` 和 `Nltags`。只有真正没有人物时才使用 `no humans`。
 
 结构确实不完整时会带着具体错误和第一次回复重试一次。开启
 `debug_prompt_enabled` 后检查：
@@ -149,6 +152,10 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 
 若“角色穿演出服/夏装/冬装”只得到泛化服装描述，检查 `requested_outfit_mode` 和 `semantic_character_outfits`。前者应分别是 `stage_profile / summer_profile / winter_profile`，后者应保持同一 wardrobe kind、`resolution_state=resolved`，并在 `effective_tags` 中出现该角色相应 qualifier 档案的组件。`danbooru_semantic_source_outfit_profiles` 中的 qualifier 也应一致。只有日志显示档案命中、但逐角色计划仍是 `creative_fallback`，说明运行的仍是旧版变体绑定流程；保存代码后重载插件再复现。“站在舞台上”和“演出结束后”不应产生 `stage_profile`。
 
+## 衣柜命中但角色名变成拼音
+
+2026-09-13 18:56 的“粥祥”记录命中本地档案，但 LLM2 的权威 roster 只有爱音与基础祥子，同时把粥祥列为 unresolved；最终 `zhouxiang` 保留在角色及叙述中，正确完整 tag 仅被额外追加。当前在本地证据合并后将精确确认的 owner 绑定回可见 anchor，摘要 `confirmed_character_bindings` 应包含“粥祥 → togawa_sakiko_(master_of_melodia)”。LLM2 收到同一映射，输出后校正唯一可确定的改名并核对缺失身份；无法唯一对应则重试，重试仍不满足时停止生成。检查 `structured_initial_validation_errors`、`structured_retry_validation_errors` 和 `character_resolution_statuses`；已修正角色应为 `semantic_confirmed`。这是按本地 owner 配置执行，不把任意服装 source 当作角色，也没有硬编码“粥祥”的拼音。
+
 ## Identity 出现错误发色、瞳色或来源角色外貌
 
 例如爱音视觉档案是 `grey_eyes`，用户只要求 Teto 风格的粉色双钻头发型，但最终 Identity 出现 `yellow eyes`。这不是服装 tag 冲突，应分别检查三层证据：
@@ -162,3 +169,43 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 若 LLM2 输出 `blonde and blue hair`、`yellow and green eyes` 这类并列描述，还要确认拆分后的孤立颜色词没有残留。程序会让孤立颜色继承右侧 `hair` / `eyes` 维度后再应用同一权限，不能把 `blonde` 或 `yellow` 当作不受约束的普通特征。
 
 若括号英文翻译被误识别成额外角色，同时检查 `semantic_plan_raw.characters[].name` 与 `aliases`。角色实体和别名必须在原文中精确构成 `name（alias）` 或 `alias（name）`；仅仅出现在同一句、作为 `name` 的子串或位于另一项特征旁边均不得升级。匿名描述如“有着巨乳（huge breasts）的粉发美少女”应得到 `name=粉发美少女, aliases=[]`。新角色仍不需要本地预先确认，只要这个语义绑定与原文相邻关系都成立，就会继续进入 resolver 与学习流程。
+
+## 女性角色被错误写成扶她
+
+先检查 `semantic_plan_raw` 与角色视觉档案。如果两者只有正常发色、瞳色、胸部尺寸等信息，而 `prompt_llm_initial_content` 首次出现 `futanari / futa with female / penis / erection`，错误来自第二阶段模型，不是角色档案。当前默认任务书不会在普通请求中展示扶她示例；只有用户原文正向明确写出扶她时才动态加入计数规则。
+
+结构化路径还会记录 `sexual_trait_authority`。其中 `futa_allowed=false` 时，LLM2 自行添加的扶她 Count、Identity、Details、Tags 和 Nltags 会被移除；`male_genitals_allowed=false` 时同样移除未经正向要求的男性生殖器内容。自慰、色情场景、体位、服装、贫乳或巨乳都不能单独开启这些权限，“不是扶她”“不要出现扶她”属于明确否定。用户在 `#` 后手工添加的原样 tags 不受此门控。
+
+旧版本内置模板若已保存到配置，插件重载时会通过模板指纹迁移到当前默认模板。真正由用户改写过、且不匹配历史内置指纹的自定义模板不会自动覆盖；这类模板若仍常驻列举扶她和阴茎示例，应手工清空“主提示词模板”以恢复内置规则。
+
+
+## 角色服装学习混入多人图，或只有 3 个聚类样本
+
+检查档案 `evidence` 中的 `sample_mode / total_posts / selected_posts / focused_posts`。旧版 `casual_filtered` 允许缺少人物归属的整图 tags 参与统计，`single_character` 也可能只是最小角色标签组合，不能据旧模式名证明是单人图。页面中的“聚类样本”表示参与最终服装统计的帖子数，不表示不同服装套数，也不是视觉模型看过的图片数。
+
+新采样会排除多人证据、分页补样并对重叠帖子去重。聚类少于 6 个样本时返回 `casual_evidence_insufficient` 等状态，不自动建档。日志 `outfit learning` 会列出 fetched、accepted、focused、rejected、queries 和 errors；网络失败与确实缺少帖子应结合 errors 区分。成功档案也保存样本标识和查询记录。完整边界见 [学习样本的归属与支持度](角色视觉档案与服装优先级.md#学习样本的归属与支持度)。
+
+已有服装组件和带 `appearance_manual_override` 的外貌不会被自动刷新覆盖；新采样成功也不代表页面中的旧组件已经被替换。应先核对并修订旧档案，不能只通过重载插件期待错误外貌自动消失。
+
+
+角色 Wiki 的“casual outfit”说明与帖子 `casual` 标签不是同一数据源。页面有常服说明和示例，不代表示例帖子带 `casual` 标签。当前自动学习仅统计帖子，尚未接入可稳定访问的 Wiki 资料渠道；HTTP 403 / Cloudflare 验证失败不能作为“角色没有常服资料”的结论。Wiki 获取能力未解决前，不应声称已完成基于该页面的自动学习。
+
+通过词库页面成功保存（包括删除档案）会清理内存中的服装采样缓存，避免立即重试仍复用旧的成功结果或十分钟失败结果。角色标签查询缓存保留。只清空档案中的 tags 仍属于编辑现有档案，不等于删除该条档案并重建。
+
+
+## 本地有 S:P 标签，但角色没有自动建档
+
+2026-09-09 的三次记录中，前两次括号英文是 `S:P little night`，第三次已改为正确的 `S:P little knight`，但角色仍出现在 `danbooru_semantic_missing`。本地词典实际包含 `s:p_little_knight`；失败发生在采样之前：括号角色别名的旧字符规则不允许 `:`，因此即使 LLM1 正确返回 aliases，也会被主机丢弃。已有 I:P 档案可通过缓存角色匹配继续使用，不能据此判断新角色入口正常。
+
+当前括号角色别名与普通候选使用一致的标点范围，保留 `:`、`!` 和作品消歧括号。别名候选直接绑定到原角色的 `target_1` 等 ID，服装计划继续引用同一个角色，不再另建一个英文角色项而留下未解析的中文项。明确括号配对与本地验证仍然必需；`little night` 这类拼写错误不会被硬编码成正确角色。
+
+resolver 内部继续保存未转义 canonical tag `s:p_little_knight`，最终拼接到 Anima prompt 时才输出 `s\:p little knight`。作品消歧括号同样输出为 `\(` / `\)`；完整权重表达式（例如 `(watercolor:2)`）和 `#` 后用户手工尾缀不被破坏。若调试摘要的 `anchor_tags` 正确但 `final_prompt_head` 仍是未转义的 `s:p little knight`，说明运行实例尚未加载最终显示层修复。
+
+验证时应同时看到 `anchor_tags` 中原角色 ID 对应 `s:p_little_knight`，以及后续服装采样调用。修复后的只读实测由 Safebooru 回退取得 46 条帖子，其中 27 条通过筛选；这证明本次可以进入采样，不等于这些统计组件已经经过逐图视觉或 Wiki 校验。接口可用性仍可能变化。
+
+
+## Master of Melodia 没有学到，反而使用校服
+
+2026-09-12 的三份任务记录分别出现：括号造型被拆成普通别名、完整来源被基础角色缓存覆盖、简称来源未解析。完整来源应保持 `togawa_sakiko_(master_of_melodia)`，不能变成 `togawa_sakiko`。修复后该 tag 在在线回退中确认为普通分类，作为独立服装来源采样；不会作为角色或作品 tag 注入。只读实测取得 56 个聚类样本，未改写运行中的衣橱。
+
+重载插件后用“丰川祥子穿着togawa sakiko (master of melodia)的衣服，站立”复现。查看 `danbooru_semantic_outfit_sources` 是否是完整来源，以及 `semantic_character_outfits` 的组件是否来自新造型。旧的错误档案不会自动删除，手工服装组件仍受保护。页面现在支持自由服装名称、所属角色和学习来源；详细字段与限制见 [自由命名衣橱](角色与服装配置工作流.md#自由命名衣橱与完整造型标签2026-09-12)。

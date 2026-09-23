@@ -20,7 +20,7 @@ const fallbackBridge = {
 const bridge = window.AstrBotPluginPage || fallbackBridge;
 
 const META = {
-  outfits: { kicker: "CHARACTER WARDROBES", title: "角色自己的变体衣柜", description: "只保存角色/persona 本人的 default、casual、summer、winter、stage 服装与稳定外观；通用校服和命名套组请放到右侧分类。" },
+  outfits: { kicker: "CHARACTER WARDROBES", title: "角色自己的变体衣柜", description: "按角色保存任意命名服装；服装名称、所属角色与学习来源分别维护。通用校服和命名套组请放到右侧分类。" },
   outfitSets: { kicker: "NAMED OUTFIT SETS", title: "通用服装套组", description: "可由任意角色穿着的命名套组。每套独立保存 canonical tag、可见组件和别名；不会进入任何角色自己的变体衣柜。" },
   terms: { kicker: "TERM TRANSLATIONS", title: "名词翻译", description: "将常用中文名词稳定映射为 canonical Danbooru tag，命中提示词时直接使用。" },
 };
@@ -55,12 +55,15 @@ function outfitEntry(item, index) {
   const card = node("article", "entry profile");
   const identity = node("div", "field-stack");
   identity.append(inputField("档案名称", item.key, (value) => item.key = value));
-  const qualifier = node("div", "field"); qualifier.append(node("label", "", "档案类型"));
-  const select = node("select"); [["default","默认服装"],["casual","官方常服 / Casual"],["summer","夏季服装"],["winter","冬季服装"],["stage","演出服"]].forEach(([value,label]) => { const option = node("option", "", label); option.value = value; option.selected = item.qualifier === value; select.append(option); });
-  select.addEventListener("change", () => { item.qualifier = select.value; markDirty(); }); qualifier.append(select); identity.append(qualifier);
+  const qualifier = inputField("服装名称 / 变体", item.qualifier, (value) => item.qualifier = value, { placeholder: "Master of Melodia、生日礼服、default…" });
+  const suggestions = node("datalist"); suggestions.id = `wardrobe-names-${index}`;
+  ["default", "casual", "summer", "winter", "stage"].forEach((value) => { const option = node("option"); option.value = value; suggestions.append(option); });
+  qualifier.querySelector("input").setAttribute("list", suggestions.id);
+  qualifier.append(suggestions, node("p", "mapping-note", "可自由命名，同一角色可保存多套。旧的五种名称仅作快捷建议。")); identity.append(qualifier);
+  identity.append(inputField("所属角色 Tags", (item.ownerTags || item.sourceTags).join(", "), (value) => item.ownerTags = splitList(value), { placeholder: "togawa_sakiko" }));
   const evidence = node("div", "meta-line"); evidence.append(node("span", "pill", item.evidence?.sampleCount ? `${item.evidence.sampleCount} 个聚类样本` : "手动档案")); if (item.evidence?.sampleMode) evidence.append(node("span", "pill", item.evidence.sampleMode)); identity.append(evidence);
   const aliases = inputField("触发别名", item.aliases.join(", "), (value) => item.aliases = splitList(value), { textarea: true, placeholder: "Amoris, 爱音演出服" }); aliases.append(chips(item.aliases, "mint"));
-  const tags = node("div", "field-stack wide"); tags.append(inputField("来源角色 Tags", item.sourceTags.join(", "), (value) => item.sourceTags = splitList(value), { placeholder: "amoris_(bang_dream!)" })); const outfitTags = inputField("服装 Tags", item.tags.join(", "), (value) => item.tags = splitList(value), { textarea: true, placeholder: "black_corset, red_shorts, ..." }); outfitTags.append(chips(item.tags)); tags.append(outfitTags); const stableTags = item.appearanceTags || []; const appearance = inputField("Stable Appearance Tags", stableTags.join(", "), (value) => item.appearanceTags = splitList(value), { textarea: true, placeholder: "long_hair, blue_eyes, animal_ears, ..." }); appearance.append(node("p", "mapping-note", "稳定发色、瞳色、耳朵、角、尾巴等身份特征；可修正自动学习结果，也可留空。"), chips(stableTags, "mint")); tags.append(appearance);
+  const tags = node("div", "field-stack wide"); tags.append(inputField("学习来源 Tags", item.sourceTags.join(", "), (value) => item.sourceTags = splitList(value), { placeholder: "amoris_(bang_dream!)" })); const outfitTags = inputField("服装 Tags", item.tags.join(", "), (value) => item.tags = splitList(value), { textarea: true, placeholder: "black_corset, red_shorts, ..." }); outfitTags.append(chips(item.tags)); tags.append(outfitTags); const stableTags = item.appearanceTags || []; const appearance = inputField("Stable Appearance Tags", stableTags.join(", "), (value) => item.appearanceTags = splitList(value), { textarea: true, placeholder: "long_hair, blue_eyes, animal_ears, ..." }); appearance.append(node("p", "mapping-note", "稳定发色、瞳色、耳朵、角、尾巴等身份特征；可修正自动学习结果，也可留空。"), chips(stableTags, "mint")); tags.append(appearance);
   card.append(identity, aliases, tags, deleteButton(index)); return card;
 }
 function mappingEntry(item, index, isSet) {
@@ -115,7 +118,7 @@ async function save() {
     setBusy(false);
   }
 }
-function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新角色服装档案", aliases: ["角色名"], sourceTags: ["canonical_character_tag"], tags: [], appearanceTags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新通用服装套组", aliases: ["新通用服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", componentTags: [], variant: "default", origin: "learned", profileKey: `manual_named_${Date.now()}` }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
+function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新角色服装档案", aliases: ["服装别名"], sourceTags: [], ownerTags: [], tags: [], appearanceTags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新通用服装套组", aliases: ["新通用服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", componentTags: [], variant: "default", origin: "learned", profileKey: `manual_named_${Date.now()}` }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
 
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; render(); }));
 elements.sort.addEventListener("change", () => { state.outfitSort = elements.sort.value; render(); });
