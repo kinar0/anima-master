@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import random
 from collections.abc import Callable
 from pathlib import Path
@@ -38,9 +39,7 @@ def generate_payload(
             "message": "width and height must be provided together",
         }
     width = int(
-        args.width
-        if args.width is not None
-        else config.get("width", defaults["width"])
+        args.width if args.width is not None else config.get("width", defaults["width"])
     )
     height = int(
         args.height
@@ -64,6 +63,12 @@ def generate_payload(
         args.negative_prompt
         or config.get("negative_prompt", defaults["negative_prompt"])
     )
+    nai_characters = None
+    if getattr(args, "nai_characters", None):
+        try:
+            nai_characters = json.loads(args.nai_characters)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("nai_character_plan_invalid_json") from exc
     prompt_body = workflow(
         config,
         prompt,
@@ -74,7 +79,25 @@ def generate_payload(
         cfg,
         seed,
         override_size=explicit_size,
+        nai_characters=nai_characters,
     )
+    nai_inputs = [
+        node["inputs"]
+        for node in prompt_body.values()
+        if isinstance(node, dict)
+        and node.get("class_type") == "NovelAIGenerator"
+        and isinstance(node.get("inputs"), dict)
+    ]
+    if len(nai_inputs) == 1:
+        # Report retained workflow parameters instead of unrelated Anima
+        # defaults when parameter overriding is disabled.
+        effective = nai_inputs[0]
+        if all(
+            isinstance(effective.get(key), (int, float))
+            for key in ("width", "height", "steps", "cfg_scale")
+        ):
+            width, height = int(effective["width"]), int(effective["height"])
+            steps, cfg = int(effective["steps"]), float(effective["cfg_scale"])
     prompt_id, history = _run_prompt(config, image_outputs, prompt_body)
     status_payload = history_failed(history)
     if status_payload:

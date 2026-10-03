@@ -35,6 +35,12 @@ try:
         parse_multi_person_plan,
         render_multi_person_character,
     )
+    from .nai_character_mode import (
+        build_nai_character_plan_prompt,
+        parse_nai_character_plan,
+        resolve_nai_canvas,
+        strip_nai_character_switch,
+    )
     from .outfit_transfer import (
         build_effective_outfit_plan,
         build_outfit_constraint_narrative,
@@ -112,6 +118,12 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         build_multi_person_plan_prompt,
         parse_multi_person_plan,
         render_multi_person_character,
+    )
+    from nai_character_mode import (
+        build_nai_character_plan_prompt,
+        parse_nai_character_plan,
+        resolve_nai_canvas,
+        strip_nai_character_switch,
     )
     from outfit_transfer import (
         build_effective_outfit_plan,
@@ -1414,10 +1426,18 @@ def merge_authoritative_identity_block(
     """
     name_pattern = re.escape(character_name).replace("_", r"(?:_|\s)")
     prefix = re.compile(
-        rf"^\s*{name_pattern}\s+(?:has|is|with)\s+",
+        rf"^\s*{name_pattern}\s+(?=(?:has|is|are|with)\s+)",
         re.I,
     )
     body = prefix.sub("", str(writer_identity or "").strip()).strip(" ,.;")
+    # Keep the copula, but separate its accompanying attributes so they still
+    # pass through the same profile authority as a leading ``has`` sentence.
+    body = re.sub(
+        r"\b((?:is|are)\s+[^,;]+?)\s+with\s+",
+        r"\1 and has ",
+        body,
+        flags=re.I,
+    )
     fragments = [
         re.sub(r"^and\s+", "", item.strip(" ,.;"), flags=re.I)
         for item in re.split(r"\s*,\s*|\s+and\s+", body, flags=re.I)
@@ -1462,10 +1482,7 @@ def merge_authoritative_identity_block(
         # retain its predicate and assemble a grammatical identity sentence.
         predicate_match = re.fullmatch(r"(?:is|are)\s+(.+)", fragment, re.I)
         if predicate_match:
-            predicate = predicate_match.group(1).strip(" ,.;")
-            if predicate:
-                predicate_clauses.append(f"is {predicate}")
-            continue
+            fragment = predicate_match.group(1).strip(" ,.;")
         # A writer may also repeat the leading connective after ``and``.
         # These are attributes, not a literal value named ``with glasses``.
         fragment = re.sub(r"^(?:has|with)\s+", "", fragment, flags=re.I)
@@ -1498,7 +1515,10 @@ def merge_authoritative_identity_block(
             for dimension in locked_dimensions
         ):
             continue
-        kept.append(fragment)
+        if predicate_match:
+            predicate_clauses.append(f"is {fragment}")
+        else:
+            kept.append(fragment)
         stable_covered_dimensions.update(
             dimension
             for dimension in dimensions
@@ -4754,6 +4774,8 @@ class PromptPipeline:
         *,
         multi_person: bool = False,
         original_user_prompt: str = "",
+        canvas_size: tuple[int, int] | None = None,
+        canvas_size_explicit: bool = False,
     ) -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
@@ -4763,12 +4785,17 @@ class PromptPipeline:
             mode: Generation mode, such as `txt2img` or `img2img`.
             multi_person: Whether `/anm 多人` requested structured planning.
             original_user_prompt: User text before reference-context augmentation.
+            canvas_size: This request's configured or explicit width and height.
+            canvas_size_explicit: Whether the user selected this size for the request.
 
         Returns:
             Final prompt plus a serializable summary dict.
         """
         original_prompt = str(user_prompt or "").strip()
-        background_intent_prompt = str(original_user_prompt or original_prompt).strip()
+        nai_r_mode, original_prompt = strip_nai_character_switch(original_prompt)
+        _, background_intent_prompt = strip_nai_character_switch(
+            str(original_user_prompt or original_prompt).strip()
+        )
         legacy_creative_flag_re = re.compile(
             r"(?<!\S)--(?:自由发挥|自由拓展|创意拓展|创意扩展|creative)"
             r"(?=$|\s|[,，;；:：])",
@@ -4786,6 +4813,7 @@ class PromptPipeline:
             "mode": mode,
             "requested_outfit_mode": requested_outfit_mode,
             "multi_person_mode": bool(multi_person),
+            "nai_r_mode": nai_r_mode,
             "original_prompt_head": self._shorten(original_prompt, 600),
         }
         preset_config = apply_config_preset(dict(self.config))
@@ -4796,6 +4824,9 @@ class PromptPipeline:
             preset_index = None
             summary["artist_preset_switch_error"] = switch_error
         if not self._bool("prompt_optimize_enabled", True):
+            if nai_r_mode:
+                summary["skipped_reason"] = "nai_character_mode_requires_optimization"
+                return PromptPipelineResult("", summary)
             summary.update(
                 {
                     "skipped_reason": "prompt_optimize_disabled",
@@ -4806,6 +4837,9 @@ class PromptPipeline:
             return PromptPipelineResult(prompt, summary)
         raw_mode, raw_prompt = strip_raw_prefix(prompt)
         if raw_mode:
+            if nai_r_mode:
+                summary["skipped_reason"] = "nai_character_mode_requires_optimization"
+                return PromptPipelineResult("", summary)
             self.logger.info("[comfyui_agent] prompt builder skipped: raw tags mode")
             summary.update(
                 {
@@ -4916,6 +4950,9 @@ class PromptPipeline:
             )
             return PromptPipelineResult("", summary)
 
+        if multi_person and nai_r_mode:
+            summary["skipped_reason"] = "nai_character_mode_incompatible_multi_person"
+            return PromptPipelineResult("", summary)
         if multi_person:
             # `/anm 多人` is the original independent compatibility route.  It
             # plans anonymous Character A/B/C/D visual blocks directly and must
@@ -6763,4 +6800,44 @@ class PromptPipeline:
                     "final_prompt": built.final_prompt,
                 }
             )
+        if nai_r_mode:
+            requested_canvas = canvas_size or (
+                self._int("width", 1024), self._int("height", 1536)
+            )
+            try:
+                nai_canvas = resolve_nai_canvas(
+                    prompt_config, requested_canvas, explicit_size=canvas_size_explicit
+                )
+                plan_prompt = build_nai_character_plan_prompt(
+                    prompt, built.final_prompt, nai_canvas
+                )
+                plan_response = await self.context.llm_generate(
+                    chat_provider_id=provider_id,
+                    prompt=plan_prompt,
+                    system_prompt="Plan NAI character instances precisely. Return only valid JSON.",
+                    max_tokens=max(
+                        1200, min(self._int("prompt_builder_max_tokens", 1800), 2400)
+                    ),
+                    thinking={"type": "disabled"},
+                )
+                nai_plan = parse_nai_character_plan(
+                    _extract_completion_text(plan_response)
+                )
+            except Exception as exc:
+                summary.update(
+                    skipped_reason="nai_character_plan_failed", llm_error=str(exc)
+                )
+                return PromptPipelineResult("", summary)
+            summary["nai_characters"] = nai_plan["characters"]
+            summary["nai_canvas"] = nai_canvas
+            summary["nai_composition_analysis"] = nai_plan["composition_analysis"]
+            summary["nai_global_prompt"] = nai_plan["global_prompt"]
+            summary["nai_character_count"] = len(nai_plan["characters"])
+            summary["final_prompt_head"] = self._shorten(nai_plan["global_prompt"], 600)
+            summary["final_prompt_chars"] = len(nai_plan["global_prompt"])
+            if self._bool("debug_prompt_enabled", False):
+                summary["nai_character_plan_prompt"] = plan_prompt
+                summary["nai_full_prompt_before_split"] = built.final_prompt
+                summary["final_prompt"] = nai_plan["global_prompt"]
+            return PromptPipelineResult(nai_plan["global_prompt"], summary)
         return PromptPipelineResult(built.final_prompt, summary)

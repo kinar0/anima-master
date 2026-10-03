@@ -15,7 +15,7 @@
   "5": {
     "inputs": {
       "samples": [
-        "13",
+        "19",
         0
       ],
       "vae": [
@@ -194,6 +194,18 @@
     "class_type": "CLIPLoader",
     "_meta": {
       "title": "加载CLIP"
+    }
+  },
+  "19": {
+    "inputs": {
+      "anything": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "easy cleanGpuUsed",
+    "_meta": {
+      "title": "清理显存占用（解码前）"
     }
   },
   "18": {

@@ -62,6 +62,7 @@ vae_name = 你的 VAE 文件名
 /anm 生图 竖图：狐莉站在梨花树下
 /anm 生图 少女站在河岸 --尺寸 1216x832
 /anm 多人 左边若叶睦抱着吉他，右边千早爱音牵着她的手
+/anm -r 左格高松灯穿校服站立，右格高松灯穿礼服坐下
 /anm 生图 独自旅行的魔法少女
 /anm 无优化 masterpiece, best quality, 1girl, solo, white dress, simple background
 /anm 解析法术

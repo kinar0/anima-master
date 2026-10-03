@@ -149,6 +149,22 @@ class ComfyUIRuntime:
             return f"ComfyUI 接口请求失败 HTTP {payload.get('status_code')}"
         if detail == "workflow_failed":
             return "ComfyUI 工作流执行失败"
+        if detail == "custom_workflow_requires_api_export":
+            return "请使用 ComfyUI API 格式工作流；当前 NAI 工作流请填写 nai_api.json"
+        if detail == "nai_prompt_link_not_supported":
+            return "NAI 提示词连线无法识别；支持直接文本、Textbox 和 ComfyUIToNovelAIV4"
+        if detail == "nai_size_requires_multiple_of_64":
+            return "NAI 工作流的宽和高必须是 64 的倍数，请使用 832x1216 或 1024x1536 等尺寸"
+        if detail == "nai_sampling_parameters_out_of_range":
+            return "NAI 节点要求步数为 1–50，CFG 为 0–30"
+        if detail == "nai_character_mode_requires_nai_workflow":
+            return "-r 需要使用包含 NovelAIGenerator 的 NAI API 工作流"
+        if detail == "nai_character_mode_requires_optimization":
+            return "-r 需要开启提示词优化，不能与原样模式同时使用"
+        if detail == "nai_character_mode_incompatible_multi_person":
+            return "-r 请使用普通 /anm 生图命令，不要与 /anm 多人兼容模式同用"
+        if detail.startswith("nai_character_plan_"):
+            return "-r 的逐角色位置规划失败，请重试或缩短为最多五个角色实例"
         if detail == "no image found in history":
             return "ComfyUI 完成了任务但没有产出图片"
         if detail == "multi_person_plan_failed":
@@ -230,9 +246,7 @@ class ComfyUIRuntime:
             return "ComfyUI 已完成任务，但没有产出可发送的图片。"
 
         if self._bool("send_result_to_chat", True):
-            for index, output in enumerate(
-                outputs[: self._int("max_send_images", 1)]
-            ):
+            for index, output in enumerate(outputs[: self._int("max_send_images", 1)]):
                 chain = []
                 if index == 0 and self._should_at_sender(event):
                     chain.extend(

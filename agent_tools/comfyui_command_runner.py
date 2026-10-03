@@ -10,6 +10,12 @@ def run_cli_action(action: Callable[[], dict[str, Any]]) -> dict[str, Any]:
     """Run a CLI command body and convert exceptions to the legacy JSON shape."""
     try:
         return action()
+    except SystemExit as exc:
+        # Workflow validation uses descriptive exits. Return these as normal
+        # helper errors so the chat layer can explain how to fix the config.
+        if isinstance(exc.code, str):
+            return {"ok": False, "error": exc.code}
+        raise
     except ValueError as exc:
         return {"ok": False, "error": str(exc)}
     except TimeoutError as exc:

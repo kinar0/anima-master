@@ -1,5 +1,20 @@
 # 故障排查
 
+## NAI 自定义工作流
+
+- `custom_workflow_requires_api_export`：读取了可视化编辑格式。当前 NAI 接入
+  应填写 `nai_api.json`；`nai.json` 留作 ComfyUI 编辑参考。
+- `nai_prompt_link_not_supported`：NAI 正负文本经过了尚未支持的节点、缺少
+  文本输入或存在循环。当前支持直接字符串、Textbox 和 ComfyUIToNovelAIV4。
+- `custom_workflow_prompt_nodes_ambiguous`：正负提示词共用同一个可写输入，
+  需在 ComfyUI 中分开后重新导出。
+- `nai_size_requires_multiple_of_64`：明确尺寸不满足 NAI 的 64 倍数要求。
+- `nai_sampling_parameters_out_of_range`：开启覆盖后，步数不在 1–50 或 CFG
+  不在 0–30。可关闭参数覆盖，使用 NAI 工作流本身的设置。
+
+账户认证、额度不足和远端生成失败需结合 ComfyUI 的 NAI 扩展日志检查。
+AstrBot 的 ComfyUI 地址仍填写 ComfyUI 服务，不填写 NovelAI 网站地址。
+
 ## `/anm` 没反应
 
 先确认 AstrBot 是否收到消息。

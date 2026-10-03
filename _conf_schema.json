@@ -61,7 +61,7 @@
         "description": "自定义工作流 JSON 路径",
         "type": "string",
         "default": "",
-        "hint": "填写 AstrBot 能读取到的 ComfyUI API 工作流 JSON 路径。服务器部署时这是服务器路径，不是本机 Windows 路径；也可以填写相对插件目录的路径。留空时不启用。示例：workflows/anima_api.json",
+        "hint": "填写 AstrBot 能读取到的 ComfyUI API 工作流 JSON 路径，可相对插件目录。NAI 使用 nai_api.json；可视化导出的 nai.json 不能直接提交。服务器部署时需使用服务器路径。开启自定义工作流后此项必填。",
         "collapsed": false,
         "condition": {
           "custom_workflow_enabled": true
@@ -71,7 +71,7 @@
         "description": "用插件参数覆盖自定义工作流参数",
         "type": "bool",
         "default": false,
-        "hint": "默认关闭，保留自定义工作流中的尺寸、采样步数、CFG、采样器和调度器。开启后才使用插件出图参数覆盖这些节点。",
+        "hint": "默认关闭，保留自定义工作流的出图参数。开启后覆盖尺寸、步数和 CFG；普通采样节点同时覆盖采样器与调度器。NAI 始终保留其 JSON 中的专用采样器与调度器。单次明确尺寸仍会生效，NAI 要求 64 的倍数。",
         "condition": {
           "custom_workflow_enabled": true
         }

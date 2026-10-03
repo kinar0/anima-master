@@ -2,8 +2,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime
+import json
 import re
 from typing import Any
+
+try:
+    from .nai_character_mode import strip_nai_character_switch
+except ImportError:  # pragma: no cover - direct module tests.
+    from nai_character_mode import strip_nai_character_switch
 
 
 def split_manual_prompt_suffix(user_prompt: str) -> tuple[str, str]:
@@ -209,12 +215,16 @@ class GenerationTaskRunner:
                     applied=prompt != original_prompt,
                 )
             prompt = self._augment_quoted_spell(event, prompt)
-            prompt = await self._build_prompt(
-                event,
-                prompt,
-                multi_person=multi_person,
-                original_user_prompt=prompt_before_suffix,
-            )
+            build_kwargs: dict[str, Any] = {
+                "multi_person": multi_person,
+                "original_user_prompt": prompt_before_suffix,
+            }
+            if strip_nai_character_switch(prompt_before_suffix)[0]:
+                build_kwargs.update(
+                    canvas_size=(int(requested_width), int(requested_height)),
+                    canvas_size_explicit=explicit_size,
+                )
+            prompt = await self._build_prompt(event, prompt, **build_kwargs)
             prompt_summary = dict(self._prompt_summary())
             prompt = insert_manual_prompt_suffix(prompt, manual_suffix)
             prompt_summary.update(
@@ -258,7 +268,25 @@ class GenerationTaskRunner:
             self._task_recorder.mark_failure(task, payload["error"])
             self._persist_task(task)
             return payload
+        if prompt_summary.get("nai_r_mode") and not prompt_summary.get("nai_characters"):
+            payload = {
+                "ok": False,
+                "error": str(
+                    prompt_summary.get("skipped_reason") or "nai_character_plan_failed"
+                ),
+                "task_id": task["task_id"],
+            }
+            self._task_recorder.mark_failure(task, payload["error"])
+            self._persist_task(task)
+            return payload
         args = ["generate", "--prompt", prompt]
+        if prompt_summary.get("nai_r_mode"):
+            args.extend(
+                [
+                    "--nai-characters",
+                    json.dumps(prompt_summary["nai_characters"], ensure_ascii=False),
+                ]
+            )
         if width:
             args.extend(["--width", str(int(width))])
         if height:

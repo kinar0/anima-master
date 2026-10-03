@@ -1382,6 +1382,49 @@ def test_identity_merge_preserves_mixed_is_predicate_grammar() -> None:
     assert "has is a loli" not in merged
 
 
+def test_identity_merge_preserves_leading_is_with_attributes() -> None:
+    merged = merge_authoritative_identity_block(
+        "togawa_sakiko",
+        "togawa_sakiko is a tall mature woman with long blue hair, "
+        "yellow eyes, sidelocks, two side up buns, huge breasts, and wide hips",
+        ("long_hair", "blue_hair", "yellow_eyes", "huge_breasts"),
+        frozenset(),
+    )
+
+    assert merged == (
+        "togawa_sakiko is a tall mature woman and has long blue hair, "
+        "yellow eyes, sidelocks, two side up buns, huge breasts, wide hips"
+    )
+
+
+def test_identity_merge_filters_conflicts_after_leading_is() -> None:
+    merged = merge_authoritative_identity_block(
+        "character_a",
+        "character a is a tall woman with blonde hair and blue eyes",
+        ("black_hair", "red_eyes"),
+        frozenset(),
+    )
+
+    assert merged == "character_a is a tall woman and has black_hair, red_eyes"
+
+
+def test_identity_merge_preserves_is_without_attributes() -> None:
+    assert merge_authoritative_identity_block(
+        "character_a", "character_a is a tall woman", (), frozenset()
+    ) == "character_a is a tall woman"
+
+
+def test_identity_merge_filters_attributes_after_mixed_is_predicate() -> None:
+    merged = merge_authoritative_identity_block(
+        "character_a",
+        "character_a has black hair and is a woman with blue eyes and glasses",
+        ("black_hair", "red_eyes"),
+        frozenset(),
+    )
+
+    assert merged == "character_a is a woman and has black hair, glasses, red_eyes"
+
+
 def test_raw_prompt_regex_does_not_open_explicit_eye_change() -> None:
     dimensions = appearance_override_dimensions(
         "把角色甲的眼睛改成蓝色；角色乙站在旁边",

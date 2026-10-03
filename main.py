@@ -306,6 +306,8 @@ class ComfyUIAgentPlugin(Star):
         *,
         multi_person: bool = False,
         original_user_prompt: str = "",
+        canvas_size: tuple[int, int] | None = None,
+        canvas_size_explicit: bool = False,
     ) -> str:
         result = await self._prompt_pipeline.build(
             event,
@@ -313,6 +315,8 @@ class ComfyUIAgentPlugin(Star):
             mode,
             multi_person=multi_person,
             original_user_prompt=original_user_prompt,
+            canvas_size=canvas_size,
+            canvas_size_explicit=canvas_size_explicit,
         )
         self._last_prompt_summary.set(dict(result.summary))
         return result.final_prompt

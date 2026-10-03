@@ -80,9 +80,14 @@ def anima_t2i_workflow(
                 "denoise": 1,
             },
         },
+        "47": {
+            "class_type": "easy cleanGpuUsed",
+            "inputs": {"anything": ["19", 0]},
+            "_meta": {"title": "清理显存占用（解码前）"},
+        },
         "8": {
             "class_type": "VAEDecode",
-            "inputs": {"samples": ["19", 0], "vae": ["15", 0]},
+            "inputs": {"samples": ["47", 0], "vae": ["15", 0]},
         },
         "46": {
             "class_type": "easy cleanGpuUsed",
@@ -192,6 +197,7 @@ def workflow(
     seed: int,
     *,
     override_size: bool = False,
+    nai_characters: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build the configured generation workflow graph.
 
@@ -220,7 +226,11 @@ def workflow(
             cfg,
             seed,
             override_size=override_size,
+            nai_characters=nai_characters,
         )
+
+    if nai_characters is not None:
+        raise SystemExit("nai_character_mode_requires_nai_workflow")
 
     workflow_name = str(config.get("workflow") or "anima_t2i")
     if workflow_name != "anima_t2i":
@@ -241,6 +251,7 @@ def custom_t2i_workflow(
     seed: int,
     *,
     override_size: bool = False,
+    nai_characters: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build a text-to-image workflow from a user-provided ComfyUI API JSON.
 
@@ -276,6 +287,8 @@ def custom_t2i_workflow(
     )
     if not isinstance(body, dict):
         raise SystemExit("custom_workflow_invalid_json")
+    if isinstance(body.get("nodes"), list):
+        raise SystemExit("custom_workflow_requires_api_export")
 
     workflow_body = copy.deepcopy(body)
     _apply_custom_workflow_inputs(
@@ -289,6 +302,7 @@ def custom_t2i_workflow(
         cfg,
         seed,
         override_size=override_size,
+        nai_characters=nai_characters,
     )
     return workflow_body
 
@@ -305,6 +319,7 @@ def _apply_custom_workflow_inputs(
     seed: int,
     *,
     override_size: bool = False,
+    nai_characters: list[dict[str, Any]] | None = None,
 ) -> None:
     text_nodes = set(_text_encode_nodes(workflow_body))
     positive_ids = _conditioning_text_node_ids(
@@ -318,17 +333,35 @@ def _apply_custom_workflow_inputs(
         text_nodes,
     )
 
-    if not positive_ids:
+    nai_ids = [
+        str(node_id)
+        for node_id, node in workflow_body.items()
+        if isinstance(node, dict) and node.get("class_type") == "NovelAIGenerator"
+    ]
+    positive_slots = [(node_id, "text") for node_id in positive_ids]
+    negative_slots = [(node_id, "text") for node_id in negative_ids]
+    for node_id in nai_ids:
+        positive_slots.append(_nai_prompt_slot(workflow_body, node_id, "prompt"))
+        negative_slots.append(
+            _nai_prompt_slot(workflow_body, node_id, "negative_prompt")
+        )
+
+    if not positive_slots:
         raise SystemExit("custom_workflow_positive_node_not_found")
-    if not negative_ids:
+    if not negative_slots:
         raise SystemExit("custom_workflow_negative_node_not_found")
-    if set(positive_ids) & set(negative_ids):
+    if set(positive_slots) & set(negative_slots):
         raise SystemExit("custom_workflow_prompt_nodes_ambiguous")
 
-    for node_id in positive_ids:
-        _set_node_input(workflow_body, node_id, "text", prompt)
-    for node_id in negative_ids:
-        _set_node_input(workflow_body, node_id, "text", negative_prompt)
+    for node_id, input_name in positive_slots:
+        _set_node_input(workflow_body, node_id, input_name, prompt)
+    for node_id, input_name in negative_slots:
+        _set_node_input(workflow_body, node_id, input_name, negative_prompt)
+
+    if nai_characters is not None:
+        if len(nai_ids) != 1:
+            raise SystemExit("nai_character_mode_requires_nai_workflow")
+        _apply_nai_character_prompts(workflow_body, nai_ids[0], nai_characters)
 
     filename_prefix = t2i_filename_prefix()
     for node in workflow_body.values():
@@ -343,6 +376,19 @@ def _apply_custom_workflow_inputs(
         override_parameters = bool(
             config.get("custom_workflow_override_parameters", False)
         )
+        if class_type == "NovelAIGenerator":
+            if override_parameters or override_size:
+                if any(
+                    side < 64 or side > 4096 or side % 64 for side in (width, height)
+                ):
+                    raise SystemExit("nai_size_requires_multiple_of_64")
+                inputs.update(width=width, height=height)
+            if override_parameters:
+                if not 1 <= steps <= 50 or not 0 <= cfg <= 30:
+                    raise SystemExit("nai_sampling_parameters_out_of_range")
+                inputs.update(steps=steps, cfg_scale=cfg)
+            # NAI sampler/scheduler names are a separate API vocabulary. Keep
+            # the exported values instead of injecting Anima's er_sde/normal.
         if (override_parameters or override_size) and class_type == "EmptyLatentImage":
             if "width" in inputs:
                 inputs["width"] = width
@@ -363,6 +409,90 @@ def _apply_custom_workflow_inputs(
             inputs["seed"] = seed
         if "noise_seed" in inputs:
             inputs["noise_seed"] = seed
+
+
+def _apply_nai_character_prompts(
+    workflow_body: dict[str, Any],
+    generator_id: str,
+    characters: list[dict[str, Any]],
+) -> None:
+    """Connect per-instance text and coordinates to NAI's character selector."""
+    generator = workflow_body[generator_id]
+    generator_inputs = generator.get("inputs", {})
+    if (
+        not isinstance(generator_inputs, dict)
+        or not isinstance(characters, list)
+        or not 1 <= len(characters) <= 5
+    ):
+        raise SystemExit("nai_character_plan_character_count")
+    used = {str(key) for key in workflow_body}
+    next_id = max((int(key) for key in used if key.isdigit()), default=0) + 1
+
+    def allocate() -> str:
+        nonlocal next_id
+        while str(next_id) in used:
+            next_id += 1
+        value = str(next_id)
+        used.add(value)
+        next_id += 1
+        return value
+
+    selector_id = allocate()
+    selector_inputs: dict[str, Any] = {}
+    for index in range(1, 6):
+        item = characters[index - 1] if index <= len(characters) else None
+        if index > 1:
+            selector_inputs[f"character{index}_enable"] = item is not None
+        selector_inputs[f"character{index}_uc"] = ""
+        selector_inputs[f"character{index}_x"] = float(item["x"]) if item else 0.5
+        selector_inputs[f"character{index}_y"] = float(item["y"]) if item else 0.5
+        if item:
+            converter_id = allocate()
+            workflow_body[converter_id] = {
+                "class_type": "ComfyUIToNovelAIV4",
+                "inputs": {"comfyui_prompt": str(item["prompt"]).strip()},
+            }
+            selector_inputs[f"character{index}"] = [converter_id, 0]
+        else:
+            selector_inputs[f"character{index}"] = ""
+    workflow_body[selector_id] = {
+        "class_type": "CharacterPromptSelect",
+        "inputs": selector_inputs,
+    }
+    generator_inputs["characterPrompts"] = [selector_id, 0]
+
+
+def _nai_prompt_slot(
+    workflow_body: dict[str, Any], node_id: str, input_name: str
+) -> tuple[str, str]:
+    """Follow supported STRING links without bypassing NAI weight conversion."""
+    visited: set[tuple[str, str]] = set()
+    while (node_id, input_name) not in visited:
+        visited.add((node_id, input_name))
+        node = workflow_body.get(node_id)
+        inputs = node.get("inputs") if isinstance(node, dict) else None
+        if not isinstance(inputs, dict):
+            break
+        value = inputs.get(input_name)
+        if isinstance(value, str):
+            return node_id, input_name
+        if not isinstance(value, list) or len(value) != 2 or value[1] != 0:
+            break
+        node_id = str(value[0])
+        source = workflow_body.get(node_id)
+        if not isinstance(source, dict):
+            break
+        source_type = source.get("class_type")
+        if source_type == "ComfyUIToNovelAIV4":
+            input_name = "comfyui_prompt"
+        elif source_type == "Textbox":
+            source_inputs = source.get("inputs", {})
+            if not isinstance(source_inputs, dict):
+                break
+            input_name = "passthrough" if "passthrough" in source_inputs else "text"
+        else:
+            break
+    raise SystemExit("nai_prompt_link_not_supported")
 
 
 def _text_encode_nodes(workflow_body: dict[str, Any]) -> list[str]:

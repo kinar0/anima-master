@@ -1,0 +1,41 @@
+{
+  "1": {
+    "class_type": "NovelAIGenerator",
+    "inputs": {
+      "prompt": ["9", 0],
+      "negative_prompt": ["12", 0],
+      "model": "NAI Diffusion V5 Full",
+      "width": 1024,
+      "height": 1536,
+      "sampler": "k_euler",
+      "steps": 28,
+      "cfg_scale": 6,
+      "seed": 1646464729,
+      "scheduler": "karras",
+      "cfg_rescale": 0,
+      "prefer_brownian": false,
+      "variety_boost": true,
+      "limit_opus_free": false
+    }
+  },
+  "3": {
+    "class_type": "Textbox",
+    "inputs": {"text": "1girl, solo, white dress, simple background"}
+  },
+  "9": {
+    "class_type": "ComfyUIToNovelAIV4",
+    "inputs": {"comfyui_prompt": ["3", 0]}
+  },
+  "11": {
+    "class_type": "Textbox",
+    "inputs": {"text": "lowres, bad anatomy"}
+  },
+  "12": {
+    "class_type": "ComfyUIToNovelAIV4",
+    "inputs": {"comfyui_prompt": ["11", 0]}
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "inputs": {"images": ["1", 0], "filename_prefix": "astrbot/nai"}
+  }
+}
