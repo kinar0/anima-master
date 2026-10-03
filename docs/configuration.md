@@ -213,6 +213,12 @@ Canonical Tag: haneoka_school_uniform
 
 ## 发送与权限
 
+### 按会话发送前打码
+
+插件详情页的“服装词库”页面内“图片打码设置”区域按 AstrBot 完整会话 ID（平台、群聊/私聊类型、会话 ID）分别保存开关。会话首次请求图片后会自动出现在页面，也可手工添加完整会话 ID。默认关闭。开启的会话在发送每张生成图片前，把该图片上传到 ComfyUI，运行插件目录中的 `autofilter2.json`，替换工作流 `LoadImage` 的图片输入，并把 `SaveImage` 的输出前缀临时换成 Windows 安全的唯一名称；其他节点和参数沿用文件中的值，原 `autofilter2.json` 不会被修改；聊天收到的是 `SaveImage` 输出。关闭时直接发送原图。打码工作流失败时不会发送原图，会提示发送失败。该功能依赖 ComfyUI 安装新工作流所需的 Impact Pack、Impact Subpack、Essentials 节点及 `bbox/censor_detect_v1.0_s.pt` 检测模型；嵌入的 Image Blur 子图由插件展开为 GLSLShader API 节点。
+
+会话开关保存在插件数据目录的 `autofilter_sessions.json`，页面保存后立即生效，不需重载插件。
+
 - `send_result_to_chat`：是否把图片发回聊天。
 - `max_send_images`：最多发送几张。
 - `notify_drawing_and_at_sender`：同一个开关控制两项行为：接受生图请求后发送动态绘图进度；前方没有未完成申请时显示“正在绘画中”，否则显示“正在绘画中，前面还有X人”（X 不包括申请人自己）；图片完成后在群聊中 At 原申请人并告知今日剩余次数。不限额和白名单用户显示“今日剩余次数：不限”；私聊不会 At。

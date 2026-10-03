@@ -19,6 +19,7 @@
         </div>
         <div class="hero-actions">
           <div id="connection" class="connection"><i></i><span>正在连接</span></div>
+          <a class="button ghost" href="#autofilter-settings">图片打码设置</a>
           <button id="refresh-button" class="button ghost" type="button">刷新</button>
           <button id="save-button" class="button primary" type="button" disabled>保存更改</button>
         </div>
@@ -55,6 +56,11 @@
           <div>✦</div><h3>这里还没有条目</h3><p>新增一条映射，或换一个搜索关键词。</p>
         </div>
       </main>
+      <section id="autofilter-settings" class="autofilter-panel" aria-label="图片打码设置">
+        <div class="autofilter-heading"><div><p class="eyebrow">IMAGE DELIVERY</p><h2>按会话发送前打码</h2><p>群聊和私聊分别设置，默认关闭。开启后使用 autofilter2.json 打码；发送时仅替换加载图像和 Windows 安全的输出文件名前缀。</p></div><button id="autofilter-refresh" class="button ghost" type="button">刷新会话</button></div>
+        <div class="autofilter-add"><input id="autofilter-session" placeholder="完整会话 ID（平台:消息类型:会话 ID）" aria-label="完整会话 ID" /><button id="autofilter-add" class="button primary" type="button">添加会话</button></div>
+        <p id="autofilter-status" role="status"></p><div id="autofilter-list"></div>
+      </section>
     </div>
 
     <div id="dirty-bar" class="dirty-bar" hidden>
@@ -63,5 +69,6 @@
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <script type="module" src="./app.js"></script>
+    <script type="module" src="./autofilter.js"></script>
   </body>
 </html>

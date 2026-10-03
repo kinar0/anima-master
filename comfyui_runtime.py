@@ -11,6 +11,8 @@ from typing import Any
 import astrbot.api.message_components as Comp
 
 try:
+    from .autofilter_settings import AutofilterSettings
+    from .autofilter_workflow import filter_image
     from .chat_delivery import (
         ack_timeout_delivery,
         is_ack_timeout,
@@ -22,6 +24,8 @@ try:
     )
     from .comfyui_startup import ComfyUIStartupManager
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from autofilter_settings import AutofilterSettings
+    from autofilter_workflow import filter_image
     from chat_delivery import (
         ack_timeout_delivery,
         is_ack_timeout,
@@ -54,6 +58,7 @@ class ComfyUIRuntime:
         get_bool: Callable[[str, bool], bool],
         get_int: Callable[[str, int], int],
         get_str: Callable[[str, str], str],
+        autofilter_settings: AutofilterSettings | None = None,
     ):
         """Store runtime dependencies for local helper processes.
 
@@ -77,6 +82,8 @@ class ComfyUIRuntime:
         self._bool = get_bool
         self._int = get_int
         self._str = get_str
+        self.autofilter_settings = autofilter_settings
+        self.autofilter_workflow = Path(__file__).with_name("autofilter2.json")
         self._startup = ComfyUIStartupManager(
             root=self.root,
             config=self.config,
@@ -212,6 +219,9 @@ class ComfyUIRuntime:
         return detail[:300]
 
     async def send_payload(self, event: Any, payload: dict[str, Any]) -> str:
+        session = str(getattr(event, "unified_msg_origin", "") or "")
+        if self.autofilter_settings is not None:
+            self.autofilter_settings.observe(session)
         if self._bool("debug_send_payload_enabled", False):
             self.logger.info(
                 "[comfyui_agent] send payload ok=%s outputs=%s error=%s",
@@ -246,7 +256,23 @@ class ComfyUIRuntime:
             return "ComfyUI 已完成任务，但没有产出可发送的图片。"
 
         if self._bool("send_result_to_chat", True):
+            sent_outputs: list[str] = []
             for index, output in enumerate(outputs[: self._int("max_send_images", 1)]):
+                if self.autofilter_settings is not None and self.autofilter_settings.enabled(session):
+                    try:
+                        output = str(await asyncio.to_thread(
+                            filter_image,
+                            Path(output),
+                            base_url=self._str("comfyui_base_url", "http://127.0.0.1:8188"),
+                            workflow_path=self.autofilter_workflow,
+                            timeout=max(30, self._int("timeout", 300)),
+                        ))
+                    except Exception as exc:
+                        self.logger.exception("[comfyui_agent] autofilter failed for session=%s", session)
+                        message = "图片已生成，但打码失败；为避免发送原图，本次未发送该图片。"
+                        payload["delivery"] = send_failed_delivery(outputs, output, exc, message)
+                        await event.send(event.plain_result(message))
+                        return message
                 chain = []
                 if index == 0 and self._should_at_sender(event):
                     chain.extend(
@@ -273,6 +299,7 @@ class ComfyUIRuntime:
                 )
                 try:
                     await event.send(event.chain_result(chain))
+                    sent_outputs.append(output)
                     trace["send_duration_ms"] = round(
                         (time.perf_counter() - started_at) * 1000
                     )
@@ -323,8 +350,8 @@ class ComfyUIRuntime:
                             str(notice_exc)[:500],
                         )
                     return message
-            message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)
-            payload["delivery"] = sent_delivery(outputs, message)
+            message = "ComfyUI 已生成并发送图片：" + ", ".join(sent_outputs)
+            payload["delivery"] = sent_delivery(sent_outputs, message)
             payload["delivery"]["trace"] = trace
             return message
         message = "ComfyUI 已生成并发送图片：" + ", ".join(outputs)

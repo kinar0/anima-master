@@ -14,6 +14,7 @@ from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
+    from .autofilter_settings import AutofilterSettings
     from .command_router import parse_hard_route
     from .config_defaults import (
         flatten_config,
@@ -31,6 +32,7 @@ try:
     from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from autofilter_settings import AutofilterSettings
     from command_router import parse_hard_route
     from config_defaults import (
         flatten_config,
@@ -90,6 +92,9 @@ class ComfyUIAgentPlugin(Star):
         self._daily_usage = DailyUsageLimiter(
             plugin_data_path / "daily_generation_usage.json", logger
         )
+        self._autofilter_settings = AutofilterSettings(
+            plugin_data_path / "autofilter_sessions.json"
+        )
         self._danbooru_tag_cache: dict[str, Any] = {}
         self._last_prompt_summary: ContextVar[dict[str, Any]] = ContextVar(
             f"anima_prompt_summary_{id(self)}",
@@ -120,6 +125,7 @@ class ComfyUIAgentPlugin(Star):
             reverse=self._reverse,
         )
         self._runtime = self._services.runtime
+        self._runtime.autofilter_settings = self._autofilter_settings
         self._prompt_pipeline = self._services.prompt_pipeline
         self._generation_task = self._services.generation_task
         self._action_handler = self._services.action_handler
@@ -136,6 +142,36 @@ class ComfyUIAgentPlugin(Star):
             ["POST"],
             "保存 Anima 服装词库",
         )
+        context.register_web_api(
+            "/astrbot_plugin_anima_master/autofilter",
+            self.get_autofilter,
+            ["GET"],
+            "查看各会话图片打码设置",
+        )
+        context.register_web_api(
+            "/astrbot_plugin_anima_master/autofilter/save",
+            self.save_autofilter,
+            ["POST"],
+            "保存会话图片打码设置",
+        )
+
+    async def get_autofilter(self):
+        try:
+            self._ensure_dashboard_user()
+            return json_response(self._autofilter_settings.snapshot())
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+
+    async def save_autofilter(self):
+        try:
+            self._ensure_dashboard_user()
+            payload = await request.json(default={})
+            self._autofilter_settings.set_enabled(payload.get("session", ""), payload.get("enabled"))
+            return json_response(self._autofilter_settings.snapshot())
+        except ValueError as exc:
+            return error_response(str(exc), status_code=400)
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
 
     @staticmethod
     def _ensure_dashboard_user() -> None:
