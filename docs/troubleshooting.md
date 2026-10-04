@@ -2,6 +2,20 @@
 
 ## NAI 自定义工作流
 
+`-r` 模式先生成完整七段提示词，再由布局模型返回全局提示词与最多五个
+角色实例的独立提示词、坐标和位置理由。布局输出上限为
+`max(1200, min(prompt_builder_max_tokens, 2400))`。若摘要显示
+`nai_character_plan_failed`，检查 `llm_error`：`nai_character_plan_invalid_json`
+通常表示返回的 JSON 不完整或格式不合法；复杂多人请求可缩短逐人描述，
+再检查模型的可见输出。失败时不会提交未经拆分的原提示词。
+
+若 `-r` 的全局提示词没有画师串，先确认插件已重载到包含画师恢复逻辑的版本，
+再比较开启 `debug_prompt_enabled` 后的 `nai_full_prompt_before_split` 与
+`nai_global_prompt`。当前代码会按启用的画师组或本次 `-sN` 选择补回画师项，
+并将同名畸形副本替换为配置值。配置中的 `(yd_(orange_maru):1.1)` 应在
+最终提示词中保持原样；若只有布局模型原始返回缺画师，而最终提示词保留它，
+则属正常恢复。
+
 - `custom_workflow_requires_api_export`：读取了可视化编辑格式。当前 NAI 接入
   应填写 `nai_api.json`；`nai.json` 留作 ComfyUI 编辑参考。
 - `nai_prompt_link_not_supported`：NAI 正负文本经过了尚未支持的节点、缺少
@@ -14,6 +28,17 @@
 
 账户认证、额度不足和远端生成失败需结合 ComfyUI 的 NAI 扩展日志检查。
 AstrBot 的 ComfyUI 地址仍填写 ComfyUI 服务，不填写 NovelAI 网站地址。
+
+## 会话打码
+
+当前 `autofilter2.json` 将 `GrowMask` 的遮罩扩张值设为 `15`；若打码边缘
+范围与旧版本不同，先检查工作流文件是否为当前版本。打码失败时插件不会
+把未打码原图发回聊天，具体节点错误应从 ComfyUI 执行记录排查。
+
+若提示 `UltralyticsDetectorProvider` 找不到 `bbox/censor_detect_v1.0_s.pt`，
+到 [模型发布目录](https://huggingface.co/deepghs/anime_censor_detection/tree/main/censor_detect_v1.0_s)
+下载 `model.pt`，改名为 `censor_detect_v1.0_s.pt`，并确认它位于
+`ComfyUI/models/ultralytics/bbox/`，而不是插件目录下。
 
 ## `/anm` 没反应
 

@@ -8,6 +8,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+try:
+    from .tag_cleaner import split_tags, display_tag_text
+except ImportError:  # pragma: no cover - direct script-style imports.
+    from tag_cleaner import split_tags, display_tag_text
+
 
 _R_SWITCH = re.compile(r"(?<!\S)-r(?=$|[\s,，;；])", re.I)
 
@@ -188,3 +193,24 @@ def parse_nai_character_plan(raw: str) -> dict[str, Any]:
         "global_prompt": global_clean,
         "characters": cleaned,
     }
+
+
+def preserve_nai_global_artist_tags(global_prompt: str, artist_tags: str) -> str:
+    """Restore configured artist anchors after the NAI layout LLM rewrites globals."""
+    configured = split_tags(artist_tags)
+    if not configured:
+        return global_prompt
+
+    def artist_key(value: str) -> str:
+        # Ignore punctuation, escaping, separators and a trailing weight so a
+        # model's malformed copy of the same artist can be replaced.
+        value = value.strip().replace("\\", "")
+        value = re.sub(r":\s*[-+]?(?:\d+(?:\.\d*)?|\.\d+)\)?$", "", value)
+        return re.sub(r"[^a-z0-9]+", "", value.casefold())
+
+    configured_keys = {artist_key(tag) for tag in configured}
+    retained = [
+        part for part in split_tags(global_prompt)
+        if artist_key(part) not in configured_keys
+    ]
+    return ", ".join([*(display_tag_text(tag) for tag in configured), *retained])

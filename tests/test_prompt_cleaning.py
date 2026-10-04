@@ -284,6 +284,19 @@ def test_anima_syntax_escaping_is_idempotent_and_preserves_weights() -> None:
     assert display_tag_text(
         "chihaya_anon has (flat_chest:1.4) and grey_eyes"
     ) == "chihaya anon has (flat chest:1.4) and grey eyes"
+    assert display_tag_text("(yd_(orange_maru):1.1)") == "(yd_(orange_maru):1.1)"
+    assert display_tag_text("(sho_(sho_lwlw):0.95)") == "(sho_(sho_lwlw):0.95)"
+
+
+def test_weighted_parenthesized_artist_preset_survives_final_assembly() -> None:
+    config = _config()
+    config.update({
+        "active_artist_preset": "naisoft",
+        "artist_presets": ["naisoft=(yd_(orange_maru):1.1), (sho_(sho_lwlw):0.95)"],
+    })
+    result = build_final_prompt(user_prompt="a girl", llm_content="1girl", config=config)
+    assert "(yd_(orange_maru):1.1)" in result.final_prompt
+    assert "(sho_(sho_lwlw):0.95)" in result.final_prompt
 
 
 def test_structured_identity_keeps_embedded_anima_weight_syntax() -> None:

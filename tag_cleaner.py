@@ -312,7 +312,18 @@ def display_tag_text(tag: str) -> str:
         ``(watercolor:2)`` keep their intentional syntax, including when they
         occur inside a longer character description.
     """
-    value = re.sub(r"\s+", " ", str(tag or "").replace("_", " ")).strip()
+    original = re.sub(r"\s+", " ", str(tag or "")).strip()
+    # A weighted Danbooru artist can itself have a parenthesized qualifier.
+    # Preserve that complete configured expression: replacing underscores or
+    # escaping its inner parentheses changes the artist tag's meaning.
+    nested_weight = re.fullmatch(
+        r"\((.+):([-+]?(?:\d+(?:\.\d*)?|\.\d+))\)", original
+    )
+    if nested_weight and "(" in nested_weight.group(1) and ")" in nested_weight.group(1):
+        body = nested_weight.group(1)
+        if body.count("(") == body.count(")"):
+            return original
+    value = original.replace("_", " ")
     rendered: list[str] = []
     previous_end = 0
     for weighted in ANIMA_WEIGHTED_TAG_RE.finditer(value):

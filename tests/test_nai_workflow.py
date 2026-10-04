@@ -19,9 +19,23 @@ from generation_task import GenerationTaskRunner  # noqa: E402
 from nai_character_mode import (  # noqa: E402
     build_nai_character_plan_prompt,
     parse_nai_character_plan,
+    preserve_nai_global_artist_tags,
     resolve_nai_canvas,
     strip_nai_character_switch,
 )
+
+
+def test_nai_global_restores_exact_configured_artist_tags():
+    artists = "(dishwasher1910:0.864), (yd_(orange_maru):1.1), year 2024"
+    missing = preserve_nai_global_artist_tags("2girls, bedroom", artists)
+    assert missing == f"(dishwasher1910:0.864), (yd_(orange_maru):1.1), year 2024, 2girls, bedroom"
+    malformed = preserve_nai_global_artist_tags(
+        r"2girls, \(yd \(orange maru\)\:1.1\), bedroom", artists
+    )
+    assert malformed == missing
+    assert preserve_nai_global_artist_tags(
+        r"2girls, \(yd \(orange maru\)\):1.1, bedroom", artists
+    ) == missing
 
 
 def nai_graph() -> dict:

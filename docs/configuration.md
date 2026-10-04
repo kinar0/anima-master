@@ -88,6 +88,13 @@ custom_workflow_override_parameters = false
 参数、质量词或 Turbo 工作流覆盖自己的设置。已有预设应先关闭、保存并重载，
 然后再设置上述自定义工作流。
 
+`-r` 布局模型必须返回全局提示词、每个可见角色实例的提示词与坐标，
+以及简短的构图分析和位置理由。其输出上限取
+`max(1200, min(prompt_builder_max_tokens, 2400))`；最多五个实例，
+复杂多人请求可能因 JSON 不完整而停止提交。启用画师词时，主机在布局结果
+解析后按当前画师组（含本次 `-sN` 选择）恢复全局画师串，并替换同名的错误副本；
+`(yd_(orange_maru):1.1)` 等嵌套括号加权项保留原始写法。
+
 NAI 提示词支持生成节点上的直接字符串，以及经 `Textbox`、
 `ComfyUIToNovelAIV4` 连接的字符串；插件沿连线替换原始文本，保留转换节点，
 由扩展把 ComfyUI 权重语法转换为 NAI 格式。未知字符串处理节点、循环连线或
@@ -216,6 +223,17 @@ Canonical Tag: haneoka_school_uniform
 ### 按会话发送前打码
 
 插件详情页的“服装词库”页面内“图片打码设置”区域按 AstrBot 完整会话 ID（平台、群聊/私聊类型、会话 ID）分别保存开关。会话首次请求图片后会自动出现在页面，也可手工添加完整会话 ID。默认关闭。开启的会话在发送每张生成图片前，把该图片上传到 ComfyUI，运行插件目录中的 `autofilter2.json`，替换工作流 `LoadImage` 的图片输入，并把 `SaveImage` 的输出前缀临时换成 Windows 安全的唯一名称；其他节点和参数沿用文件中的值，原 `autofilter2.json` 不会被修改；聊天收到的是 `SaveImage` 输出。关闭时直接发送原图。打码工作流失败时不会发送原图，会提示发送失败。该功能依赖 ComfyUI 安装新工作流所需的 Impact Pack、Impact Subpack、Essentials 节点及 `bbox/censor_detect_v1.0_s.pt` 检测模型；嵌入的 Image Blur 子图由插件展开为 GLSLShader API 节点。
+
+检测模型需要手工放入 **ComfyUI 的模型目录**：从
+[deepghs/anime_censor_detection 的 `censor_detect_v1.0_s` 目录](https://huggingface.co/deepghs/anime_censor_detection/tree/main/censor_detect_v1.0_s)
+下载其中的 `model.pt`，重命名为 `censor_detect_v1.0_s.pt`，放到
+`ComfyUI/models/ultralytics/bbox/censor_detect_v1.0_s.pt`。工作流中的
+`UltralyticsDetectorProvider` 选择的是 `bbox/censor_detect_v1.0_s.pt`；
+文件名或目录不一致时，打码工作流无法加载该模型。
+
+当前随附工作流的 `GrowMask` 遮罩扩张值为 `15`（此前为 `8`）；
+它扩大被检测区域周围的打码遮罩。工作流参数在每次运行时从文件读取，
+不会由会话开关另行覆盖。
 
 会话开关保存在插件数据目录的 `autofilter_sessions.json`，页面保存后立即生效，不需重载插件。
 

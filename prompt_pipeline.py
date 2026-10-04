@@ -38,6 +38,7 @@ try:
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
         parse_nai_character_plan,
+        preserve_nai_global_artist_tags,
         resolve_nai_canvas,
         strip_nai_character_switch,
     )
@@ -75,6 +76,7 @@ try:
         parse_constraint_plan,
     )
     from .prompt_presets import (
+        active_artist_tags,
         apply_config_preset,
         extract_artist_preset_switch,
         fixed_character_tags,
@@ -122,6 +124,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from nai_character_mode import (
         build_nai_character_plan_prompt,
         parse_nai_character_plan,
+        preserve_nai_global_artist_tags,
         resolve_nai_canvas,
         strip_nai_character_switch,
     )
@@ -159,6 +162,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         parse_constraint_plan,
     )
     from prompt_presets import (
+        active_artist_tags,
         apply_config_preset,
         extract_artist_preset_switch,
         fixed_character_tags,
@@ -6823,6 +6827,11 @@ class PromptPipeline:
                 nai_plan = parse_nai_character_plan(
                     _extract_completion_text(plan_response)
                 )
+                if built.used_default_style:
+                    nai_plan["global_prompt"] = preserve_nai_global_artist_tags(
+                        nai_plan["global_prompt"],
+                        active_artist_tags(prompt_config, preset_index),
+                    )
             except Exception as exc:
                 summary.update(
                     skipped_reason="nai_character_plan_failed", llm_error=str(exc)
