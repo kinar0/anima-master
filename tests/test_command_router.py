@@ -120,6 +120,26 @@ def test_anm_size_and_prompt_are_space_separated():
     )
 
 
+def test_leading_generation_switches_preserve_explicit_size_and_alias():
+    for text in (
+        "-r 1216x832 少女站在河岸",
+        "-s1 1216x832 少女站在河岸",
+        "-r -s1 1216x832 少女站在河岸",
+        "-s1 -r 1216x832 少女站在河岸",
+    ):
+        prefix = text.split("1216x832")[0].strip()
+        assert parse_generation_size(text, ALLOWED_SIZES) == (
+            f"{prefix} 少女站在河岸",
+            (1216, 832),
+            None,
+        )
+    assert parse_generation_size("-r 竖图：少女站立", ALLOWED_SIZES) == (
+        "-r 少女站立",
+        (1024, 1536),
+        None,
+    )
+
+
 def test_parse_generation_size_accepts_valid_explicit_size_outside_configured_list():
     prompt, size, error = parse_generation_size(
         "分辨率 1000x1400，白色礼服少女", ALLOWED_SIZES

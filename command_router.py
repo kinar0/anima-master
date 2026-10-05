@@ -76,7 +76,7 @@ def parse_generation_size(
     for pattern in (
         rf"(?<!\S)--(?:尺寸|分辨率)\s*(?:=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
         rf"(?:尺寸|分辨率)\s*(?:为|是|=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
-        rf"^\s*{_SIZE_VALUE_PATTERN}(?=$|\s|[：:,，])\s*[：:,，]?",
+        rf"^\s*(?:(?:-r|-s\d+)\s+)*(?P<bare_size>{_SIZE_VALUE_PATTERN}(?=$|\s|[：:,，])\s*[：:,，]?)",
     ):
         size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
         if size_match:
@@ -92,7 +92,7 @@ def parse_generation_size(
         for pattern in (
             rf"(?<!\S)--(?:尺寸|分辨率)\s*(?:=|＝|:|：)?\s*(?P<alias>{aliases})(?=$|\s|[：:,，])",
             rf"(?:尺寸|分辨率)\s*(?:为|是|=|＝|:|：)?\s*(?P<alias>{aliases})(?=$|\s|[：:,，])",
-            rf"^\s*(?P<alias>{aliases})(?=$|\s|[：:,，])\s*[：:,，]?",
+            rf"^\s*(?:(?:-r|-s\d+)\s+)*(?P<bare_size>(?P<alias>{aliases})(?=$|\s|[：:,，])\s*[：:,，]?)",
         ):
             size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
             if size_match:
@@ -113,7 +113,12 @@ def parse_generation_size(
     if not size_match:
         return prompt, None, None
 
-    cleaned = (prompt[: size_match.start()] + " " + prompt[size_match.end() :]).strip()
+    size_span = (
+        size_match.span("bare_size")
+        if "bare_size" in size_match.re.groupindex
+        else size_match.span()
+    )
+    cleaned = (prompt[: size_span[0]] + " " + prompt[size_span[1] :]).strip()
     cleaned = re.sub(r"^[\s,，;；:：]+|[\s,，;；:：]+$", "", cleaned)
     cleaned = re.sub(r"([,，;；])\s*[,，;；]+", r"\1", cleaned)
     cleaned = _SPACES_RE.sub(" ", cleaned)

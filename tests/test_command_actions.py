@@ -129,6 +129,33 @@ def test_generate_action_accepts_space_after_explicit_size():
     assert calls == [("少女站在河岸", {"width": 1216, "height": 832})]
 
 
+def test_generate_action_accepts_size_after_generation_switches():
+    calls = []
+
+    async def generate(event, prompt, **kwargs):
+        calls.append((prompt, kwargs))
+
+    handler = _handler(
+        config={
+            "allowed_sizes": ["1216x832"],
+            "artist_presets": ["test=artist:test"],
+        },
+        generate=generate,
+    )
+
+    for switches in ("-r", "-s1", "-r -s1"):
+        result = asyncio.run(
+            handler.handle_action(
+                object(), "generate", f"{switches} 1216x832 少女站在河岸"
+            )
+        )
+        assert result is None
+        assert calls[-1] == (
+            f"{switches} 少女站在河岸",
+            {"width": 1216, "height": 832},
+        )
+
+
 def test_generate_action_accepts_valid_size_not_in_configured_candidates():
     calls = []
 
