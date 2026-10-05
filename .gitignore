@@ -12,3 +12,6 @@ outputs/
 config.local.toml
 AGENTS.md
 /data/
+
+# Download the censor model from Hugging Face; do not commit model weights.
+打码功能/*.pt

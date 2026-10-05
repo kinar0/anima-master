@@ -1,0 +1,7 @@
+打码检测模型下载地址：
+https://huggingface.co/deepghs/anime_censor_detection/tree/main/censor_detect_v1.0_s
+
+下载该目录中的 model.pt，重命名为 censor_detect_v1.0_s.pt，放到：
+ComfyUI/models/ultralytics/bbox/censor_detect_v1.0_s.pt
+
+模型文件仅供本地 ComfyUI 使用，不要提交到本仓库。
