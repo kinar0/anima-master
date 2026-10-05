@@ -71,10 +71,19 @@ def test_help_text_is_compact_and_fixed():
     assert "/anm 多人 <描述>" in text
     assert "不常用兼容入口" in text
     assert "/anm 无优化 <tags>" in text
+    assert "/anm -r <描述>" in text
+    assert "NAI API 工作流和提示词优化" in text
+    assert "/anm -s1 <描述>" in text
+    assert "--尺寸 1216x832" in text
+    assert "# 后原样追加" in text
     assert "/anm 改图 <要求>" in text
+    assert "需在配置中开启" in text
     assert "/anm 解析法术" in text
     assert "/anm 反推" in text
+    assert "暂未开启" not in text
     assert "/anm 1216x832" in text
+    assert "/anm 调试状态" in text
+    assert "/anm 添加角色 <名称>=<tags>" in text
     assert text == help_text(img2img_enabled=True)
 
 

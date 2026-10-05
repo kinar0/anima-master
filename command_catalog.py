@@ -180,21 +180,26 @@ def keyword_action_pairs() -> list[tuple[str, str]]:
 
 
 def build_help_text(img2img_enabled: bool = False) -> str:
-    """Build the compact fixed Anima help text.
+    """Build the chat-visible Anima command guide.
 
-    ``img2img_enabled`` remains in the signature for compatibility. The help
-    stays fixed and marks image editing as a capability that may need enabling.
+    ``img2img_enabled`` remains in the signature for compatibility. Image
+    editing is always marked as requiring its configuration switch.
     """
     return "\n".join(
         (
-            "Anima 绘图助手",
-            "生图：/anm <描述>; /anm 宽x高 <描述>; /anm <描述>#（自动追加的英语提示词）",
-            "多人：直接用 /anm <多个角色的描述>；/anm 多人 <描述> 为不常用兼容入口",
-            "原样 tags：/anm 无优化 <tags>",
-            "引用图片：/anm 改图 <要求>｜/anm 解析法术｜/anm 反推（暂未开启）",
-            "示例：/anm 1216x832 白色礼服少女#sitting on a chair",
-            "状态：/anm 状态｜排查：/anm 诊断",
-            "画师组：/anm 切换画师组 <名称>：切换当前画师组；/anm 创建画师组 <名称>=<tags>：保存并启用画师组 /anm 查看画师组：查看信息"
+            "Anima 绘图助手（/anm 帮助）",
+            "生图：/anm <描述>；多人也直接描述多个角色",
+            "尺寸：/anm 1216x832 <描述>；也可写“竖图/横图/方图”等，或在末尾加 --尺寸 1216x832",
+            "NAI 逐角色：/anm -r <描述>；需启用 NAI API 工作流和提示词优化，不与“多人/无优化”同用",
+            "画师选择：/anm -s1 <描述>（按画师组序号选本次画师串）",
+            "手动 tags：/anm <描述>#英文 tags（# 后原样追加，不参与优化）",
+            "原样 tags：/anm 无优化 <tags>（跳过提示词优化）",
+            "旧多人模式：/anm 多人 <描述>（不常用兼容入口，仅 2–4 人）",
+            "图片：附图或引用图片后用 /anm 解析法术、/anm 反推；/anm 改图 <要求> 需在配置中开启",
+            "状态：/anm 状态｜/anm 诊断｜/anm 调试状态",
+            "画师组：/anm 查看画师组｜/anm 创建画师组 <名称>=<tags>｜/anm 切换画师组 <名称>｜/anm 删除画师组 <名称>",
+            "固定角色：/anm 添加角色 <名称>=<tags>",
+            "同义前缀：/anima、/comfyui",
         )
     )
 
