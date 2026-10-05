@@ -16,6 +16,7 @@ try:
     from .config_defaults import persist_flat_config_key
     from .deployment_diagnostics import compact_status_text, diagnostic_text
     from .multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
+    from .prompt_block_rules import matches_blocked_combination
     from .prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
@@ -37,6 +38,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from config_defaults import persist_flat_config_key
     from deployment_diagnostics import compact_status_text, diagnostic_text
     from multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
+    from prompt_block_rules import matches_blocked_combination
     from prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
@@ -312,12 +314,16 @@ class CommandActionHandler:
             return "图生图/改图功能已关闭。当前先保留文生图、法术解析和图片反推主线。"
         if not self._is_allowed(event):
             return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
-        ready = await self._ensure_ready(event)
-        if not ready.get("ok"):
-            return await self._send_payload(event, ready)
         prompt = str(prompt or "").strip()
         if not prompt:
             return "请在后面写改图提示词。"
+        if matches_blocked_combination(
+            prompt, self.config.get("blocked_prompt_combinations", [])
+        ):
+            return "请求包含禁止的词语组合，已拒绝生成。"
+        ready = await self._ensure_ready(event)
+        if not ready.get("ok"):
+            return await self._send_payload(event, ready)
         image_input = await self._event_image_input(event)
         if not image_input:
             return "改图失败：请在本次消息中附图，或引用一条包含图片的消息。"

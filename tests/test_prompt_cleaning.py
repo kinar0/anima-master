@@ -288,6 +288,22 @@ def test_anima_syntax_escaping_is_idempotent_and_preserves_weights() -> None:
     assert display_tag_text("(sho_(sho_lwlw):0.95)") == "(sho_(sho_lwlw):0.95)"
 
 
+def test_nai_numeric_artist_weights_survive_final_assembly() -> None:
+    artists = (
+        "1.2::artist:banpai akira ::, 0.6::artist:chen_bin ::, "
+        "0.5::artist:onineko::, 0.4:: artist:fukai ryosuke::, "
+        "0.5::artist:kyokucho ::, 0.2::artist:ke-ta::, "
+        "year 2025, year 2026, -0.5:: lips::"
+    )
+    config = _config()
+    config.update({"active_artist_preset": "naipaint", "artist_presets": [f"naipaint={artists}"]})
+
+    result = build_final_prompt(user_prompt="a girl", llm_content="1girl", config=config)
+
+    assert artists in result.final_prompt
+    assert r"\:\:" not in result.final_prompt
+
+
 def test_weighted_parenthesized_artist_preset_survives_final_assembly() -> None:
     config = _config()
     config.update({

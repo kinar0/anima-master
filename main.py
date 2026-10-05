@@ -31,6 +31,7 @@ try:
     from .service_container import build_services
     from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
+    from .prompt_block_rules import matches_blocked_combination
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from autofilter_settings import AutofilterSettings
     from command_router import parse_hard_route
@@ -49,6 +50,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from service_container import build_services
     from danbooru_resolver import WardrobeValidationError
     from usage_limiter import DailyUsageLimiter
+    from prompt_block_rules import matches_blocked_combination
 
 
 class ComfyUIAgentPlugin(Star):
@@ -414,6 +416,12 @@ class ComfyUIAgentPlugin(Star):
         negative_prompt: str | None = None,
         multi_person: bool = False,
     ) -> str:
+        if matches_blocked_combination(
+            prompt, self.config.get("blocked_prompt_combinations", [])
+        ):
+            message = "请求包含禁止的词语组合，已拒绝生成。"
+            await event.send(event.plain_result(message))
+            return message
         quota_error = self._reserve_generation_call(event)
         if quota_error:
             await event.send(event.plain_result(quota_error))

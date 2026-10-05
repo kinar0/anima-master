@@ -57,6 +57,82 @@ def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
     assert "footwear" in prompt
 
 
+def test_llm1_six_character_contract_rejects_an_incomplete_roster() -> None:
+    names = ("角色甲", "角色乙", "角色丙", "角色丁", "角色戊", "角色己")
+    user_prompt = "六个角色：" + "、".join(names) + "一起站在舞台上"
+
+    instruction = build_semantic_plan_prompt(user_prompt)
+    incomplete = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": name,
+                    "aliases": [],
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                }
+                for name in names[:4]
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    assert "explicitly requires exactly 6 visible characters" in instruction
+    assert semantic_plan_validation_issues(incomplete, user_prompt) == (
+        "characters must contain exactly 6 visible characters; got 4",
+    )
+    repair = build_semantic_plan_repair_prompt(
+        user_prompt,
+        incomplete,
+        semantic_plan_validation_issues(incomplete, user_prompt),
+    )
+    assert "characters must contain exactly 6 visible characters; got 4" in repair
+    assert "corrected complete JSON object" in repair
+
+
+def test_llm1_preserves_all_six_characters_after_normalization() -> None:
+    names = ("角色甲", "角色乙", "角色丙", "角色丁", "角色戊", "角色己")
+    user_prompt = "6个角色：" + "、".join(names) + "一起站在舞台上"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": name,
+                    "aliases": [],
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [],
+                }
+                for name in names
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    anchors = parse_semantic_plan(raw, user_prompt)
+    plans = parse_semantic_character_plans(raw, user_prompt, anchors)
+
+    assert semantic_plan_validation_issues(raw, user_prompt) == ()
+    assert [
+        anchor.source_text
+        for anchor in anchors
+        if anchor.role == "target_character"
+    ] == list(names)
+    assert len(plans) == 6
+    assert plans[-1].target_anchor_id == "target_6"
+
+
+def test_llm1_count_contract_sums_explicit_gender_counts() -> None:
+    instruction = build_semantic_plan_prompt(
+        "4girls and 2boys pose together: A, B, C, D, E, F"
+    )
+
+    assert "explicitly requires exactly 6 visible characters" in instruction
+
+
 def test_llm1_past_tense_operations_and_plain_slots_are_not_discarded() -> None:
     prompt = (
         "丰川祥子穿着oblivionis的衣服，她的面具没有戴，"
@@ -161,6 +237,40 @@ def test_semantic_appearance_changes_are_source_grounded_advisory_hints() -> Non
     assert changes[0].source_text == "异色瞳"
     assert changes[0].dimensions == ("eye_traits",)
     assert changes[0].operation == "additive"
+
+
+def test_futa_evidence_belongs_only_to_the_adjacent_named_character() -> None:
+    prompt = "一脸娇羞的丰川祥子不熟练地给扶她千早爱音的巨根戴避孕套"
+    raw = json.dumps(
+        {
+            "characters": [
+                {
+                    "name": name,
+                    "aliases": [],
+                    "clothing": None,
+                    "clothing_source": None,
+                    "clothing_changes": [],
+                    "appearance_changes": [{
+                        "dimension": "chest_size",
+                        "operation": "replace",
+                        "source_text": "扶她",
+                    }],
+                }
+                for name in ("丰川祥子", "千早爱音")
+            ]
+        },
+        ensure_ascii=False,
+    )
+
+    changes = parse_semantic_appearance_changes(raw, prompt)
+
+    assert [(item.character_name, item.source_text, item.dimensions) for item in changes] == [
+        ("千早爱音", "扶她", ()),
+    ]
+    assert any(
+        "characters[1].appearance_changes[1].source_text" in issue
+        for issue in semantic_plan_validation_issues(raw, prompt)
+    )
 
 
 def test_semantic_appearance_change_accepts_leading_pronoun_for_named_character() -> None:

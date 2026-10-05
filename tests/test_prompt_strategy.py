@@ -3568,7 +3568,7 @@ def test_pipeline_binds_natural_stage_request_to_character_stage_profile() -> No
             return ()
 
         def profile_hints_for_prompt(self, _prompt):
-            return {}
+            return {"千早爱音": "chihaya_anon, pink_hair, grey_eyes"}
 
         def cached_outfit_profiles_for_prompt(self, _prompt):
             return SemanticLookupResult(
@@ -3648,6 +3648,96 @@ def test_pipeline_binds_natural_stage_request_to_character_stage_profile() -> No
     ]
     assert "explicit stage wardrobe = blue_jacket" in context.calls[1]["prompt"]
     assert "haneoka_school_uniform" not in context.calls[1]["prompt"]
+    writer_prompt = context.calls[1]["prompt"]
+    assert "本地角色身份/稳定外貌" not in writer_prompt
+    assert writer_prompt.count("Stable appearance by wearer") == 1
+    assert "confirmed hard tags: chihaya_anon" not in writer_prompt
+
+
+def test_nai_position_planner_console_trace_follows_prompt_debug_switch() -> None:
+    writer = (
+        "{Count: 1girl}\n{Characters:}\n{Copyright:}\n{Identity:}\n"
+        "{Details:}\n{Tags: standing, white background}\n"
+        "{Nltags: A girl stands against a white background.}"
+    )
+    plan = (
+        '{"composition_analysis":{"viewpoint":"front","layout":"centered",'
+        '"relations":"solo"},"global_prompt":"1girl, looking at viewer, white background",'
+        '"characters":[{"name":"girl","prompt":"standing, looking at viewer",'
+        '"position_reason":"center of canvas","x":0.5,"y":0.5}]}'
+    )
+
+    class _Context:
+        def __init__(self, plan_output):
+            self.outputs = [writer, plan_output]
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **_kwargs):
+            return type("_Response", (), {"completion_text": self.outputs.pop(0)})()
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return type("_Plan", (), {
+                "use_web_search": False, "use_deep_thinking": False,
+                "search_reason": "", "thinking_reason": "",
+            })()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content)
+
+    class _CaptureLogger(_Logger):
+        def __init__(self):
+            self.messages = []
+
+        def info(self, message, *args):
+            self.messages.append(message % args if args else message)
+
+    def run(debug, plan_output=plan):
+        logger = _CaptureLogger()
+        config = {"debug_prompt_enabled": debug}
+        pipeline = PromptPipeline(
+            context=_Context(plan_output), config=config, logger=logger,
+            danbooru_resolver=_Resolver(), researcher=_Researcher(),
+            get_bool=lambda key, default: bool(config.get(key, default)),
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            shorten=_shorten,
+        )
+        event = type("_Event", (), {"unified_msg_origin": "session"})()
+        return asyncio.run(pipeline.build(event, "-r 一个女孩站立")), logger.messages
+
+    enabled_result, enabled_log = run(True)
+    disabled_result, disabled_log = run(False)
+    failed_result, failed_log = run(True, "not json")
+
+    assert enabled_result.summary["nai_character_count"] == 1
+    assert enabled_result.summary["nai_character_plan_raw"] == plan
+    assert enabled_result.final_prompt == "1girl, white background"
+    assert enabled_result.summary["nai_dropped_global_character_tags"] == [
+        "looking at viewer"
+    ]
+    assert any("NAI -r position planner prompt" in line for line in enabled_log)
+    assert any("NAI -r position planner raw output" in line for line in enabled_log)
+    assert any("center of canvas" in line for line in enabled_log)
+    assert disabled_result.summary["nai_character_count"] == 1
+    assert "nai_character_plan_raw" not in disabled_result.summary
+    assert not any("NAI -r position planner" in line for line in disabled_log)
+    assert failed_result.summary["skipped_reason"] == "nai_character_plan_failed"
+    assert failed_result.summary["nai_character_plan_raw"] == "not json"
+    assert any("NAI -r position planner failed" in line for line in failed_log)
 
 
 def test_creative_outfit_keeps_profile_identity_without_default_clothes() -> None:
@@ -5218,6 +5308,26 @@ def test_structured_count_validation_adds_mixed_gender_counts() -> None:
     )
     assert not structured_count_tags_match_roster(("1girl", "1boy"), 3)
     assert not structured_count_tags_match_roster(("2girls", "2people"), 2)
+
+
+def test_structured_parser_collapses_only_identical_repeated_blocks() -> None:
+    blocks = (
+        "{Count: 2girls}\n"
+        "{Characters: togawa_sakiko, chihaya_anon}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: togawa_sakiko has blue hair; chihaya_anon has pink hair}\n"
+        "{Details: togawa_sakiko smiles; chihaya_anon stands}\n"
+        "{Tags: close-up}\n"
+        "{Nltags: togawa_sakiko stands beside chihaya_anon.}"
+    )
+    repeated = _parse_structured_prompt(blocks + "\n" + blocks)
+    conflicting = _parse_structured_prompt(
+        blocks + "\n{Details: togawa_sakiko sits; chihaya_anon stands}"
+    )
+
+    assert repeated.validation_errors == ()
+    assert len(repeated.characters) == 2
+    assert conflicting.validation_errors == ("duplicate fields: details",)
 
 
 def test_unrequested_futa_and_male_genitals_are_removed_from_structured_output() -> None:

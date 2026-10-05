@@ -2,12 +2,25 @@
 
 ## NAI 自定义工作流
 
-`-r` 模式先生成完整七段提示词，再由布局模型返回全局提示词与最多五个
-角色实例的独立提示词、坐标和位置理由。布局输出上限为
-`max(1200, min(prompt_builder_max_tokens, 2400))`。若摘要显示
+`-r` 模式先生成完整七段提示词，再由布局模型返回全局提示词与各角色实例的
+独立提示词、坐标和位置理由。V5 最多 22 个实例，V4/V4.5 最多 6 个；布局输出
+上限按模型角色上限扩展，最高 7200 tokens。若摘要显示
 `nai_character_plan_failed`，检查 `llm_error`：`nai_character_plan_invalid_json`
 通常表示返回的 JSON 不完整或格式不合法；复杂多人请求可缩短逐人描述，
 再检查模型的可见输出。失败时不会提交未经拆分的原提示词。
+`nai_character_plan_invalid_interaction_tag` 表示布局模型给某个角色的
+`interaction_tags` 写了空动作、多个 `#`、逗号串或非英文 tag。
+应让模型只为明确互动的角色各写一项 `source#tag`、`target#tag` 或
+`mutual#tag`；无明确方向时使用空列表。
+
+若一名角色的性别、衣服、动作、表情、外貌或 `looking at viewer` 影响了其他角色，检查任务摘要中的
+`nai_global_prompt` 和 `nai_dropped_global_character_tags`。视线 tag 应只出现在
+对应的 `nai_characters[].prompt`；其他明确角色实例条件也应进入该角色框。解析器会从全局提示词删除可明确识别的误放项，并把原始项
+列入 `nai_dropped_global_character_tags`。若删除列表非空但目标角色框里也没有该
+条件，说明布局模型没有完成重新分配，应对照调试日志中的位置规划任务书和原始回复。
+不要用该列表判断所有重复词都必须删除：官方 base prompt 本来就负责场景，
+`bed`、`table`、`classroom` 等共享环境物件可以保留；角色框再用
+`lying on bed`、`sitting on table` 表达局部关系。
 
 若 `-r` 的全局提示词没有画师串，先确认插件已重载到包含画师恢复逻辑的版本，
 再比较开启 `debug_prompt_enabled` 后的 `nai_full_prompt_before_split` 与
@@ -130,8 +143,8 @@ AstrBot 的 ComfyUI 地址仍填写 ComfyUI 服务，不填写 NovelAI 网站地
 ## 生图提示 `invalid_structured_prompt`
 
 这表示 LLM2 的七字段外壳或人数锚点不完整，不是 ComfyUI 工作流的
-`node_errors`。当前硬校验只检查七个命名字段是否各出现一次，以及 `Count`
-是否包含有效人数 tag；七个字段是 `Count`、`Characters`、`Copyright`、
+`node_errors`。当前硬校验检查七个命名字段是否齐全、同名字段有无冲突值，以及 `Count`
+是否包含有效人数 tag；完全相同的重复字段会折叠成一份。七个字段是 `Count`、`Characters`、`Copyright`、
 `Identity`、`Details`、`Tags` 和 `Nltags`。
 Identity/Details 不会再因为角色名没有位于分句开头而令整份回复失败：照片分镜
 中的唯一角色名可用于归属，无角色名的后续分号句继承上一明确角色，仍无法归属
@@ -178,7 +191,7 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 
 对于“角色 A cosplay 角色 B”，检查 `wardrobe_resolution_states`、`semantic_character_outfits` 和 `source_grounding_tags`。LLM1 正常时会在 A 的 `clothing_source` 中原样返回 B；即使 LLM1 给了错误 wardrobe 意图，主机也会对明确的“A cosplay B / A 穿 B 的衣服”逐角色修复为 `outfit_source`。普通文字请求不得出现旧换装块的“最终主体必须是固定角色”；只有参考图/搜索换装仍可进入旧路线。若句式本身无法确定穿着者，才保留 `explicit_but_unresolved`，且不得恢复目标默认衣柜。
 
-新 LLM1 原始结果应是 `characters[].name / aliases / clothing / clothing_source / clothing_changes / appearance_changes`，不应再看到 `wardrobe.kind` 指令。`name` 应是原文中的角色实体短语；`aliases` 只列与它明确构成同一 `A（B）` 对的别名。`semantic_plan_attempt_count=2` 只用于 JSON、原文证据或基本字段外形损坏；修复失败时仍保留初稿中可解析的部分。旧日志里的 `wardrobe.kind/source/anchor_id` 是兼容格式，不应据此修改当前提示词。
+新 LLM1 原始结果应是 `characters[].name / aliases / clothing / clothing_source / clothing_changes / appearance_changes`，不应再看到 `wardrobe.kind` 指令。`name` 应是原文中的角色实体短语；`aliases` 只列与它明确构成同一 `A（B）` 对的别名。宿主最多保留 22 名可见角色；原文明示“6 个角色 / 六人 / 4girls and 2boys”等人数而回复只有 4 项时，`semantic_plan_validation_errors` 应出现 `characters must contain exactly 6 visible characters; got 4`，随后 `semantic_plan_attempt_count=2`。若原始回复已有 6 项而解析后的 anchors/plans 只有 4 项，说明仍在运行带历史 `characters[:4]` 截断的旧代码，应重载插件。修复失败时仍保留初稿中可解析的部分。旧日志里的 `wardrobe.kind/source/anchor_id` 是兼容格式，不应据此修改当前提示词。
 
 `clothing_changes` 的标准槽位是 `upper_body.primary / lower_body.skirt / one_piece.dress / outerwear / headwear / face_accessory.mask / handwear / legwear / footwear / lower_body.all / misc`。例如真实返回中的 `operation=removed, slots=[mask]` 与 `slots=[boots]` 会分别归一为 `remove face_accessory.mask` 和 `remove footwear`；未知但非空的槽位归入 `misc`。若操作、颜色或 `source_text` 仍无法校验，`semantic_plan_validation_errors` 必须出现具体错误并触发一次修复，不能只在最终计划中悄悄消失。检查给 LLM2 的 `Per-character clothing evidence` 是否保留 `Changes:` 和原始用户证据。
 

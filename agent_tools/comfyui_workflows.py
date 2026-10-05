@@ -6,6 +6,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+
+def _nai_character_limit(model: Any) -> int:
+    name = str(model or "").casefold()
+    if "v5" in name or "diffusion-5" in name:
+        return 22
+    if "v4" in name or "diffusion-4" in name:
+        return 6
+    return 0
+
 DEFAULT_NEGATIVE_PROMPT = (
     "worst quality, low quality, score_1, score_2, score_3, artist name"
 )
@@ -422,7 +431,7 @@ def _apply_nai_character_prompts(
     if (
         not isinstance(generator_inputs, dict)
         or not isinstance(characters, list)
-        or not 1 <= len(characters) <= 5
+        or not 1 <= len(characters) <= _nai_character_limit(generator_inputs.get("model"))
     ):
         raise SystemExit("nai_character_plan_character_count")
     used = {str(key) for key in workflow_body}
@@ -439,22 +448,22 @@ def _apply_nai_character_prompts(
 
     selector_id = allocate()
     selector_inputs: dict[str, Any] = {}
-    for index in range(1, 6):
+    for index in range(1, max(5, len(characters)) + 1):
         item = characters[index - 1] if index <= len(characters) else None
         if index > 1:
             selector_inputs[f"character{index}_enable"] = item is not None
         selector_inputs[f"character{index}_uc"] = ""
         selector_inputs[f"character{index}_x"] = float(item["x"]) if item else 0.5
         selector_inputs[f"character{index}_y"] = float(item["y"]) if item else 0.5
-        if item:
-            converter_id = allocate()
-            workflow_body[converter_id] = {
-                "class_type": "ComfyUIToNovelAIV4",
-                "inputs": {"comfyui_prompt": str(item["prompt"]).strip()},
-            }
-            selector_inputs[f"character{index}"] = [converter_id, 0]
-        else:
+        if not item:
             selector_inputs[f"character{index}"] = ""
+            continue
+        converter_id = allocate()
+        workflow_body[converter_id] = {
+            "class_type": "ComfyUIToNovelAIV4",
+            "inputs": {"comfyui_prompt": str(item["prompt"]).strip()},
+        }
+        selector_inputs[f"character{index}"] = [converter_id, 0]
     workflow_body[selector_id] = {
         "class_type": "CharacterPromptSelect",
         "inputs": selector_inputs,

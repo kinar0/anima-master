@@ -35,9 +35,62 @@ from typing import Any
 
 DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT = (
     "Extract only what the user said about each visible character. Copy phrases "
-    "exactly, use null for unknown clothing, never guess tags or lore, and return "
-    "JSON only."
+    "exactly, preserve the user's complete visible-character roster without "
+    "merging or omitting anyone, use null for unknown clothing, never guess tags "
+    "or lore, and return JSON only."
 )
+
+MAX_SEMANTIC_CHARACTERS = 22
+MAX_SEMANTIC_ANCHORS = MAX_SEMANTIC_CHARACTERS * 2
+
+_COUNT_WORD_VALUES = {
+    **{str(value): value for value in range(1, MAX_SEMANTIC_CHARACTERS + 1)},
+    "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6,
+    "七": 7, "八": 8, "九": 9, "十": 10, "十一": 11, "十二": 12,
+    "十三": 13, "十四": 14, "十五": 15, "十六": 16, "十七": 17,
+    "十八": 18, "十九": 19, "二十": 20, "二十一": 21, "二十二": 22,
+    "one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+    "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
+    "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
+    "sixteen": 16, "seventeen": 17, "eighteen": 18, "nineteen": 19,
+    "twenty": 20, "twenty-one": 21, "twenty two": 22, "twenty-two": 22,
+}
+_COUNT_WORD_PATTERN = "|".join(
+    re.escape(value)
+    for value in sorted(_COUNT_WORD_VALUES, key=len, reverse=True)
+)
+
+
+def _explicit_visible_character_count(user_prompt: str) -> int | None:
+    """Read an explicit visible-person total without trying to identify names."""
+    text = str(user_prompt or "")
+    total_patterns = (
+        rf"(?<![第零一二两三四五六七八九十\d])"
+        rf"(?P<count>{_COUNT_WORD_PATTERN})\s*(?:个|名|位)?\s*"
+        rf"(?:可见的?)?(?:角色|人物|人)(?!称)",
+        rf"\b(?P<count>{_COUNT_WORD_PATTERN})\s+(?:visible\s+)?"
+        rf"(?:characters?|people|persons?)\b",
+    )
+    for pattern in total_patterns:
+        match = re.search(pattern, text, re.I)
+        if match:
+            return _COUNT_WORD_VALUES.get(match.group("count").casefold())
+
+    gender_pattern = (
+        rf"(?<![第零一二两三四五六七八九十\d])"
+        rf"(?P<count>{_COUNT_WORD_PATTERN})\s*(?:个|名|位)?\s*"
+        rf"(?:女孩|女生|女性|少女|男孩|男生|男性|少年)"
+        rf"|\b(?P<english>{_COUNT_WORD_PATTERN})\s*"
+        rf"(?:girls?|boys?|women|men)\b"
+    )
+    values: list[int] = []
+    for match in re.finditer(gender_pattern, text, re.I):
+        value = match.group("count") or match.group("english")
+        parsed = _COUNT_WORD_VALUES.get(str(value).casefold())
+        if parsed:
+            values.append(parsed)
+    total = sum(values)
+    return total if 1 <= total <= MAX_SEMANTIC_CHARACTERS else None
 
 LEGACY_SEMANTIC_PLAN_SYSTEM_PROMPTS = frozenset({
     "You extract semantic lookup anchors for a local Danbooru index. "
@@ -344,8 +397,18 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         A prompt requiring per-character intent JSON with no model-authored tags.
         The host derives IDs and performs local evidence lookup afterward.
     """
+    expected_count = _explicit_visible_character_count(user_prompt)
+    count_contract = (
+        f"The request explicitly requires exactly {expected_count} visible "
+        f"characters. The characters array MUST contain exactly {expected_count} "
+        "items. Do not merge, summarize, sample, or omit characters. "
+        if expected_count is not None else
+        "Preserve the complete visible-character roster. Do not merge, summarize, "
+        "sample, or omit characters. "
+    )
     return (
-        "List each visible character once. A character used only as a cosplay or "
+        "List each visible character once. " + count_contract +
+        "A character used only as a cosplay or "
         "clothing reference is not visible. Copy all text values exactly from the "
         "request; never translate, guess tags, or fill missing clothes.\n\n"
         "Return only:\n"
@@ -380,7 +443,9 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "gender_presentation), operation (replace or additive), and exact "
         "source_text; do not output tags. operation=replace means the new value "
         "supersedes the old value; operation=additive means both remain visibly "
-        "present. Shared "
+        "present. A trait immediately before a name belongs only to that "
+        "person (扶她千早爱音 means only 千早爱音 is futanari); futanari is not "
+        "chest_size. Shared "
         "words such as both/all/双方/两人/都 must be copied onto every affected "
         "character.\n\n"
         f"User request: {user_prompt}"
@@ -391,7 +456,8 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
     """Convert an untrusted planner response into source-grounded lookup anchors.
 
     ``raw`` may contain a fenced or prose-wrapped JSON object. The result contains
-    at most twelve anchors whose source text occurs in ``user_prompt`` and whose
+    at most ``MAX_SEMANTIC_ANCHORS`` anchors whose source text occurs in
+    ``user_prompt`` and whose
     candidate spellings are safe to pass to the local Danbooru lookup CLI. An
     invalid response degrades to an empty tuple rather than aborting generation.
     """
@@ -401,7 +467,7 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
     if not isinstance(items, list):
         return ()
     anchors: list[SemanticAnchor] = []
-    for index, item in enumerate(items[:12]):
+    for index, item in enumerate(items[:MAX_SEMANTIC_ANCHORS]):
         if not isinstance(item, dict):
             continue
         role = str(item.get("role") or "").strip().lower()
@@ -589,6 +655,18 @@ def _appearance_source_is_grounded(
     source_key = normalized(source_text)
     if not source_key:
         return False
+    # A bare sexual-trait phrase is easy for a planner to copy onto every
+    # character because it occurs somewhere in the request.  Require the
+    # phrase to be locally attached to this character instead.  This is only
+    # an evidence check; it does not infer new appearance dimensions.
+    if source_key in {"扶她", "futa", "futanari"}:
+        name_key = normalized(character_name)
+        if not name_key:
+            return False
+        return bool(
+            re.search(re.escape(source_key) + re.escape(name_key), prompt_key)
+            or re.search(re.escape(name_key) + r"(?:是|为|变成|成为)?" + re.escape(source_key), prompt_key)
+        )
     if source_key in prompt_key:
         return True
     if not str(character_name or "").strip() or len(source_key) < 4:
@@ -622,7 +700,7 @@ def parse_semantic_appearance_changes(
     if not isinstance(characters, list):
         return ()
     changes: list[SemanticAppearanceChange] = []
-    for character in characters[:4]:
+    for character in characters[:MAX_SEMANTIC_CHARACTERS]:
         if not isinstance(character, dict):
             continue
         name = str(character.get("name") or "").strip()
@@ -657,6 +735,11 @@ def parse_semantic_appearance_changes(
                     )
                 )
             ) if isinstance(raw_dimensions, (list, tuple)) else ()
+            if re.sub(r"[^\w\u4e00-\u9fff]+", "", source_text.casefold()) in {
+                "扶她", "futa", "futanari"
+            }:
+                # Futanari is a sex characteristic, not a breast-size edit.
+                dimensions = tuple(d for d in dimensions if d != "chest_size")
             operation = {
                 "replace": "replace",
                 "replacement": "replace",
@@ -743,7 +826,7 @@ def _simple_semantic_to_legacy(
         return {"kind": kind, "source": wardrobe_source, "changes": changes}
 
     wardrobe_role_demands: dict[str, set[str]] = {}
-    for item in characters[:4]:
+    for item in characters[:MAX_SEMANTIC_CHARACTERS]:
         if not isinstance(item, dict):
             continue
         wardrobe = normalized_wardrobe(item)
@@ -820,7 +903,7 @@ def _simple_semantic_to_legacy(
     # evidence observable, this prevents a valid clothing request from being
     # mistaken for an unspecified creative fallback.
     if intent_only:
-        for item in characters[:4]:
+        for item in characters[:MAX_SEMANTIC_CHARACTERS]:
             if not isinstance(item, dict):
                 continue
             wardrobe = normalized_wardrobe(item)
@@ -863,7 +946,9 @@ def _simple_semantic_to_legacy(
             })
             lookup_ids[key] = [anchor_id]
 
-    for index, item in enumerate(characters[:4], start=1):
+    for index, item in enumerate(
+        characters[:MAX_SEMANTIC_CHARACTERS], start=1
+    ):
         if not isinstance(item, dict):
             continue
         source_text = str(
@@ -1000,7 +1085,7 @@ def parse_semantic_character_plans(
         by_id[key] = anchor
     plans: list[SemanticCharacterPlan] = []
     referenced_targets: list[str] = []
-    for item in items[:8]:
+    for item in items[:MAX_SEMANTIC_CHARACTERS]:
         if not isinstance(item, dict):
             continue
         target_id = str(item.get("target_anchor_id") or "").strip().lower()
@@ -1078,11 +1163,24 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                 )
             )
             and "wardrobe" not in item
-            for item in characters[:4]
+            for item in characters[:MAX_SEMANTIC_CHARACTERS]
         )
         issues: list[str] = []
+        if len(characters) > MAX_SEMANTIC_CHARACTERS:
+            issues.append(
+                f"characters must not exceed {MAX_SEMANTIC_CHARACTERS} visible "
+                f"characters; got {len(characters)}"
+            )
+        expected_count = _explicit_visible_character_count(user_prompt)
+        if expected_count is not None and len(characters) != expected_count:
+            issues.append(
+                "characters must contain exactly "
+                f"{expected_count} visible characters; got {len(characters)}"
+            )
         request_has_parentheses = bool(re.search(r"[（(][^（）()]{1,120}[）)]", user_prompt))
-        for index, item in enumerate(characters[:4], start=1):
+        for index, item in enumerate(
+            characters[:MAX_SEMANTIC_CHARACTERS], start=1
+        ):
             if not isinstance(item, dict):
                 issues.append(f"characters[{index}] must be an object")
                 continue
@@ -1195,8 +1293,13 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
             return ("characters and lookups must both be arrays",)
         lookup_rows = [item for item in lookups[:8] if isinstance(item, dict)]
         issues: list[str] = []
+        if len(characters) > MAX_SEMANTIC_CHARACTERS:
+            issues.append(
+                f"characters must not exceed {MAX_SEMANTIC_CHARACTERS} visible "
+                f"characters; got {len(characters)}"
+            )
         wardrobe_demands: dict[str, set[str]] = {}
-        for item in characters[:4]:
+        for item in characters[:MAX_SEMANTIC_CHARACTERS]:
             if not isinstance(item, dict) or not isinstance(item.get("wardrobe"), dict):
                 continue
             wardrobe = item["wardrobe"]
@@ -1208,7 +1311,15 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                 source_key = re.sub(r"\s+", " ", source.lower())
                 expected_role = "outfit" if kind == "named_outfit" else "outfit_source"
                 wardrobe_demands.setdefault(source_key, set()).add(expected_role)
-        for index, item in enumerate(characters[:4], start=1):
+        expected_count = _explicit_visible_character_count(user_prompt)
+        if expected_count is not None and len(characters) != expected_count:
+            issues.append(
+                "characters must contain exactly "
+                f"{expected_count} visible characters; got {len(characters)}"
+            )
+        for index, item in enumerate(
+            characters[:MAX_SEMANTIC_CHARACTERS], start=1
+        ):
             if not isinstance(item, dict):
                 issues.append(f"characters[{index}] must be an object")
                 continue
@@ -1281,7 +1392,9 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
     issues: list[str] = []
     if isinstance(raw_plans, list):
         seen_targets: list[str] = []
-        for index, item in enumerate(raw_plans[:8], start=1):
+        for index, item in enumerate(
+            raw_plans[:MAX_SEMANTIC_CHARACTERS], start=1
+        ):
             if not isinstance(item, dict):
                 issues.append(f"character_plans[{index}] is not an object")
                 continue
@@ -1442,7 +1555,7 @@ def parse_semantic_character_aliases(
     if not isinstance(characters, list):
         return ()
     pairs: list[tuple[str, str]] = []
-    for item in characters[:4]:
+    for item in characters[:MAX_SEMANTIC_CHARACTERS]:
         if not isinstance(item, dict):
             continue
         name = str(item.get("name") or "").strip()

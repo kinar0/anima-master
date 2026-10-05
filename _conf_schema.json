@@ -730,6 +730,16 @@
           "sensual_mode_enabled": true
         }
       },
+      "blocked_prompt_combinations": {
+        "description": "拒绝生成的词语组合",
+        "type": "list",
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "hint": "每行一组，词语用 && 连接，例如：词语A && 词语B。用户输入同时包含该行全部词语时直接拒绝，不调用提示词模型或 ComfyUI，也不扣生图次数；不区分英文字母大小写，检查 # 后手工词。留空则不拦截。",
+        "collapsed": true
+      },
       "keyword_prompt_rules_enabled": {
         "description": "启用关键词强制规则",
         "type": "bool",

@@ -201,6 +201,9 @@ ANIMA_WEIGHTED_TAG_RE = re.compile(
     r"(?P<weight>[-+]?(?:\d+(?:\.\d*)?|\.\d+))\)"
 )
 ANIMA_LITERAL_SYNTAX_CHARS = frozenset(":()[]")
+NAI_NUMERIC_EMPHASIS_RE = re.compile(
+    r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)::.+?::\s*$"
+)
 
 
 def split_tags(text: str) -> list[str]:
@@ -217,7 +220,14 @@ def split_tags(text: str) -> list[str]:
         cleaned.strip(),
         flags=re.I,
     )
-    parts = [part.strip(" \t\r\n,.;:：") for part in cleaned.split(",")]
+    parts = []
+    for fragment in cleaned.split(","):
+        part = fragment.strip(" \t\r\n,.;")
+        # A final :: closes NovelAI numeric emphasis. Generic punctuation
+        # trimming used to erase it before the prompt reached ComfyUI.
+        if not NAI_NUMERIC_EMPHASIS_RE.fullmatch(part):
+            part = part.strip(":：")
+        parts.append(part)
     return [part for part in parts if part]
 
 
@@ -313,6 +323,11 @@ def display_tag_text(tag: str) -> str:
         occur inside a longer character description.
     """
     original = re.sub(r"\s+", " ", str(tag or "")).strip()
+    # Numeric emphasis is intentional NAI syntax, including any artist:
+    # function inside it. Keep the configured expression byte-for-byte apart
+    # from whitespace normalization; literal Danbooru colons still escape.
+    if NAI_NUMERIC_EMPHASIS_RE.fullmatch(original):
+        return original
     # A weighted Danbooru artist can itself have a parenthesized qualifier.
     # Preserve that complete configured expression: replacing underscores or
     # escaping its inner parentheses changes the artist tag's meaning.

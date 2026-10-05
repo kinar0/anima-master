@@ -288,6 +288,59 @@ _ENGLISH_SCENE_RE = re.compile(
     flags=re.I,
 )
 
+# Recognize a generated environment without treating clothing such as
+# "stage costume" as a scene request.
+_GENERATED_SCENE_TAG_RE = re.compile(
+    r"(?:indoors?|outdoors?|(?:dark |japanese |school |bedroom )?interior|"
+    r"(?:bed|living|class|bath|dining) ?room|kitchen|office|library|"
+    r"street|city|beach|forest|park|garden|station|restaurant|cafe|"
+    r"shrine|temple|castle|dungeon|poolside|nightscape|"
+    r"(?:dim |bright )?indoor lighting(?: with (?:a )?spotlight)?)",
+    re.I,
+)
+
+
+def has_generated_scene(tags: str, prose: str = "") -> bool:
+    """Return whether model output contains a concrete scene or environment."""
+    if any(
+        _GENERATED_SCENE_TAG_RE.fullmatch(part.strip().lower().replace("_", " "))
+        for part in str(tags or "").split(",")
+    ):
+        return True
+    return bool(
+        re.search(r"\b(?:indoors|outdoors|indoor lighting|outdoor lighting)\b", prose, re.I)
+        or re.search(
+            r"\b(?:in|inside|at) (?:an? |the )?"
+            r"(?:bedroom|living room|classroom|bathroom|kitchen|office|"
+            r"library|dungeon|forest|garden|park|street)\b",
+            prose,
+            re.I,
+        )
+    )
+
+
+def strip_default_portrait_tags(text: str) -> str:
+    """Remove automatic white/simple background tags when a scene wins."""
+    return ", ".join(
+        part.strip()
+        for part in str(text or "").split(",")
+        if part.strip()
+        and part.strip().lower().replace("_", " ")
+        not in {"simple background", "white background"}
+    )
+
+
+def strip_default_portrait_prose(text: str) -> str:
+    """Remove automatic plain-background phrases from scene prose."""
+    cleaned = re.sub(
+        r"\s*\b(?:with|against|on|before|over)\s+(?:an?\s+|the\s+)?"
+        r"(?:(?:simple|white)\s+)+(?:plain\s+)?background\b",
+        "",
+        str(text or ""),
+        flags=re.I,
+    )
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
+
 
 def _positive_background_text(text: str) -> str:
     """Remove common negative background requests before intent detection."""

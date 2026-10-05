@@ -18,6 +18,7 @@ from agent_tools.comfyui_workflows import custom_t2i_workflow, workflow  # noqa:
 from generation_task import GenerationTaskRunner  # noqa: E402
 from nai_character_mode import (  # noqa: E402
     build_nai_character_plan_prompt,
+    has_explicit_nai_interaction,
     parse_nai_character_plan,
     preserve_nai_global_artist_tags,
     resolve_nai_canvas,
@@ -36,6 +37,14 @@ def test_nai_global_restores_exact_configured_artist_tags():
     assert preserve_nai_global_artist_tags(
         r"2girls, \(yd \(orange maru\)\):1.1, bedroom", artists
     ) == missing
+
+
+def test_nai_global_restores_numeric_emphasis_artist_tags():
+    artists = "1.2::artist:banpai akira ::, -0.5:: lips::"
+
+    assert preserve_nai_global_artist_tags("2girls, bedroom", artists) == (
+        f"{artists}, 2girls, bedroom"
+    )
 
 
 def nai_graph() -> dict:
@@ -117,24 +126,231 @@ def test_nai_r_switch_and_repeated_character_instances(tmp_path):
     assert "school uniform" in first and "evening dress" in second
 
 
+def test_nai_directional_action_tags_reach_the_correct_character_boxes():
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {
+            "viewpoint": "front view", "layout": "two figures", "relations": "A hugs B",
+        },
+        "global_prompt": "2girls, source#hug, indoors",
+        "characters": [
+            {"name": "A", "prompt": "girl, blue hair, hugging B", "interaction_tags": ["source#hug"],
+             "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": "girl, pink hair, target#hug", "interaction_tags": ["target#hug"],
+             "position_reason": "right", "x": .7, "y": .5},
+        ],
+    }))
+    assert plan["global_prompt"] == "2girls, indoors"
+    assert plan["characters"][0]["prompt"].endswith("source#hug")
+    assert plan["characters"][1]["prompt"].count("target#hug") == 1
+    result = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, plan["global_prompt"],
+        "blurry", 1024, 1536, 28, 6, 123, nai_characters=plan["characters"],
+    )
+    selector = result[result["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    first = result[selector["character1"][0]]["inputs"]["comfyui_prompt"]
+    second = result[selector["character2"][0]]["inputs"]["comfyui_prompt"]
+    assert "source#hug" in first and "target#hug" not in first
+    assert "target#hug" in second and "source#hug" not in second
+
+
+def test_nai_gaze_tags_are_character_scoped_and_removed_from_global_prompt():
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {
+            "viewpoint": "front", "layout": "close pair", "relations": "different gazes",
+        },
+        "global_prompt": (
+            "2girls, looking at viewer, eye_contact, looking down, sideways glance, "
+            "indoors, close-up, eye-level"
+        ),
+        "characters": [
+            {"name": "togawa sakiko", "prompt": "face toward viewer, looking at viewer",
+             "position_reason": "left", "x": .36, "y": .42},
+            {"name": "chihaya anon", "prompt": (
+                "face toward viewer, eyes glancing down-left toward togawa sakiko's chest"
+             ), "position_reason": "right", "x": .62, "y": .56},
+        ],
+    }))
+
+    assert plan["global_prompt"] == "2girls, indoors, close-up, eye-level"
+    assert plan["dropped_global_character_tags"] == [
+        "looking at viewer", "eye_contact", "looking down", "sideways glance",
+    ]
+    assert "looking at viewer" in plan["characters"][0]["prompt"]
+    assert "eyes glancing down-left" in plan["characters"][1]["prompt"]
+
+
+def test_nai_all_character_instance_conditions_are_removed_from_global_prompt():
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {
+            "viewpoint": "wide shot", "layout": "group", "relations": "classroom",
+        },
+        "global_prompt": (
+            "2girls, girl, blue_hair, large_breasts, white_shirt, school_uniform, "
+            "smiling, holding_guitar, sitting_on_table, hug, bed, classroom, "
+            "cinematic lighting, wide shot"
+        ),
+        "characters": [
+            {
+                "name": "character a",
+                "prompt": (
+                    "girl, blue_hair, large_breasts, white_shirt, school_uniform, "
+                    "smiling, holding_guitar, sitting_on_table, hug, bed"
+                ),
+                "position_reason": "sitting on the left desk", "x": .3, "y": .55,
+            },
+            {
+                "name": "character b",
+                "prompt": "girl, pink_hair, school_uniform, standing",
+                "position_reason": "standing at right", "x": .7, "y": .5,
+            },
+        ],
+    }))
+
+    assert plan["global_prompt"] == (
+        "2girls, bed, classroom, cinematic lighting, wide shot"
+    )
+    assert plan["dropped_global_character_tags"] == [
+        "girl", "blue_hair", "large_breasts", "white_shirt", "school_uniform",
+        "smiling", "holding_guitar", "sitting_on_table", "hug",
+    ]
+
+
+def test_nai_position_prompt_requires_per_character_gaze_assignment():
+    canvas = {
+        "width": 1216, "height": 832, "aspect_ratio": "19:13",
+        "orientation": "landscape", "character_limit": 22,
+    }
+    instruction = build_nai_character_plan_prompt(
+        "两人的脸朝向viewer，但爱音看向祥子的胸口", "2girls, looking at viewer", canvas
+    )
+
+    assert "local environment relationships in global_prompt" in instruction
+    assert "repeat it in every applicable character prompt" in instruction
+    assert "only Anon's eyes glance down-left toward Sakiko's chest" in instruction
+    assert "looking at viewer only in Sakiko's prompt" in instruction
+    assert "sex/gender, identity tag" in instruction
+    assert "sitting on a table" in instruction
+    assert "classroom belongs globally" in instruction
+    assert "sitting on classroom desk belongs to that character" in instruction
+
+
+def test_nai_mutual_action_tags_and_legacy_plan_without_tags():
+    base = {
+        "composition_analysis": {
+            "viewpoint": "front", "layout": "pair", "relations": "mutual embrace",
+        },
+        "global_prompt": "2girls, indoors",
+        "characters": [
+            {"name": "A", "prompt": "girl", "interaction_tags": ["mutual#hug"],
+             "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": "girl", "interaction_tags": ["mutual#hug"],
+             "position_reason": "right", "x": .7, "y": .5},
+        ],
+    }
+    mutual = parse_nai_character_plan(json.dumps(base))
+    assert all("mutual#hug" in item["prompt"] for item in mutual["characters"])
+    for item in base["characters"]:
+        del item["interaction_tags"]
+    legacy = parse_nai_character_plan(json.dumps(base))
+    assert all(item["interaction_tags"] == [] for item in legacy["characters"])
+
+
+def test_nai_directional_action_accepts_one_multiword_danbooru_tag():
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {"viewpoint": "front", "layout": "pair", "relations": "pointing"},
+        "global_prompt": "2girls",
+        "characters": [
+            {"name": "A", "prompt": "girl", "interaction_tags": ["source#pointing at another"],
+             "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": "girl", "interaction_tags": ["target#pointing"],
+             "position_reason": "right", "x": .7, "y": .5},
+        ],
+    }))
+    assert "source#pointing at another" in plan["characters"][0]["prompt"]
+    assert "target#pointing" in plan["characters"][1]["prompt"]
+
+
+@pytest.mark.parametrize("invalid", ["source#hug, target#hug", "source#hug#kiss", "source#", "source#亲吻", "hug"])
+def test_nai_drops_invalid_directional_action_tag_without_losing_layout(invalid):
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {"viewpoint": "front", "layout": "pair", "relations": "hug"},
+        "global_prompt": "2girls",
+        "characters": [
+            {"name": "A", "prompt": "girl, smiling", "interaction_tags": [invalid],
+             "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": "girl", "interaction_tags": [],
+             "position_reason": "right", "x": .7, "y": .5},
+        ],
+    }))
+    assert plan["characters"][0]["prompt"] == "A, girl, smiling"
+    assert plan["characters"][0]["x"] == .3
+    assert plan["dropped_interaction_tags"] == [invalid]
+
+
+def test_nai_ordinary_four_panel_request_omits_directional_tags():
+    request = (
+        "4格漫画：第1格爱音掀开暖帘，祥子跟在身后；第2格爱音回头微笑；"
+        "第3格祥子点头；第4格两人走向座位。"
+    )
+    assert not has_explicit_nai_interaction(request)
+    canvas = {"width": 832, "height": 1216, "aspect_ratio": "13:19", "orientation": "portrait"}
+    instruction = build_nai_character_plan_prompt(request, "2girls", canvas)
+    assert '"interaction_tags"' not in instruction
+    assert "Omit interaction_tags entirely" in instruction
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {"viewpoint": "front", "layout": "four panels", "relations": "walking"},
+        "global_prompt": "2girls, restaurant",
+        "characters": [{"name": "A", "prompt": "A, lifting curtain, source#lift(curtain)",
+                        "interaction_tags": ["target#walk"],
+                        "position_reason": "upper panel", "x": .5, "y": .2}],
+    }), allow_interaction_tags=False)
+    assert plan["characters"][0]["prompt"] == "A, lifting curtain"
+    assert len(plan["dropped_interaction_tags"]) == 2
+
+
 def test_nai_r_requires_nai_workflow():
     with pytest.raises(SystemExit, match="nai_character_mode_requires_nai_workflow"):
         workflow({}, "1girl", "blurry", 1024, 1536, 20, 5, 42,
                  nai_characters=[{"name": "girl", "prompt": "girl", "x": .5, "y": .5}])
 
 
-def test_nai_r_rejects_more_instances_than_workflow_supports():
+def test_nai_r_supports_22_instances_and_rejects_23():
+    characters = [
+        {"name": f"girl {i}", "prompt": f"girl {i}, standing", "position_reason": "panel", "x": .5, "y": .5}
+        for i in range(1, 23)
+    ]
+    plan = {"composition_analysis": {"viewpoint": "front", "layout": "grid", "relations": "separate"},
+            "global_prompt": "22girls, grid", "characters": characters}
+    parsed = parse_nai_character_plan(json.dumps(plan))
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, parsed["global_prompt"],
+        "blurry", 1024, 1536, 28, 6, 123, nai_characters=parsed["characters"],
+    )
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    assert selector["character22_enable"] is True
+    assert "girl 22" in graph[selector["character22"][0]]["inputs"]["comfyui_prompt"]
+    plan["characters"].append(characters[0])
     with pytest.raises(ValueError, match="nai_character_plan_character_count"):
-        parse_nai_character_plan(json.dumps({
-            "composition_analysis": {
-                "viewpoint": "front view", "layout": "six panels", "relations": "separate",
-            },
-            "global_prompt": "6girls, split screen",
-            "characters": [
-                {"name": "girl", "prompt": "girl, standing", "position_reason": "panel", "x": .5, "y": .5}
-                for _ in range(6)
-            ],
-        }))
+        parse_nai_character_plan(json.dumps(plan))
+
+
+def test_nai_r_uses_v4_model_limit_even_with_explicit_canvas(tmp_path):
+    graph = nai_graph()
+    graph["1"]["inputs"]["model"] = "NAI Diffusion V4.5 Full"
+    path = tmp_path / "nai-v4.json"
+    path.write_text(json.dumps(graph), encoding="utf-8")
+    canvas = resolve_nai_canvas(
+        {"custom_workflow_enabled": True, "custom_workflow_path": str(path)},
+        (832, 1216), explicit_size=True,
+    )
+    assert canvas["character_limit"] == 6
+    assert "at most 6 instances" in build_nai_character_plan_prompt("six girls", "6girls", canvas)
+    characters = [{"name": "girl", "prompt": "girl", "x": .5, "y": .5} for _ in range(7)]
+    with pytest.raises(SystemExit, match="nai_character_plan_character_count"):
+        custom_t2i_workflow(
+            {"custom_workflow_path": str(path)}, "7girls", "blurry",
+            832, 1216, 28, 6, 123, nai_characters=characters,
+        )
 
 
 @pytest.mark.parametrize("chair,floor", [((.27, .29), (.76, .75)), ((.74, .25), (.23, .77))])
@@ -149,6 +365,10 @@ def test_nai_complex_side_view_preserves_model_layout(chair, floor):
     assert "camera angle" in instruction
     assert "relative positions" in instruction
     assert "Do not use a fixed coordinate template" in instruction
+    assert "Omit interaction_tags entirely" in instruction
+    directed = build_nai_character_plan_prompt("A 拥抱 B", "2girls", canvas)
+    assert "source#tag" in directed and "target#tag" in directed
+    assert "mutual#tag" in directed
     assert "Actual canvas: 1024x1536 pixels, aspect ratio 2:3 (portrait)" in instruction
     plan = parse_nai_character_plan(json.dumps({
         "composition_analysis": {
@@ -178,6 +398,7 @@ def test_nai_canvas_uses_explicit_size_or_override():
     assert explicit == {
         "width": 1536, "height": 1024, "aspect_ratio": "3:2",
         "orientation": "landscape", "source": "request",
+        "model": "NAI Diffusion V5 Full", "character_limit": 22,
     }
     config["custom_workflow_override_parameters"] = True
     overridden = resolve_nai_canvas(config, (832, 1216), plugin_root=PLUGIN_DIR)

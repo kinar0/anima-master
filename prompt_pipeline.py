@@ -37,6 +37,7 @@ try:
     )
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
+        has_explicit_nai_interaction,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
         resolve_nai_canvas,
@@ -66,7 +67,11 @@ try:
         enforce_user_background_intent,
         extract_background_mode,
         framing_hidden_outfit_slots,
+        has_generated_scene,
+        strip_default_portrait_prose,
+        strip_default_portrait_tags,
         strip_unrequested_default_background_prose,
+        user_requests_explicit_background,
     )
     from .prompt_builder import (
         build_final_prompt,
@@ -123,6 +128,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from nai_character_mode import (
         build_nai_character_plan_prompt,
+        has_explicit_nai_interaction,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
         resolve_nai_canvas,
@@ -152,7 +158,11 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         enforce_user_background_intent,
         extract_background_mode,
         framing_hidden_outfit_slots,
+        has_generated_scene,
+        strip_default_portrait_prose,
+        strip_default_portrait_tags,
         strip_unrequested_default_background_prose,
+        user_requests_explicit_background,
     )
     from prompt_builder import (
         build_final_prompt,
@@ -889,8 +899,11 @@ def _parse_structured_prompt(text: str) -> StructuredPromptParseResult:
     for key, value in matches:
         values_by_field.setdefault(key.lower(), []).append(value.strip())
     missing = sorted(field_names - set(values_by_field))
+    # Some providers repeat a completed block verbatim.  Reusing one identical
+    # value is unambiguous; competing values still require a format retry.
     duplicates = sorted(
-        key for key, values in values_by_field.items() if len(values) != 1
+        key for key, values in values_by_field.items()
+        if len(set(values)) > 1
     )
     validation_errors: list[str] = []
     if missing:
@@ -3672,6 +3685,7 @@ class PromptPipeline:
         fixed_character: bool,
         character_name: str = "",
         allow_futa: bool = False,
+        max_tokens: int | None = None,
     ) -> str:
         """Ask the configured provider for the seven-block Anima prompt payload.
 
@@ -3713,7 +3727,7 @@ class PromptPipeline:
                 "Identity and Details; keep its clothing in its own Details clause."
                 + sexual_trait_rule
             ),
-            "max_tokens": self._int("prompt_builder_max_tokens", 700),
+            "max_tokens": max_tokens or self._int("prompt_builder_max_tokens", 700),
             "thinking": {
                 "type": "enabled" if use_deep_thinking else "disabled"
             },
@@ -3912,7 +3926,7 @@ class PromptPipeline:
         return tuple(refined)
 
     async def _generate_semantic_plan_with_llm(
-        self, *, provider_id: str, user_prompt: str
+        self, *, provider_id: str, user_prompt: str, max_tokens: int | None = None
     ) -> str:
         """Propose bounded lookup anchors; the local index remains authoritative."""
         planner_prompt = build_semantic_plan_prompt(user_prompt)
@@ -3938,7 +3952,7 @@ class PromptPipeline:
             chat_provider_id=provider_id,
             prompt=planner_prompt,
             system_prompt=planner_system_prompt,
-            max_tokens=min(self._int("prompt_builder_max_tokens", 900), 900),
+            max_tokens=max_tokens or min(self._int("prompt_builder_max_tokens", 900), 900),
             thinking={"type": "disabled"},
         )
         raw_plan = _extract_completion_text(response)
@@ -3956,6 +3970,7 @@ class PromptPipeline:
         user_prompt: str,
         previous_raw: str,
         issues: tuple[str, ...],
+        max_tokens: int | None = None,
     ) -> str:
         """Run one bounded relationship-repair attempt after schema validation."""
         repair_prompt = build_semantic_plan_repair_prompt(
@@ -3982,7 +3997,7 @@ class PromptPipeline:
             chat_provider_id=provider_id,
             prompt=repair_prompt,
             system_prompt=planner_system_prompt,
-            max_tokens=min(self._int("prompt_builder_max_tokens", 900), 900),
+            max_tokens=max_tokens or min(self._int("prompt_builder_max_tokens", 900), 900),
             thinking={"type": "disabled"},
         )
         repaired = _extract_completion_text(response)
@@ -4549,6 +4564,17 @@ class PromptPipeline:
             )
         )
         filtered_common_tags = tuple(split_tags(filtered_background_tags))
+        generated_scene_selected = bool(
+            not user_requests_explicit_background(background_request)
+            and has_generated_scene(
+                ", ".join(filtered_common_tags), ", ".join(character_blocks)
+            )
+        )
+        if generated_scene_selected:
+            effective_background_mode = EXPLICIT_SCENE
+            filtered_common_tags = tuple(split_tags(
+                strip_default_portrait_tags(", ".join(filtered_common_tags))
+            ))
         if effective_background_mode == DEFAULT_PORTRAIT:
             filtered_common_tags = tuple(
                 dict.fromkeys(
@@ -4727,7 +4753,7 @@ class PromptPipeline:
                 "background_mode_source": (
                     "user_prompt_override"
                     if background_overridden
-                    else "llm_plan"
+                    else "llm_generated_scene" if generated_scene_selected else "llm_plan"
                 ),
                 "explicit_position_requested": explicit_position_requested,
                 "interaction_aliases_normalized": (
@@ -5071,6 +5097,7 @@ class PromptPipeline:
                 semantic_plan_raw = await self._generate_semantic_plan_with_llm(
                     provider_id=provider_id,
                     user_prompt=prompt,
+                    max_tokens=7200 if nai_r_mode else None,
                 )
                 semantic_plan_attempt_count = 1
                 semantic_plan_initial_raw = semantic_plan_raw
@@ -5085,6 +5112,7 @@ class PromptPipeline:
                             user_prompt=prompt,
                             previous_raw=semantic_plan_raw,
                             issues=semantic_plan_validation_errors,
+                            max_tokens=7200 if nai_r_mode else None,
                         )
                     except Exception as repair_exc:
                         # Keep the usable, source-grounded subset of the first
@@ -5722,10 +5750,7 @@ class PromptPipeline:
             local_character_hints, character_effective_outfits
         )
         if character_effective_outfits:
-            context_lines = [
-                "Local Danbooru validation (non-wardrobe hard tags only):",
-                "confirmed hard tags: " + ", ".join(semantic_confirmed_tags),
-            ]
+            context_lines = []
             visible_roster = tuple(
                 dict.fromkeys(
                     tag
@@ -5737,15 +5762,27 @@ class PromptPipeline:
                     )
                 )
             )
+            extra_hard_tags = tuple(
+                tag for tag in semantic_confirmed_tags if tag not in visible_roster
+            )
+            if extra_hard_tags:
+                context_lines.append(
+                    "Other confirmed non-wardrobe hard tags: "
+                    + ", ".join(extra_hard_tags)
+                )
             if visible_roster:
+                bindings = tuple(summary["confirmed_character_bindings"])
                 context_lines.extend(
                     (
                         "confirmed visible character roster (authoritative):",
-                        ", ".join(visible_roster),
-                        "Use these exact canonical names in Characters, Identity, Details and Nltags; do not translate aliases into pinyin or shorten qualified names.",
+                        "Use these canonical names in Characters, Identity, Details and Nltags:",
                         *(
                             f"- {item['source']} => {item['canonical_tag']}"
-                            for item in summary["confirmed_character_bindings"]
+                            for item in bindings
+                        ),
+                        *(
+                            tag for tag in visible_roster
+                            if tag not in {item["canonical_tag"] for item in bindings}
                         ),
                     )
                 )
@@ -5753,18 +5790,11 @@ class PromptPipeline:
                 item for item in character_effective_outfits if item.appearance_tags
             )
             if appearance_plans:
-                context_lines.append(
-                    "Character-scoped stable appearance authority (never mix wearers):"
-                )
+                context_lines.append("Stable appearance by wearer (user edits take priority):")
                 context_lines.extend(
                     f"- {item.target_source_text}: "
                     + ", ".join(item.appearance_tags)
                     for item in appearance_plans
-                )
-                context_lines.append(
-                    "Treat this as the stable profile baseline. Preserve it unless "
-                    "the user-requested identity change below calls for a visual "
-                    "adjustment."
                 )
                 advisory_change_lines = []
                 for item in appearance_plans:
@@ -5788,10 +5818,8 @@ class PromptPipeline:
                     )
                 if advisory_change_lines:
                     context_lines.append(
-                        "LLM1 detected these explicit user identity changes. They are "
-                        "advisory evidence, not hard tags: use visual judgment to "
-                        "modify the matching stable profile rather than mechanically "
-                        "preserving a conflicting trait:"
+                        "Explicit user appearance changes by wearer; never assign "
+                        "one person's change to another:"
                     )
                     context_lines.extend(advisory_change_lines)
                     context_lines.append(
@@ -5814,7 +5842,13 @@ class PromptPipeline:
             # requests.  The legacy fixed-character fallback remains below.
             fixed_character=False,
             character_name="",
-            fixed_character_hints=local_character_hints,
+            fixed_character_hints={
+                name: hint for name, hint in local_character_hints.items()
+                if not any(
+                    _character_outfit_matches(name, item) and item.appearance_tags
+                    for item in character_effective_outfits
+                )
+            },
             sensual_mode=use_sensual_mode,
             mode=mode,
             prompt_builder_template=self._str("prompt_builder_template", ""),
@@ -5850,6 +5884,7 @@ class PromptPipeline:
                 fixed_character=False,
                 character_name="",
                 allow_futa=allow_futa,
+                max_tokens=7200 if nai_r_mode else None,
             )
         except Exception as exc:
             if not research_plan.use_deep_thinking:
@@ -5871,6 +5906,7 @@ class PromptPipeline:
                         fixed_character=False,
                         character_name="",
                         allow_futa=allow_futa,
+                        max_tokens=7200 if nai_r_mode else None,
                     )
                 except Exception as retry_exc:
                     self.logger.warning(
@@ -5900,6 +5936,7 @@ class PromptPipeline:
                     fixed_character=False,
                     character_name="",
                     allow_futa=allow_futa,
+                    max_tokens=7200 if nai_r_mode else None,
                 )
             except Exception as retry_exc:
                 self.logger.warning(
@@ -6006,6 +6043,7 @@ class PromptPipeline:
                     fixed_character=False,
                     character_name="",
                     allow_futa=allow_futa,
+                    max_tokens=7200 if nai_r_mode else None,
                 )
                 summary["prompt_llm_attempt_count"] = 2
                 if self._bool("debug_prompt_enabled", False):
@@ -6511,6 +6549,7 @@ class PromptPipeline:
         nltags = nltags_authority.filter_prose(nltags)
         background_mode = ""
         background_mode_source = "not_applicable"
+        generated_scene_selected = False
         if mode == "txt2img":
             background_mode = llm_background_mode
             if background_mode:
@@ -6528,6 +6567,16 @@ class PromptPipeline:
             nltags = strip_unrequested_default_background_prose(
                 nltags, background_intent_prompt
             )
+            generated_scene_selected = bool(
+                not user_requests_explicit_background(background_intent_prompt)
+                and has_generated_scene(llm_content, nltags)
+            )
+            if generated_scene_selected:
+                if background_mode == DEFAULT_PORTRAIT:
+                    background_mode = EXPLICIT_SCENE
+                    background_mode_source = "llm_generated_scene"
+                llm_content = strip_default_portrait_tags(llm_content)
+                nltags = strip_default_portrait_prose(nltags)
         llm_failed = bool(llm_error and not str(llm_content or "").strip())
         if structured_prompt_mode:
             character_resolution = DanbooruResolveOutcome(text=llm_content)
@@ -6602,6 +6651,19 @@ class PromptPipeline:
                     "[comfyui_agent] prompt constraint planner failed: %s",
                     constraint_exc,
                 )
+        structured_extra_tags = wardrobe_authority.filter_tags(tuple(
+            dict.fromkeys(
+                (
+                    *required_profile_tags,
+                    *semantic_required_tags,
+                    *global_outfit_reinforcement_tags,
+                )
+            )
+        ))
+        if generated_scene_selected:
+            structured_extra_tags = tuple(split_tags(
+                strip_default_portrait_tags(", ".join(structured_extra_tags))
+            ))
         built = build_final_prompt(
             user_prompt=prompt,
             llm_content=llm_content,
@@ -6612,15 +6674,7 @@ class PromptPipeline:
             structured_copyright_tags=structured_copyright_tags,
             structured_identity_blocks=structured_identity_blocks,
             structured_detail_blocks=structured_detail_blocks,
-            structured_tag_tags=wardrobe_authority.filter_tags(tuple(
-                dict.fromkeys(
-                    (
-                        *required_profile_tags,
-                        *semantic_required_tags,
-                        *global_outfit_reinforcement_tags,
-                    )
-                )
-            )),
+            structured_tag_tags=structured_extra_tags,
             preserve_structured_order=structured_prompt_mode,
             constraint_plan=constraint_plan,
             background_mode=background_mode,
@@ -6808,6 +6862,9 @@ class PromptPipeline:
             requested_canvas = canvas_size or (
                 self._int("width", 1024), self._int("height", 1536)
             )
+            debug_nai_plan = self._bool("debug_prompt_enabled", False)
+            plan_prompt = ""
+            plan_raw = ""
             try:
                 nai_canvas = resolve_nai_canvas(
                     prompt_config, requested_canvas, explicit_size=canvas_size_explicit
@@ -6815,18 +6872,52 @@ class PromptPipeline:
                 plan_prompt = build_nai_character_plan_prompt(
                     prompt, built.final_prompt, nai_canvas
                 )
+                if debug_nai_plan:
+                    self.logger.info(
+                        "[comfyui_agent] NAI -r position planner canvas:\n%s",
+                        json.dumps(nai_canvas, ensure_ascii=False, indent=2),
+                    )
+                    self.logger.info(
+                        "[comfyui_agent] NAI -r position planner prompt:\n%s",
+                        plan_prompt,
+                    )
                 plan_response = await self.context.llm_generate(
                     chat_provider_id=provider_id,
                     prompt=plan_prompt,
                     system_prompt="Plan NAI character instances precisely. Return only valid JSON.",
                     max_tokens=max(
-                        1200, min(self._int("prompt_builder_max_tokens", 1800), 2400)
+                        1200,
+                        min(7200, max(
+                            self._int("prompt_builder_max_tokens", 1800),
+                            1200 + 260 * nai_canvas["character_limit"],
+                        )),
                     ),
                     thinking={"type": "disabled"},
                 )
+                plan_raw = _extract_completion_text(plan_response)
+                if debug_nai_plan:
+                    self.logger.info(
+                        "[comfyui_agent] NAI -r position planner raw output:\n%s",
+                        plan_raw,
+                    )
                 nai_plan = parse_nai_character_plan(
-                    _extract_completion_text(plan_response)
+                    plan_raw,
+                    character_limit=nai_canvas["character_limit"],
+                    allow_interaction_tags=has_explicit_nai_interaction(prompt),
                 )
+                if background_mode == DEFAULT_PORTRAIT and has_generated_scene(
+                    nai_plan["global_prompt"],
+                    ", ".join(item["prompt"] for item in nai_plan["characters"]),
+                ):
+                    nai_plan["global_prompt"] = strip_default_portrait_tags(
+                        strip_default_portrait_prose(nai_plan["global_prompt"])
+                    )
+                    for character in nai_plan["characters"]:
+                        character["prompt"] = strip_default_portrait_tags(
+                            character["prompt"]
+                        )
+                    summary["background_mode"] = EXPLICIT_SCENE
+                    summary["background_mode_source"] = "nai_generated_scene"
                 if built.used_default_style:
                     nai_plan["global_prompt"] = preserve_nai_global_artist_tags(
                         nai_plan["global_prompt"],
@@ -6836,17 +6927,36 @@ class PromptPipeline:
                 summary.update(
                     skipped_reason="nai_character_plan_failed", llm_error=str(exc)
                 )
+                if debug_nai_plan:
+                    summary["nai_character_plan_prompt"] = plan_prompt
+                    summary["nai_character_plan_raw"] = plan_raw
+                    self.logger.info(
+                        "[comfyui_agent] NAI -r position planner failed: %s", exc
+                    )
                 return PromptPipelineResult("", summary)
             summary["nai_characters"] = nai_plan["characters"]
             summary["nai_canvas"] = nai_canvas
             summary["nai_composition_analysis"] = nai_plan["composition_analysis"]
             summary["nai_global_prompt"] = nai_plan["global_prompt"]
             summary["nai_character_count"] = len(nai_plan["characters"])
+            summary["nai_dropped_interaction_tags"] = nai_plan["dropped_interaction_tags"]
+            summary["nai_dropped_global_character_tags"] = nai_plan[
+                "dropped_global_character_tags"
+            ]
             summary["final_prompt_head"] = self._shorten(nai_plan["global_prompt"], 600)
             summary["final_prompt_chars"] = len(nai_plan["global_prompt"])
             if self._bool("debug_prompt_enabled", False):
                 summary["nai_character_plan_prompt"] = plan_prompt
+                summary["nai_character_plan_raw"] = plan_raw
                 summary["nai_full_prompt_before_split"] = built.final_prompt
                 summary["final_prompt"] = nai_plan["global_prompt"]
+                self.logger.info(
+                    "[comfyui_agent] NAI -r position planner final plan:\n%s",
+                    json.dumps(
+                        {"canvas": nai_canvas, **nai_plan},
+                        ensure_ascii=False,
+                        indent=2,
+                    ),
+                )
             return PromptPipelineResult(nai_plan["global_prompt"], summary)
         return PromptPipelineResult(built.final_prompt, summary)

@@ -61,6 +61,36 @@ def test_unknown_action_returns_error():
     assert result == "未知 Anima 指令。"
 
 
+def test_create_artist_preset_preserves_nai_numeric_emphasis() -> None:
+    config = {"quality_prefix": "test"}
+    handler = _handler(config)
+    response = handler.create_artist_preset(
+        "naipaint=1.2::artist:banpai akira ::, "
+        "0.6::artist:chen_bin ::, -0.5:: lips::"
+    )
+
+    assert "已保存并启用" in response
+    assert config["artist_presets"] == [
+        "naipaint=1.2::artist:banpai akira ::, "
+        "0.6::artist:chen_bin ::, -0.5:: lips::,"
+    ]
+
+
+def test_edit_blocks_combination_before_comfyui_readiness() -> None:
+    handler = _handler(
+        config={"blocked_prompt_combinations": ["词甲 && 词乙"]}
+    )
+    handler._bool = lambda key, default: True if key == "img2img_enabled" else default
+
+    async def unexpected_ready(_event):
+        raise AssertionError("blocked edit must not check ComfyUI")
+
+    handler._ensure_ready = unexpected_ready
+    result = asyncio.run(handler.edit(object(), "词乙和词甲"))
+
+    assert result == "请求包含禁止的词语组合，已拒绝生成。"
+
+
 def test_generate_action_passes_one_time_size_override():
     calls = []
 

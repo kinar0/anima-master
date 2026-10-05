@@ -18,6 +18,9 @@ from prompt_background import (  # noqa: E402
     enforce_user_background_intent,
     extract_background_mode,
     framing_hidden_outfit_slots,
+    has_generated_scene,
+    strip_default_portrait_prose,
+    strip_default_portrait_tags,
     strip_unrequested_default_background_tags,
     strip_unrequested_default_background_prose,
     user_requests_explicit_background,
@@ -91,6 +94,22 @@ def test_explicit_scene_strips_only_default_background_phrase_from_nltags() -> N
     assert strip_unrequested_default_background_prose(
         prose, "爱音和祥子在泳池边站在一起"
     ) == "Anon and Sakiko stand poolside under bright sunlight."
+
+
+def test_generated_scene_replaces_automatic_white_background() -> None:
+    tags = "3girls, stage costume, indoors, simple background, white background"
+    assert has_generated_scene(tags) is True
+    assert has_generated_scene("3girls, stage costume, spotlight") is False
+    assert strip_default_portrait_tags(tags) == "3girls, stage costume, indoors"
+    prose = (
+        "Sakiko in her stage costume kneels beside Anon, "
+        "dim indoor lighting with a spotlight against a white background"
+    )
+    assert has_generated_scene("", prose) is True
+    assert strip_default_portrait_prose(prose) == (
+        "Sakiko in her stage costume kneels beside Anon, "
+        "dim indoor lighting with a spotlight"
+    )
 
 
 def test_nltags_is_separated_before_background_and_tag_processing() -> None:
