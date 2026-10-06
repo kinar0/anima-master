@@ -51,6 +51,8 @@ from prompt_pipeline import (  # noqa: E402
     add_explicit_cosplay_source_anchors,
     add_host_outfit_changes_to_plans,
     explicit_cosplay_assignments,
+    explicit_worn_clothing_phrases,
+    preserve_unresolved_worn_clothing_plans,
     repair_explicit_cosplay_plans,
     repair_single_target_cached_named_outfit_plan,
     resolve_unspecified_wardrobe_mode,
@@ -1784,6 +1786,74 @@ def test_multi_target_cached_named_outfit_repairs_only_explicit_wearer_clauses()
     assert repaired[2].wardrobe == SemanticWardrobe("creative_fallback")
 
 
+def test_modified_named_uniform_repairs_planner_omission_without_losing_changes() -> None:
+    targets = (
+        SemanticAnchor("anon", "target_character", "character", "爱音", "", ("chihaya_anon",)),
+        SemanticAnchor("sakiko", "target_character", "character", "祥子", "", ("togawa_sakiko",)),
+    )
+    outfit = SemanticAnchor(
+        "tsukinomori", "outfit", "outfit", "月之森校服", "",
+        ("tsukinomori_school_uniform",),
+    )
+    skirt_change = SemanticOutfitDirective(
+        "replace_color", ("lower_body.skirt",), "蓝色", "裙子改成蓝色", "sakiko"
+    )
+    plans = (
+        SemanticCharacterPlan("anon", SemanticWardrobe("default_profile")),
+        SemanticCharacterPlan("sakiko", SemanticWardrobe("default_profile"), (skirt_change,)),
+    )
+    cached = SemanticLookupResult(
+        named_outfit_tags=("tsukinomori_school_uniform",), anchors=(outfit,)
+    )
+
+    repaired = repair_single_target_cached_named_outfit_plan(
+        plans, (*targets, outfit), cached,
+        "爱音看着祥子穿着露出小腹的月之森校服，裙子改成蓝色",
+    )
+
+    assert repaired[0] == plans[0]
+    assert repaired[1].wardrobe == SemanticWardrobe("named_outfit", "tsukinomori")
+    assert repaired[1].directives == (skirt_change,)
+
+    ambiguous = repair_single_target_cached_named_outfit_plan(
+        plans, (*targets, outfit), cached,
+        "爱音穿着常服，看着穿着月之森校服的祥子",
+    )
+    assert ambiguous == plans
+    scene_mention = repair_single_target_cached_named_outfit_plan(
+        plans, (*targets, outfit), cached,
+        "祥子穿着白色外套站在陈列的月之森校服旁边",
+    )
+    assert scene_mention == plans
+
+
+def test_unrecognized_worn_clothing_never_restores_saved_default() -> None:
+    targets = (
+        SemanticAnchor("a", "target_character", "character", "甲", "", ("character_a",)),
+        SemanticAnchor("b", "target_character", "character", "乙", "", ("character_b",)),
+    )
+    plans = (
+        SemanticCharacterPlan("a", SemanticWardrobe("default_profile")),
+        SemanticCharacterPlan("b", SemanticWardrobe("none")),
+    )
+    prompt = "甲穿着带金线的紫色斗篷站在乙旁边，乙正在看书"
+
+    repaired = preserve_unresolved_worn_clothing_plans(plans, targets, prompt)
+
+    assert repaired[0].wardrobe == SemanticWardrobe("creative_fallback")
+    assert repaired[1] == plans[1]
+    assert explicit_worn_clothing_phrases(prompt, "甲") == (
+        "带金线的紫色斗篷站在乙旁边",
+    )
+    assert explicit_worn_clothing_phrases(prompt, "乙") == ()
+
+
+def test_worn_clothing_scope_does_not_cross_to_another_wearer() -> None:
+    prompt = "甲穿着长外套，乙穿着红色连衣裙"
+    assert explicit_worn_clothing_phrases(prompt, "甲") == ("长外套",)
+    assert explicit_worn_clothing_phrases(prompt, "乙") == ("红色连衣裙",)
+
+
 def test_generic_named_outfit_components_reach_writer_for_arbitrary_wearer() -> None:
     target = SemanticAnchor(
         "tomori", "target_character", "character", "高松灯", "", ("takamatsu_tomori",)
@@ -1833,7 +1903,8 @@ def test_generic_named_outfit_components_reach_writer_for_arbitrary_wearer() -> 
         "green_skirt",
         "green_necktie",
     )
-    assert "named outfit = haneoka_school_uniform, grey_jacket" in context
+    assert "named outfit base = haneoka_school_uniform, grey_jacket" in context
+    assert "apply every user-requested change to the base" in context
 
 
 def test_explicit_cosplay_wording_is_repaired_per_wearer() -> None:
@@ -1968,7 +2039,7 @@ def test_prompt_matched_saved_outfit_profile_binds_to_each_wearer_plan() -> None
     assert set(authority.selected_tags) == set(saved_tags)
     assert safe_global_outfit_tags(effective) == ()
     context = character_wardrobe_authority_context(effective)
-    assert context.count("named outfit =") == 2
+    assert context.count("named outfit base =") == 2
 
     detail = controlled_character_outfit_detail(
         "togawa_sakiko sits on a chair, wearing the Haneoka summer school "

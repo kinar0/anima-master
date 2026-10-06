@@ -2426,6 +2426,32 @@ def fallback_target_anchors_from_semantic_evidence(
     return tuple(targets)
 
 
+_DIRECT_WEAR_VERB = r"(?:穿着?|身穿|身着|换上|换成|wears?|wearing|dressed\s+in)"
+
+
+def explicit_worn_clothing_phrases(user_prompt: str, wearer: str) -> tuple[str, ...]:
+    """Find direct wearer-to-clothing evidence without classifying the garment.
+
+    The text after a wear verb stays intact for the writer. A name elsewhere in
+    the same clause is not enough to assign that clothing to the character.
+    """
+    if not wearer.strip():
+        return ()
+    phrases: list[str] = []
+    for clause in re.split(r"[，,。；;\n]+", str(user_prompt or "")):
+        for match in re.finditer(
+            rf"{re.escape(wearer.strip())}\s*(?:正|正在)?\s*"
+            rf"{_DIRECT_WEAR_VERB}\s*[\"“']?(?P<clothing>.+)",
+            clause,
+            flags=re.I,
+        ):
+            clothing = re.split(_DIRECT_WEAR_VERB, match.group("clothing"), maxsplit=1, flags=re.I)[0]
+            clothing = clothing.strip(" \t\"”'的")
+            if clothing:
+                phrases.append(clothing)
+    return tuple(dict.fromkeys(phrases))
+
+
 def repair_single_target_cached_named_outfit_plan(
     plans: tuple[SemanticCharacterPlan, ...],
     anchors: tuple[SemanticAnchor, ...],
@@ -2463,11 +2489,6 @@ def repair_single_target_cached_named_outfit_plan(
             outfit_anchors[source_key] = anchor
     if not outfit_anchors:
         return plans
-    clauses = tuple(
-        clause.strip()
-        for clause in re.split(r"[，。；;\n]+", user_prompt)
-        if clause.strip()
-    )
     repaired: list[SemanticCharacterPlan] = []
     for plan in plans:
         target = targets.get(plan.target_anchor_id)
@@ -2475,16 +2496,18 @@ def repair_single_target_cached_named_outfit_plan(
             repaired.append(plan)
             continue
         matches: dict[str, SemanticAnchor] = {}
-        for clause in clauses:
-            if not DanbooruResolver._alias_match_spans(clause, target.source_text):
-                continue
+        for phrase in explicit_worn_clothing_phrases(user_prompt, target.source_text):
+            # A later scene mention is not the object of the wear verb.
+            worn_object = re.split(
+                r"(?:站在|坐在|看着|望着|走到|跑到|放在|挂在|陈列在|"
+                r"\b(?:standing|sitting|looking|hanging)\b)",
+                phrase,
+                maxsplit=1,
+                flags=re.I,
+            )[0]
             for source_key, outfit_anchor in outfit_anchors.items():
-                source = re.escape(outfit_anchor.source_text.strip())
-                if re.search(
-                    rf"(?:穿着?|身穿|身着|换上|换成|wears?|wearing|dressed\s+in)"
-                    rf"\s*[\"“']?{source}",
-                    clause,
-                    flags=re.I,
+                if DanbooruResolver._alias_match_spans(
+                    worn_object[:96], outfit_anchor.source_text
                 ):
                     matches[source_key] = outfit_anchor
         if len(matches) == 1:
@@ -2495,6 +2518,26 @@ def repair_single_target_cached_named_outfit_plan(
             )
         repaired.append(plan)
     return tuple(repaired)
+
+
+def preserve_unresolved_worn_clothing_plans(
+    plans: tuple[SemanticCharacterPlan, ...],
+    anchors: tuple[SemanticAnchor, ...],
+    user_prompt: str,
+) -> tuple[SemanticCharacterPlan, ...]:
+    """Prevent a missed ordinary outfit from falling back to a saved uniform."""
+    targets = {
+        anchor.anchor_id: anchor for anchor in anchors
+        if anchor.role == "target_character"
+    }
+    return tuple(
+        replace(plan, wardrobe=SemanticWardrobe("creative_fallback"))
+        if plan.wardrobe.kind in {"none", "default_profile", "default_reference"}
+        and (target := targets.get(plan.target_anchor_id)) is not None
+        and explicit_worn_clothing_phrases(user_prompt, target.source_text)
+        else plan
+        for plan in plans
+    )
 
 
 def explicit_cosplay_assignments(
@@ -3550,8 +3593,10 @@ def character_wardrobe_authority_context(
         elif plan.wardrobe_kind == "named_outfit" and plan.complete_named_profile:
             tags = ", ".join(plan.effective.effective_tags) or "no grounded garments"
             lines.append(
-                f"- {plan.target_source_text}: named outfit = {tags}. Keep these visible "
-                "components; do not substitute another outfit."
+                f"- {plan.target_source_text}: named outfit base = {tags}. Keep its "
+                "recognizable unmodified components; apply every user-requested "
+                "change to the base even when a saved component conflicts. Do not "
+                "substitute another outfit."
                 f"{mutation_rule}{crop_rule}"
             )
         elif plan.wardrobe_kind == "outfit_source":
@@ -5215,6 +5260,9 @@ class PromptPipeline:
                     cached_named_result,
                     prompt,
                 )
+                semantic_character_plans = preserve_unresolved_worn_clothing_plans(
+                    semantic_character_plans, semantic_anchors, prompt
+                )
                 bind_wardrobes = getattr(self._danbooru_resolver, "bind_character_wardrobes", None)
                 if callable(bind_wardrobes):
                     if semantic_lookup_ready:
@@ -5244,6 +5292,10 @@ class PromptPipeline:
                     outfit_transfer_enabled=outfit_plan.enabled,
                     anchors=semantic_anchors,
                     plans=semantic_character_plans,
+                ) or any(
+                    explicit_worn_clothing_phrases(prompt, anchor.source_text)
+                    for anchor in semantic_anchors
+                    if anchor.role == "target_character"
                 )
                 if explicit_wardrobe_evidence:
                     if requested_outfit_mode == "default_profile":
