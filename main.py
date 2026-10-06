@@ -15,6 +15,7 @@ from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
     from .autofilter_settings import AutofilterSettings
+    from .artist_session_settings import ArtistSessionSettings
     from .command_router import parse_hard_route
     from .config_defaults import (
         flatten_config,
@@ -34,6 +35,7 @@ try:
     from .prompt_block_rules import matches_blocked_combination
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from autofilter_settings import AutofilterSettings
+    from artist_session_settings import ArtistSessionSettings
     from command_router import parse_hard_route
     from config_defaults import (
         flatten_config,
@@ -97,6 +99,9 @@ class ComfyUIAgentPlugin(Star):
         self._autofilter_settings = AutofilterSettings(
             plugin_data_path / "autofilter_sessions.json"
         )
+        self._artist_session_settings = ArtistSessionSettings(
+            plugin_data_path / "artist_sessions.json"
+        )
         self._danbooru_tag_cache: dict[str, Any] = {}
         self._last_prompt_summary: ContextVar[dict[str, Any]] = ContextVar(
             f"anima_prompt_summary_{id(self)}",
@@ -129,8 +134,10 @@ class ComfyUIAgentPlugin(Star):
         self._runtime = self._services.runtime
         self._runtime.autofilter_settings = self._autofilter_settings
         self._prompt_pipeline = self._services.prompt_pipeline
+        self._prompt_pipeline.artist_session_settings = self._artist_session_settings
         self._generation_task = self._services.generation_task
         self._action_handler = self._services.action_handler
+        self._action_handler.artist_session_settings = self._artist_session_settings
         self._llm_tool_bridge = self._services.llm_tool_bridge
         context.register_web_api(
             "/astrbot_plugin_anima_master/wardrobe",

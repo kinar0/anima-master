@@ -4847,6 +4847,12 @@ class PromptPipeline:
             "original_prompt_head": self._shorten(original_prompt, 600),
         }
         preset_config = apply_config_preset(dict(self.config))
+        artist_settings = getattr(self, "artist_session_settings", None)
+        if artist_settings is not None:
+            session = str(getattr(event, "unified_msg_origin", "") or "").strip()
+            selected = artist_settings.get(session)
+            if selected is not None:
+                preset_config["active_artist_preset"] = selected
         preset_index, prompt, switch_error = extract_artist_preset_switch(
             prompt, preset_config
         )

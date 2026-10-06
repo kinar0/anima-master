@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .artist_session_settings import artist_session_key
     from .agent_tools.comfyui_sizes import allowed_sizes
     from .command_catalog import COMMAND_ENTRIES
     from .command_router import (
@@ -28,6 +29,7 @@ try:
     )
     from .tag_cleaner import canonical_tag_text, join_prompt_parts, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from artist_session_settings import artist_session_key
     from agent_tools.comfyui_sizes import allowed_sizes
     from command_catalog import COMMAND_ENTRIES
     from command_router import (
@@ -109,6 +111,23 @@ class CommandActionHandler:
         self._format_spell_payload = format_spell_payload
         self._bool = get_bool
         self._shorten = shorten
+        self.artist_session_settings = None
+
+    def _active_artist(self, event: Any = None) -> str:
+        settings = self.artist_session_settings
+        session = artist_session_key(event)
+        selected = settings.get(session) if settings and session else None
+        if selected is None:
+            return active_artist_preset_name(self.config)
+        return selected if selected in artist_presets(self.config) else ""
+
+    def _select_artist(self, event: Any, name: str) -> None:
+        settings = self.artist_session_settings
+        session = artist_session_key(event)
+        if settings and session:
+            settings.set(session, name)
+        else:
+            self._persist_config_key("active_artist_preset", name)
 
     def action_names(self) -> set[str]:
         """Return all command actions understood by this handler."""
@@ -156,18 +175,19 @@ class CommandActionHandler:
             return False
         return True
 
-    def _save_artist_preset(self, name: str, tags: str) -> str:
+    def _save_artist_preset(self, name: str, tags: str, event: Any = None) -> str:
         presets = artist_presets(self.config)
         presets[name] = tags
-        self._persist_artist_presets(presets, active=name)
+        self._persist_artist_presets(presets)
+        self._select_artist(event, name)
         return f"已保存并启用画师组“{name}”：\n" + self._shorten(tags, 800)
 
-    def create_artist_preset(self, prompt: str) -> str:
+    def create_artist_preset(self, prompt: str, event: Any = None) -> str:
         parsed = self._parse_name_tags(prompt)
         if not parsed:
             return "请使用“名称=tags”的格式。例：/anm 创建画师组 千代风格=@artist_a, @artist_b,"
         name, tags = parsed
-        return self._save_artist_preset(name, tags)
+        return self._save_artist_preset(name, tags, event)
 
     def _persist_artist_presets(
         self, presets: dict[str, str], active: str | None = None
@@ -177,59 +197,60 @@ class CommandActionHandler:
         if active is not None:
             self._persist_config_key("active_artist_preset", active)
 
-    def set_artist_tags(self, prompt: str) -> str:
+    def set_artist_tags(self, prompt: str, event: Any = None) -> str:
         parsed = self._parse_name_tags(prompt)
         if parsed:
             name, tags = parsed
-            return self._save_artist_preset(name, tags)
+            return self._save_artist_preset(name, tags, event)
 
         tags = self._normalize_tag_text(prompt)
         if not tags:
             return "请写画师 tags，或使用“名称=tags”。例：/anm 创建画师组 千代=@artist_a, @artist_b,"
         self._persist_config_key("default_artist_tags", tags)
-        self._persist_config_key("active_artist_preset", "")
+        self._select_artist(event, "")
         return "已设置默认画师 tags，并切回默认画师 tags：\n" + self._shorten(tags, 800)
 
-    def append_artist_tags(self, prompt: str) -> str:
+    def append_artist_tags(self, prompt: str, event: Any = None) -> str:
         parsed = self._parse_name_tags(prompt)
         if parsed:
             name, tags = parsed
             presets = artist_presets(self.config)
             merged = merge_tag_text(presets.get(name), tags)
             presets[name] = merged
-            self._persist_artist_presets(presets, active=name)
+            self._persist_artist_presets(presets)
+            self._select_artist(event, name)
             return f"已追加并启用画师组“{name}”：\n" + self._shorten(merged, 800)
 
         addition = self._normalize_tag_text(prompt)
         if not addition:
             return "请写要追加的画师 tags，或使用“名称=tags”。例：/anm 追加画师组 千代=@artist_a,"
-        active = active_artist_preset_name(self.config)
+        active = self._active_artist(event)
         if active:
             presets = artist_presets(self.config)
             merged = merge_tag_text(presets.get(active), addition)
             presets[active] = merged
-            self._persist_artist_presets(presets, active=active)
+            self._persist_artist_presets(presets)
             return f"已追加当前画师组“{active}”：\n" + self._shorten(merged, 800)
         merged = merge_tag_text(self.config.get("default_artist_tags"), addition)
         self._persist_config_key("default_artist_tags", merged)
         return "已追加默认画师 tags：\n" + self._shorten(merged, 800)
 
-    def use_artist_preset(self, prompt: str) -> str:
+    def use_artist_preset(self, prompt: str, event: Any = None) -> str:
         name = str(prompt or "").strip()
         if not name:
             return "请写要启用的画师组名称。例：/anm 切换画师组 千代"
         if name in {"默认", "默认画师", "默认画师组", "default"}:
-            self._persist_config_key("active_artist_preset", "")
+            self._select_artist(event, "")
             return "已切回默认画师 tags。"
         presets = artist_presets(self.config)
         if name not in presets:
             return f"没有找到画师组“{name}”。可用画师组：{', '.join(sorted(presets)) if presets else '无'}"
-        self._persist_config_key("active_artist_preset", name)
+        self._select_artist(event, name)
         return f"已启用画师组“{name}”：\n" + self._shorten(presets[name], 800)
 
-    def list_artist_presets(self) -> str:
+    def list_artist_presets(self, event: Any = None) -> str:
         presets = artist_presets(self.config)
-        active = active_artist_preset_name(self.config)
+        active = self._active_artist(event)
         default_tags = str(self.config.get("default_artist_tags") or "").strip()
         lines = ["画师组："]
         lines.append(
@@ -252,7 +273,7 @@ class CommandActionHandler:
         )
         return "\n".join(lines)
 
-    def delete_artist_preset(self, prompt: str) -> str:
+    def delete_artist_preset(self, prompt: str, event: Any = None) -> str:
         name = str(prompt or "").strip()
         if not name:
             return "请写要删除的画师组名称。例：/anm 删除画师组 千代"
@@ -260,8 +281,13 @@ class CommandActionHandler:
         if name not in presets:
             return f"没有找到画师组“{name}”。"
         presets.pop(name, None)
-        active = active_artist_preset_name(self.config)
-        self._persist_artist_presets(presets, active="" if active == name else active)
+        active = self._active_artist(event)
+        global_active = active_artist_preset_name(self.config)
+        self._persist_artist_presets(
+            presets, active="" if global_active == name else global_active
+        )
+        if self.artist_session_settings:
+            self.artist_session_settings.remove_preset(name)
         return f"已删除画师组“{name}”。" + (
             " 当前已切回默认画师 tags。" if active == name else ""
         )
@@ -387,19 +413,21 @@ class CommandActionHandler:
         if action == "diagnose":
             return self.diagnose_text(await self._run_tool(["status"]))
         if action == "debug_status":
-            return self._task_recorder.debug_status_text(self.config)
+            return self._task_recorder.debug_status_text(
+                dict(self.config, active_artist_preset=self._active_artist(event))
+            )
         if action == "set_artist_tags":
-            return self.set_artist_tags(prompt)
+            return self.set_artist_tags(prompt, event)
         if action == "create_artist_preset":
-            return self.create_artist_preset(prompt)
+            return self.create_artist_preset(prompt, event)
         if action == "append_artist_tags":
-            return self.append_artist_tags(prompt)
+            return self.append_artist_tags(prompt, event)
         if action == "use_artist_preset":
-            return self.use_artist_preset(prompt)
+            return self.use_artist_preset(prompt, event)
         if action == "list_artist_presets":
-            return self.list_artist_presets()
+            return self.list_artist_presets(event)
         if action == "delete_artist_preset":
-            return self.delete_artist_preset(prompt)
+            return self.delete_artist_preset(prompt, event)
         if action == "add_fixed_character":
             return self.add_fixed_character(prompt)
         if action == "generate":
