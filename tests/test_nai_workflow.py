@@ -18,7 +18,6 @@ from agent_tools.comfyui_workflows import custom_t2i_workflow, workflow  # noqa:
 from generation_task import GenerationTaskRunner  # noqa: E402
 from nai_character_mode import (  # noqa: E402
     build_nai_character_plan_prompt,
-    has_explicit_nai_interaction,
     parse_nai_character_plan,
     preserve_nai_global_artist_tags,
     resolve_nai_canvas,
@@ -292,20 +291,40 @@ def test_nai_ordinary_four_panel_request_omits_directional_tags():
         "4格漫画：第1格爱音掀开暖帘，祥子跟在身后；第2格爱音回头微笑；"
         "第3格祥子点头；第4格两人走向座位。"
     )
-    assert not has_explicit_nai_interaction(request)
     canvas = {"width": 832, "height": 1216, "aspect_ratio": "13:19", "orientation": "portrait"}
     instruction = build_nai_character_plan_prompt(request, "2girls", canvas)
-    assert '"interaction_tags"' not in instruction
-    assert "Omit interaction_tags entirely" in instruction
+    assert '"interaction_tags":[]' in instruction
+    assert "Leave interaction_tags empty" in instruction
     plan = parse_nai_character_plan(json.dumps({
         "composition_analysis": {"viewpoint": "front", "layout": "four panels", "relations": "walking"},
         "global_prompt": "2girls, restaurant",
-        "characters": [{"name": "A", "prompt": "A, lifting curtain, source#lift(curtain)",
-                        "interaction_tags": ["target#walk"],
+        "characters": [{"name": "A", "prompt": "A, lifting curtain, source#lifting curtain",
+                        "interaction_tags": [],
                         "position_reason": "upper panel", "x": .5, "y": .2}],
-    }), allow_interaction_tags=False)
+    }))
     assert plan["characters"][0]["prompt"] == "A, lifting curtain"
-    assert len(plan["dropped_interaction_tags"]) == 2
+    assert plan["characters"][0]["interaction_tags"] == []
+    assert plan["dropped_interaction_tags"] == ["source#lifting curtain"]
+
+
+def test_nai_unlisted_interaction_is_not_blocked_by_a_trigger_word_list():
+    request = "A踢了B，B摔倒在地"
+    canvas = {"width": 832, "height": 1216, "aspect_ratio": "13:19", "orientation": "portrait"}
+    instruction = build_nai_character_plan_prompt(request, "2girls", canvas)
+    assert "open-ended semantic decision" in instruction
+    assert request in instruction
+    plan = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {"viewpoint": "front", "layout": "pair", "relations": "A kicks B"},
+        "global_prompt": "2girls, street",
+        "characters": [
+            {"name": "A", "prompt": "girl, kicking B", "interaction_tags": ["source#kicking"],
+             "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": "girl, falling", "interaction_tags": ["target#kicking"],
+             "position_reason": "right", "x": .7, "y": .5},
+        ],
+    }))
+    assert plan["characters"][0]["prompt"].endswith("source#kicking")
+    assert plan["characters"][1]["prompt"].endswith("target#kicking")
 
 
 def test_nai_r_requires_nai_workflow():
@@ -365,7 +384,7 @@ def test_nai_complex_side_view_preserves_model_layout(chair, floor):
     assert "camera angle" in instruction
     assert "relative positions" in instruction
     assert "Do not use a fixed coordinate template" in instruction
-    assert "Omit interaction_tags entirely" in instruction
+    assert "Leave interaction_tags empty" in instruction
     directed = build_nai_character_plan_prompt("A 拥抱 B", "2girls", canvas)
     assert "source#tag" in directed and "target#tag" in directed
     assert "mutual#tag" in directed

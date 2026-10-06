@@ -37,7 +37,6 @@ try:
     )
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
-        has_explicit_nai_interaction,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
         resolve_nai_canvas,
@@ -128,7 +127,6 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from nai_character_mode import (
         build_nai_character_plan_prompt,
-        has_explicit_nai_interaction,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
         resolve_nai_canvas,
@@ -6961,7 +6959,6 @@ class PromptPipeline:
                 nai_plan = parse_nai_character_plan(
                     plan_raw,
                     character_limit=nai_canvas["character_limit"],
-                    allow_interaction_tags=has_explicit_nai_interaction(prompt),
                 )
                 if background_mode == DEFAULT_PORTRAIT and has_generated_scene(
                     nai_plan["global_prompt"],

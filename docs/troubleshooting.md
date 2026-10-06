@@ -8,10 +8,12 @@
 `nai_character_plan_failed`，检查 `llm_error`：`nai_character_plan_invalid_json`
 通常表示返回的 JSON 不完整或格式不合法；复杂多人请求可缩短逐人描述，
 再检查模型的可见输出。失败时不会提交未经拆分的原提示词。
-`nai_character_plan_invalid_interaction_tag` 表示布局模型给某个角色的
-`interaction_tags` 写了空动作、多个 `#`、逗号串或非英文 tag。
+`nai_dropped_interaction_tags` 非空表示布局模型给某个角色的
+`interaction_tags` 写了空动作、多个 `#`、逗号串、非英文 tag，或把方向标签写进了普通角色描述而未放进 `interaction_tags` 数组。
 应让模型只为明确互动的角色各写一项 `source#tag`、`target#tag` 或
-`mutual#tag`；无明确方向时使用空列表。
+`mutual#tag`；无明确方向时使用空列表。布局模型根据完整原文判断互动，
+不再由固定动作词组门控。主机只校验格式，若标签格式正确但互动对象或方向不对，
+需检查 `nai_character_plan_raw` 与原文；`nai_dropped_interaction_tags` 不会记录这种语义错误。
 
 若一名角色的性别、衣服、动作、表情、外貌或 `looking at viewer` 影响了其他角色，检查任务摘要中的
 `nai_global_prompt` 和 `nai_dropped_global_character_tags`。视线 tag 应只出现在

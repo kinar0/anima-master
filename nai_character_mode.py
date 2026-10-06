@@ -16,16 +16,6 @@ except ImportError:  # pragma: no cover - direct script-style imports.
 
 _R_SWITCH = re.compile(r"(?<!\S)-r(?=$|[\s,，;；])", re.I)
 MAX_NAI_CHARACTERS = 22
-_EXPLICIT_INTERACTION_RE = re.compile(
-    r"拥抱|抱住|搂住|接吻|亲吻|牵.{0,4}手|握手|击掌|对视|推.{0,4}(?:他|她|对方)|"
-    r"(?:hug|kiss|hold hands|shake hands|high.five|look at each other|pushes? (?:him|her|them))",
-    re.I,
-)
-
-
-def has_explicit_nai_interaction(user_prompt: str) -> bool:
-    """Conservatively opt into optional person-to-person direction tags."""
-    return bool(_EXPLICIT_INTERACTION_RE.search(str(user_prompt or "")))
 
 
 def nai_character_limit(model: str) -> int:
@@ -176,23 +166,6 @@ def build_nai_character_plan_prompt(
     user_prompt: str, final_prompt: str, canvas: dict[str, Any]
 ) -> str:
     width, height = int(canvas["width"]), int(canvas["height"])
-    interaction_requested = has_explicit_nai_interaction(user_prompt)
-    interaction_example = (
-        '"interaction_tags":["source#hug"],'
-        if interaction_requested else ""
-    )
-    interaction_rule = (
-        "For an explicitly directed interaction, add interaction_tags to the "
-        "participating character entries: the actor gets source#tag and the "
-        "recipient gets target#tag. For a genuinely mutual action, give each "
-        "participant mutual#tag. Each string must contain exactly one "
-        "Danbooru action tag after # (spaces within one tag are fine), never "
-        "a comma-separated phrase or a whole sentence. Keep these tags out "
-        "of global_prompt and the ordinary prompt field. "
-        if interaction_requested else
-        "The user did not request a person-to-person directed action. Omit "
-        "interaction_tags entirely; keep individual actions in each prompt. "
-    )
     return (
         "Plan the composition for this NAI image request before assigning any "
         "character coordinates. First identify every visible character instance, "
@@ -209,7 +182,7 @@ def build_nai_character_plan_prompt(
         '{"name":"canonical character tag or short identity",'
         '"prompt":"gender, identity, appearance, clothing, expression, pose, '
         'action, local environment relation",'
-        f'{interaction_example}'
+        '"interaction_tags":[], '
         '"position_reason":"...",'
         '"x":0.5,"y":0.5}]}\n'
         "Create one characters entry per visible INSTANCE, not per unique name. "
@@ -262,7 +235,19 @@ def build_nai_character_plan_prompt(
         "those gaze facts in global_prompt. "
         "Write all prompt strings in English. Keep established Danbooru tags "
         "and escaped weight syntax when useful. "
-        f"{interaction_rule}"
+        "Decide from the user request whether any visible characters perform "
+        "an explicit person-to-person action. This is an open-ended semantic "
+        "decision, not a fixed list of trigger words: actions such as feeding, "
+        "kicking or helping someone up can qualify. For each directed action, "
+        "give the actor source#tag and the recipient target#tag in their "
+        "respective interaction_tags arrays. For a genuinely mutual action, "
+        "give each participant mutual#tag. Use a concise Danbooru action tag "
+        "after #; each array entry contains exactly one action tag (spaces "
+        "within one tag are fine), never a comma-separated phrase or sentence. "
+        "Leave interaction_tags empty when the request only describes "
+        "individual actions, proximity, a one-sided gaze, an off-screen "
+        "person, or no clear interaction between visible characters. Do not "
+        "put directional tags in global_prompt or the ordinary prompt field. "
         "Do not invent an interaction or assign its direction from character "
         "order or position alone. "
         "Do not invent another visible person from viewer or an off-screen source.\n"
@@ -276,7 +261,6 @@ def build_nai_character_plan_prompt(
 
 def parse_nai_character_plan(
     raw: str, *, character_limit: int = MAX_NAI_CHARACTERS,
-    allow_interaction_tags: bool = True,
 ) -> dict[str, Any]:
     """Validate model output before any NAI workflow is submitted."""
     value = str(raw or "").strip()
@@ -318,7 +302,7 @@ def parse_nai_character_plan(
         interaction_tags: list[str] = []
 
         def collect_interaction_tag(tag: Any) -> None:
-            if not allow_interaction_tags or len(interaction_tags) >= 8:
+            if len(interaction_tags) >= 8:
                 dropped_interaction_tags.append(str(tag)[:80])
                 return
             try:
@@ -335,12 +319,13 @@ def parse_nai_character_plan(
         elif raw_interaction_tags:
             dropped_interaction_tags.append(str(raw_interaction_tags)[:80])
         character_prompt = prompt.strip()
-        # The list is authoritative; a copied directional tag in the prose
-        # field should not duplicate the same tag in the submitted character box.
+        # Only the explicit array can supply direction tags. Strip copies from
+        # the prose field so an empty array really means no interaction tag.
         prompt_parts = []
         for part in split_tags(character_prompt):
             if re.match(r"^(?:source|target|mutual)#", part, re.I):
-                collect_interaction_tag(part)
+                if part not in interaction_tags:
+                    dropped_interaction_tags.append(part[:80])
             else:
                 prompt_parts.append(part)
         character_prompt = ", ".join(prompt_parts)
