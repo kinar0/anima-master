@@ -1291,7 +1291,8 @@ def authoritative_profile_identity_block(
 _APPEARANCE_DIMENSION_PATTERNS: dict[str, re.Pattern[str]] = {
     "eye_color": re.compile(
         r"(?:red|blue|green|yellow|gold(?:en)?|silver|white|black|purple|pink|"
-        r"brown|grey|gray|amber|aqua|cyan|orange|violet|hazel)[ _-]+eyes?\b|"
+        r"brown|grey|gray|amber|aqua|cyan|orange|violet|hazel)"
+        r"(?:[ _-]+eyes?|[ _-]+eyed)\b|"
         r"(?:红|蓝|绿|黄|金|银|白|黑|紫|粉|棕|褐|灰|琥珀|青|橙)(?:色)?(?:眼睛|眼|瞳)|"
         r"(?:眼睛|瞳色|瞳).{0,8}(?:红|蓝|绿|黄|金|银|白|黑|紫|粉|棕|褐|灰|琥珀|青|橙)(?:色)?",
         re.I,
@@ -3088,7 +3089,7 @@ def build_character_effective_outfits(
             else None
         )
         cached_target_appearance_profile = cached_profile_for_target(target, "")
-        _cached_character_tag, cached_target_appearance = saved_appearance_for_names(
+        cached_character_tag, cached_target_appearance = saved_appearance_for_names(
             semantic_result, (target.source_text, *target.candidates)
         )
         if cached_target_appearance:
@@ -3196,7 +3197,12 @@ def build_character_effective_outfits(
         built.append(CharacterEffectiveOutfit(
             target_anchor_id=plan.target_anchor_id,
             target_source_text=target.source_text,
-            target_candidates=target.candidates,
+            target_candidates=tuple(dict.fromkeys((
+                *target.candidates,
+                *((cached_character_tag,) if cached_character_tag else ()),
+                *((anchor_tags[plan.target_anchor_id.lower()],)
+                  if plan.target_anchor_id.lower() in anchor_tags else ()),
+            ))),
             wardrobe_kind=wardrobe_kind,
             wardrobe_anchor_id=plan.wardrobe.anchor_id,
             wardrobe_tag=wardrobe_tag,
@@ -3319,14 +3325,16 @@ def complete_character_wardrobe_states(
     for target in targets:
         if target.anchor_id.lower() in existing_ids:
             continue
-        _source_tag, appearance_tags = saved_appearance_for_names(
+        source_tag, appearance_tags = saved_appearance_for_names(
             semantic_result, (target.source_text, *target.candidates)
         )
         completed.append(
             CharacterEffectiveOutfit(
                 target_anchor_id=target.anchor_id,
                 target_source_text=target.source_text,
-                target_candidates=target.candidates,
+                target_candidates=tuple(dict.fromkeys((
+                    *target.candidates, *((source_tag,) if source_tag else ()),
+                ))),
                 wardrobe_kind=(
                     "explicit_but_unresolved"
                     if explicit_wardrobe_evidence
@@ -3461,10 +3469,61 @@ def _replacement_writer_dimensions(
     return frozenset(
         "eye_color" if dimension == "eye_traits" else dimension
         for change in changes
-        if change.operation == "replace"
+        if change.operation in {"replace", "omit"}
         for dimension in change.dimensions
         if dimension in _APPEARANCE_DIMENSION_PATTERNS or dimension == "eye_traits"
     )
+
+
+def _omitted_appearance_dimensions(
+    changes: tuple[SemanticAppearanceChange, ...],
+) -> frozenset[str]:
+    """A request to hide a feature outranks its saved visual profile."""
+    return frozenset(
+        "eye_color" if dimension == "eye_traits" else dimension
+        for change in changes
+        if change.operation == "omit"
+        for dimension in change.dimensions
+        if dimension in _APPEARANCE_DIMENSION_PATTERNS or dimension == "eye_traits"
+    )
+
+
+def _without_omitted_appearance(
+    text: str, dimensions: frozenset[str]
+) -> str:
+    """Remove positive appearance assertions, retaining visibility instructions."""
+    result = str(text or "")
+    for dimension in dimensions:
+        result = _APPEARANCE_DIMENSION_PATTERNS[dimension].sub("", result)
+    result = re.sub(r"\b(?:and|with)\s*(?=[,;]|$)", "", result, flags=re.I)
+    result = re.sub(r"\s+,", ",", result)
+    result = re.sub(r",\s*(?=,|;|$)", "", result)
+    result = re.sub(r"\s{2,}", " ", result)
+    return result.strip(" ,;")
+
+
+def _enforce_nai_appearance_omissions(
+    characters: list[dict[str, Any]],
+    plans: tuple[CharacterEffectiveOutfit, ...],
+    changes: tuple[SemanticAppearanceChange, ...],
+) -> None:
+    """Apply wearer-scoped visibility authority after the NAI planner rewrites tags."""
+    for character in characters:
+        wearer = next(
+            (
+                item for item in plans
+                if _character_outfit_matches(character["name"], item)
+            ), None,
+        )
+        if wearer is None:
+            continue
+        omitted = _omitted_appearance_dimensions(
+            _semantic_appearance_changes_for_character(changes, wearer)
+        )
+        if omitted:
+            character["prompt"] = _without_omitted_appearance(
+                character["prompt"], omitted
+            )
 
 
 def reconcile_character_hints_with_appearance(
@@ -5805,6 +5864,15 @@ class PromptPipeline:
         local_character_hints = reconcile_character_hints_with_appearance(
             local_character_hints, character_effective_outfits
         )
+        summary["appearance_omissions"] = [
+            {"character": item.target_source_text, "dimensions": sorted(omitted)}
+            for item in character_effective_outfits
+            if (omitted := _omitted_appearance_dimensions(
+                _semantic_appearance_changes_for_character(
+                    semantic_appearance_changes, item
+                )
+            ))
+        ]
         if character_effective_outfits:
             context_lines = []
             visible_roster = tuple(
@@ -5849,7 +5917,14 @@ class PromptPipeline:
                 context_lines.append("Stable appearance by wearer (user edits take priority):")
                 context_lines.extend(
                     f"- {item.target_source_text}: "
-                    + ", ".join(item.appearance_tags)
+                    + ", ".join(
+                        tag for tag in item.appearance_tags
+                        if appearance_dimension(tag) not in _omitted_appearance_dimensions(
+                            _semantic_appearance_changes_for_character(
+                                semantic_appearance_changes, item
+                            )
+                        )
+                    )
                     for item in appearance_plans
                 )
                 advisory_change_lines = []
@@ -5881,7 +5956,9 @@ class PromptPipeline:
                     context_lines.append(
                         "Follow each change operation exactly: additive keeps the "
                         "compatible baseline value and also states the new visible "
-                        "value; replace supersedes only that dimension."
+                        "value; replace supersedes only that dimension; omit "
+                        "means the feature is not visible and its saved color or "
+                        "shape must not be mentioned anywhere."
                     )
             if semantic_result.missing_descriptions:
                 context_lines.append(
@@ -6358,7 +6435,15 @@ class PromptPipeline:
                     ),
                     None,
                 )
+                planner_changes = (
+                    _semantic_appearance_changes_for_character(
+                        semantic_appearance_changes, character_outfit
+                    ) if character_outfit else ()
+                )
+                omitted_dimensions = _omitted_appearance_dimensions(planner_changes)
                 detail = character.detail_tags
+                if omitted_dimensions:
+                    detail = _without_omitted_appearance(detail, omitted_dimensions)
                 override_dimensions = frozenset()
                 if character_outfit and character_outfit.appearance_tags:
                     override_dimensions = appearance_override_dimensions(
@@ -6402,9 +6487,10 @@ class PromptPipeline:
                 effective_detail_blocks.append(detail)
                 identity_block = character.identity_tags
                 if character_outfit and character_outfit.appearance_tags:
-                    planner_changes = _semantic_appearance_changes_for_character(
-                        semantic_appearance_changes, character_outfit
-                    )
+                    if omitted_dimensions:
+                        identity_block = _without_omitted_appearance(
+                            identity_block, omitted_dimensions
+                        )
                     identity_block = merge_authoritative_identity_block(
                         character.name,
                         identity_block,
@@ -6463,6 +6549,24 @@ class PromptPipeline:
                 structured_nltags,
                 tuple(character.name for character in structured_characters),
             )
+            omitted_profile_tags = tuple(
+                tag.replace("_", " ")
+                for item in character_effective_outfits
+                for tag in item.appearance_tags
+                if appearance_dimension(tag) in _omitted_appearance_dimensions(
+                    _semantic_appearance_changes_for_character(
+                        semantic_appearance_changes, item
+                    )
+                )
+            )
+            for tag in omitted_profile_tags:
+                # Nltags has no reliable character grammar, so remove only
+                # suppressed saved values. Another wearer's different eye
+                # color must remain available in their prose.
+                nltags = re.sub(re.escape(tag), "", nltags, flags=re.I)
+            if omitted_profile_tags:
+                nltags = re.sub(r"\s+,", ",", nltags)
+                nltags = re.sub(r"\s{2,}", " ", nltags)
             if semantic_result.outfit_source_tags and not character_effective_outfits:
                 nltags = minimal_verified_outfit_nltags(
                     nltags,
@@ -6959,6 +7063,11 @@ class PromptPipeline:
                 nai_plan = parse_nai_character_plan(
                     plan_raw,
                     character_limit=nai_canvas["character_limit"],
+                )
+                _enforce_nai_appearance_omissions(
+                    nai_plan["characters"],
+                    character_effective_outfits,
+                    semantic_appearance_changes,
                 )
                 if background_mode == DEFAULT_PORTRAIT and has_generated_scene(
                     nai_plan["global_prompt"],

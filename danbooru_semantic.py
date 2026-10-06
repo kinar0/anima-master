@@ -440,8 +440,12 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "appearance_changes = explicit request phrases only. Prefer objects with "
         "dimension (eye_color, hair_color, hair_length, hair_style, skin_color, "
         "chest_size, animal_ears, tail, horns, age_presentation, or "
-        "gender_presentation), operation (replace or additive), and exact "
-        "source_text; do not output tags. operation=replace means the new value "
+        "gender_presentation), operation (replace, additive, or omit), and exact "
+        "source_text; do not output tags. Use omit when the user says a visible "
+        "feature must not be drawn or must be completely hidden (for example, "
+        "no visible eyes); this suppresses that dimension's saved profile. "
+        "Do not use omit for missing highlights, a dull gaze, closed eyes, "
+        "or a changed eye color. operation=replace means the new value "
         "supersedes the old value; operation=additive means both remain visibly "
         "present. A trait immediately before a name belongs only to that "
         "person (扶她千早爱音 means only 千早爱音 is futanari); futanari is not "
@@ -635,6 +639,15 @@ _APPEARANCE_CHANGE_DIMENSIONS = {
 }
 
 
+def _explicit_eye_omission(source_text: str) -> bool:
+    """Recognize an explicit absence, never an eye-color or expression edit."""
+    return bool(re.search(
+        r"不画眼睛|没有眼睛|无眼睛|看不见眼睛|眼睛不可见|"
+        r"\b(?:no visible eyes|no eyes|eyes? not visible|faceless)\b",
+        source_text, re.I,
+    ))
+
+
 def _appearance_source_is_grounded(
     source_text: str, user_prompt: str, character_name: str
 ) -> bool:
@@ -740,6 +753,8 @@ def parse_semantic_appearance_changes(
             }:
                 # Futanari is a sex characteristic, not a breast-size edit.
                 dimensions = tuple(d for d in dimensions if d != "chest_size")
+            if _explicit_eye_omission(source_text):
+                dimensions = tuple(dict.fromkeys((*dimensions, "eye_color")))
             operation = {
                 "replace": "replace",
                 "replacement": "replace",
@@ -747,7 +762,14 @@ def parse_semantic_appearance_changes(
                 "add": "additive",
                 "augment": "additive",
                 "coexist": "additive",
+                "omit": "omit",
+                "hidden": "omit",
             }.get(raw_operation, "unspecified")
+            # Older planners called an explicit absence a replacement. Preserve
+            # that grounded intent without treating ordinary eye expressions as
+            # absence; the dimension still comes from LLM1, not a host guess.
+            if _explicit_eye_omission(source_text):
+                operation = "omit"
             change = SemanticAppearanceChange(name, source_text, dimensions, operation)
             if change not in changes:
                 changes.append(change)
@@ -1246,11 +1268,36 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                                 )
                                 continue
                             operation = str(change.get("operation") or "").lower()
-                            if operation not in {"replace", "additive"}:
+                            if operation not in {"replace", "additive", "omit"}:
                                 issues.append(
                                     f"characters[{index}].appearance_changes"
-                                    f"[{change_index}].operation must be replace or "
-                                    "additive"
+                                    f"[{change_index}].operation must be replace, "
+                                    "additive, or omit"
+                                )
+                            dimension_values = change.get(
+                                "dimensions", change.get("dimension", ())
+                            )
+                            if isinstance(dimension_values, str):
+                                dimension_values = (dimension_values,)
+                            if not isinstance(dimension_values, (list, tuple)) or any(
+                                str(value or "").strip().lower()
+                                not in {*_APPEARANCE_CHANGE_DIMENSIONS, "misc"}
+                                for value in dimension_values
+                            ):
+                                issues.append(
+                                    f"characters[{index}].appearance_changes"
+                                    f"[{change_index}].dimension must be a supported "
+                                    "appearance dimension"
+                                )
+                            elif operation == "omit" and not any(
+                                str(value or "").strip().lower()
+                                in _APPEARANCE_CHANGE_DIMENSIONS
+                                for value in dimension_values
+                            ):
+                                issues.append(
+                                    f"characters[{index}].appearance_changes"
+                                    f"[{change_index}].omit requires a visible "
+                                    "appearance dimension"
                                 )
                             source_text = str(change.get("source_text") or "").strip()
                             if not _appearance_source_is_grounded(

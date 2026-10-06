@@ -213,6 +213,12 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 
 ## Identity 出现错误发色、瞳色或来源角色外貌
 
+### 明确“不画眼睛”却仍出现 `grey eyes`
+
+先看 `semantic_plan_raw` 的对应角色 `appearance_changes` 和摘要 `appearance_omissions`。角色视觉档案中的 `grey_eyes` 是正常基线；用户明确要求眼睛不可见时，必须得到该角色的 `eye_color/omit`，而不是把“无眼睛”当成新的瞳色。旧 planner 对同一原文输出 `eye_color/replace` 或错误的 `face_accessory.mask` 时，主机会从可定位的明确缺席证据归一为 `omit`；错误维度还会触发一次修复请求。
+
+`llm_prompt` 中被省略角色的稳定外貌列表不应再含其瞳色，最终结构化 `Identity`、`Details`、`Nltags` 也不得补回。NAI `-r` 还要检查 `nai_characters[].prompt`，因为位置规划模型会重新写每个人的提示词；同画面未省略眼睛的其他角色仍可保留自己的瞳色。`#` 手工尾缀和原样模式属于直通，不执行上述权限。
+
 例如爱音视觉档案是 `grey_eyes`，用户只要求 Teto 风格的粉色双钻头发型，但最终 Identity 出现 `yellow eyes`。这不是服装 tag 冲突，应分别检查三层证据：
 
 1. `danbooru_semantic_character_appearance_profiles` 或 `semantic_character_outfits[].appearance_tags` 是否仍是目标角色自己的稳定外貌，而不是 cosplay 来源角色的外貌。

@@ -12,6 +12,9 @@ if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from prompt_pipeline import (  # noqa: E402
+    _enforce_nai_appearance_omissions,
+    _omitted_appearance_dimensions,
+    _without_omitted_appearance,
     _parse_structured_prompt,
     _replacement_writer_dimensions,
     CharacterEffectiveOutfit,
@@ -78,6 +81,154 @@ from task_summary import (  # noqa: E402
     build_last_task_debug_lines,
     build_strategy_summary,
 )
+
+
+def test_hidden_appearance_removes_profile_color_without_erasing_visibility_cue() -> None:
+    changes = (SemanticAppearanceChange(
+        "爱音", "上半张脸黑着(不画眼睛)", ("eye_color",), "omit"
+    ),)
+    omitted = _omitted_appearance_dimensions(changes)
+
+    assert omitted == frozenset({"eye_color"})
+    assert "grey eyes" not in _without_omitted_appearance(
+        "chihaya_anon has long pink hair and grey eyes, no visible eyes",
+        omitted,
+    )
+    assert "no visible eyes" in _without_omitted_appearance(
+        "female, chihaya anon, grey eyes, upper face shadowed, no visible eyes",
+        omitted,
+    )
+
+
+def test_nai_visibility_authority_is_scoped_to_the_affected_character() -> None:
+    plans = tuple(CharacterEffectiveOutfit(
+        target_anchor_id=name,
+        target_source_text=source,
+        target_candidates=(name,),
+        wardrobe_kind="creative_fallback",
+        wardrobe_anchor_id="",
+        wardrobe_tag="",
+        appearance_tags=(eye_tag,),
+        effective=EffectiveOutfitPlan(subject=source),
+    ) for name, source, eye_tag in (
+        ("chihaya_anon", "爱音", "grey_eyes"),
+        ("togawa_sakiko", "祥子", "yellow_eyes"),
+    ))
+    characters = [
+        {"name": "chihaya anon", "prompt": "chihaya anon, grey eyes, no visible eyes"},
+        {"name": "togawa sakiko", "prompt": "togawa sakiko, yellow eyes"},
+    ]
+
+    _enforce_nai_appearance_omissions(characters, plans, (
+        SemanticAppearanceChange("爱音", "不画眼睛", ("eye_color",), "omit"),
+    ))
+
+    assert "grey eyes" not in characters[0]["prompt"]
+    assert "no visible eyes" in characters[0]["prompt"]
+    assert "yellow eyes" in characters[1]["prompt"]
+
+
+def test_pipeline_does_not_restore_hidden_eyes_from_character_profile() -> None:
+    semantic = (
+        '{"characters":['
+        '{"name":"爱音","aliases":[],"clothing":null,'
+        '"clothing_source":null,"clothing_changes":[],"appearance_changes":['
+        '{"dimension":"eye_color","operation":"replace",'
+        '"source_text":"上半张脸黑着(不画眼睛)"}]},'
+        '{"name":"祥子","aliases":[],"clothing":null,'
+        '"clothing_source":null,"clothing_changes":[],"appearance_changes":[]}]}'
+    )
+    writer = (
+        "{Count: 2girls}\n"
+        "{Characters: chihaya_anon, togawa_sakiko}\n"
+        "{Copyright: bang_dream!}\n"
+        "{Identity: chihaya_anon has pink hair and grey eyes, no visible eyes; "
+        "togawa_sakiko has blue hair and yellow eyes}\n"
+        "{Details: chihaya_anon has a shadowed upper face and grey eyes; "
+        "togawa_sakiko stands beside her}\n"
+        "{Tags: upper body, simple background}\n"
+        "{Nltags: chihaya_anon has grey eyes behind shadow; "
+        "togawa_sakiko has yellow eyes.}"
+    )
+
+    class _Response:
+        def __init__(self, content):
+            self.completion_text = content
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [semantic, writer]
+            self.calls = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.calls.append(kwargs)
+            return _Response(self.outputs.pop(0))
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return type("Plan", (), {
+                "use_web_search": False, "use_deep_thinking": False,
+                "search_reason": "", "thinking_reason": "",
+            })()
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_outfit_profiles_for_prompt(self, _prompt):
+            return SemanticLookupResult(
+                confirmed_tags=("chihaya_anon", "togawa_sakiko"),
+                character_appearance_profiles=(
+                    (("爱音",), "chihaya_anon", ("pink_hair", "grey_eyes")),
+                    (("祥子",), "togawa_sakiko", ("blue_hair", "yellow_eyes")),
+                ),
+                status="profile_cache",
+            )
+
+        def semantic_lookup_available(self):
+            return False
+
+        async def resolve_semantic_anchors(self, _anchors):
+            raise AssertionError("local lookup disabled")
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(
+                text=llm_content, status="resolved",
+                canonical_tag=llm_content, identity_tags=(llm_content,),
+            )
+
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context, config={}, logger=_Logger(),
+        danbooru_resolver=_Resolver(), researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("Event", (), {"unified_msg_origin": "session"})()
+
+    result = asyncio.run(pipeline.build(
+        event, "爱音上半张脸黑着(不画眼睛)，祥子站在旁边"
+    ))
+
+    assert result.summary["appearance_omissions"] == [
+        {"character": "爱音", "dimensions": ["eye_color"]}
+    ]
+    assert "grey eyes" not in context.calls[1]["prompt"].lower()
+    assert "grey eyes" not in result.final_prompt.lower(), result.summary["semantic_character_outfits"]
+    assert "no visible eyes" in result.final_prompt.lower()
+    assert "yellow eyes" in result.final_prompt.lower()
 
 
 def _shorten(text: str, limit: int = 600) -> str:

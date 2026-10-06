@@ -50,7 +50,7 @@ def test_semantic_prompt_prioritizes_multi_character_wardrobe_binding() -> None:
     assert "never translate, guess tags" in prompt
     assert "A cosplay C" in prompt
     assert "clothing_source" in prompt
-    assert "operation (replace or additive)" in prompt
+    assert "operation (replace, additive, or omit)" in prompt
     assert "only the exact entity mention" in prompt
     assert "operation MUST be one of remove" in prompt
     assert "face_accessory.mask" in prompt
@@ -305,6 +305,42 @@ def test_semantic_appearance_change_accepts_leading_pronoun_for_named_character(
     assert changes[0].operation == "additive"
 
 
+def test_explicitly_hidden_eyes_are_an_omission_even_with_old_planner_labels() -> None:
+    prompt = "半张脸黑着(不画眼睛)的爱音，旁边的祥子眼神无光"
+    raw = json.dumps({"characters": [
+        {"name": "爱音", "appearance_changes": [{
+            "dimension": "eye_color", "operation": "replace",
+            "source_text": "半张脸黑着(不画眼睛)",
+        }]},
+        {"name": "祥子", "appearance_changes": [{
+            "dimension": "eye_color", "operation": "replace",
+            "source_text": "眼神无光",
+        }]},
+    ]}, ensure_ascii=False)
+
+    changes = parse_semantic_appearance_changes(raw, prompt)
+    assert changes[0].dimensions == ("eye_color",)
+    assert changes[0].operation == "omit"
+    assert changes[1].operation == "replace"
+
+
+def test_wrong_appearance_dimension_requests_repair_but_keeps_grounded_omission() -> None:
+    prompt = "半张脸黑着(不画眼睛)的爱音"
+    raw = json.dumps({"characters": [{
+        "name": "爱音", "aliases": [], "clothing": None,
+        "clothing_source": None, "clothing_changes": [],
+        "appearance_changes": [{
+            "dimension": "face_accessory.mask", "operation": "additive",
+            "source_text": "半张脸黑着(不画眼睛)",
+        }],
+    }]}, ensure_ascii=False)
+
+    assert any("dimension must be a supported appearance dimension" in issue
+               for issue in semantic_plan_validation_issues(raw, prompt))
+    assert parse_semantic_appearance_changes(raw, prompt)[0].operation == "omit"
+    assert parse_semantic_appearance_changes(raw, prompt)[0].dimensions == ("eye_color",)
+
+
 def test_semantic_appearance_change_rejects_low_similarity_unrelated_evidence() -> None:
     prompt = "若叶睦站在窗边，用黄色眼睛看着天空"
     raw = json.dumps(
@@ -373,7 +409,7 @@ def test_semantic_plan_requires_explicit_appearance_operation() -> None:
     )
 
     assert semantic_plan_validation_issues(raw, prompt) == (
-        "characters[1].appearance_changes[1].operation must be replace or additive",
+        "characters[1].appearance_changes[1].operation must be replace, additive, or omit",
     )
 
 
