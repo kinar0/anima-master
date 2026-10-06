@@ -250,6 +250,7 @@ def main() -> None:
     p.add_argument("--seed", type=int)
     p.add_argument("--negative-prompt")
     p.add_argument("--nai-characters")
+    p.add_argument("--user-id", default="")
     p.set_defaults(func=generate)
 
     p = sub.add_parser("edit")

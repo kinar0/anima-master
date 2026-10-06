@@ -18,16 +18,21 @@ from agent_tools.comfyui_workflows import (  # noqa: E402
 
 
 def test_t2i_filename_prefix_renders_windows_safe_date_path() -> None:
-    assert t2i_filename_prefix(datetime(2026, 8, 16, 20, 27, 6)) == (
-        "astrbot/anm/2026-08-16/0816202706"
+    assert t2i_filename_prefix(datetime(2026, 8, 16, 20, 27, 6), "123456") == (
+        "astrbot/2026-08-16/123456/0816202706"
+    )
+    assert t2i_filename_prefix(datetime(2026, 8, 16), "../abc\\def") == (
+        "astrbot/2026-08-16/abc_def/0816000000"
     )
 
 
 def test_default_t2i_workflow_uses_dated_output_prefix() -> None:
-    result = anima_t2i_workflow({}, "positive", "negative", 832, 1216, 30, 5.0, 42)
+    result = anima_t2i_workflow(
+        {}, "positive", "negative", 832, 1216, 30, 5.0, 42, user_id="123456"
+    )
 
     assert re.fullmatch(
-        r"astrbot/anm/\d{4}-\d{2}-\d{2}/\d{10}",
+        r"astrbot/\d{4}-\d{2}-\d{2}/123456/\d{10}",
         result["9"]["inputs"]["filename_prefix"],
     )
 
@@ -61,10 +66,11 @@ def test_custom_t2i_workflow_uses_dated_output_prefix(tmp_path: Path) -> None:
         30,
         5.0,
         42,
+        user_id="other-user",
     )
 
     assert re.fullmatch(
-        r"astrbot/anm/\d{4}-\d{2}-\d{2}/\d{10}",
+        r"astrbot/\d{4}-\d{2}-\d{2}/other-user/\d{10}",
         result["4"]["inputs"]["filename_prefix"],
     )
 

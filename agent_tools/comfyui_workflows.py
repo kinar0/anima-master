@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,10 +21,12 @@ DEFAULT_NEGATIVE_PROMPT = (
 )
 
 
-def t2i_filename_prefix(now: datetime | None = None) -> str:
+def t2i_filename_prefix(now: datetime | None = None, user_id: str = "") -> str:
     """Build a Windows-safe dated ComfyUI output prefix."""
     timestamp = now or datetime.now()
-    return f"astrbot/{timestamp:%Y-%m-%d}/{timestamp:%m%d%H%M%S}"
+    sender = re.sub(r"[^A-Za-z0-9_-]", "_", str(user_id).strip()).strip("._-")
+    sender = sender[:128] or "unknown"
+    return f"astrbot/{timestamp:%Y-%m-%d}/{sender}/{timestamp:%m%d%H%M%S}"
 
 
 def anima_t2i_workflow(
@@ -35,6 +38,8 @@ def anima_t2i_workflow(
     steps: int,
     cfg: float,
     seed: int,
+    *,
+    user_id: str = "",
 ) -> dict[str, Any]:
     """Build the Anima text-to-image workflow graph."""
     return {
@@ -107,7 +112,7 @@ def anima_t2i_workflow(
             "class_type": "SaveImage",
             "inputs": {
                 "images": ["46", 0],
-                "filename_prefix": t2i_filename_prefix(),
+                "filename_prefix": t2i_filename_prefix(user_id=user_id),
             },
         },
     }
@@ -207,6 +212,7 @@ def workflow(
     *,
     override_size: bool = False,
     nai_characters: list[dict[str, Any]] | None = None,
+    user_id: str = "",
 ) -> dict[str, Any]:
     """Build the configured generation workflow graph.
 
@@ -236,6 +242,7 @@ def workflow(
             seed,
             override_size=override_size,
             nai_characters=nai_characters,
+            user_id=user_id,
         )
 
     if nai_characters is not None:
@@ -245,7 +252,8 @@ def workflow(
     if workflow_name != "anima_t2i":
         raise SystemExit(f"unsupported workflow: {workflow_name}")
     return anima_t2i_workflow(
-        config, prompt, negative_prompt, width, height, steps, cfg, seed
+        config, prompt, negative_prompt, width, height, steps, cfg, seed,
+        user_id=user_id,
     )
 
 
@@ -261,6 +269,7 @@ def custom_t2i_workflow(
     *,
     override_size: bool = False,
     nai_characters: list[dict[str, Any]] | None = None,
+    user_id: str = "",
 ) -> dict[str, Any]:
     """Build a text-to-image workflow from a user-provided ComfyUI API JSON.
 
@@ -312,6 +321,7 @@ def custom_t2i_workflow(
         seed,
         override_size=override_size,
         nai_characters=nai_characters,
+        user_id=user_id,
     )
     return workflow_body
 
@@ -329,6 +339,7 @@ def _apply_custom_workflow_inputs(
     *,
     override_size: bool = False,
     nai_characters: list[dict[str, Any]] | None = None,
+    user_id: str = "",
 ) -> None:
     text_nodes = set(_text_encode_nodes(workflow_body))
     positive_ids = _conditioning_text_node_ids(
@@ -372,7 +383,7 @@ def _apply_custom_workflow_inputs(
             raise SystemExit("nai_character_mode_requires_nai_workflow")
         _apply_nai_character_prompts(workflow_body, nai_ids[0], nai_characters)
 
-    filename_prefix = t2i_filename_prefix()
+    filename_prefix = t2i_filename_prefix(user_id=user_id)
     for node in workflow_body.values():
         if not isinstance(node, dict):
             continue

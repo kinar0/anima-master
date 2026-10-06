@@ -80,6 +80,7 @@ def generate_payload(
         seed,
         override_size=explicit_size,
         nai_characters=nai_characters,
+        user_id=getattr(args, "user_id", ""),
     )
     nai_inputs = [
         node["inputs"]

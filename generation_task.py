@@ -280,6 +280,8 @@ class GenerationTaskRunner:
             self._persist_task(task)
             return payload
         args = ["generate", "--prompt", prompt]
+        sender_id = getattr(event, "get_sender_id", lambda: "")()
+        args.extend(["--user-id", str(sender_id or "")])
         if prompt_summary.get("nai_r_mode"):
             args.extend(
                 [
