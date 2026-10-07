@@ -14,6 +14,7 @@ from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
+    from .agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from .autofilter_settings import AutofilterSettings
     from .artist_session_settings import ArtistSessionSettings
     from .command_router import parse_hard_route
@@ -34,6 +35,7 @@ try:
     from .usage_limiter import DailyUsageLimiter
     from .prompt_block_rules import matches_blocked_combination
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from autofilter_settings import AutofilterSettings
     from artist_session_settings import ArtistSessionSettings
     from command_router import parse_hard_route
@@ -422,11 +424,23 @@ class ComfyUIAgentPlugin(Star):
         cfg: float | None = None,
         negative_prompt: str | None = None,
         multi_person: bool = False,
+        size_explicit: bool = True,
     ) -> str:
         if matches_blocked_combination(
             prompt, self.config.get("blocked_prompt_combinations", [])
         ):
             message = "请求包含禁止的词语组合，已拒绝生成。"
+            await event.send(event.plain_result(message))
+            return message
+        if (
+            size_explicit
+            and width is not None
+            and height is not None
+            and int(width) * int(height) > MAX_NON_WHITELIST_EXPLICIT_PIXELS
+            and str(event.get_sender_id() or "").strip()
+            not in self._sender_id_set("generation_whitelist_sender_ids")
+        ):
+            message = "非白名单用户指定的分辨率不能超过 1MP（1024×1024 像素）。"
             await event.send(event.plain_result(message))
             return message
         quota_error = self._reserve_generation_call(event)
@@ -728,8 +742,8 @@ class ComfyUIAgentPlugin(Star):
 
         Args:
             prompt(string): Complete prompt or tags to send to ComfyUI unchanged.
-            width(number): Optional width from 832 to 1756, divisible by 4.
-            height(number): Optional height from 832 to 1756, divisible by 4.
+            width(number): Optional width from 512 to 1756, divisible by 4.
+            height(number): Optional height from 512 to 1756, divisible by 4.
             steps(number): Optional sampling steps.
             cfg(number): Optional CFG scale.
             negative_prompt(string): Optional negative prompt to use for this generation.

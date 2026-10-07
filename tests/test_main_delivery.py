@@ -93,6 +93,96 @@ def test_generate_sends_daily_limit_rejection_without_starting_generation() -> N
     assert "正在绘画中" not in result
 
 
+def test_explicit_size_limit_uses_sender_whitelist_before_reserving_usage() -> None:
+    class _Event:
+        def __init__(self, sender_id: str) -> None:
+            self.sender_id = sender_id
+            self.messages: list[str] = []
+
+        def get_sender_id(self) -> str:
+            return self.sender_id
+
+        def plain_result(self, text: str) -> str:
+            return text
+
+        async def send(self, result: str) -> None:
+            self.messages.append(result)
+
+    plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
+    plugin.config = {"generation_whitelist_sender_ids": ["white"]}
+    _init_generation_queue(plugin)
+    reserved = []
+    submitted = []
+    plugin._reserve_generation_call = lambda event: reserved.append(event.sender_id) or ""
+
+    async def generate_payload(_event, _prompt, **kwargs):
+        submitted.append((kwargs["width"], kwargs["height"]))
+        return {"ok": True, "task_id": "task", "delivery": {}}
+
+    plugin._generate_payload = generate_payload
+    plugin._send_payload = lambda *_args: asyncio.sleep(0, result="sent")
+    plugin._generation_task = type(
+        "_Task", (), {"record_delivery": lambda self, *_args: None}
+    )()
+
+    ordinary = _Event("ordinary")
+    assert "1MP" in asyncio.run(
+        plugin._generate(ordinary, "少女", width=1024, height=1028)
+    )
+    assert ordinary.messages and reserved == [] and submitted == []
+
+    assert asyncio.run(
+        plugin._generate(_Event("ordinary"), "少女", width=1024, height=1024)
+    ) == "sent"
+    assert asyncio.run(
+        plugin._generate(_Event("ordinary"), "少女", width=512, height=1756)
+    ) == "sent"
+    assert asyncio.run(
+        plugin._generate(_Event("white"), "少女", width=1024, height=1536)
+    ) == "sent"
+    assert reserved == ["ordinary", "ordinary", "white"]
+    assert submitted == [(1024, 1024), (512, 1756), (1024, 1536)]
+
+
+def test_legacy_multi_person_automatic_size_does_not_count_as_explicit() -> None:
+    class _Event:
+        def get_sender_id(self) -> str:
+            return "ordinary"
+
+        def plain_result(self, text: str) -> str:
+            return text
+
+        async def send(self, _result: str) -> None:
+            pass
+
+    plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
+    plugin.config = {}
+    _init_generation_queue(plugin)
+    plugin._multi_generation_semaphore = asyncio.Semaphore(1)
+    plugin._reserve_generation_call = lambda _event: ""
+    plugin._generate_payload = lambda *_args, **_kwargs: asyncio.sleep(
+        0, result={"ok": True, "task_id": "task", "delivery": {}}
+    )
+    plugin._send_payload = lambda *_args: asyncio.sleep(0, result="sent")
+    plugin._generation_task = type(
+        "_Task", (), {"record_delivery": lambda self, *_args: None}
+    )()
+
+    assert (
+        asyncio.run(
+            plugin._generate(
+                _Event(),
+                "两人",
+                width=1024,
+                height=1536,
+                multi_person=True,
+                size_explicit=False,
+            )
+        )
+        == "sent"
+    )
+
+
 def test_generate_sends_progress_notice_after_quota_acceptance() -> None:
     class _Event:
         def __init__(self) -> None:

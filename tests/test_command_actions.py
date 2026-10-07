@@ -12,6 +12,7 @@ from command_actions import CommandActionHandler  # noqa: E402
 from command_catalog import COMMAND_ENTRIES  # noqa: E402
 from multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS  # noqa: E402
 from prompt_presets import DEFAULT_NEGATIVE_PROMPT  # noqa: E402
+from tag_cleaner import join_prompt_parts  # noqa: E402
 
 
 class _Recorder:
@@ -234,11 +235,11 @@ def test_multi_person_action_uses_square_default_and_request_flag():
             {
                 "width": 1024,
                 "height": 1024,
-                "negative_prompt": (
-                    f"{DEFAULT_NEGATIVE_PROMPT}, "
-                    f"{', '.join(MULTI_PERSON_NEGATIVE_TAGS)}"
+                "negative_prompt": join_prompt_parts(
+                    [DEFAULT_NEGATIVE_PROMPT, ", ".join(MULTI_PERSON_NEGATIVE_TAGS)]
                 ),
                 "multi_person": True,
+                "size_explicit": False,
             },
         )
     ]
@@ -270,11 +271,11 @@ def test_multi_person_action_preserves_explicit_vertical_size():
             {
                 "width": 832,
                 "height": 1216,
-                "negative_prompt": (
-                    f"{DEFAULT_NEGATIVE_PROMPT}, "
-                    f"{', '.join(MULTI_PERSON_NEGATIVE_TAGS)}"
+                "negative_prompt": join_prompt_parts(
+                    [DEFAULT_NEGATIVE_PROMPT, ", ".join(MULTI_PERSON_NEGATIVE_TAGS)]
                 ),
                 "multi_person": True,
+                "size_explicit": True,
             },
         )
     ]

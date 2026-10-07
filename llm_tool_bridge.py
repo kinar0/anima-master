@@ -63,7 +63,7 @@ class LLMToolBridge:
             f"地址={payload.get('base_url')}，"
             f"工作流={payload.get('workflow')}，"
             f"比例快捷尺寸候选={payload.get('allowed_sizes')}，"
-            "明确尺寸规则=宽高均为832-1756且为4的倍数，"
+            "明确尺寸规则=宽高均为512-1756且为4的倍数；非白名单用户最多1024×1024像素，"
             f"版本={payload.get('comfyui_version')}，"
             f"GPU={payload.get('gpu')}，"
             f"可用显存={payload.get('vram_free_mb')}，"

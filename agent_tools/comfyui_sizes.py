@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 
-MIN_GENERATION_SIDE = 832
+MIN_GENERATION_SIDE = 512
 MAX_GENERATION_SIDE = 1756
 GENERATION_SIDE_MULTIPLE = 4
+MAX_NON_WHITELIST_EXPLICIT_PIXELS = 1024 * 1024
 
 
 def is_valid_generation_size(width: int, height: int) -> bool:

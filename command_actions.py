@@ -470,6 +470,7 @@ class CommandActionHandler:
                 return size_error
             if not prompt:
                 return "请在尺寸后面描述至少两个人物。"
+            size_explicit = size is not None
             if size is None and sizes:
                 prompt_lower = prompt.lower()
                 three_or_more = bool(
@@ -544,6 +545,7 @@ class CommandActionHandler:
                     ]
                 ),
                 multi_person=True,
+                size_explicit=size_explicit,
             )
             return None
         if action == "edit":

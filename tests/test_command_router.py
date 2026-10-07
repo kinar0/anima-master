@@ -160,6 +160,11 @@ def test_parse_generation_size_accepts_valid_explicit_size_outside_configured_li
 
 
 def test_parse_generation_size_accepts_contract_boundaries():
+    assert parse_generation_size("512x1024 少女", ALLOWED_SIZES) == (
+        "少女",
+        (512, 1024),
+        None,
+    )
     assert parse_generation_size("832x1756 少女", ALLOWED_SIZES) == (
         "少女",
         (832, 1756),
@@ -168,14 +173,14 @@ def test_parse_generation_size_accepts_contract_boundaries():
 
 
 def test_parse_generation_size_rejects_out_of_range_or_non_multiple():
-    for requested in ("828x1024", "832x1760", "834x1024"):
+    for requested in ("508x1024", "832x1760", "834x1024"):
         prompt, size, error = parse_generation_size(
             f"{requested} 少女", ALLOWED_SIZES
         )
 
         assert prompt == "少女"
         assert size is None
-        assert error and "832-1756" in error and "4 的倍数" in error
+        assert error and "512-1756" in error and "4 的倍数" in error
 
 
 def test_parse_generation_size_does_not_consume_alias_prefix():
