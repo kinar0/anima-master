@@ -13,6 +13,7 @@ if str(PLUGIN_DIR) not in sys.path:
 
 from prompt_pipeline import (  # noqa: E402
     _enforce_nai_appearance_omissions,
+    _enforce_nai_cosplay_tags,
     _omitted_appearance_dimensions,
     _without_omitted_appearance,
     _parse_structured_prompt,
@@ -54,6 +55,7 @@ from prompt_pipeline import (  # noqa: E402
     add_explicit_cosplay_source_anchors,
     add_host_outfit_changes_to_plans,
     explicit_cosplay_assignments,
+    explicit_cosplay_tags,
     explicit_worn_clothing_phrases,
     preserve_unresolved_worn_clothing_plans,
     repair_explicit_cosplay_plans,
@@ -66,6 +68,7 @@ from prompt_pipeline import (  # noqa: E402
 )
 from outfit_transfer import EffectiveOutfitPlan, UserOutfitPatch  # noqa: E402
 from prompt_presets import looks_like_danbooru_tags  # noqa: E402
+from prompt_builder import build_final_prompt  # noqa: E402
 from prompt_templates import build_llm_prompt, has_positive_futa_request  # noqa: E402
 from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver  # noqa: E402
 from danbooru_semantic import (  # noqa: E402
@@ -2068,6 +2071,8 @@ def test_explicit_cosplay_wording_is_repaired_per_wearer() -> None:
         "丰川祥子正在cos初音未来，千早爱音站在旁边",
         "丰川祥子扮成初音未来，千早爱音站在旁边",
         "丰川祥子穿着初音未来的cosplay服装，千早爱音站在旁边",
+        "丰川祥子穿着初音未来的cosplay服，千早爱音站在旁边",
+        "正在Cos初音未来的丰川祥子站在旁边，千早爱音坐着",
         "丰川祥子身穿初音未来的衣服，千早爱音站在旁边",
     )
 
@@ -2087,6 +2092,115 @@ def test_explicit_cosplay_wording_is_repaired_per_wearer() -> None:
         source = next(anchor for anchor in anchors if anchor.role == "outfit_source")
         assert repaired[0].wardrobe == SemanticWardrobe("outfit_source", source.anchor_id)
         assert repaired[1].wardrobe == SemanticWardrobe("none")
+
+
+@pytest.mark.parametrize("prompt, expected", (
+    ("丰川祥子在cosplay初音未来，千早爱音站在旁边", ("hatsune_miku_(cosplay)",)),
+    ("丰川祥子穿着初音未来的cosplay服装，千早爱音站在旁边", ("hatsune_miku_(cosplay)",)),
+    ("丰川祥子穿着初音未来的cosplay服，千早爱音站在旁边", ("hatsune_miku_(cosplay)",)),
+    ("正在Cos初音未来的丰川祥子站在旁边，千早爱音坐着", ("hatsune_miku_(cosplay)",)),
+    ("丰川祥子扮成初音未来，千早爱音站在旁边", ("hatsune_miku_(cosplay)",)),
+    ("丰川祥子穿着初音未来的cosplay服务，千早爱音站在旁边", ()),
+    ("不是正在Cos初音未来的丰川祥子，而是普通穿搭", ()),
+    ("丰川祥子身穿初音未来的衣服，千早爱音站在旁边", ()),
+    ("丰川祥子不想cosplay初音未来，只穿她的衣服", ()),
+    ("千早爱音cosplay初音未来，丰川祥子站在旁边", ()),
+))
+def test_explicit_cosplay_tag_requires_wearer_source_and_intent(
+    prompt: str, expected: tuple[str, ...]
+) -> None:
+    anchors = (
+        SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "", ("togawa_sakiko",)),
+        SemanticAnchor("anon", "target_character", "character", "千早爱音", "", ("chihaya_anon",)),
+        SemanticAnchor("miku", "outfit_source", "character", "初音未来", "", ("hatsune_miku",)),
+    )
+    outfits = (CharacterEffectiveOutfit(
+        target_anchor_id="sakiko",
+        target_source_text="丰川祥子",
+        target_candidates=("togawa_sakiko",),
+        wardrobe_kind="outfit_source",
+        wardrobe_anchor_id="miku",
+        wardrobe_tag="hatsune_miku",
+        appearance_tags=(),
+        effective=EffectiveOutfitPlan(),
+    ),)
+
+    tags = explicit_cosplay_tags(anchors, outfits, prompt)
+    assert tags == expected
+    if tags:
+        built = build_final_prompt(
+            user_prompt=prompt,
+            llm_content="standing",
+            config={"quality_prefix": ""},
+            structured_tag_tags=tags,
+            preserve_structured_order=True,
+        )
+        assert "hatsune miku \\(cosplay\\)" in built.final_prompt
+
+
+def test_explicit_cosplay_tag_requires_confirmed_character_source() -> None:
+    anchors = (
+        SemanticAnchor("sakiko", "target_character", "character", "丰川祥子", "", ()),
+        SemanticAnchor("source", "outfit_source", "character", "初音未来", "", ()),
+    )
+    outfit = CharacterEffectiveOutfit(
+        target_anchor_id="sakiko",
+        target_source_text="丰川祥子",
+        target_candidates=(),
+        wardrobe_kind="outfit_source",
+        wardrobe_anchor_id="source",
+        wardrobe_tag="",
+        appearance_tags=(),
+        effective=EffectiveOutfitPlan(),
+    )
+    prompt = "丰川祥子cosplay初音未来"
+    assert explicit_cosplay_tags(anchors, (outfit,), prompt) == ()
+    assert explicit_cosplay_tags(anchors, (replace(outfit, wardrobe_kind="named_outfit", wardrobe_tag="hatsune_miku"),), prompt) == ()
+    assert explicit_cosplay_tags(anchors, (replace(outfit, wardrobe_tag="hatsune_miku"),), prompt) == ("hatsune_miku_(cosplay)",)
+    general_source = replace(anchors[1], source_category=0)
+    assert explicit_cosplay_tags(
+        (anchors[0], general_source),
+        (replace(outfit, wardrobe_tag="hatsune_miku"),), prompt,
+    ) == ()
+
+
+def test_explicit_cosplay_tag_does_not_spread_to_another_wearer() -> None:
+    anchors = (
+        SemanticAnchor("a", "target_character", "character", "角色甲", "", ()),
+        SemanticAnchor("b", "target_character", "character", "角色乙", "", ()),
+        SemanticAnchor("source", "outfit_source", "character", "初音未来", "", ()),
+    )
+    first = CharacterEffectiveOutfit(
+        target_anchor_id="a", target_source_text="角色甲", target_candidates=(),
+        wardrobe_kind="outfit_source", wardrobe_anchor_id="source",
+        wardrobe_tag="hatsune_miku", appearance_tags=(),
+        effective=EffectiveOutfitPlan(),
+    )
+    second = replace(first, target_anchor_id="b", target_source_text="角色乙")
+
+    assert explicit_cosplay_tags(
+        anchors, (first, second),
+        "角色甲cosplay初音未来，角色乙穿初音未来的衣服",
+    ) == ("hatsune_miku_(cosplay)",)
+    assert explicit_cosplay_tags(
+        anchors, (second,),
+        "角色甲cosplay初音未来，角色乙穿初音未来的衣服",
+    ) == ()
+
+    nai_plan = {
+        "global_prompt": "best quality, hatsune miku \\(cosplay\\)",
+        "characters": [
+            {"name": "角色甲", "prompt": "角色甲, standing"},
+            {"name": "角色乙", "prompt": "角色乙, sitting"},
+        ],
+    }
+    _enforce_nai_cosplay_tags(
+        nai_plan, anchors, (first, second),
+        "角色甲cosplay初音未来，角色乙穿初音未来的衣服",
+    )
+    assert nai_plan["global_prompt"] == "best quality"
+    assert "hatsune miku \\(cosplay\\)" in nai_plan["characters"][0]["prompt"]
+    assert "cosplay" not in nai_plan["characters"][1]["prompt"]
 
 
 def test_host_clothing_change_repairs_a_terse_llm1_plan() -> None:

@@ -28,6 +28,7 @@ NAI 工作流可在正文加入独立的 `-r` 开关，例如 `/anm -r 左格高
 2. 角色视觉档案提供 canonical 角色、稳定外貌和 default/casual/stage 等候选衣柜；衣柜只是候选资料，稳定外貌则是未被用户显式修改维度的基线。
 3. 程序用统一的 `WardrobeAuthority` 决定哪些衣服本次有效，哪些历史衣柜已经失效。
 4. 第二次 LLM 同时看到完整原文、逐角色稳定外貌和服装权限，并编写 Identity、动作、构图、背景和服装表达。`outfit_source` / cosplay 使用来源档案帮助理解，但数据库组件不会被主机自动追加到最终 `Details` 或共享 Tags；模型按用户原文选择需要的可见组件，后处理只阻止被删除、陈旧或属于其他穿着者的内容复活。
+   原文明确写出“A cosplay B / 正在 Cos B 的 A / A 扮成 B / A 穿 B 的 cosplay 服装（或 cosplay 服）”，且 B 已解析为角色来源时，主机会额外加入 B 的 `_(cosplay)` tag（最终显示为 `b \(cosplay\)`）。NAI `-r` 会把它放进 A 的角色框，不留在全局提示词中。普通“A 穿 B 的衣服”、否定 cosplay、来源未确认或只是命名服装套组时不加；raw、`#` 尾缀和独立 `/anm 多人` 兼容模式不走这条规则。
 5. 程序最后再次过滤第二次 LLM 的 Tags、Details 和 Nltags，并逐角色重建 Identity：LLM1 以可定位的 `appearance_changes` 提醒 LLM2 理解用户的外貌修改，稳定外貌档案仍是基线。主机不再用正则从用户原文猜测外貌维度；角色 `Details` 和共享 `Tags` 不能绕过这套外貌权限。
 
 角色自有的 default/casual/summer/winter/stage 变体使用“穿着者 + qualifier”选择。用户可自然写“千早爱音穿着演出服”，无需重复成“千早爱音穿着千早爱音演出服”。普通衣物原文也会保留成显式 clothing anchor，因此不会因没有命名套组 tag 而被当成“衣服未指定”。

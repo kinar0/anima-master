@@ -95,7 +95,7 @@ try:
     )
     from .prompt_research import PromptResearcher
     from .prompt_templates import build_llm_prompt, has_positive_futa_request
-    from .tag_cleaner import clean_content_tags, split_tags
+    from .tag_cleaner import clean_content_tags, display_tag_text, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
     from danbooru_semantic import (
@@ -185,7 +185,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from prompt_research import PromptResearcher
     from prompt_templates import build_llm_prompt, has_positive_futa_request
-    from tag_cleaner import clean_content_tags, split_tags
+    from tag_cleaner import clean_content_tags, display_tag_text, split_tags
 
 
 def _extract_completion_text(response: Any) -> str:
@@ -2540,7 +2540,8 @@ def preserve_unresolved_worn_clothing_plans(
 
 
 def explicit_cosplay_assignments(
-    anchors: tuple[SemanticAnchor, ...], user_prompt: str
+    anchors: tuple[SemanticAnchor, ...], user_prompt: str, *,
+    cosplay_only: bool = False,
 ) -> tuple[tuple[str, str], ...]:
     """Extract only explicit wearer/source pairs from character-scoped clauses."""
     targets = tuple(anchor for anchor in anchors if anchor.role == "target_character")
@@ -2550,7 +2551,7 @@ def explicit_cosplay_assignments(
         if clause.strip()
     )
     source_token = r"[\u3400-\u9fffA-Za-z0-9_.'!:+\-]{1,40}?"
-    patterns = (
+    cosplay_patterns = (
         re.compile(
             # Do not reinterpret the noun in ``C 的 cosplay 服装`` as a
             # second verb whose source is the following word ``服装``.
@@ -2562,13 +2563,28 @@ def explicit_cosplay_assignments(
         ),
         re.compile(
             rf"(?:穿着?|身穿|换上|套上)\s*[\"“']?(?P<source>{source_token})"
-            rf"(?:的(?:cosplay|角色扮演)?|(?:cosplay|角色扮演))"
-            rf"(?:服装|衣服|服饰|造型|costume|outfit)",
+            rf"(?:的(?:cosplay|角色扮演)|(?:cosplay|角色扮演))"
+            rf"(?:服装|衣服|服饰|造型|costume|outfit|服(?=$|\s))",
             re.I,
         ),
     )
+    borrowing_patterns = (
+        re.compile(
+            rf"(?:穿着?|身穿|换上|套上)\s*[\"“']?(?P<source>{source_token})"
+            rf"的(?:服装|衣服|服饰|造型|costume|outfit)",
+            re.I,
+        ),
+    )
+    patterns = cosplay_patterns if cosplay_only else (*cosplay_patterns, *borrowing_patterns)
     assignments: list[tuple[str, str]] = []
     for target in targets:
+        reversed_cosplay = re.compile(
+            rf"(?:正在|正|在)?\s*(?<!的)(?:cosplay(?:ing)?(?:\s+as)?|cos|"
+            rf"扮演|扮成|装扮成|打扮成)\s*[\"“']?(?P<source>{source_token})"
+            rf"的\s*{re.escape(target.source_text)}"
+            rf"(?![A-Za-z0-9_])",
+            re.I,
+        )
         for clause in clauses:
             if not DanbooruResolver._alias_match_spans(clause, target.source_text):
                 continue
@@ -2580,6 +2596,17 @@ def explicit_cosplay_assignments(
                 if match:
                     break
             if not match:
+                match = reversed_cosplay.search(clause)
+                if not match:
+                    continue
+                preceding_text = clause[:match.start()]
+            else:
+                preceding_text = scoped[:match.start()]
+            if cosplay_only and re.search(
+                r"(?:不|别|勿|未|没有|并非|不是|不想|不要)\s*(?:在|正在|正)?\s*$",
+                preceding_text,
+                re.I,
+            ):
                 continue
             source = match.group("source").strip(" \"“”'")
             if source and source.lower() != target.source_text.strip().lower():
@@ -2587,6 +2614,39 @@ def explicit_cosplay_assignments(
                 if pair not in assignments:
                     assignments.append(pair)
     return tuple(assignments)
+
+
+def explicit_cosplay_tags(
+    anchors: tuple[SemanticAnchor, ...],
+    outfits: tuple[CharacterEffectiveOutfit, ...],
+    user_prompt: str,
+) -> tuple[str, ...]:
+    """Add a source-character cosplay tag only for an explicit wearer relation."""
+    by_id = {anchor.anchor_id: anchor for anchor in anchors}
+    assignments = dict(explicit_cosplay_assignments(
+        anchors, user_prompt, cosplay_only=True
+    ))
+    tags: list[str] = []
+    for outfit in outfits:
+        source_text = assignments.get(outfit.target_anchor_id)
+        source = by_id.get(outfit.wardrobe_anchor_id)
+        canonical = outfit.wardrobe_tag.strip()
+        if not (
+            source_text
+            and outfit.wardrobe_kind == "outfit_source"
+            and source is not None
+            and source.role == "outfit_source"
+            and source.group == "character"
+            and source.source_category != 0
+            and re.sub(r"\s+", " ", source.source_text.strip().lower())
+            == re.sub(r"\s+", " ", source_text.strip().lower())
+            and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_:'!().+\-]*", canonical)
+        ):
+            continue
+        tag = f"{canonical}_(cosplay)"
+        if tag not in tags:
+            tags.append(tag)
+    return tuple(tags)
 
 
 def add_explicit_cosplay_source_anchors(
@@ -3524,6 +3584,42 @@ def _enforce_nai_appearance_omissions(
             character["prompt"] = _without_omitted_appearance(
                 character["prompt"], omitted
             )
+
+
+def _enforce_nai_cosplay_tags(
+    nai_plan: dict[str, Any],
+    anchors: tuple[SemanticAnchor, ...],
+    outfits: tuple[CharacterEffectiveOutfit, ...],
+    user_prompt: str,
+) -> None:
+    """Keep deterministic cosplay tags in their wearer's NAI instance box."""
+    def tag_key(value: str) -> str:
+        return re.sub(r"[\s_\\]+", "", value.casefold())
+
+    assigned: set[str] = set()
+    for character in nai_plan["characters"]:
+        tags = tuple(dict.fromkeys(
+            tag
+            for outfit in outfits
+            if _character_outfit_matches(character["name"], outfit)
+            for tag in explicit_cosplay_tags(anchors, (outfit,), user_prompt)
+        ))
+        if len(tags) != 1:
+            continue
+        rendered = display_tag_text(tags[0])
+        assigned.add(tag_key(rendered))
+        if not any(
+            tag_key(part) == tag_key(rendered)
+            for part in split_tags(character["prompt"])
+        ):
+            character["prompt"] += f", {rendered}"
+    if assigned:
+        retained = ", ".join(
+            part for part in split_tags(nai_plan["global_prompt"])
+            if tag_key(part) not in assigned
+        )
+        if retained:
+            nai_plan["global_prompt"] = retained
 
 
 def reconcile_character_hints_with_appearance(
@@ -6820,6 +6916,18 @@ class PromptPipeline:
                 )
             )
         ))
+        cosplay_tags = explicit_cosplay_tags(
+            semantic_anchors, character_effective_outfits, prompt
+        )
+        summary["explicit_cosplay_tags"] = list(cosplay_tags)
+        if structured_prompt_mode:
+            structured_extra_tags = tuple(dict.fromkeys(
+                (*structured_extra_tags, *cosplay_tags)
+            ))
+        else:
+            required_core_tags = tuple(dict.fromkeys(
+                (*required_core_tags, *cosplay_tags)
+            ))
         if generated_scene_selected:
             structured_extra_tags = tuple(split_tags(
                 strip_default_portrait_tags(", ".join(structured_extra_tags))
@@ -7068,6 +7176,9 @@ class PromptPipeline:
                     nai_plan["characters"],
                     character_effective_outfits,
                     semantic_appearance_changes,
+                )
+                _enforce_nai_cosplay_tags(
+                    nai_plan, semantic_anchors, character_effective_outfits, prompt
                 )
                 if background_mode == DEFAULT_PORTRAIT and has_generated_scene(
                     nai_plan["global_prompt"],
