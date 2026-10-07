@@ -764,8 +764,14 @@
   "anima_master_experimental": {
     "description": "实验与附加功能",
     "type": "object",
-    "hint": "包含图生图、放大和去背景等附加能力；不影响基础文生图。",
+    "hint": "包含漫画台词排字、图生图、放大和去背景等附加能力。",
     "items": {
+      "comic_dialogue_enabled": {
+        "description": "漫画台词原文排字",
+        "type": "bool",
+        "default": false,
+        "hint": "默认关闭。开启后，从明确的漫画对白/内心独白/旁白标记，或带说话人的引号台词中复制原文。短台词优先排进画面内的气泡；空间不足时放在图片上方的对白区。NAI 和 Anima 共用，不改现有提示词优化。排字失败时不发送缺台词的原图。"
+      },
       "img2img_enabled": {
         "description": "启用图生图 / 改图",
         "type": "bool",

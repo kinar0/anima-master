@@ -23,6 +23,7 @@ try:
         skipped_delivery,
     )
     from .comfyui_startup import ComfyUIStartupManager
+    from .comic_dialogue import ComicLine, letter_comic_image
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from autofilter_settings import AutofilterSettings
     from autofilter_workflow import filter_image
@@ -36,6 +37,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         skipped_delivery,
     )
     from comfyui_startup import ComfyUIStartupManager
+    from comic_dialogue import ComicLine, letter_comic_image
 
 try:
     from aiocqhttp.exceptions import ActionFailed
@@ -178,6 +180,10 @@ class ComfyUIRuntime:
             return "多人场景规划连续失败，已停止生成以避免回退成单人图片"
         if detail == "model_refused_generation":
             return "模型拒绝了生成"
+        if detail == "comic_dialogue_parse_failed":
+            return "漫画台词标记存在，但无法可靠提取台词；请用“角色：台词”的格式"
+        if detail == "comic_dialogue_render_failed":
+            return "图片已生成，但漫画台词排字失败；原图未发送"
         if detail == "multi_person_verification_failed":
             return "多人图片在重试后仍未通过人物数量、统一场景或角色一致性检查，失败图片未发送"
         if detail == "comfyui_offline":
@@ -220,8 +226,9 @@ class ComfyUIRuntime:
 
     async def send_payload(self, event: Any, payload: dict[str, Any]) -> str:
         session = str(getattr(event, "unified_msg_origin", "") or "")
-        if self.autofilter_settings is not None:
-            self.autofilter_settings.observe(session)
+        autofilter_settings = getattr(self, "autofilter_settings", None)
+        if autofilter_settings is not None:
+            autofilter_settings.observe(session)
         if self._bool("debug_send_payload_enabled", False):
             self.logger.info(
                 "[comfyui_agent] send payload ok=%s outputs=%s error=%s",
@@ -255,10 +262,58 @@ class ComfyUIRuntime:
             await event.send(event.plain_result(message))
             return "ComfyUI 已完成任务，但没有产出可发送的图片。"
 
+        comic_rows = payload.get("comic_dialogue_lines")
+        if comic_rows:
+            try:
+                comic_lines = tuple(
+                    ComicLine(
+                        kind=str(row["kind"]),
+                        speaker=str(row["speaker"]),
+                        text=str(row["text"]),
+                    )
+                    for row in comic_rows
+                )
+                comic_dir = self.root / "workspace" / "outputs" / "comic_dialogue"
+                task_id = str(payload.get("task_id") or "comic")
+                rendered = [
+                    str(await asyncio.to_thread(
+                        letter_comic_image,
+                        Path(output),
+                        comic_lines,
+                        comic_dir,
+                        task_id=task_id,
+                        index=index,
+                    ))
+                    for index, output in enumerate(outputs)
+                ]
+            except Exception as exc:
+                self.logger.exception("[comfyui_agent] comic dialogue lettering failed")
+                payload["ok"] = False
+                payload["error"] = "comic_dialogue_render_failed"
+                payload["comic_dialogue_error"] = str(exc)[:300]
+                message = "图片已生成，但漫画台词排字失败；为避免发送缺台词的原图，本次未发送图片。"
+                payload["delivery"] = send_failed_delivery(
+                    outputs, outputs[0], exc, message
+                )
+                payload["delivery"]["error"] = "comic_dialogue_render_failed"
+                payload["delivery"]["detail"] = str(exc)[:300]
+                await event.send(event.plain_result(message))
+                return message
+            payload["comic_original_outputs"] = outputs
+            payload["outputs"] = rendered
+            payload["selected_output_path"] = rendered[0]
+            outputs = rendered
+            self.logger.info(
+                "[comfyui_agent] comic dialogue lettered task=%s lines=%s images=%s",
+                task_id,
+                len(comic_lines),
+                len(rendered),
+            )
+
         if self._bool("send_result_to_chat", True):
             sent_outputs: list[str] = []
             for index, output in enumerate(outputs[: self._int("max_send_images", 1)]):
-                if self.autofilter_settings is not None and self.autofilter_settings.enabled(session):
+                if autofilter_settings is not None and autofilter_settings.enabled(session):
                     try:
                         output = str(await asyncio.to_thread(
                             filter_image,

@@ -232,6 +232,8 @@ Canonical Tag: haneoka_school_uniform
 
 ## 实验功能
 
+`comic_dialogue_enabled` 位于“实验与附加功能”，默认关闭。开启后处理明确标记的对白／内心独白／旁白，以及带说话人的引号台词。先从用户原文复制台词，短台词优先在画面内排气泡，空间不足时在图片上方添加对白区；Anima 与 NAI 共用。原图保留在 ComfyUI 输出目录，排字版保存在 AstrBot `workspace/outputs/comic_dialogue/`，沿用 `storage_retention_days` 清理。若显式台词无法可靠提取或排字失败，本次不发送缺台词的原图。关闭开关或请求没有可识别台词时不改变现有提示词和回传流程。
+
 图生图、放大和去背景仍在开发中。配置项保留给后续版本使用，不建议作为稳定功能依赖。
 
 改图工作流会先用 `max_image_side` 限制输入图的基准最长边，再把基准宽高乘以

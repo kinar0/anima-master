@@ -128,8 +128,9 @@
     {
       "key": "anima_master_experimental",
       "description": "实验与附加功能",
-      "hint": "包含图生图、放大和去背景等附加能力；不影响基础文生图。",
+      "hint": "包含漫画台词排字、图生图、放大和去背景等附加能力。",
       "items": [
+        "comic_dialogue_enabled",
         "img2img_enabled",
         "prompt_optimize_img2img_enabled",
         "edit_denoise",

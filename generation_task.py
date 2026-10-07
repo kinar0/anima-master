@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from datetime import datetime
 import json
 import re
+from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 try:
+    from .comic_dialogue import ComicDialogueError, extract_comic_dialogue
     from .nai_character_mode import strip_nai_character_switch
 except ImportError:  # pragma: no cover - direct module tests.
+    from comic_dialogue import ComicDialogueError, extract_comic_dialogue
     from nai_character_mode import strip_nai_character_switch
 
 
@@ -158,6 +160,24 @@ class GenerationTaskRunner:
             self._task_recorder.mark_failure(task, payload["error"])
             self._persist_task(task)
             return payload
+        comic_lines = ()
+        if self._bool("comic_dialogue_enabled", False):
+            try:
+                comic_lines = extract_comic_dialogue(prompt_before_suffix)
+            except ComicDialogueError as exc:
+                payload = {
+                    "ok": False,
+                    "error": "comic_dialogue_parse_failed",
+                    "comic_dialogue_error": str(exc),
+                    "task_id": task["task_id"],
+                }
+                self._task_recorder.mark_failure(task, payload["error"])
+                self._persist_task(task)
+                return payload
+            task["comic_dialogue"] = {
+                "enabled": True,
+                "line_count": len(comic_lines),
+            }
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):
             ready["task_id"] = task["task_id"]
@@ -303,6 +323,10 @@ class GenerationTaskRunner:
             args.extend(["--negative-prompt", str(negative_prompt)])
         payload = await self._run_tool(args)
         payload["task_id"] = task["task_id"]
+        if comic_lines and payload.get("ok"):
+            payload["comic_dialogue_lines"] = [
+                line.to_dict() for line in comic_lines
+            ]
         if multi_person:
             payload["_prepared_prompt"] = prompt
             payload["_prepared_prompt_summary"] = prompt_summary
