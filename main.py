@@ -33,6 +33,7 @@ try:
     from .service_container import build_services
     from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
+    from .generation_request_guard import generation_request_guard
     from .prompt_block_rules import matches_blocked_combination
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
@@ -54,6 +55,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from service_container import build_services
     from danbooru_resolver import WardrobeValidationError
     from usage_limiter import DailyUsageLimiter
+    from generation_request_guard import generation_request_guard
     from prompt_block_rules import matches_blocked_combination
 
 
@@ -95,6 +97,7 @@ class ComfyUIAgentPlugin(Star):
         )
         self._generation_queue_lock = threading.Lock()
         self._unfinished_generation_requests = 0
+        self._generation_request_guard = generation_request_guard
         self._daily_usage = DailyUsageLimiter(
             plugin_data_path / "daily_generation_usage.json", logger
         )
@@ -426,6 +429,14 @@ class ComfyUIAgentPlugin(Star):
         multi_person: bool = False,
         size_explicit: bool = True,
     ) -> str:
+        guard = getattr(self, "_generation_request_guard", None)
+        if guard is not None and not guard.claim(event):
+            logger.info(
+                "[comfyui_agent] duplicate generation message ignored: platform=%s message_id=%s",
+                event.get_platform_id(),
+                getattr(getattr(event, "message_obj", None), "message_id", ""),
+            )
+            return ""
         if matches_blocked_combination(
             prompt, self.config.get("blocked_prompt_combinations", [])
         ):
