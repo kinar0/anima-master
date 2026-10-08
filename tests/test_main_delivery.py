@@ -362,11 +362,15 @@ def test_generation_reservation_counts_normal_user_but_not_whitelist(
     tmp_path: Path,
 ) -> None:
     class _Event:
-        def __init__(self, sender_id: str) -> None:
+        def __init__(self, sender_id: str, group_id: str = "") -> None:
             self.sender_id = sender_id
+            self.group_id = group_id
 
         def get_sender_id(self) -> str:
             return self.sender_id
+
+        def get_group_id(self) -> str:
+            return self.group_id
 
         def is_admin(self) -> bool:
             return False
@@ -384,7 +388,7 @@ def test_generation_reservation_counts_normal_user_but_not_whitelist(
     )
     plugin._generation_usage_summary = ContextVar("test_generation_usage", default={})
 
-    assert plugin._reserve_generation_call(_Event("ordinary")) == ""
+    assert plugin._reserve_generation_call(_Event("ordinary", "group")) == ""
     assert plugin._generation_usage_summary.get()["remaining"] == 0
     assert "1/1" in plugin._reserve_generation_call(_Event("ordinary"))
     assert plugin._reserve_generation_call(_Event("white")) == ""

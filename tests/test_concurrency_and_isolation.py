@@ -434,6 +434,62 @@ def test_delivery_mentions_requester_on_first_group_image_when_enabled(
     assert event.sent[1] == [str(second)]
 
 
+def test_delivery_shows_remaining_usage_on_first_private_image_without_at(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    first = tmp_path / "first.png"
+    second = tmp_path / "second.png"
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+
+    class _SendEvent:
+        def __init__(self) -> None:
+            self.sent: list[list[object]] = []
+
+        def get_group_id(self) -> str:
+            return ""
+
+        def get_sender_id(self) -> str:
+            return "123456789"
+
+        def chain_result(self, chain):
+            return chain
+
+        async def send(self, result) -> None:
+            self.sent.append(result)
+
+    monkeypatch.setattr(
+        runtime_module.Comp.Image,
+        "fromFileSystem",
+        staticmethod(lambda path: path),
+    )
+    runtime = ComfyUIRuntime.__new__(ComfyUIRuntime)
+    runtime._bool = lambda key, default: (
+        True if key == "notify_drawing_and_at_sender" else default
+    )
+    runtime._int = lambda key, default: 2 if key == "max_send_images" else default
+    runtime.logger = _Logger()
+    event = _SendEvent()
+
+    asyncio.run(
+        runtime.send_payload(
+            event,
+            {
+                "ok": True,
+                "outputs": [str(first), str(second)],
+                "daily_usage": {"limit": 5, "remaining": 0},
+            },
+        )
+    )
+
+    assert len(event.sent) == 2
+    assert len(event.sent[0]) == 2
+    assert event.sent[0][0].text == "今日剩余次数：0\n"
+    assert event.sent[0][1] == str(first)
+    assert event.sent[1] == [str(second)]
+
+
 def test_remaining_usage_text_shows_unlimited_for_whitelist() -> None:
     assert (
         ComfyUIRuntime._remaining_usage_text(

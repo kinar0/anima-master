@@ -329,14 +329,14 @@ class ComfyUIRuntime:
                         await event.send(event.plain_result(message))
                         return message
                 chain = []
-                if index == 0 and self._should_at_sender(event):
-                    chain.extend(
-                        [
-                            Comp.At(qq=str(event.get_sender_id())),
-                            Comp.Plain(
-                                " " + self._remaining_usage_text(payload) + "\n"
-                            ),
-                        ]
+                if index == 0 and self._bool("notify_drawing_and_at_sender", False):
+                    if self._should_at_sender(event):
+                        chain.append(Comp.At(qq=str(event.get_sender_id())))
+                        prefix = " "
+                    else:
+                        prefix = ""
+                    chain.append(
+                        Comp.Plain(prefix + self._remaining_usage_text(payload) + "\n")
                     )
                 chain.append(Comp.Image.fromFileSystem(output))
                 trace = self._delivery_trace(event, output, index, len(outputs), chain)
