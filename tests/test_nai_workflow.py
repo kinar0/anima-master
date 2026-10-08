@@ -225,8 +225,8 @@ def test_nai_position_prompt_requires_per_character_gaze_assignment():
 
     assert "local environment relationships in global_prompt" in instruction
     assert "repeat it in every applicable character prompt" in instruction
-    assert "only Anon's eyes glance down-left toward Sakiko's chest" in instruction
-    assert "looking at viewer only in Sakiko's prompt" in instruction
+    assert "Do not invent a gaze toward the viewer" in instruction
+    assert "Anon looks toward Sakiko" in instruction
     assert "sex/gender, identity tag" in instruction
     assert "sitting on a table" in instruction
     assert "classroom belongs globally" in instruction

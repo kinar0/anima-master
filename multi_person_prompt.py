@@ -170,7 +170,7 @@ Rules:
 - For locally saved characters, appearance must be empty and saved defining tags must never be contradicted.
 - Do not output quality tags, safety tags, artist tags, Markdown, or explanations.
 - Keep character fields and relationships visually concrete.
-- Preserve the user's explicit interaction direction and gaze direction.
+- Preserve the user's explicit interaction direction and gaze direction. Do not invent a gaze toward the viewer; when the request describes people looking at each other, keep that relation between them.
 - When the interaction is directed, order characters by semantic role: put the actor, holder, carrier, or supporter before the recipient. Do not reorder them merely because the recipient was named first in a sentence.
 - Put the complete directed relationship in exactly one interactions entry. Describe it from both sides in that entry: state the actor's concrete action and arm/body placement first, then state that the recipient is being held, supported, carried, or otherwise acted upon. Repeat the names as Character aliases where useful for binding. Character pose fields must not repeat the relationship, but must retain each person's independent posture (for example sitting upright versus lying against the other person's chest).
 - Do not rely on an unbound phrase such as `in Character A's arms`, or on a bare symmetric word such as embrace, cuddling, or hug, to encode who acts on whom.

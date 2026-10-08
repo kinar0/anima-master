@@ -21,7 +21,7 @@
 不再由固定动作词组门控。主机只校验格式，若标签格式正确但互动对象或方向不对，
 需检查 `nai_character_plan_raw` 与原文；`nai_dropped_interaction_tags` 不会记录这种语义错误。
 
-若一名角色的性别、衣服、动作、表情、外貌或 `looking at viewer` 影响了其他角色，检查任务摘要中的
+若一名角色的性别、衣服、动作、表情、外貌或视线影响了其他角色，检查任务摘要中的
 `nai_global_prompt` 和 `nai_dropped_global_character_tags`。视线 tag 应只出现在
 对应的 `nai_characters[].prompt`；其他明确角色实例条件也应进入该角色框。解析器会从全局提示词删除可明确识别的误放项，并把原始项
 列入 `nai_dropped_global_character_tags`。若删除列表非空但目标角色框里也没有该

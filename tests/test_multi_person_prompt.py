@@ -182,6 +182,8 @@ def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:
     assert "order characters by semantic role" in prompt
     assert "Describe it from both sides" in prompt
     assert "bare symmetric word such as embrace" in prompt
+    assert "Do not invent a gaze toward the viewer" in prompt
+    assert "looking at viewer" not in prompt
 
 
 def test_multi_person_pipeline_builds_hybrid_prompt_and_resolves_each_character():

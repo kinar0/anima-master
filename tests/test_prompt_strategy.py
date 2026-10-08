@@ -696,6 +696,8 @@ def test_prompt_pipeline_uses_default_creative_generation():
     assert "wardrobe.kind" not in context.calls[0]["prompt"]
     assert "Count must contain an exact Danbooru people-count tag" in context.calls[0]["system_prompt"]
     assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
+    assert "不要把看向观众当作默认姿态" in context.calls[0]["prompt"]
+    assert "looking at viewer" not in context.calls[0]["prompt"]
 
 
 def test_prompt_pipeline_retries_incomplete_structured_parenthesized_character() -> None:
