@@ -79,7 +79,11 @@ def test_create_artist_preset_preserves_nai_numeric_emphasis() -> None:
 
 def test_edit_blocks_combination_before_comfyui_readiness() -> None:
     handler = _handler(
-        config={"blocked_prompt_combinations": ["词甲 && 词乙"]}
+        config={
+            "blocked_prompt_rules": [
+                {"group_a": ["词甲"], "group_b": ["词乙"]}
+            ],
+        }
     )
     handler._bool = lambda key, default: True if key == "img2img_enabled" else default
 

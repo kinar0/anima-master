@@ -24,6 +24,27 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
 RESET_TO_DEFAULTS_KEY = "reset_to_defaults"
 
 
+def migrate_block_rule_groups(config: Any) -> dict[str, Any]:
+    """Move the former fixed A/B lists into the repeatable rule editor."""
+    result = dict(config or {})
+    old_a = result.get("blocked_prompt_group_a", [])
+    old_b = result.get("blocked_prompt_group_b", [])
+    if not (isinstance(old_a, list) and isinstance(old_b, list)):
+        return result
+    result.pop("blocked_prompt_group_a", None)
+    result.pop("blocked_prompt_group_b", None)
+    if not old_a and not old_b:
+        return result
+    rules = result.get("blocked_prompt_rules", [])
+    if not isinstance(rules, list):
+        rules = []
+    result["blocked_prompt_rules"] = [
+        *rules,
+        {"__template_key": "group_pair", "group_a": old_a, "group_b": old_b},
+    ]
+    return result
+
+
 def migrate_prompt_defaults(config: Any) -> dict[str, Any]:
     """Replace previous built-in defaults and obsolete compatibility keys.
 

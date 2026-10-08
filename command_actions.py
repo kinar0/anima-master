@@ -17,7 +17,7 @@ try:
     from .config_defaults import persist_flat_config_key
     from .deployment_diagnostics import compact_status_text, diagnostic_text
     from .multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
-    from .prompt_block_rules import matches_blocked_combination
+    from .prompt_block_rules import matches_blocked_prompt
     from .prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
@@ -40,7 +40,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from config_defaults import persist_flat_config_key
     from deployment_diagnostics import compact_status_text, diagnostic_text
     from multi_person_prompt import MULTI_PERSON_NEGATIVE_TAGS
-    from prompt_block_rules import matches_blocked_combination
+    from prompt_block_rules import matches_blocked_prompt
     from prompt_presets import (
         DEFAULT_NEGATIVE_PROMPT,
         active_artist_preset_name,
@@ -343,9 +343,7 @@ class CommandActionHandler:
         prompt = str(prompt or "").strip()
         if not prompt:
             return "请在后面写改图提示词。"
-        if matches_blocked_combination(
-            prompt, self.config.get("blocked_prompt_combinations", [])
-        ):
+        if matches_blocked_prompt(prompt, self.config):
             return "请求包含禁止的词语组合，已拒绝生成。"
         ready = await self._ensure_ready(event)
         if not ready.get("ok"):

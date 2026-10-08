@@ -730,14 +730,42 @@
           "sensual_mode_enabled": true
         }
       },
+      "blocked_prompt_rules": {
+        "description": "屏蔽词组对规则",
+        "type": "template_list",
+        "default": [],
+        "hint": "点击添加条目，可建立任意多条组对规则，例如 A/B、C/D。每条规则内左组任意词条与右组任意词条同时命中即拒绝；任意一条规则命中即拒绝。",
+        "templates": {
+          "group_pair": {
+            "name": "新增一对屏蔽词组",
+            "hint": "分别管理左组和右组词条；两组都至少有一个词条才生效。",
+            "items": {
+              "group_a": {
+                "description": "左组词条",
+                "type": "list",
+                "default": [],
+                "items": { "type": "string" },
+                "hint": "逐条添加；命中其中任意一个即可。"
+              },
+              "group_b": {
+                "description": "右组词条",
+                "type": "list",
+                "default": [],
+                "items": { "type": "string" },
+                "hint": "逐条添加；需同时命中左组任意一个词条。"
+              }
+            }
+          }
+        }
+      },
       "blocked_prompt_combinations": {
-        "description": "拒绝生成的词语组合",
+        "description": "旧版屏蔽组合（兼容）",
         "type": "list",
         "default": [],
         "items": {
           "type": "string"
         },
-        "hint": "每行一组，词语用 && 连接，例如：词语A && 词语B。用户输入同时包含该行全部词语时直接拒绝，不调用提示词模型或 ComfyUI，也不扣生图次数；不区分英文字母大小写，检查 # 后手工词。留空则不拦截。",
+        "hint": "保留升级前已配置的规则；每行用 && 连接至少两个词。任一旧规则或任一组对规则命中都会拒绝。新规则请在上方的组对规则中管理。",
         "collapsed": true
       },
       "keyword_prompt_rules_enabled": {

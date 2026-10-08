@@ -23,6 +23,7 @@ try:
         group_config,
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
+        migrate_block_rule_groups,
         migrate_prompt_defaults,
     )
     from .prompt_presets import (
@@ -34,7 +35,7 @@ try:
     from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
     from .generation_request_guard import generation_request_guard
-    from .prompt_block_rules import matches_blocked_combination
+    from .prompt_block_rules import matches_blocked_prompt
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from autofilter_settings import AutofilterSettings
@@ -45,6 +46,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         group_config,
         maybe_migrate_to_grouped_config,
         maybe_reset_to_defaults,
+        migrate_block_rule_groups,
         migrate_prompt_defaults,
     )
     from prompt_presets import (
@@ -56,7 +58,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from danbooru_resolver import WardrobeValidationError
     from usage_limiter import DailyUsageLimiter
     from generation_request_guard import generation_request_guard
-    from prompt_block_rules import matches_blocked_combination
+    from prompt_block_rules import matches_blocked_prompt
 
 
 class ComfyUIAgentPlugin(Star):
@@ -77,7 +79,7 @@ class ComfyUIAgentPlugin(Star):
             schema_path,
         )
         raw_or_reset = migrate_prompt_defaults(
-            flatten_config(raw_or_reset or grouped_or_reset)
+            migrate_block_rule_groups(flatten_config(raw_or_reset or grouped_or_reset))
         )
         raw_config = maybe_materialize_chiyo_preset(
             None,
@@ -437,9 +439,7 @@ class ComfyUIAgentPlugin(Star):
                 getattr(getattr(event, "message_obj", None), "message_id", ""),
             )
             return ""
-        if matches_blocked_combination(
-            prompt, self.config.get("blocked_prompt_combinations", [])
-        ):
+        if matches_blocked_prompt(prompt, self.config):
             message = "请求包含禁止的词语组合，已拒绝生成。"
             await event.send(event.plain_result(message))
             return message

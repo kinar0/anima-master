@@ -8,9 +8,27 @@ PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
-from config_defaults import migrate_prompt_defaults  # noqa: E402
+from config_defaults import migrate_block_rule_groups, migrate_prompt_defaults  # noqa: E402
 from danbooru_semantic import DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT  # noqa: E402
 from prompt_templates import DEFAULT_LLM_PROMPT_TEMPLATE  # noqa: E402
+
+
+def test_fixed_block_groups_migrate_to_repeatable_rule_once() -> None:
+    config = {
+        "blocked_prompt_group_a": ["甲", "乙"],
+        "blocked_prompt_group_b": ["丙"],
+        "blocked_prompt_rules": [
+            {"__template_key": "group_pair", "group_a": ["丁"], "group_b": ["戊"]}
+        ],
+    }
+    migrated = migrate_block_rule_groups(config)
+    assert "blocked_prompt_group_a" not in migrated
+    assert "blocked_prompt_group_b" not in migrated
+    assert migrated["blocked_prompt_rules"] == [
+        {"__template_key": "group_pair", "group_a": ["丁"], "group_b": ["戊"]},
+        {"__template_key": "group_pair", "group_a": ["甲", "乙"], "group_b": ["丙"]},
+    ]
+    assert migrate_block_rule_groups(migrated) == migrated
 
 
 def test_empty_builtin_prompt_fields_migrate_to_aesthetic_defaults() -> None:

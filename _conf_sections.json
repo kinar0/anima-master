@@ -121,6 +121,8 @@
         "style_tags",
         "sensual_mode_enabled",
         "sensual_mode_markers",
+        "blocked_prompt_rules",
+        "blocked_prompt_combinations",
         "keyword_prompt_rules_enabled",
         "keyword_prompt_rules"
       ]
