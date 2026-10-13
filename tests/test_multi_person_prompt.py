@@ -146,12 +146,14 @@ def test_character_renderer_uses_fixed_tags_as_authoritative_identity() -> None:
         ),
         alias="Character A",
         fixed_tags="white hair, red eyes, fox ears",
+        identity_anchors=("white hair", "fox ears"),
     )
 
     assert block.startswith("Character A:")
     assert "wrong_guessed_name" not in block
     assert "On the left" not in block
-    assert "white hair, red eyes, fox ears" in block
+    assert "white hair, fox ears" in block
+    assert "red eyes" not in block
     assert "orange hair" not in block
     assert "black dress" in block
 
@@ -168,6 +170,18 @@ def test_renderer_keeps_bound_outfit_constraint_in_character_block() -> None:
     )
 
     assert "wears no shirt or top." in block
+
+
+def test_fixed_renderer_does_not_restore_profile_when_no_anchor_is_visible() -> None:
+    block = render_multi_person_character(
+        MultiPersonCharacter(slot="left", name="A", danbooru_candidate="wrong_name",
+                             appearance="blue eyes", clothing="", expression="",
+                             pose="head out of frame, hands only", props=()),
+        alias="Character A", fixed_tags="white hair, red eyes, fox ears",
+        identity_anchors=(),
+    )
+    assert "hands only" in block
+    assert "eyes" not in block and "hair" not in block and "fox ears" not in block
 
 
 def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:
@@ -331,7 +345,8 @@ def test_multi_person_pipeline_protects_fixed_character_appearance():
 
     assert result.summary["fixed_character_count"] == 1
     assert result.summary["danbooru_resolved_count"] == 1
-    assert "white hair, red eyes, fox ears" in result.final_prompt
+    assert "red eyes" in result.final_prompt  # Correct the selected eye anchor.
+    assert "white hair" not in result.final_prompt and "fox ears" not in result.final_prompt
     assert "orange hair" not in result.final_prompt
     assert "solo" not in result.final_prompt
 

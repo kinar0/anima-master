@@ -10,8 +10,10 @@ from typing import Any
 
 try:
     from .tag_cleaner import split_tags, display_tag_text
+    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 except ImportError:  # pragma: no cover - direct script-style imports.
     from tag_cleaner import split_tags, display_tag_text
+    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 
 
 _R_SWITCH = re.compile(r"(?<!\S)-r(?=$|[\s,，;；])", re.I)
@@ -193,16 +195,38 @@ def build_nai_character_plan_prompt(
         '{"composition_analysis":{"viewpoint":"...","layout":"...",'
         '"relations":"..."},"global_prompt":"...","characters":['
         '{"name":"canonical character tag or short identity",'
-        '"prompt":"gender, identity, appearance, clothing, expression, pose, '
+        '"anchor_id":"matching local target anchor, or empty",'
+        '"source_text":"exact request clause for this instance, or empty",'
+        '"prompt":"girl / boy / other, identity, appearance, clothing, expression, pose, '
         'action, local environment relation",'
         '"interaction_tags":[], '
         '"position_reason":"...",'
         '"x":0.5,"y":0.5}]}\n'
         "Create one characters entry per visible INSTANCE, not per unique name. "
         "If the same character appears in two panels/grid cells, make two entries "
-        "with separate actions, clothing and coordinates. Preserve the user's "
+        "with separate actions, clothing and coordinates. For repeated identities "
+        "with clothing/appearance changes, source_text MUST quote the exact request "
+        "clause applying to that instance, or an array of exact clauses when "
+        "separate shared and local clauses both apply. When quoting, never "
+        "summarize, translate, or join non-contiguous text into "
+        "a synthetic clause. Leave source_text empty when it is not needed to "
+        "scope repeated-instance changes. Use the matching local anchor_id when "
+        "different local wardrobe plans exist for one identity; never choose by "
+        "character-array order. Preserve the user's "
         "explicit differences between instances. The user request is authoritative "
-        "for those differences even if the validated full prompt merged them. "
+        "over identity-level local evidence for those differences. "
+        "Count every visible instance, including anonymous people and repeated "
+        "appearances, once in the global population tags: 1girl or 1boy for one "
+        "known-gender person, Ngirls for all girls, Nboys for all boys, and "
+        "Ngirls, Mboys for a mixed group. Unknown gender may use Npeople. "
+        "Each character prompt describes exactly one instance and uses the "
+        "unnumbered gender tag girl, boy, or other; never put 1girl, 1boy, "
+        "Ngirls, Mboys, or other population counts inside a character prompt. "
+        "Use explicit user gender first, then reliable character identity facts; "
+        "do not infer a gender change from titles, clothing, poses or chest size. "
+        "Keep the same exact canonical spelling in name and that instance's "
+        "prompt. For anonymous people use a short identity, not an invented "
+        "canonical tag. Copyright uses only confirmed series tags. "
         f"Use at most {canvas.get('character_limit', MAX_NAI_CHARACTERS)} instances for this model. "
         "Coordinates range from 0 to 1, with x increasing left to right and y "
         "increasing top to bottom. Respect explicit left/right or panel placement; "
@@ -221,15 +245,15 @@ def build_nai_character_plan_prompt(
         "leaning against a wall, standing in water, lying on a bed, being under "
         "an umbrella, or occupying a chair. A face can point toward the "
         "viewer while its eyes look elsewhere; preserve those as separate facts. "
-        "Put only whole-image conditions in global_prompt: artist tags, quality, "
-        "copyright, total person-count, the shared background/scene itself, "
+        "Put only whole-image conditions in global_prompt: copyright, "
+        "total person-count, the shared background/scene itself, "
         "camera/framing, lighting, color grading and layout. A scene may be global "
         "while a character's contact with it is local: classroom belongs globally, "
         "but sitting on classroom desk belongs to that character. Do not put sex/"
         "gender, character identity, appearance, wardrobe, expression, pose, worn "
         "or handled objects, body/head orientation, gaze, individual actions, or "
-        "local environment relationships in global_prompt. The validated "
-        "full prompt may contain unscoped character tags; redistribute them "
+        "local environment relationships in global_prompt. Local evidence "
+        "may contain unscoped character tags; assign them to the correct instance "
         "instead of copying them globally. User-requested gaze belongs in the "
         "applicable character prompt, never global_prompt. Do not invent a gaze "
         "toward the viewer. Even when every "
@@ -242,12 +266,18 @@ def build_nai_character_plan_prompt(
         "desk, put sitting on desk only in that character prompt. If the user "
         "says Anon looks toward Sakiko, put that gaze only in Anon's prompt; "
         "put no gaze fact in global_prompt. "
-        "Write all prompt strings in English. Keep established Danbooru tags "
-        "and escaped weight syntax when useful. "
+        "Keep established Danbooru tags, canonical identity spelling and escaped "
+        "weight syntax when useful. NAI natural-language descriptions may retain "
+        "the user's original Chinese when that preserves the requested meaning. "
+        "source_text must quote the original request in its original language; "
+        "do not translate it. Composition analysis and position reasons may be "
+        "in Chinese or English. "
         "Decide from the user request whether any visible characters perform "
         "an explicit person-to-person action. This is an open-ended semantic "
         "decision, not a fixed list of trigger words: actions such as feeding, "
-        "kicking or helping someone up can qualify. For each directed action, "
+        "kicking or helping someone up can qualify. Put who acts on whom, "
+        "direction and relevant contact in the involved character prompts, "
+        "not just analysis fields or direction tags. For each directed action, "
         "give the actor source#tag and the recipient target#tag in their "
         "respective interaction_tags arrays. For a genuinely mutual action, "
         "give each participant mutual#tag. Use a concise Danbooru action tag "
@@ -265,7 +295,8 @@ def build_nai_character_plan_prompt(
         f"width/height={width / height:.4f}.\n"
         f"User request:\n{user_prompt}\n"
         f"{noun_rule}"
-        f"Validated full prompt and character evidence:\n{final_prompt}"
+        f"Local character evidence (not a previously written full prompt):\n{final_prompt}"
+        + APPEARANCE_VISIBILITY_POLICY
     )
 
 
@@ -372,6 +403,10 @@ def parse_nai_character_plan(
                 if part not in interaction_tags:
                     dropped_interaction_tags.append(part[:80])
             else:
+                count = re.fullmatch(r"\d+\s*(girls?|boys?|others?|people|persons?)", part.strip(), re.I)
+                if count:
+                    gender = count.group(1).casefold()
+                    part = "girl" if gender.startswith("girl") else "boy" if gender.startswith("boy") else "other"
                 prompt_parts.append(part)
         character_prompt = ", ".join(prompt_parts)
         if name.casefold() not in character_prompt.casefold():
@@ -381,13 +416,24 @@ def parse_nai_character_plan(
         position_reason = item.get("position_reason")
         if not isinstance(position_reason, str) or not position_reason.strip():
             raise ValueError("nai_character_plan_missing_position_reason")
+        evidence = {}
+        for field in ("anchor_id", "source_text"):
+            value = item.get(field, "")
+            if field == "source_text" and isinstance(value, list):
+                if not 1 <= len(value) <= 12 or any(not isinstance(clause, str) or not clause.strip() for clause in value):
+                    raise ValueError("nai_character_plan_invalid_instance_evidence")
+                evidence[field] = [clause.strip() for clause in value]
+            elif not isinstance(value, str):
+                raise ValueError("nai_character_plan_invalid_instance_evidence")
+            elif value.strip():
+                evidence[field] = value.strip()
         cleaned.append({
-            "name": name.strip(), "prompt": character_prompt,
+            **evidence, "name": name.strip(), "prompt": character_prompt,
             "interaction_tags": interaction_tags,
             "position_reason": position_reason.strip(), "x": x, "y": y,
         })
     # Exact character identity tags belong to the instance boxes even if the
-    # planner copied them from the validated seven-field prompt.
+    # writer copied them from local evidence.
     global_parts = split_tags(global_prompt)
     names = {re.sub(r"[\s_]+", "", item["name"].casefold()) for item in cleaned}
     dropped_global_character_tags: list[str] = []

@@ -1,0 +1,49 @@
+{
+  "method": "same 1325 translated/verified checkpoint rows and current 1427 mappings; seven calls",
+  "before": {
+    "wardrobe": {
+      "milliseconds": [
+        22.968799981754273,
+        14.325199997983873,
+        13.54770001489669
+      ],
+      "median_ms": 14.325199997983873,
+      "json_bytes": 100459,
+      "counts": {
+        "outfits": 51,
+        "outfitSets": 9,
+        "terms": 1427
+      }
+    },
+    "batch": {
+      "milliseconds": [
+        1929.6261999988928,
+        1603.56019999017,
+        1673.4775000077207
+      ],
+      "median_ms": 1673.4775000077207,
+      "json_bytes": 547309,
+      "counts": {
+        "total": 8005,
+        "translated": 1325,
+        "verified": 1325,
+        "rows": 1325
+      }
+    }
+  },
+  "batch_after_ms": [
+    382.44549999944866,
+    40.713700000196695,
+    41.79589997511357,
+    40.98749998956919,
+    40.70610000053421,
+    39.62379999575205,
+    40.946300025098026
+  ],
+  "batch_after_cold_ms": 382.44549999944866,
+  "batch_after_warm_median_ms": 40.83000001264736,
+  "full_batch_json_bytes": 547309,
+  "status_json_bytes": 58,
+  "review_first_page_ms": 58.457500010263175,
+  "review_first_page_json_bytes": 44532
+}

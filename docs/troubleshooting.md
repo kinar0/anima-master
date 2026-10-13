@@ -1,5 +1,13 @@
 # 故障排查
 
+## 词库页面等待 / 审核决定没有参与生图
+
+首屏只读完整词库与轻量任务状态，完整翻译进度和候选审核分别按需展开。若仍等待，区分 bridge 就绪、wardrobe 请求、批量进度、传输与渲染耗时，不用条目数推断根因。进度已加入文件/映射版本缓存并移出请求主循环，但首次计算仍有成本；报告中的本地耗时不是 WebUI 端到端测量。
+
+“采纳为待验收”“保存修改为待验收”只写审查记录，不改 `danbooru_term_mappings`；相近查找只找维护候选。revision 冲突时刷新后重试，草稿保留。本地证据缺失不等于 NAI 不支持。看不到新面板/接口时先确认插件已加载新代码并刷新页面，不让旧页面的未保存词库覆盖新值。本轮未自动重载。
+
+名词不命中可检查明确否定、文字提及/非视觉范围以及最长别名重叠。完整的“没穿内裤”“不对称发型”等现有词义仍可用，独立正向出现仍提供参考；复杂否定或隐喻可能超出当前保守规则，不增加整段失败原句补洞。
+
 ## 名词翻译已导入，却显示在“冲突或跳过”
 
 旧页面把“已复核但没有可新增别名”的条目合并展示，因此正常导入的重复映射、真实冲突和模型拒绝会混在一起。更新并重载插件、刷新页面后，选择“需人工复核”即可查看未解决的问题；“已在词库（全部别名）”单独显示已完成条目。部分成功的标签会逐个显示别名状态，不会因其中一个可导入而隐藏另一个的冲突。统计卡中的人工复核按标签计数，可导入和已在词库按别名计数。在上方词库修订保存后点击“刷新进度”重新分类，无需重译或删除断点。
@@ -16,12 +24,15 @@
 
 ## NAI 自定义工作流
 
-`-r` 模式先生成完整七段提示词，再由布局模型返回全局提示词与各角色实例的
+若本地已有多名角色档案，但 `confirmed_character_bindings` 只有一名，先对照 `semantic_plan_raw`，可能是第一阶段返回合法但不完整的名单。NAI `-r` 当前仍向写作者提供遗漏档案的条件参考；检查 `nai_character_plan_prompt` 的 `Additional locally confirmed identities`、`nai_local_profile_references` 和 `nai_bound_local_profile_references`。参考不是强制出场名单，服装来源仍独立处理；明确衣服尚未绑定时，不应看到该参考的 default reference。已清空的 `fixed_characters` 不再提供旧辅助拼写，但当前词库别名和档案仍可正常匹配。
+全局人数统计所有可见实例，角色框使用 `girl / boy / other`；独立的数字性别计数会归一化。画师/质量由主机补全，任务书不要求模型生成。NAI 自然语言和分析允许中文，`source_text` 使用原文原语言；不要把中文原文引用误判为英文输出不合规。
+
+`-r` 模式保留第一次意图规划，专用第二次 LLM 直接返回全局提示词与各角色实例的
 独立提示词、坐标和位置理由。V5 最多 22 个实例，V4/V4.5 最多 6 个；布局输出
 上限按模型角色上限扩展，最高 7200 tokens。若摘要显示
 `nai_character_plan_failed`，检查 `llm_error`：`nai_character_plan_invalid_json`
 通常表示返回的 JSON 不完整或格式不合法；复杂多人请求可缩短逐人描述，
-再检查模型的可见输出。失败时不会提交未经拆分的原提示词。
+再检查模型的可见输出。失败时停止提交，不回退到普通七字段写作或未规划的整体提示词。
 旧版本可能报 `nai_character_plan_missing_noun_tags: <tag>`：例如 2026-10-13 09:58 的回复已有完整构图分析、三个角色框和有效坐标，却仅因缺少 `heart` 拒绝提交。这条硬规则及其整份布局重试已移除。更新并重载插件后，词库仅辅助布局模型表达；缺少独立 tag 只记入 `nai_missing_noun_tags`，不会阻断生图或强行猜测归属。该诊断统计精确独立 tag，不代表自然语言没有表达同一含义。角色框中实际写入的合法 `source#tag / target#tag / mutual#tag` 也计入精确覆盖；非法 JSON、角色框或坐标仍属于规划失败。
 `nai_dropped_interaction_tags` 非空表示布局模型给某个角色的
 `interaction_tags` 写了空动作、多个 `#`、逗号串、非英文 tag，或把方向标签写进了普通角色描述而未放进 `interaction_tags` 数组。
@@ -40,7 +51,7 @@
 `lying on bed`、`sitting on table` 表达局部关系。
 
 若 `-r` 的全局提示词没有画师串，先确认插件已重载到包含画师恢复逻辑的版本，
-再比较开启 `debug_prompt_enabled` 后的 `nai_full_prompt_before_split` 与
+再比较开启 `debug_prompt_enabled` 后的 `nai_character_plan_raw` 与
 `nai_global_prompt`。当前代码会按启用的画师组或本次 `-sN` 选择补回画师项，
 并将同名畸形副本替换为配置值。配置中的 `(yd_(orange_maru):1.1)` 应在
 最终提示词中保持原样；若只有布局模型原始返回缺画师，而最终提示词保留它，
@@ -230,11 +241,15 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 
 ## Identity 出现错误发色、瞳色或来源角色外貌
 
+### 背面或裁切人物被补回画外外貌
+
+当前模型任务书要求仅写本图可见的外貌；普通 Identity 和 NAI `-r` 不再用整份档案补齐未写出的维度，旧多人的空 anchors 也不触发整串固定外貌恢复。先比较模型原始输出与最终结果：原始输出没有眼睛、最终却有时应查补回通道及运行版本；原始输出本来就写了不可见眼睛时是模型判断问题。背向但回头、侧脸或镜面露眼不应一刀切删除。低 CFG 开启时另看 priority tags 及其角色可见性上下文。raw/`#`、人为画师或质量配置中的词仍按原契约处理。完整改动与验证边界见 [NAI 角色转换与外貌可见性](新增计划-NAI角色转换与外貌可见性.md)。
+
 ### 明确“不画眼睛”却仍出现 `grey eyes`
 
 先看 `semantic_plan_raw` 的对应角色 `appearance_changes` 和摘要 `appearance_omissions`。角色视觉档案中的 `grey_eyes` 是正常基线；用户明确要求眼睛不可见时，必须得到该角色的 `eye_color/omit`，而不是把“无眼睛”当成新的瞳色。旧 planner 对同一原文输出 `eye_color/replace` 或错误的 `face_accessory.mask` 时，主机会从可定位的明确缺席证据归一为 `omit`；错误维度还会触发一次修复请求。
 
-`llm_prompt` 中被省略角色的稳定外貌列表不应再含其瞳色，最终结构化 `Identity`、`Details`、`Nltags` 也不得补回。NAI `-r` 还要检查 `nai_characters[].prompt`，因为位置规划模型会重新写每个人的提示词；同画面未省略眼睛的其他角色仍可保留自己的瞳色。`#` 手工尾缀和原样模式属于直通，不执行上述权限。
+`llm_prompt` 中被省略角色的稳定外貌列表不应再含其瞳色，最终结构化 `Identity`、`Details`、`Nltags` 也不得补回。NAI `-r` 还要检查 `nai_characters[].prompt`，因为专用第二阶段直接写每个可见实例的提示词；同画面未省略眼睛的其他角色仍可保留自己的瞳色。`#` 手工尾缀和原样模式属于直通，不执行上述权限。
 
 例如爱音视觉档案是 `grey_eyes`，用户只要求 Teto 风格的粉色双钻头发型，但最终 Identity 出现 `yellow eyes`。这不是服装 tag 冲突，应分别检查三层证据：
 
@@ -242,13 +257,16 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 2. 给第二次 LLM 的完整提示中，`Character-scoped stable appearance authority` 是否按穿着者列出档案；命中的固定角色辅助提示是否已经被最新档案重建，不再携带陈旧瞳色。
 3. 最终 `structured_identity_blocks` 是否只保留用户明确修改的外貌维度，并恢复未提及维度的档案值；同时检查 `structured_detail_blocks`、共享 `Tags` 和最终 prompt，确认它们没有重新带入同一未开放维度的竞争特征。
 
-当前外貌裁决单位是“角色 × 维度”，不是整份 Identity。只改发型不会解锁瞳色，只改 A 的瞳色不会影响 B。检查 LLM1 对每条修改给出的 `operation`：`replace` 应排除该维度旧值，`additive` 应保留兼容旧值并加入新值；主机不再靠固定中文关键词决定两者。用户没有提瞳色时，LLM 写出的黄眼、蓝眼等冲突描述必须被删除。writer 已正确表达的稳定外貌应保留自然语言，主机只补缺失维度，不应在最终提示词末尾再次盲目拼入整份档案。
+当前外貌裁决单位是“角色 × 维度”，不是整份 Identity。只改发型不会解锁瞳色，只改 A 的瞳色不会影响 B。检查 LLM1 对每条修改给出的 `operation`：`replace` 应排除该维度旧值，`additive` 应保留兼容旧值并加入新值；主机不再靠固定中文关键词决定两者。用户没有提瞳色时，LLM 写出的黄眼、蓝眼等冲突描述必须被删除。writer 已正确表达的稳定外貌应保留自然语言，主机只纠正已表达维度的冲突，不补齐模型未表达的维度，也不应在最终提示词末尾再次盲目拼入整份档案。
 
 若 LLM2 输出 `blonde and blue hair`、`yellow and green eyes` 这类并列描述，还要确认拆分后的孤立颜色词没有残留。程序会让孤立颜色继承右侧 `hair` / `eyes` 维度后再应用同一权限，不能把 `blonde` 或 `yellow` 当作不受约束的普通特征。
 
 若括号英文翻译被误识别成额外角色，同时检查 `semantic_plan_raw.characters[].name` 与 `aliases`。角色实体和别名必须在原文中精确构成 `name（alias）` 或 `alias（name）`；仅仅出现在同一句、作为 `name` 的子串或位于另一项特征旁边均不得升级。匿名描述如“有着巨乳（huge breasts）的粉发美少女”应得到 `name=粉发美少女, aliases=[]`。新角色仍不需要本地预先确认，只要这个语义绑定与原文相邻关系都成立，就会继续进入 resolver 与学习流程。
 
 ## 女性角色被错误写成扶她
+
+NAI `-r` 同样检查 `sexual_trait_authority` 与原始用户输入。只有正向明确要求才追加 NAI 扶她写作规则；参考图反推或引用补充中的 `futanari` 不得开启权限。扶她人数在全局，特征只在所属角色框；普通色气模式仍由配置/触发词决定，不能据此给同伴新增性征。未经要求的中文“扶她”等断言也会被过滤。
+色气指引与普通七字段现在共用一份完整文本。若 `sensual_mode=true` 但专用任务书仍只有旧英文一句，先确认插件重载；若为 false，检查 `sensual_mode_enabled` 与自定义 `sensual_mode_markers`。最后的服装权限块应出现在色气指引之后，防止表现力要求恢复被删除服装。
 
 先检查 `semantic_plan_raw` 与角色视觉档案。如果两者只有正常发色、瞳色、胸部尺寸等信息，而 `prompt_llm_initial_content` 首次出现 `futanari / futa with female / penis / erection`，错误来自第二阶段模型，不是角色档案。当前默认任务书不会在普通请求中展示扶她示例；只有用户原文正向明确写出扶她时才动态加入计数规则。
 
@@ -287,3 +305,12 @@ resolver 内部继续保存未转义 canonical tag `s:p_little_knight`，最终�
 2026-09-12 的三份任务记录分别出现：括号造型被拆成普通别名、完整来源被基础角色缓存覆盖、简称来源未解析。完整来源应保持 `togawa_sakiko_(master_of_melodia)`，不能变成 `togawa_sakiko`。修复后该 tag 在在线回退中确认为普通分类，作为独立服装来源采样；不会作为角色或作品 tag 注入。只读实测取得 56 个聚类样本，未改写运行中的衣橱。
 
 重载插件后用“丰川祥子穿着togawa sakiko (master of melodia)的衣服，站立”复现。查看 `danbooru_semantic_outfit_sources` 是否是完整来源，以及 `semantic_character_outfits` 的组件是否来自新造型。旧的错误档案不会自动删除，手工服装组件仍受保护。页面现在支持自由服装名称、所属角色和学习来源；详细字段与限制见 [自由命名衣橱](角色与服装配置工作流.md#自由命名衣橱与完整造型标签2026-09-12)。
+
+## 背景与通用名词参考（2026-10-13）
+
+普通优化与 NAI `-r` 不再根据地点词或 marker 强制补白底、删除场景。默认任务书要求无背景需求时仅简单白底，隐含环境需求交给模型判断。看 `llm_prompt` / `nai_character_plan_prompt` 中的原文以及原始回复；`background_mode` 只反映诊断标记，不能用它证明模型正确理解背景需求。没有 marker 不触发重写。自定义普通模板仍收到更新后的背景策略，但模板自身相反指令应由用户修订。
+
+`danbooru_explicit_term_tags` 保留旧摘要键名，仅代表名词命中参考，不是硬约束。`danbooru_term_fallback_tags` 恒为空；`nai_missing_noun_tags` 只是精确 tag 覆盖诊断。错误匹配后模型未采用、正确匹配后模型遗漏，都不会再被宿主补入。角色身份、衣柜和外貌维度权限仍分别运行。Toolbox 词库导入与恢复见 configuration 的“Toolbox 现成词库”。
+
+
+NAI 同身份多格若报 `nai_character_plan_missing_instance_source` 或 `nai_character_plan_missing_instance_anchor`，表示无法把已知修改/不同衣柜安全绑定到某个格子；不会按名字或数组顺序猜归属。检查 `nai_character_plan_raw` 的 `source_text` 和 `anchor_id`：必要原文片段必须真实存在，共享与局部条件可用片段数组。必要片段虚构报 `nai_character_plan_ungrounded_instance_source`，错误本地 anchor 报 `nai_character_plan_invalid_instance_anchor`；当前此类具体结构错误停止提交，不退回旧 writer。身份唯一、重复实例没有待区分的修改，或没有匹配的本地计划时，无效可选引用只从角色数据移除并记入 `nai_dropped_instance_sources`，不触发重试或停止。2026-10-13 22:18 的三人请求中，模型将并列主语和共享动作拼成不连续的“蛇妖若叶睦的挑逗”，旧版因未区分必要与可选证据而误拒绝整个布局；当前此类辅助改写不会授予新权限或阻断请求。`nai_character_plan_visible_outfit_source` 表示模型把仅用于服装参考的已确认来源升级为可见人物；原文同时要求该来源人物出现时允许成为角色框。

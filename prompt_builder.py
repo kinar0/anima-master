@@ -82,6 +82,7 @@ def build_final_prompt(
     suppress_fixed_character: bool = False,
     force_multi_character: bool = False,
     background_mode: str = "",
+    background_from_writer: bool = False,
 ) -> PromptBuildResult:
     config = apply_config_preset(config)
     preset_index = config.pop("_artist_preset_index", None)
@@ -195,7 +196,7 @@ def build_final_prompt(
     )
     constraint_result = apply_prompt_constraints(content, constraint_plan)
     content = constraint_result.content_tags
-    if background_mode == DEFAULT_PORTRAIT:
+    if background_mode == DEFAULT_PORTRAIT and not background_from_writer:
         content = apply_default_portrait_tags(
             content,
             include_full_body=not any(

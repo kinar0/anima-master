@@ -1,0 +1,1695 @@
+{
+  "status": "offline_proposals_not_applied",
+  "concepts": [
+    {
+      "canonical_tag": "hug",
+      "aliases": [
+        "抱抱",
+        "相拥"
+      ],
+      "chinese_definition": "拥抱他人",
+      "equivalence_basis": "人际拥抱不同于持物",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "hug",
+            "prompt_tag": "hug",
+            "category": "general",
+            "source_category": "general",
+            "count": 139878,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她给同伴一个抱抱"
+      ],
+      "nearby_counterexamples": [
+        "她抱着吉他"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "抱抱既可指亲密接触，也可为口头安慰或抽象对象；本阶段不强绑。相拥可继续单独试验。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "headpat",
+      "aliases": [
+        "摸摸头",
+        "摸头杀"
+      ],
+      "chinese_definition": "轻柔拍摸他人的头",
+      "equivalence_basis": "摸他人头不同于整理自己头发",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "headpat",
+            "prompt_tag": "headpat",
+            "category": "general",
+            "source_category": "general",
+            "count": 14998,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她轻轻摸摸同伴的头"
+      ],
+      "nearby_counterexamples": [
+        "她摸摸自己的头发"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "摸头杀含评价或招式用法；且轻摸他人头的语序变化不能靠固定短语覆盖。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "holding_hands",
+      "aliases": [
+        "把手牵起来",
+        "牵起手"
+      ],
+      "chinese_definition": "两人牵手",
+      "equivalence_basis": "两人牵手不同于牵引绳",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "holding_hands",
+            "prompt_tag": "holding hands",
+            "category": "general",
+            "source_category": "general",
+            "count": 119482,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "两人把手牵起来"
+      ],
+      "nearby_counterexamples": [
+        "她牵着狗绳"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "两人牵手不同于牵引绳",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "interlocked_fingers",
+      "aliases": [
+        "十指紧扣",
+        "十指交扣"
+      ],
+      "chinese_definition": "手指交错扣住",
+      "equivalence_basis": "扣指不同于使用键盘",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "interlocked_fingers",
+            "prompt_tag": "interlocked fingers",
+            "category": "general",
+            "source_category": "general",
+            "count": 44260,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "两人的手十指紧扣"
+      ],
+      "nearby_counterexamples": [
+        "她十指敲着键盘"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "扣指不同于使用键盘",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "kiss",
+      "aliases": [
+        "亲亲",
+        "亲一口"
+      ],
+      "chinese_definition": "亲吻",
+      "equivalence_basis": "称呼台词不证明亲吻",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "kiss",
+            "prompt_tag": "kiss",
+            "category": "general",
+            "source_category": "general",
+            "count": 85255,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她亲亲同伴的脸"
+      ],
+      "nearby_counterexamples": [
+        "亲亲宝贝只是台词，人物站着"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "亲亲既是称呼又是动作；原文给 LLM。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "smile",
+      "aliases": [
+        "露出笑容",
+        "笑眯眯"
+      ],
+      "chinese_definition": "微笑表情",
+      "equivalence_basis": "名词提及不证明表情",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "smile",
+            "prompt_tag": "smile",
+            "category": "general",
+            "source_category": "general",
+            "count": 3547397,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她露出笑容"
+      ],
+      "nearby_counterexamples": [
+        "她说笑容二字，脸上没有表情"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "名词提及不证明表情",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "blush",
+      "aliases": [
+        "面颊泛红",
+        "双颊泛红"
+      ],
+      "chinese_definition": "面部泛红",
+      "equivalence_basis": "部位明确才是脸红",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "blush",
+            "prompt_tag": "blush",
+            "category": "general",
+            "source_category": "general",
+            "count": 3960425,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她面颊泛红"
+      ],
+      "nearby_counterexamples": [
+        "夕阳把墙照得泛红"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "部位明确才是脸红",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "crying",
+      "aliases": [
+        "哭得掉眼泪",
+        "哭出来"
+      ],
+      "chinese_definition": "哭泣",
+      "equivalence_basis": "修辞不等于哭泣",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "crying",
+            "prompt_tag": "crying",
+            "category": "general",
+            "source_category": "general",
+            "count": 95756,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她哭得掉眼泪"
+      ],
+      "nearby_counterexamples": [
+        "她欲哭无泪但没流泪"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "修辞不等于哭泣",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "closed_eyes",
+      "aliases": [
+        "双眼闭上",
+        "闭上双眼"
+      ],
+      "chinese_definition": "双眼闭合",
+      "equivalence_basis": "闭眼不同于眼神变化",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "closed_eyes",
+            "prompt_tag": "closed eyes",
+            "category": "general",
+            "source_category": "general",
+            "count": 802678,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她把双眼闭上"
+      ],
+      "nearby_counterexamples": [
+        "她只是眼神无光"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "动作变化与最终闭眼状态需要时态上下文，先保持候选记录。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "wink",
+      "aliases": [
+        "眨一只眼",
+        "单眼眨眼"
+      ],
+      "chinese_definition": "单眼眨眼示意",
+      "equivalence_basis": "wink 是单眼示意，不是一般眨眼",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "wink",
+            "prompt_tag": "wink",
+            "category": "general",
+            "source_category": "general",
+            "count": 106622,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她对同伴眨一只眼"
+      ],
+      "nearby_counterexamples": [
+        "她两只眼同时眨了一下"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "单眼眨动还可为眼部反射，未必 wink；需动作语境。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "open_mouth",
+      "aliases": [
+        "把嘴张开",
+        "张开嘴巴"
+      ],
+      "chinese_definition": "嘴巴张开",
+      "equivalence_basis": "需要明确嘴的对象",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "open_mouth",
+            "prompt_tag": "open mouth",
+            "category": "general",
+            "source_category": "general",
+            "count": 3063033,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她把嘴张开"
+      ],
+      "nearby_counterexamples": [
+        "她张开雨伞"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "需要明确嘴的对象",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "standing",
+      "aliases": [
+        "站着"
+      ],
+      "chinese_definition": "站立姿态",
+      "equivalence_basis": "比喻立场不是站姿",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "standing",
+            "prompt_tag": "standing",
+            "category": "general",
+            "source_category": "general",
+            "count": 1165308,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她站着"
+      ],
+      "nearby_counterexamples": [
+        "她站在故事的立场上，画面坐着"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "比喻立场不是站姿",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "sitting",
+      "aliases": [
+        "坐着"
+      ],
+      "chinese_definition": "坐姿",
+      "equivalence_basis": "台词不证明姿态",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "sitting",
+            "prompt_tag": "sitting",
+            "category": "general",
+            "source_category": "general",
+            "count": 1151493,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她坐着"
+      ],
+      "nearby_counterexamples": [
+        "她说坐着二字，画面站立"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "台词不证明姿态",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "kneeling",
+      "aliases": [
+        "双膝跪地",
+        "跪地"
+      ],
+      "chinese_definition": "跪姿",
+      "equivalence_basis": "跪姿不同于蹲姿",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "kneeling",
+            "prompt_tag": "kneeling",
+            "category": "general",
+            "source_category": "general",
+            "count": 169468,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她双膝跪地"
+      ],
+      "nearby_counterexamples": [
+        "她只是屈膝蹲着"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "跪姿不同于蹲姿",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "squatting",
+      "aliases": [
+        "蹲着"
+      ],
+      "chinese_definition": "蹲姿",
+      "equivalence_basis": "蹲姿不同于跪姿",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "squatting",
+            "prompt_tag": "squatting",
+            "category": "general",
+            "source_category": "general",
+            "count": 123109,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她蹲着"
+      ],
+      "nearby_counterexamples": [
+        "她双膝跪地"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "蹲姿不同于跪姿",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "on_back",
+      "aliases": [
+        "躺平"
+      ],
+      "chinese_definition": "面朝上仰卧",
+      "equivalence_basis": "躺平修辞需跳过",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "on_back",
+            "prompt_tag": "on back",
+            "category": "general",
+            "source_category": "general",
+            "count": 335370,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她躺平在床上，面朝上"
+      ],
+      "nearby_counterexamples": [
+        "她躺平摆烂只是性格，画面站立"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "躺平常见比喻且未必面朝上，不能等价于仰卧。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "on_stomach",
+      "aliases": [
+        "肚子朝下趴着"
+      ],
+      "chinese_definition": "腹部朝下俯卧",
+      "equivalence_basis": "单字触发容易误匹配",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "on_stomach",
+            "prompt_tag": "on stomach",
+            "category": "general",
+            "source_category": "general",
+            "count": 79454,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她趴在床上，肚子朝下"
+      ],
+      "nearby_counterexamples": [
+        "趴这个字写在纸上，人站着"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "当前正例无新增覆盖需求，且单字趴存在原库误命中。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "crossed_arms",
+      "aliases": [
+        "双臂交叉抱在胸前"
+      ],
+      "chinese_definition": "双臂交叉",
+      "equivalence_basis": "抱臂不同于抱物",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "crossed_arms",
+            "prompt_tag": "crossed arms",
+            "category": "general",
+            "source_category": "general",
+            "count": 90331,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她双臂交叉抱在胸前"
+      ],
+      "nearby_counterexamples": [
+        "她抱着箱子"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "较长姿态描述不适合作为字面别名补洞，原库抱臂已有。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "arms_up",
+      "aliases": [
+        "两只胳膊举起来",
+        "双臂高举"
+      ],
+      "chinese_definition": "双臂举起",
+      "equivalence_basis": "双臂与单臂区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "arms_up",
+            "prompt_tag": "arms up",
+            "category": "general",
+            "source_category": "general",
+            "count": 238853,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她把两只胳膊举起来"
+      ],
+      "nearby_counterexamples": [
+        "她只举起一只手"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "双臂与单臂区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "legs_together",
+      "aliases": [
+        "两条腿并在一起",
+        "两腿并拢"
+      ],
+      "chinese_definition": "双腿并拢",
+      "equivalence_basis": "整腿并拢不同于膝合脚分",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "legs_together",
+            "prompt_tag": "legs together",
+            "category": "general",
+            "source_category": "general",
+            "count": 41494,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她两条腿并在一起"
+      ],
+      "nearby_counterexamples": [
+        "她只是膝盖靠拢但脚分开"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "整腿并拢不同于膝合脚分",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "white_dress",
+      "aliases": [
+        "白色连身裙",
+        "白连身裙"
+      ],
+      "chinese_definition": "白色连衣裙",
+      "equivalence_basis": "连身裙与半身裙不能互换",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "white_dress",
+            "prompt_tag": "white dress",
+            "category": "general",
+            "source_category": "general",
+            "count": 326205,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿白色连身裙"
+      ],
+      "nearby_counterexamples": [
+        "她穿白色半身裙"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "连身裙与半身裙不能互换",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "white_skirt",
+      "aliases": [
+        "白色半身裙",
+        "白半身裙"
+      ],
+      "chinese_definition": "白色半身裙",
+      "equivalence_basis": "半身裙与连身裙区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "white_skirt",
+            "prompt_tag": "white skirt",
+            "category": "general",
+            "source_category": "general",
+            "count": 105401,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿白色半身裙"
+      ],
+      "nearby_counterexamples": [
+        "她穿白色连身裙"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "半身裙与连身裙区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "black_pantyhose",
+      "aliases": [
+        "黑色裤袜",
+        "黑裤袜"
+      ],
+      "chinese_definition": "黑色连裤袜",
+      "equivalence_basis": "裤袜不同于及膝袜",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "black_pantyhose",
+            "prompt_tag": "black pantyhose",
+            "category": "general",
+            "source_category": "general",
+            "count": 210828,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿黑色裤袜"
+      ],
+      "nearby_counterexamples": [
+        "她穿黑色及膝袜"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "裤袜不同于及膝袜",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "white_pantyhose",
+      "aliases": [
+        "白色裤袜",
+        "白裤袜"
+      ],
+      "chinese_definition": "白色连裤袜",
+      "equivalence_basis": "连裤袜不同于短袜",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "white_pantyhose",
+            "prompt_tag": "white pantyhose",
+            "category": "general",
+            "source_category": "general",
+            "count": 61190,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿白色裤袜"
+      ],
+      "nearby_counterexamples": [
+        "她穿白色短袜"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "连裤袜不同于短袜",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "one-piece_swimsuit",
+      "aliases": [
+        "连体式泳装",
+        "连体泳装"
+      ],
+      "chinese_definition": "连成一件的泳装",
+      "equivalence_basis": "连体与分体区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "one-piece_swimsuit",
+            "prompt_tag": "one-piece swimsuit",
+            "category": "general",
+            "source_category": "general",
+            "count": 169633,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿连体式泳装"
+      ],
+      "nearby_counterexamples": [
+        "她穿分体式泳装"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "连体与分体区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "hoodie",
+      "aliases": [
+        "帽衫"
+      ],
+      "chinese_definition": "连帽卫衣",
+      "equivalence_basis": "帽衫不同于帽子",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "hoodie",
+            "prompt_tag": "hoodie",
+            "category": "general",
+            "source_category": "general",
+            "count": 152448,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿帽衫"
+      ],
+      "nearby_counterexamples": [
+        "她只戴帽子"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "帽衫不同于帽子",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "sweater",
+      "aliases": [
+        "针织毛衣"
+      ],
+      "chinese_definition": "毛衣",
+      "equivalence_basis": "毛衣不泛指全部针织服装",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "sweater",
+            "prompt_tag": "sweater",
+            "category": "general",
+            "source_category": "general",
+            "count": 232289,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿针织毛衣"
+      ],
+      "nearby_counterexamples": [
+        "她穿针织背心"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "针织毛衣本身已被原库毛衣覆盖，首批无需扩展。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "sneakers",
+      "aliases": [
+        "球鞋"
+      ],
+      "chinese_definition": "运动鞋",
+      "equivalence_basis": "运动鞋不同于舞鞋",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "sneakers",
+            "prompt_tag": "sneakers",
+            "category": "general",
+            "source_category": "general",
+            "count": 78613,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿球鞋"
+      ],
+      "nearby_counterexamples": [
+        "她穿芭蕾舞鞋"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "运动鞋不同于舞鞋",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "fingerless_gloves",
+      "aliases": [
+        "半指手套",
+        "露指手套"
+      ],
+      "chinese_definition": "露出手指的手套",
+      "equivalence_basis": "露指条件不能丢",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [
+        {
+          "alias": "露指手套",
+          "existing_tag": "fingerless_gloves",
+          "type": "same"
+        }
+      ],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "fingerless_gloves",
+            "prompt_tag": "fingerless gloves",
+            "category": "general",
+            "source_category": "general",
+            "count": 317638,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她戴半指手套"
+      ],
+      "nearby_counterexamples": [
+        "她戴完整手套"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "露指条件不能丢",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "denim_shorts",
+      "aliases": [
+        "牛仔热裤"
+      ],
+      "chinese_definition": "牛仔短裤",
+      "equivalence_basis": "牛仔短裤不能推成长裤",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "denim_shorts",
+            "prompt_tag": "denim shorts",
+            "category": "general",
+            "source_category": "general",
+            "count": 42346,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿牛仔热裤"
+      ],
+      "nearby_counterexamples": [
+        "她穿牛仔长裤"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "牛仔短裤不能推成长裤",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "raincoat",
+      "aliases": [
+        "雨衣"
+      ],
+      "chinese_definition": "防雨外衣",
+      "equivalence_basis": "衣服与伞的对象区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "raincoat",
+            "prompt_tag": "raincoat",
+            "category": "general",
+            "source_category": "general",
+            "count": 4819,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她穿雨衣"
+      ],
+      "nearby_counterexamples": [
+        "她手里拿雨伞"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "衣服与伞的对象区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "holding_umbrella",
+      "aliases": [
+        "举着伞",
+        "撑着伞"
+      ],
+      "chinese_definition": "手持雨伞",
+      "equivalence_basis": "出现物件不等于使用物件",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "holding_umbrella",
+            "prompt_tag": "holding umbrella",
+            "category": "general",
+            "source_category": "general",
+            "count": 35280,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她手里举着伞"
+      ],
+      "nearby_counterexamples": [
+        "伞在墙角，人物空手"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "出现物件不等于使用物件",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "holding_book",
+      "aliases": [
+        "捧着书"
+      ],
+      "chinese_definition": "手持书",
+      "equivalence_basis": "持物与背景提及区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "holding_book",
+            "prompt_tag": "holding book",
+            "category": "general",
+            "source_category": "general",
+            "count": 48496,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她手里捧着书"
+      ],
+      "nearby_counterexamples": [
+        "她背后书架上有书"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "持物与背景提及区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "holding_cup",
+      "aliases": [
+        "端着杯子",
+        "捧着杯子"
+      ],
+      "chinese_definition": "手持杯",
+      "equivalence_basis": "持杯与摆放区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "holding_cup",
+            "prompt_tag": "holding cup",
+            "category": "general",
+            "source_category": "general",
+            "count": 72483,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她手里端着杯子"
+      ],
+      "nearby_counterexamples": [
+        "杯子放在桌子上"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "持杯与摆放区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "holding_phone",
+      "aliases": [
+        "握着手机"
+      ],
+      "chinese_definition": "手持手机",
+      "equivalence_basis": "持手机不同于手机出现",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "holding_phone",
+            "prompt_tag": "holding phone",
+            "category": "general",
+            "source_category": "general",
+            "count": 55410,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她手里握着手机"
+      ],
+      "nearby_counterexamples": [
+        "手机放在桌子上"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "持手机不同于手机出现",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "holding_sword",
+      "aliases": [
+        "握着剑"
+      ],
+      "chinese_definition": "手持剑",
+      "equivalence_basis": "持剑不同于剑出现",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "holding_sword",
+            "prompt_tag": "holding sword",
+            "category": "general",
+            "source_category": "general",
+            "count": 124476,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她手里握着剑"
+      ],
+      "nearby_counterexamples": [
+        "剑挂在墙上"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "持剑不同于剑出现",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "backpack",
+      "aliases": [
+        "双肩包"
+      ],
+      "chinese_definition": "双肩背包",
+      "equivalence_basis": "包的形制不同",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "backpack",
+            "prompt_tag": "backpack",
+            "category": "general",
+            "source_category": "general",
+            "count": 82476,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她背着双肩包"
+      ],
+      "nearby_counterexamples": [
+        "她拎着单肩包"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "包的形制不同",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "hair_bow",
+      "aliases": [
+        "头发上别着蝴蝶结"
+      ],
+      "chinese_definition": "头发上的蝴蝶结",
+      "equivalence_basis": "发饰不同于衣物蝴蝶结",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "hair_bow",
+            "prompt_tag": "hair bow",
+            "category": "general",
+            "source_category": "general",
+            "count": 561434,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她头发上别着蝴蝶结"
+      ],
+      "nearby_counterexamples": [
+        "她衣领上有蝴蝶结"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "短语附带安装位置与动作；更自然的发饰别名原库已有，暂不以长句补词。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "stuffed_toy",
+      "aliases": [
+        "毛绒公仔",
+        "绒毛玩偶"
+      ],
+      "chinese_definition": "毛绒玩具",
+      "equivalence_basis": "玩具不同于动物",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "stuffed_toy",
+            "prompt_tag": "stuffed toy",
+            "category": "general",
+            "source_category": "general",
+            "count": 96890,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她身旁有毛绒公仔"
+      ],
+      "nearby_counterexamples": [
+        "她身旁是真猫"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "玩具不同于动物",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "sunglasses",
+      "aliases": [
+        "太阳眼镜"
+      ],
+      "chinese_definition": "太阳镜",
+      "equivalence_basis": "墨镜与普通眼镜区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "sunglasses",
+            "prompt_tag": "sunglasses",
+            "category": "general",
+            "source_category": "general",
+            "count": 114761,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她戴太阳眼镜"
+      ],
+      "nearby_counterexamples": [
+        "她戴普通近视眼镜"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "墨镜与普通眼镜区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "choker",
+      "aliases": [
+        "贴颈项链"
+      ],
+      "chinese_definition": "贴颈饰品",
+      "equivalence_basis": "贴颈与长项链区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "choker",
+            "prompt_tag": "choker",
+            "category": "general",
+            "source_category": "general",
+            "count": 486891,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她戴贴颈项链"
+      ],
+      "nearby_counterexamples": [
+        "她戴垂到胸前的项链"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "贴颈项链仍可有不同结构，canonical 适用需进一步语义核对。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "scarf",
+      "aliases": [
+        "围脖"
+      ],
+      "chinese_definition": "围巾",
+      "equivalence_basis": "独立围巾不同于衣领",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "scarf",
+            "prompt_tag": "scarf",
+            "category": "general",
+            "source_category": "general",
+            "count": 232356,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她脖子上围着围脖"
+      ],
+      "nearby_counterexamples": [
+        "她穿高领毛衣"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "围脖可以是圈状颈套，未必等价 scarf 的具体结构。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "rain",
+      "aliases": [
+        "下着雨",
+        "雨天"
+      ],
+      "chinese_definition": "降雨",
+      "equivalence_basis": "天气与比喻区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "rain",
+            "prompt_tag": "rain",
+            "category": "general",
+            "source_category": "general",
+            "count": 37070,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "画面下着雨"
+      ],
+      "nearby_counterexamples": [
+        "她只是心里下着雨，画面晴朗"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "天气与比喻区别",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "snow",
+      "aliases": [
+        "下着雪",
+        "飘雪"
+      ],
+      "chinese_definition": "雪",
+      "equivalence_basis": "降雪与颜色区别",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "snow",
+            "prompt_tag": "snow",
+            "category": "general",
+            "source_category": "general",
+            "count": 46527,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "画面下着雪"
+      ],
+      "nearby_counterexamples": [
+        "她的头发雪白，没有下雪"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "降雪不同于积雪物件，需确认 canonical 定义后再接受；本地存在不是语义证明。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "beach",
+      "aliases": [
+        "海边沙滩"
+      ],
+      "chinese_definition": "海滩",
+      "equivalence_basis": "海滩不同于河岸",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "beach",
+            "prompt_tag": "beach",
+            "category": "general",
+            "source_category": "general",
+            "count": 125592,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她站在海边沙滩"
+      ],
+      "nearby_counterexamples": [
+        "她站在河边"
+      ],
+      "review_decision": "deferred_semantics",
+      "review_basis": "原库沙滩已覆盖该开发正例，不因规模预算添加冗余词。",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "classroom",
+      "aliases": [
+        "教室"
+      ],
+      "chinese_definition": "教室",
+      "equivalence_basis": "教室不同于办公室",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "classroom",
+            "prompt_tag": "classroom",
+            "category": "general",
+            "source_category": "general",
+            "count": 26772,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她在教室里"
+      ],
+      "nearby_counterexamples": [
+        "她在办公室里"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "教室不同于办公室",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "park",
+      "aliases": [
+        "公园"
+      ],
+      "chinese_definition": "公园",
+      "equivalence_basis": "公园不同于工业园",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "park",
+            "prompt_tag": "park",
+            "category": "general",
+            "source_category": "general",
+            "count": 2852,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "她在公园里"
+      ],
+      "nearby_counterexamples": [
+        "她在工业园里"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "公园不同于工业园",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    },
+    {
+      "canonical_tag": "starry_sky",
+      "aliases": [
+        "满天繁星",
+        "繁星满天"
+      ],
+      "chinese_definition": "星空",
+      "equivalence_basis": "星空不同于比喻眼神",
+      "source": "本任务人工撰写；依据开发集缺口；未复用 Toolbox 别名、未调用翻译模型",
+      "existing_mapping_conflicts": [],
+      "backend_coverage": {
+        "anima_local_catalog": "exact_present",
+        "records": [
+          {
+            "tag": "starry_sky",
+            "prompt_tag": "starry sky",
+            "category": "general",
+            "source_category": "general",
+            "count": 42542,
+            "match_score": 1000,
+            "match_layer": "exact_tag"
+          }
+        ],
+        "nai": "not_verified; absence in Anima is not evidence of NAI incompatibility"
+      },
+      "positive_examples": [
+        "背景满天繁星"
+      ],
+      "nearby_counterexamples": [
+        "她眼里像有繁星，背景室内"
+      ],
+      "review_decision": "proposed",
+      "review_basis": "星空不同于比喻眼神",
+      "authority": "词汇参考；不是 hard tag、衣柜权限或穿着者证据"
+    }
+  ],
+  "ambiguous_skips": [
+    {
+      "expression": "白裙子",
+      "reason": "连衣裙与半身裙多义，不新增强绑"
+    },
+    {
+      "expression": "黑丝",
+      "reason": "袜型不明确"
+    },
+    {
+      "expression": "张开",
+      "reason": "没有部位对象"
+    },
+    {
+      "expression": "拍头",
+      "reason": "力度与对象不明"
+    },
+    {
+      "expression": "抱抱",
+      "reason": "口头安慰或抽象对象"
+    },
+    {
+      "expression": "巨乳",
+      "reason": "保留原值，不统一 large/huge/gigantic 胸部尺寸等级"
+    }
+  ]
+}

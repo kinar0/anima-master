@@ -1,0 +1,29 @@
+{
+  "entire_config_unchanged": true,
+  "current_1427_rows_preserved": true,
+  "checkpoint_hashes_unchanged": true,
+  "runtime_decisions_file_created": false,
+  "changed_existing_files": [
+    "docs/名词翻译后续实施顺序-Toolbox复用与质量验收.md",
+    "noun_translation_batch.py",
+    "pages/wardrobe/noun_translation.js",
+    "tests/test_noun_translation_page.py",
+    "tests/test_noun_translation_page_ui.cjs",
+    "tests/test_wardrobe_pagination_ui.cjs",
+    "third_party/llm_nai_toolbox/NOTICE.md",
+    "README.md",
+    "danbooru_resolver.py",
+    "docs/configuration.md",
+    "docs/troubleshooting.md",
+    "docs/中文提示词到英文提示词流程.md",
+    "docs/角色与服装配置工作流.md",
+    "main.py",
+    "pages/wardrobe/app.js",
+    "pages/wardrobe/index.html",
+    "pages/wardrobe/style.css"
+  ],
+  "candidate_applied": false,
+  "model_calls": 0,
+  "image_calls": 0,
+  "restart": false
+}

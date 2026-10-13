@@ -1,0 +1,9 @@
+{
+  "restored_at": "2026-10-13T08:07:35.919376+00:00",
+  "manifest": "toolbox_import/applied.json",
+  "before_count": 43691,
+  "removed_count": 42264,
+  "remaining_count": 1427,
+  "previous_rows_exactly_restored": true,
+  "unrelated_config_unchanged": true
+}

@@ -20,6 +20,7 @@
         <div class="hero-actions">
           <div id="connection" class="connection"><i></i><span>正在连接</span></div>
           <a class="button ghost" href="#autofilter-settings">图片打码设置</a>
+          <a class="button ghost" href="#vocabulary-review">候选审核</a>
           <button id="refresh-button" class="button ghost" type="button">刷新</button>
           <button id="save-button" class="button primary" type="button" disabled>保存更改</button>
         </div>
@@ -58,11 +59,29 @@
         </div>
         <nav id="library-pagination-bottom" class="library-pagination"></nav>
       </main>
+      <section id="vocabulary-review" class="batch-panel" aria-label="词汇候选审核">
+        <h2>词汇候选与释义审核</h2>
+        <p>复用 Toolbox 的现成别名、释义和易混辨析。以下操作只保存审核记录，采纳项仍需验收，不会直接写入生图词库。</p>
+        <details id="review-details">
+          <summary>展开候选审核</summary>
+          <form id="review-search" class="batch-actions">
+            <label>搜索 <input id="review-query" placeholder="中文、tag 或说明；可查字面相近候选" autocomplete="off" /></label>
+            <label>范围 <select id="review-filter"><option value="focus">首轮缺口</option><option value="issues">原库待复核</option><option value="all">全部资料</option><option value="pending">未审核</option><option value="keep_current">保留现值</option><option value="proposed">采纳待验收</option><option value="modified">修改待验收</option><option value="deferred">暂缓</option><option value="rejected">拒绝</option></select></label>
+            <button class="button soft" type="submit">查找</button>
+            <button id="review-refresh" class="button ghost" type="button">刷新资料</button>
+          </form>
+          <p id="review-status" role="status">展开后读取候选资料。</p>
+          <div class="review-pagination"><button id="review-prev" class="button ghost" type="button">上一页</button><span id="review-page"></span><button id="review-next" class="button ghost" type="button">下一页</button></div>
+          <div id="review-rows" class="review-list"></div>
+          <p class="mapping-note">资料来源：Toolbox 0.9.8。来源释义与相似搜索用于审核，不是语义正确认证；本地目录缺失也不代表 NAI 不支持。</p>
+        </details>
+      </section>
       <section id="noun-translation" class="batch-panel" aria-label="批量名词翻译">
         <div class="batch-heading">
           <div><p class="eyebrow">BATCH TRANSLATION</p><h2>批量名词翻译</h2><p>从插件自带的 Anima 通用标签中分批翻译，每轮最多 50 个并自动复核。复核通过的别名经预览后才会进入生图词库。</p></div>
-          <div class="batch-heading-actions"><label class="batch-switch"><input id="batch-enabled" type="checkbox" disabled /><span>名词翻译参与生图<small>关闭后保留词库和断点，但不向模型提供映射或补入 tag</small></span></label><button id="batch-refresh" class="button ghost" type="button">刷新进度</button></div>
+          <div class="batch-heading-actions"><label class="batch-switch"><input id="batch-enabled" type="checkbox" disabled /><span>名词翻译参与生图<small>关闭后保留词库和断点，但不向模型提供名词参考</small></span></label><button id="batch-refresh" class="button ghost" type="button">刷新进度</button></div>
         </div>
+        <details id="batch-details"><summary>展开翻译进度与断点</summary>
         <div class="batch-stats" aria-live="polite">
           <div><span>已翻译</span><strong id="batch-translated">—</strong></div>
           <div><span>已复核</span><strong id="batch-verified">—</strong></div>
@@ -84,6 +103,7 @@
         <p class="batch-status">人工复核只列出尚未解决的冲突、格式问题、未通过别名或无译名条目。部分成功的标签会逐个列出别名状态，也可能同时出现在“可导入”中；全部别名已在词库的条目不计入人工复核。可在上方“名词翻译”列表修订，保存后点击“刷新进度”。</p>
         <div class="batch-table-wrap"><table class="batch-table"><thead><tr><th>Canonical tag</th><th>初译别名</th><th>复核结果</th><th>导入状态</th></tr></thead><tbody id="batch-rows"></tbody></table></div>
         <nav id="batch-pagination" class="batch-pagination"></nav>
+        </details>
       </section>
       <section id="autofilter-settings" class="autofilter-panel" aria-label="图片打码设置">
         <div class="autofilter-heading"><div><p class="eyebrow">IMAGE DELIVERY</p><h2>按会话发送前打码</h2><p>群聊和私聊分别设置，默认关闭。开启后使用 autofilter2.json 打码；发送时仅替换加载图像和 Windows 安全的输出文件名前缀。</p></div><button id="autofilter-refresh" class="button ghost" type="button">刷新会话</button></div>
@@ -100,6 +120,7 @@
     <script src="./pagination.js"></script>
     <script type="module" src="./app.js"></script>
     <script type="module" src="./noun_translation.js"></script>
+    <script type="module" src="./vocabulary_review.js"></script>
     <script type="module" src="./autofilter.js"></script>
   </body>
 </html>

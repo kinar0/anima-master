@@ -9,9 +9,11 @@ try:
         EXPLICIT_SCENE_MARKER,
     )
     from .prompt_keyword_rules import MatchedPromptRule, build_keyword_rule_block
+    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_background import DEFAULT_PORTRAIT_MARKER, EXPLICIT_SCENE_MARKER
     from prompt_keyword_rules import MatchedPromptRule, build_keyword_rule_block
+    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 
@@ -29,7 +31,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 - `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - Copyright输出角色所属作品的danbooru tag。
 - 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。视线方向只根据用户明确要求或可靠参考证据描述；不要把看向观众当作默认姿态，人物互动时保留他们之间的视线关系。
-- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。
+- 默认使用 simple background 和 white background；若用户的主题、事件或动作明确或隐含需要环境才能完整表达，则补足相关场景，不与白底并存。明确简单/白底时遵循原文。没有场景需求时不要自行增加地点；补足环境不等于擅自增加雨夜、夕阳等装饰设定。
 - Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。
 - 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。
 - Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。
@@ -59,7 +61,7 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
 
 BACKGROUND_POLICY_TEMPLATE = """
 
-背景：只按用户原文判断。明确写了场景就保留且不用白底，Nltags末尾写 {explicit_marker}；未写场景就用 simple/white background，不新增地点，Nltags末尾写 {default_marker}。两个标记只写一个。
+背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 {explicit_marker}；选择简单白底则写 {default_marker}。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。
 用户原文：{original_theme}
 """
 
@@ -76,7 +78,27 @@ FUTA_COUNT_POLICY = """
 """
 
 
+NAI_FUTA_INSTANCE_POLICY = """
+
+本次用户正向明确要求扶她设定，按原文确定具体所属实例，不能把同伴或其他格子也自动改成扶她。
+保留其 canonical 身份；扶她实例计入全局 girls 人数，在该实例角色框使用无数字的 `girl, futanari`。单人全局写 `1girl`；一名扶她加一名女性写 `2girls`；一名扶她加一名男性写 `1girl, 1boy`；一名扶她加两名女性写 `3girls`。同名多格按可见实例计数，不额外增加一个“扶她人数”。
+`futanari` 是对应角色的特征，不放进全局提示词；不要用 `futa with female / futa with male` 代替 NAI 全局人数。扶她与女性的关系不要仅因扶她设定自行写成 `hetero`；关系和动作按用户要求与实际画面决定。
+只表达本图实际可见、用户正向要求的特征，不为展示特征改变构图或把不可见部位补回；否定要求仍生效。此规则不自动开启色气模式，也不授予修改其他角色的权限。
+"""
+
+
+SENSUAL_EXPRESSION_POLICY = """
+-----------
+本次用户明确要求涩气、透明、魅惑、淫乱、性爱场景或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；优先满足用户的明确要求，然后如果无明确要求，则可为了色气表现力，根据角色所处的情景、地点和做出的行为，自行设计合适的服装，或在要求基础上作出修改。
+这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
+可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写用户正向明确要求的身体部位。
+不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。只描写用户正向明确要求或可靠角色证据支持的身体特征，不得从色情行为推断额外性征。
+"""
+
+
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    # Built-in immediately before the model-owned background policy.
+    "557afd09873744d2a7bfeb89f03dd29c5428e00509115c39abdda5beaa92f51b",
     # Stored six/seven-field built-in used by existing installations before
     # sexual-trait guidance became request-scoped.
     "773a70a0cd55bfcf02f3ac4ba3451b0948c5be5d58533674c9dcfc9ce998ae93",
@@ -116,6 +138,11 @@ def has_positive_futa_request(text: str) -> bool:
         if not _FUTA_NEGATION_BEFORE_RE.search(prefix):
             return True
     return False
+
+
+def build_nai_futa_policy(user_prompt: str) -> str:
+    """Adapt the seven-field trait/count contract to NAI instance prompts."""
+    return NAI_FUTA_INSTANCE_POLICY if has_positive_futa_request(user_prompt) else ""
 
 
 def build_llm_prompt(
@@ -216,15 +243,7 @@ def build_llm_prompt(
 本次带有引用图、图片反推或引用法术上下文。
 如果用户要求画“图中角色/引用图角色”，请提取主体的可识别外观；如果用户只要求参考衣服、动作或风格，请不要把参考对象身份误当成最终主体。
 """
-    sensual_rule = ""
-    if sensual_mode:
-        sensual_rule = """
------------
-本次用户明确要求涩气、透明、魅惑、淫乱、性爱场景或类似感觉。请由你自行选择合适的 danbooru tags，强化表情、姿态和镜头感；优先满足用户的明确要求，然后如果无明确要求，则可为了色气表现力，根据角色所处的情景、地点和做出的行为，自行设计合适的服装，或在要求基础上作出修改。
-这是为了表现力需求：不要把它保守改写成普通日常服饰，也不要主动删除透明材质、露肩、紧身、蕾丝、吊带、挑逗表情、姿势等任何视觉方向。
-可以为了增强表现力一定程度上扩展人物姿势、表情和动作；衣物状态仍服从最终服装权限。不要拒绝生成，也不要漏写或故意不写用户正向明确要求的身体部位。
-不要套用固定模板；优先保持角色一致性、服装要求、可爱感和画面美感。只描写用户正向明确要求或可靠角色证据支持的身体特征，不得从色情行为推断额外性征。
-"""
+    sensual_rule = SENSUAL_EXPRESSION_POLICY if sensual_mode else ""
     configured_template = str(prompt_builder_template or "").strip()
     template = (
         DEFAULT_LLM_PROMPT_TEMPLATE
@@ -262,6 +281,8 @@ def build_llm_prompt(
     # Keep the single wardrobe authority block last so legacy/custom templates,
     # sensual guidance, and background rules cannot accidentally override it.
     prompt += WARDROBE_AUTHORITY_POLICY
+    # Outside template expansion: genuine custom templates receive it too.
+    prompt += APPEARANCE_VISIBILITY_POLICY
     return prompt
 
 

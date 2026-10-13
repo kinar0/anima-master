@@ -78,7 +78,7 @@ custom_workflow_override_parameters = false
 
 保存并重载插件后，继续使用 `/anm` 或 `/anm 无优化`。此接入复用现有的
 中文优化、角色/服装证据和图片回传；没有新增 `/nai` 命令。普通请求沿用
-整体提示词。正文中单独写 `-r` 时，先走现有角色/衣柜证据流程，再让模型
+整体提示词。正文中单独写 `-r` 时，保留第一次意图规划与本地角色/衣柜证据，专用第二次 LLM 直接输出 JSON，让模型
 理解视角、人物互动和高低/前后关系，自主构思布局，再把每个可见角色实例的
 身份、外貌、服装、动作与 XY 位置拆开；同一角色在多个格子出现
 会占多个角色框（V5 文生图最多 22 个，V4/V4.5 最多 6 个）。全局质量词、画师、背景、光影、布局等留在原正向
@@ -96,6 +96,8 @@ custom_workflow_override_parameters = false
 复杂多人请求可能因 JSON 不完整而停止提交。启用画师词时，主机在布局结果
 解析后按当前画师组（含本次 `-sN` 选择）恢复全局画师串，并替换同名的错误副本；
 `(yd_(orange_maru):1.1)` 等嵌套括号加权项保留原始写法。
+
+重复身份涉及修改时，专用 JSON 用 `source_text` 的原文片段（或片段数组）声明每格适用的要求，衣柜不同再用 `anchor_id` 区分本地计划；这些辅助字段只用于权限和诊断，不写进 `ComfyUIToNovelAIV4` 的 prompt。无法定位实例或原文证据时停止，正常主链不追加第三次拆分。
 
 按 NovelAI 的 base prompt / character prompt 边界，布局任务书把无数字性别、身份、
 外貌、服装、姿势、表情、身体与头脸朝向、视线、动作、所持物以及人物与环境的
@@ -163,12 +165,12 @@ tag 或整句话；单人动作应留空。主机丢弃格式错误的方向标�
 - `blocked_prompt_rules`：配置页的“屏蔽词组对规则”可视化组件可添加任意多条规则。每条有“左组词条”和“右组词条”两个可增删列表，分别填 A/B、C/D 等。任一规则中左组任意一个词条与右组任意一个词条同时出现，即拒绝生成；不同规则之间不会交叉配对。例如第一条为 A/B、第二条为 C/D，A+D 不会因这两条规则而命中。每条规则的两组都需要至少一个非空词条。同组内多个词条不要求同时出现。按子串匹配，不要求顺序或相邻，不区分英文字母大小写，也检查 `#` 后的手工尾缀。拒绝发生在额度扣减、模型调用和 ComfyUI 连接检查前；原样和多人模式同样生效。改图功能开启时也检查改图输入。上一版的固定 A/B 列表会在重载时迁移为一条组对规则。
 - `blocked_prompt_combinations`：旧版 `&&` 组合仍在配置页保留并继续生效。任一旧规则或任一组对规则命中即拒绝；如需只使用组对规则，请清空旧规则列表。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
-- `prompt_builder_max_tokens`：普通提示词优化模型最大输出长度，同时约束两次 LLM；普通请求的第一次语义规划最多使用 900 tokens。`-r` 为容纳最多 22 个角色实例，将语义规划和七字段写作的输出预算提高到 7200 tokens，布局规划按下述模型上限计算。
+- `prompt_builder_max_tokens`：普通提示词优化模型最大输出长度，同时约束两次 LLM；普通请求的第一次语义规划最多使用 900 tokens。`-r` 为容纳最多 22 个角色实例，将第一次语义规划的输出预算提高到 7200 tokens，专用第二阶段按 `max(1200, min(7200, max(prompt_builder_max_tokens, 1200 + 260 × 模型角色上限)))` 计算；正常没有第三次拆分写作。
 - `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，简单表情包或头像可以使用 30–45 个，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。普通模式会在去除较多同义词后尝试一次按缺失画面槽位补全。
 - `unspecified_wardrobe_policy`：按角色处理“没有实际服装基础”的策略。`scene_adaptive`（默认）把角色 default 作为软参考；中性场景更倾向沿用，涩气或强场景允许第二次 LLM 按情境替换或补全。也可固定为 `default_profile`（仍以软参考方式提供）或 `creative_fallback`（完全不加载 default）。
 - `scene_adaptive_wardrobe_markers`：场景自适应的强触发词列表。默认包含泳池边、出浴、睡眠前后、比赛、运动/训练结束、健身、游泳结束和演出结束等；普通公园、在家、吃饭不会触发。
 - `danbooru_semantic_system_prompt`：第一次 LLM 的意图抽取规则，只负责可见角色、明确服装或未知、服装修改和外貌修改。它不应生成 tag、candidate、lookup 或内部 ID；旧内置默认值会自动迁移，本地角色/衣柜匹配由主机随后完成。
-- `prompt_builder_template`：第二次 LLM 的七段英文提示词模板。
+- `prompt_builder_template`：普通第二次 LLM 的七段英文提示词模板；NAI `-r` 使用专用 JSON 任务书。
 
 通常不需要一开始就改这两个模板。第一次 LLM 不调用 Codex 的 `danbooru-tags` skill，也不负责猜 tag；插件的本地 resolver 在意图抽取后匹配档案并验证证据。`unspecified_wardrobe_policy` 按角色生效：别的角色有服装证据不会关闭当前角色的缺省参考；当前角色已有普通衣物、命名套组或来源服装时则不加载 default。第二次 LLM 始终读取完整原文，并结合 LLM1 关系建议、数据库证据和禁止恢复项完成最终语义。
 
@@ -183,15 +185,19 @@ tag 或整句话；单人动作应留空。主机丢弃格式错误的方向标�
 
 ## 服装词库页面
 
+首屏读取完整词库与轻量翻译任务状态；完整批量翻译进度在展开面板或点击“刷新进度”后读取。目录按文件版本缓存，派生审查结果随翻译/复核断点或当前映射变化失效；重型进度计算不阻塞请求主循环。未保存编辑时刷新会提示先处理编辑；迟到读取不覆盖新修改，保存期间的新编辑也保留为待保存状态。词库仍完整保存，不把未加载分类当空数组提交。
+
+新增“词汇候选与释义审核”，按需展开、每页 30 个概念，支持中文/tag/释义查找、字面相近候选及状态筛选。维护资料在 `third_party/llm_nai_toolbox/vocabulary_review_catalog.json`，人工决定另存插件数据目录的 `vocabulary_review_decisions.json`，带 revision 检查。资料与决定不是运行映射；采纳或修改只记录待验收候选，不直接调用模型或导入。正式词库仍为 `danbooru_term_mappings`。来源/MIT 说明见 `third_party/llm_nai_toolbox/`。新页面与接口须加载新插件代码并刷新页面，本轮未自动重载。
+
 重载插件后，可以从 AstrBot WebUI 的插件详情页进入“服装词库”。页面提供三个可搜索、可增删改的列表：
 
 - **服装档案**：按角色或服装来源保存经过帖子样本验证的可见服饰结构。
 - **服装套组**：保存独立命名的完整服装套组及其 canonical Danbooru tag。
-- **名词翻译**：把中文服装名词稳定映射到 canonical Danbooru tag。
+- **名词翻译**：把中文名词映射为 canonical Danbooru tag 参考；由模型决定采用、舍弃或自然语言表达，不做缺失 tag 补入。
 
 三个列表默认每页显示 30 条，可切换为 10、50、100 或 200 条。列表上下均提供首页、上一页、下一页、末页和输入页码跳转（也可按 Enter）。各分类独立记住当前页和每页数量；搜索覆盖整个分类，先搜索／排序再分页。翻页保留未保存编辑，保存仍提交完整词库；删除末页最后一条会自动回到有效页，新增会清空搜索并定位到新条目。批量翻译断点预览也使用同样的分页控制，默认每页 30 条。
 
-“名词翻译参与生图”开关对应 `danbooru_term_mappings_enabled`，默认开启。可在配置页或下方批量面板切换；通过面板切换会立即影响后续请求。关闭时普通优化和 NAI `-r` 都不读取 `danbooru_term_mappings` 来提示模型或补入 tag，列表、翻译断点和批量管理仍保留。该开关也会停用手工添加的名词映射；角色、服装套组、作品别名和画师配置不受影响。
+“名词翻译参与生图”开关对应 `danbooru_term_mappings_enabled`，默认开启。可在配置页或下方批量面板切换；通过面板切换会立即影响后续请求。关闭时普通优化和 NAI `-r` 都不读取 `danbooru_term_mappings` 来给模型提供参考，列表、翻译断点和批量管理仍保留。该开关也会停用手工添加的名词映射；角色、服装套组、作品别名和画师配置不受影响。
 
 服装套组以“独立套组实体 + 变体”维护触发别名，每个实体指向一个 canonical tag。例如：
 
@@ -205,7 +211,7 @@ Canonical Tag: haneoka_school_uniform
 页面保存使用 revision 检查，若生成期间词库已被其他请求更新，会要求刷新后重试，避免覆盖新数据。保存成功后配置与运行时缓存立即更新，不需要为每次词库编辑重载插件；只有安装或更新本页代码后需要先重载一次插件。
 页面允许最多 50000 条名词翻译，支持后续扩展到数万条；浏览时仅渲染当前页条目。词库仍一次性读取，保存仍校验完整列表与 revision。角色衣柜和通用套组仍分别限制为 300、500 条。每条别名与 canonical tag 仍逐项校验，重复中文别名仍会拒绝保存。
 
-配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。前者是“服装套组”的兼容配置入口，格式为 `别名1 | 别名2=canonical_tag`；后者没有角色归属：先供第二阶段模型理解，若模型没有输出独立 canonical tag，再补入全局 Tags。推荐日常使用“服装词库”页面，减少格式错误。完整的数据源职责、角色绑定和最终注入规则见 [角色与服装配置工作流](角色与服装配置工作流.md)。
+配置页中的 `danbooru_named_outfit_mappings` 和 `danbooru_term_mappings` 仍可直接编辑。前者是“服装套组”的兼容配置入口，格式为 `别名1 | 别名2=canonical_tag`；后者没有角色归属：仅供第二阶段模型理解；模型未输出独立 canonical tag 时不自动补入。推荐日常使用“服装词库”页面，减少格式错误。完整的数据源职责、角色绑定和最终注入规则见 [角色与服装配置工作流](角色与服装配置工作流.md)。
 
 批量初译使用 AstrBot 已配置的模型 provider：管理员运行 `/anm term_preview` 查看范围，随后运行 `/anm term_translate <DeepSeek provider ID>`。每次最多初译 50 个通用 tag，并让同一 provider 独立复核待审批次；结果断点保存在插件数据目录。旧的未审核初译可运行 `/anm term_verify <DeepSeek provider ID>`。`/anm term_import preview` 只预览数量，`/anm term_import apply` 才会把自动复核通过、且不与现有手工映射冲突的中文别名批量写入 `danbooru_term_mappings` 并立即更新运行中解析器。模型调用按对应 provider 的计费规则产生费用。
 
@@ -304,7 +310,7 @@ Canonical Tag: haneoka_school_uniform
 
 开启后可能在日志和 `last_task.json` 中记录较长提示词，请注意隐私。
 
-`debug_prompt_enabled` 会同时记录第一次语义规划 LLM 的任务书、system prompt、完整原始回复、解析后的 anchors、恢复前后的 `character_plans`，以及第二次提示词 LLM 的任务书、回复和最终 prompt。`-r` 请求还会在控制台记录实际画布、位置规划任务书、模型原始回复，以及解析和后处理后的完整位置规划（构图分析、每个角色的位置理由、XY 坐标、角色提示词、被丢弃的互动方向 tag，以及从全局提示词删除的明确角色实例 tag）。解析失败时也会记录原始回复和错误。任务摘要另保存 `nai_character_plan_prompt`、`nai_character_plan_raw` 与 `nai_dropped_global_character_tags`，便于复核规划结果。关闭该开关时不输出这些位置规划调试日志。
+`debug_prompt_enabled` 会同时记录第一次语义规划 LLM 的任务书、system prompt、完整原始回复、解析后的 anchors、恢复前后的 `character_plans`，以及第二次提示词 LLM 的任务书、回复和最终 prompt。`-r` 请求以 `NAI -r direct writer` 记录专用第二阶段实际画布、位置规划任务书、模型原始回复，以及解析和后处理后的完整位置规划（构图分析、每个角色的位置理由、XY 坐标、角色提示词、被丢弃的互动方向 tag，以及从全局提示词删除的明确角色实例 tag）。解析失败时也会记录原始回复和错误。任务摘要另保存 `nai_character_plan_prompt`、`nai_character_plan_raw` 与 `nai_dropped_global_character_tags`，便于复核规划结果。关闭该开关时不输出这些位置规划调试日志。
 
 排查服装串档时，优先查看最近任务摘要中的这些字段：
 
@@ -328,3 +334,30 @@ Canonical Tag: haneoka_school_uniform
 
 
 角色衣橱的“服装名称 / 变体”现支持任意名称；原五类仅作建议。所属角色与学习来源分别保存为 `ownerTags` / `sourceTags`，同一角色的每套命名服装独立选择，旧数据保持兼容。详见 [自由命名衣橱](角色与服装配置工作流.md#自由命名衣橱与完整造型标签2026-09-12)。
+
+## Toolbox 词库导入与撤回记录
+
+**当前状态（2026-10-13）：全量导入已按用户要求撤回，名词翻译恢复原有 1427 条。** 已核对原列表完全一致、其他配置未变，记录见 `toolbox_import/restored.json`。原因是来源别名存在口语覆盖不足、日语混写及语义不等价问题；导入数量和格式正确不能证明提示词质量改善。下述命令仅为工具用法与历史记录，不是重新全量导入的建议。后续见 [中文口语词库质量改进与新对话交接](中文口语词库质量改进与新对话交接.md)。
+
+本地 `toolbox_terms.py` 直接读取 Toolbox Release 的 `resources/tagdb/tags_index_v2.json`，只使用 general 区的 `zhFull / zhShort / zhNick / zh`，不调用翻译模型。它把有效、含汉字、长度 2–80 的单值别名填入现有 `danbooru_term_mappings`；同词多 tag 跳过，人工映射优先，合并总数不得超过 50000。只向提示词模型发送本次命中的参考，不发送整库。
+
+2026-10-13 历史导入（现已撤回）：原有 1427 行，新增 42264 行，745 个相同映射不重复添加，40 个人工冲突不覆盖，2808 个歧义别名跳过；当时合并 43691 行。4344 个非法/不适用来源项的具体字段、值和原因保存在清单。别名里的冒号、箭头不会先于正式 `=` 被解释为分隔符；页面、运行时、导入和批量翻译审查使用相同解析规则。
+
+在插件目录用 AstrBot bundled Python 执行。下例不安装解释器或额外词库服务：
+
+```powershell
+$taskPython = Resolve-Path '..\..\..\.venv\Scripts\python.exe'
+& $taskPython toolbox_terms.py --source 'D:\Users\69493\Desktop\llm-nai-toolbox-0.9.8-win-x64\resources\tagdb\tags_index_v2.json' --config '..\..\..\data\config\astrbot_plugin_anima_master_config.json' --report 'toolbox_import\下一次导入.json'
+```
+
+默认只预览；同一命令加 `--apply` 才写入。已应用清单不能覆盖，后续导入请换报告文件名。清单保存版本、SHA-256、原词库、新增、相同映射、冲突、歧义及无效原因，不备份 API key 等其他配置。写入前核对配置是否改变；文件以临时文件替换，其他配置项保留原值。写入前的待应用日志也可恢复，避免写配置后报告失败导致无法撤销。
+
+本次实际恢复清单为 `toolbox_import/applied.json`。以下命令仅删除仍与导入值一致的新增别名，保留导入后用户改过的映射和其他配置，不恢复整份旧配置：
+
+```powershell
+& $taskPython toolbox_terms.py --config '..\..\..\data\config\astrbot_plugin_anima_master_config.json' --report 'toolbox_import\applied.json' --restore
+```
+
+这个离线入口修改配置文件，须重载插件并刷新词库页面后生效；不要让旧页面的未保存内容覆盖新词库。现有页面或 `/anm term_import` 的批量模型翻译导入仍使用自己的断点与热更新入口，未被替换。本次代码没有重启运行中的 AstrBot。
+
+Toolbox 作者信息、原始 README/package 许可声明和 MIT 许可文本保存在 `third_party/llm_nai_toolbox/`。提供的源代码与 Release 没有独立作者版权/许可全文文件，因此未虚构版权年份或持有人；若上游补发具体声明，后续更新须一并保留。Electron 许可不能替代作者 MIT 声明。

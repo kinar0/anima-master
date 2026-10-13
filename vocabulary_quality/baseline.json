@@ -1,0 +1,2305 @@
+{
+  "counts": {
+    "development": {
+      "samples": 96,
+      "correct_references": 40,
+      "focus_correct_references": 28,
+      "permissible_parent_references": 12,
+      "wrong_references": 3,
+      "missing_references": 44,
+      "unjudged_references": 0,
+      "acceptable_abstentions": 26,
+      "samples_with_wrong_reference": 3
+    },
+    "acceptance": {
+      "samples": 36,
+      "correct_references": 16,
+      "focus_correct_references": 8,
+      "permissible_parent_references": 8,
+      "wrong_references": 6,
+      "missing_references": 36,
+      "unjudged_references": 0,
+      "acceptable_abstentions": 4,
+      "samples_with_wrong_reference": 6
+    }
+  },
+  "samples": [
+    {
+      "id": "D01P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "hug"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D01N",
+      "split": "development",
+      "matches": [
+        [
+          "抱着",
+          "carrying"
+        ]
+      ],
+      "correct_references": [
+        "carrying"
+      ],
+      "focus_correct_references": [
+        "carrying"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D02P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "headpat"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D02N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D03P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_hands"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D03N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D04P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "interlocked_fingers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D04N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D05P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "kiss"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D05N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D06P",
+      "split": "development",
+      "matches": [
+        [
+          "露出",
+          "exposure"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "exposure"
+      ],
+      "missing_references": [
+        "smile"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D06N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D07P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "blush"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D07N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D08P",
+      "split": "development",
+      "matches": [
+        [
+          "眼泪",
+          "tears"
+        ]
+      ],
+      "correct_references": [
+        "tears"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "tears"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "crying"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D08N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D09P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "closed_eyes"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D09N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D10P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "wink"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D10N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D11P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "open_mouth"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D11N",
+      "split": "development",
+      "matches": [
+        [
+          "雨伞",
+          "umbrella"
+        ]
+      ],
+      "correct_references": [
+        "umbrella"
+      ],
+      "focus_correct_references": [
+        "umbrella"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D12P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "standing"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D12N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D13P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "sitting"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D13N",
+      "split": "development",
+      "matches": [
+        [
+          "站立",
+          "standing"
+        ]
+      ],
+      "correct_references": [
+        "standing"
+      ],
+      "focus_correct_references": [
+        "standing"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D14P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "kneeling"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D14N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D15P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "squatting"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D15N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D16P",
+      "split": "development",
+      "matches": [
+        [
+          "在床上",
+          "on_bed"
+        ]
+      ],
+      "correct_references": [
+        "on_bed"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "on_bed"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "on_back"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D16N",
+      "split": "development",
+      "matches": [
+        [
+          "站立",
+          "standing"
+        ]
+      ],
+      "correct_references": [
+        "standing"
+      ],
+      "focus_correct_references": [
+        "standing"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D17P",
+      "split": "development",
+      "matches": [
+        [
+          "在床上",
+          "on_bed"
+        ],
+        [
+          "趴",
+          "on_stomach"
+        ]
+      ],
+      "correct_references": [
+        "on_bed",
+        "on_stomach"
+      ],
+      "focus_correct_references": [
+        "on_stomach"
+      ],
+      "permissible_parent_references": [
+        "on_bed"
+      ],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D17N",
+      "split": "development",
+      "matches": [
+        [
+          "趴",
+          "on_stomach"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "on_stomach"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D18P",
+      "split": "development",
+      "matches": [
+        [
+          "双臂交叉",
+          "crossed_arms"
+        ]
+      ],
+      "correct_references": [
+        "crossed_arms"
+      ],
+      "focus_correct_references": [
+        "crossed_arms"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D18N",
+      "split": "development",
+      "matches": [
+        [
+          "抱着",
+          "carrying"
+        ],
+        [
+          "箱子",
+          "box"
+        ]
+      ],
+      "correct_references": [
+        "box",
+        "carrying"
+      ],
+      "focus_correct_references": [
+        "box",
+        "carrying"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D19P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "arms_up"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D19N",
+      "split": "development",
+      "matches": [
+        [
+          "举起一只手",
+          "arm_up"
+        ]
+      ],
+      "correct_references": [
+        "arm_up"
+      ],
+      "focus_correct_references": [
+        "arm_up"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D20P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "legs_together"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D20N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D21P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "white_dress"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D21N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D22P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "white_skirt"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D22N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D23P",
+      "split": "development",
+      "matches": [
+        [
+          "裤袜",
+          "pantyhose"
+        ]
+      ],
+      "correct_references": [
+        "pantyhose"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "pantyhose"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "black_pantyhose"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D23N",
+      "split": "development",
+      "matches": [
+        [
+          "及膝袜",
+          "kneehighs"
+        ]
+      ],
+      "correct_references": [
+        "kneehighs"
+      ],
+      "focus_correct_references": [
+        "kneehighs"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D24P",
+      "split": "development",
+      "matches": [
+        [
+          "裤袜",
+          "pantyhose"
+        ]
+      ],
+      "correct_references": [
+        "pantyhose"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "pantyhose"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "white_pantyhose"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D24N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D25P",
+      "split": "development",
+      "matches": [
+        [
+          "泳装",
+          "swimsuit"
+        ]
+      ],
+      "correct_references": [
+        "swimsuit"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "swimsuit"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "one-piece_swimsuit"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D25N",
+      "split": "development",
+      "matches": [
+        [
+          "泳装",
+          "swimsuit"
+        ]
+      ],
+      "correct_references": [
+        "swimsuit"
+      ],
+      "focus_correct_references": [
+        "swimsuit"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D26P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "hoodie"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D26N",
+      "split": "development",
+      "matches": [
+        [
+          "帽子",
+          "hat"
+        ]
+      ],
+      "correct_references": [
+        "hat"
+      ],
+      "focus_correct_references": [
+        "hat"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D27P",
+      "split": "development",
+      "matches": [
+        [
+          "毛衣",
+          "sweater"
+        ]
+      ],
+      "correct_references": [
+        "sweater"
+      ],
+      "focus_correct_references": [
+        "sweater"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D27N",
+      "split": "development",
+      "matches": [
+        [
+          "背心",
+          "tank_top"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "tank_top"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D28P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "sneakers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D28N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D29P",
+      "split": "development",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ]
+      ],
+      "correct_references": [
+        "gloves"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "gloves"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "fingerless_gloves"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D29N",
+      "split": "development",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ]
+      ],
+      "correct_references": [
+        "gloves"
+      ],
+      "focus_correct_references": [
+        "gloves"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D30P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "denim_shorts"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D30N",
+      "split": "development",
+      "matches": [
+        [
+          "长裤",
+          "pants"
+        ]
+      ],
+      "correct_references": [
+        "pants"
+      ],
+      "focus_correct_references": [
+        "pants"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D31P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "raincoat"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D31N",
+      "split": "development",
+      "matches": [
+        [
+          "雨伞",
+          "umbrella"
+        ]
+      ],
+      "correct_references": [
+        "umbrella"
+      ],
+      "focus_correct_references": [
+        "umbrella"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D32P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_umbrella"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D32N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D33P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_book"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D33N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D34P",
+      "split": "development",
+      "matches": [
+        [
+          "杯子",
+          "cup"
+        ]
+      ],
+      "correct_references": [
+        "cup"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "cup"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_cup"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D34N",
+      "split": "development",
+      "matches": [
+        [
+          "杯子",
+          "cup"
+        ],
+        [
+          "桌子",
+          "table"
+        ]
+      ],
+      "correct_references": [
+        "cup",
+        "table"
+      ],
+      "focus_correct_references": [
+        "cup",
+        "table"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D35P",
+      "split": "development",
+      "matches": [
+        [
+          "手机",
+          "phone"
+        ]
+      ],
+      "correct_references": [
+        "phone"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "phone"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_phone"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D35N",
+      "split": "development",
+      "matches": [
+        [
+          "手机",
+          "phone"
+        ],
+        [
+          "桌子",
+          "table"
+        ]
+      ],
+      "correct_references": [
+        "phone",
+        "table"
+      ],
+      "focus_correct_references": [
+        "phone",
+        "table"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D36P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_sword"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D36N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D37P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "backpack"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D37N",
+      "split": "development",
+      "matches": [
+        [
+          "单肩包",
+          "shoulder_bag"
+        ]
+      ],
+      "correct_references": [
+        "shoulder_bag"
+      ],
+      "focus_correct_references": [
+        "shoulder_bag"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D38P",
+      "split": "development",
+      "matches": [
+        [
+          "蝴蝶结",
+          "bow"
+        ]
+      ],
+      "correct_references": [
+        "bow"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "bow"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "hair_bow"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D38N",
+      "split": "development",
+      "matches": [
+        [
+          "蝴蝶结",
+          "bow"
+        ],
+        [
+          "衣领",
+          "collar"
+        ]
+      ],
+      "correct_references": [
+        "bow",
+        "collar"
+      ],
+      "focus_correct_references": [
+        "bow",
+        "collar"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D39P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "stuffed_toy"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D39N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D40P",
+      "split": "development",
+      "matches": [
+        [
+          "眼镜",
+          "glasses"
+        ]
+      ],
+      "correct_references": [
+        "glasses"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "glasses"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "sunglasses"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D40N",
+      "split": "development",
+      "matches": [
+        [
+          "眼镜",
+          "glasses"
+        ]
+      ],
+      "correct_references": [
+        "glasses"
+      ],
+      "focus_correct_references": [
+        "glasses"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D41P",
+      "split": "development",
+      "matches": [
+        [
+          "项链",
+          "necklace"
+        ]
+      ],
+      "correct_references": [
+        "necklace"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "necklace"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "choker"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D41N",
+      "split": "development",
+      "matches": [
+        [
+          "项链",
+          "necklace"
+        ]
+      ],
+      "correct_references": [
+        "necklace"
+      ],
+      "focus_correct_references": [
+        "necklace"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D42P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "scarf"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D42N",
+      "split": "development",
+      "matches": [
+        [
+          "高领毛衣",
+          "turtleneck_sweater"
+        ]
+      ],
+      "correct_references": [
+        "turtleneck_sweater"
+      ],
+      "focus_correct_references": [
+        "turtleneck_sweater"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D43P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "rain"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D43N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D44P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "snow"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D44N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D45P",
+      "split": "development",
+      "matches": [
+        [
+          "沙滩",
+          "beach"
+        ]
+      ],
+      "correct_references": [
+        "beach"
+      ],
+      "focus_correct_references": [
+        "beach"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D45N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D46P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "classroom"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D46N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D47P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "park"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D47N",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "D48P",
+      "split": "development",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "starry_sky"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "D48N",
+      "split": "development",
+      "matches": [
+        [
+          "室内",
+          "indoors"
+        ]
+      ],
+      "correct_references": [
+        "indoors"
+      ],
+      "focus_correct_references": [
+        "indoors"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A01",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "white_dress"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A02",
+      "split": "acceptance",
+      "matches": [
+        [
+          "裤袜",
+          "pantyhose"
+        ]
+      ],
+      "correct_references": [
+        "pantyhose"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "pantyhose"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "black_pantyhose",
+        "white_skirt"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A03",
+      "split": "acceptance",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ],
+        [
+          "裤袜",
+          "pantyhose"
+        ]
+      ],
+      "correct_references": [
+        "gloves",
+        "pantyhose"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "gloves",
+        "pantyhose"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "fingerless_gloves",
+        "white_pantyhose"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A04",
+      "split": "acceptance",
+      "matches": [
+        [
+          "泳装",
+          "swimsuit"
+        ]
+      ],
+      "correct_references": [
+        "swimsuit"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "swimsuit"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "one-piece_swimsuit",
+        "sneakers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A05",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "backpack",
+        "hoodie"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A06",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "denim_shorts",
+        "raincoat"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A07",
+      "split": "acceptance",
+      "matches": [
+        [
+          "眼镜",
+          "glasses"
+        ],
+        [
+          "项链",
+          "necklace"
+        ]
+      ],
+      "correct_references": [
+        "glasses",
+        "necklace"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "glasses",
+        "necklace"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "choker",
+        "sunglasses"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A08",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "stuffed_toy"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A09",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "kneeling"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A10",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "squatting"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A11",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "classroom"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A12",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "grass",
+        "park"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A13",
+      "split": "acceptance",
+      "matches": [
+        [
+          "杯子",
+          "cup"
+        ]
+      ],
+      "correct_references": [
+        "cup"
+      ],
+      "focus_correct_references": [
+        "cup"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "book",
+        "holding_book",
+        "holding_cup"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A14",
+      "split": "acceptance",
+      "matches": [
+        [
+          "手机",
+          "phone"
+        ]
+      ],
+      "correct_references": [
+        "phone"
+      ],
+      "focus_correct_references": [
+        "phone"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_phone"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A15",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_sword",
+        "sword"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A16",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "holding_hands"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A17",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "interlocked_fingers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A18",
+      "split": "acceptance",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "gloves"
+      ],
+      "missing_references": [
+        "sneakers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A19",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "sneakers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A20",
+      "split": "acceptance",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ]
+      ],
+      "correct_references": [
+        "gloves"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "gloves"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "fingerless_gloves"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A21",
+      "split": "acceptance",
+      "matches": [
+        [
+          "白衬衫",
+          "white_shirt"
+        ],
+        [
+          "衬衫",
+          "shirt"
+        ]
+      ],
+      "correct_references": [
+        "shirt",
+        "white_shirt"
+      ],
+      "focus_correct_references": [
+        "shirt",
+        "white_shirt"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "table"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A22",
+      "split": "acceptance",
+      "matches": [
+        [
+          "微笑",
+          "smile"
+        ],
+        [
+          "露出",
+          "exposure"
+        ],
+        [
+          "拿着雨伞",
+          "holding_umbrella"
+        ]
+      ],
+      "correct_references": [
+        "holding_umbrella",
+        "smile"
+      ],
+      "focus_correct_references": [
+        "holding_umbrella",
+        "smile"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "exposure"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A23",
+      "split": "acceptance",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ]
+      ],
+      "correct_references": [
+        "gloves"
+      ],
+      "focus_correct_references": [],
+      "permissible_parent_references": [
+        "gloves"
+      ],
+      "wrong_references": [],
+      "missing_references": [
+        "fingerless_gloves",
+        "sneakers"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A24",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "backpack"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A25",
+      "split": "acceptance",
+      "matches": [
+        [
+          "靴子",
+          "boots"
+        ]
+      ],
+      "correct_references": [
+        "boots"
+      ],
+      "focus_correct_references": [
+        "boots"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A26",
+      "split": "acceptance",
+      "matches": [
+        [
+          "手套",
+          "gloves"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "gloves"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A27",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "white_background"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A28",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [
+        "white_background"
+      ],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A29",
+      "split": "acceptance",
+      "matches": [
+        [
+          "白裙子",
+          "white_skirt"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "white_skirt"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A30",
+      "split": "acceptance",
+      "matches": [
+        [
+          "裙子",
+          "skirt"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "skirt"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A31",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "A32",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "A33",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "A34",
+      "split": "acceptance",
+      "matches": [],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": true
+    },
+    {
+      "id": "A35",
+      "split": "acceptance",
+      "matches": [
+        [
+          "事后",
+          "aftersex"
+        ]
+      ],
+      "correct_references": [
+        "aftersex"
+      ],
+      "focus_correct_references": [
+        "aftersex"
+      ],
+      "permissible_parent_references": [],
+      "wrong_references": [],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    },
+    {
+      "id": "A36",
+      "split": "acceptance",
+      "matches": [
+        [
+          "严肃",
+          "serious"
+        ],
+        [
+          "认真",
+          "serious"
+        ]
+      ],
+      "correct_references": [],
+      "focus_correct_references": [],
+      "permissible_parent_references": [],
+      "wrong_references": [
+        "serious"
+      ],
+      "missing_references": [],
+      "unjudged_references": [],
+      "acceptable_abstention": false
+    }
+  ]
+}

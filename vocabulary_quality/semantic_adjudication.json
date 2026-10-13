@@ -1,0 +1,26 @@
+{
+  "method": "人工补充判定仅解释原评分表未涵盖的命中；不修改冻结原文，不用于增删候选别名。宽泛父概念可作弱参考，不计为细分概念覆盖；台词、修辞与错误形制为误导。",
+  "samples": {
+    "D06P": {"wrong": ["exposure"], "basis": "露出笑容不是身体暴露；原库露出过泛"},
+    "D08P": {"permissible": ["tears"], "basis": "原文明确眼泪"},
+    "D16P": {"permissible": ["on_bed"], "basis": "原文明确在床上"},
+    "D17P": {"permissible": ["on_bed"], "basis": "原文明确在床上"},
+    "D23P": {"permissible": ["pantyhose"], "basis": "裤袜父概念允许，但未覆盖黑色细分"},
+    "D24P": {"permissible": ["pantyhose"], "basis": "裤袜父概念允许，但未覆盖白色细分"},
+    "D25P": {"permissible": ["swimsuit"], "basis": "泳装父概念允许，但未覆盖连体细分"},
+    "D27N": {"wrong": ["tank_top"], "basis": "针织背心可为毛衣马甲，不足以确定 tank_top"},
+    "D29P": {"permissible": ["gloves"], "basis": "手套父概念允许，但未覆盖露指条件"},
+    "D34P": {"permissible": ["cup"], "basis": "原文明示杯子，但未覆盖持杯动作"},
+    "D35P": {"permissible": ["phone"], "basis": "原文明示手机，但未覆盖持手机动作"},
+    "D38P": {"permissible": ["bow"], "basis": "原文有蝴蝶结，但未覆盖发饰部位"},
+    "D40P": {"permissible": ["glasses"], "basis": "眼镜父概念可作弱参考，不能替代墨镜细分覆盖"},
+    "D41P": {"permissible": ["necklace"], "basis": "项链父概念允许，未证明 choker 形制"},
+    "A02": {"permissible": ["pantyhose"], "basis": "裤袜父概念允许"},
+    "A03": {"permissible": ["pantyhose", "gloves"], "basis": "父概念允许，颜色与半指条件另计"},
+    "A04": {"permissible": ["swimsuit"], "basis": "泳装父概念允许"},
+    "A07": {"permissible": ["necklace", "glasses"], "basis": "项链、眼镜泛参考允许；不替代具体形制"},
+    "A20": {"permissible": ["gloves"], "basis": "原文仍有一个正向佩戴实例，不据此分配穿着者"},
+    "A22": {"wrong": ["exposure"], "basis": "露出微笑不证明身体暴露"},
+    "A23": {"permissible": ["gloves"], "basis": "祥子明确戴手套，不能因此赋给爱音"}
+  }
+}

@@ -1,0 +1,512 @@
+{
+  "applied": false,
+  "batch_gate": "failed; no publishable validated batch this run",
+  "withdrawn_tags": [
+    "classroom",
+    "fingerless_gloves",
+    "park",
+    "sneakers"
+  ],
+  "aliases": [
+    {
+      "entry": "把手牵起来=holding_hands",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "牵起手=holding_hands",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "十指紧扣=interlocked_fingers",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "十指交扣=interlocked_fingers",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "露出笑容=smile",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "笑眯眯=smile",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "面颊泛红=blush",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "双颊泛红=blush",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "哭得掉眼泪=crying",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "哭出来=crying",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "把嘴张开=open_mouth",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "张开嘴巴=open_mouth",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "站着=standing",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 3,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "坐着=sitting",
+      "decision": "defer_new_error",
+      "development_correct_gain": 2,
+      "development_new_errors": [
+        {
+          "id": "D13N",
+          "tags": [
+            "sitting"
+          ]
+        }
+      ],
+      "merge_skipped": [],
+      "final_disposition": "defer_new_error"
+    },
+    {
+      "entry": "双膝跪地=kneeling",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 2,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "跪地=kneeling",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 2,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "蹲着=squatting",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 2,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "两只胳膊举起来=arms_up",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "双臂高举=arms_up",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "两条腿并在一起=legs_together",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "两腿并拢=legs_together",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "白色连身裙=white_dress",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 2,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "白连身裙=white_dress",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "白色半身裙=white_skirt",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 2,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "白半身裙=white_skirt",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "黑色裤袜=black_pantyhose",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "黑裤袜=black_pantyhose",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "白色裤袜=white_pantyhose",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "白裤袜=white_pantyhose",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "连体式泳装=one-piece_swimsuit",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "连体泳装=one-piece_swimsuit",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "帽衫=hoodie",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "球鞋=sneakers",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "withdrawn_acceptance_error"
+    },
+    {
+      "entry": "半指手套=fingerless_gloves",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "withdrawn_acceptance_error"
+    },
+    {
+      "entry": "露指手套=fingerless_gloves",
+      "decision": "conflict_or_existing",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [
+        {
+          "entry": "露指手套=fingerless_gloves",
+          "existing": "fingerless_gloves",
+          "reason": "same"
+        }
+      ],
+      "final_disposition": "conflict_or_existing"
+    },
+    {
+      "entry": "牛仔热裤=denim_shorts",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "雨衣=raincoat",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "举着伞=holding_umbrella",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "撑着伞=holding_umbrella",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "捧着书=holding_book",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "端着杯子=holding_cup",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "捧着杯子=holding_cup",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "握着手机=holding_phone",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "握着剑=holding_sword",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "双肩包=backpack",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "毛绒公仔=stuffed_toy",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "绒毛玩偶=stuffed_toy",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "太阳眼镜=sunglasses",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "下着雨=rain",
+      "decision": "defer_new_error",
+      "development_correct_gain": 1,
+      "development_new_errors": [
+        {
+          "id": "D43N",
+          "tags": [
+            "rain"
+          ]
+        }
+      ],
+      "merge_skipped": [],
+      "final_disposition": "defer_new_error"
+    },
+    {
+      "entry": "雨天=rain",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    },
+    {
+      "entry": "教室=classroom",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "withdrawn_acceptance_error"
+    },
+    {
+      "entry": "公园=park",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "withdrawn_acceptance_error"
+    },
+    {
+      "entry": "满天繁星=starry_sky",
+      "decision": "retain_for_comparison",
+      "development_correct_gain": 1,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "provisional_requires_fresh_holdout"
+    },
+    {
+      "entry": "繁星满天=starry_sky",
+      "decision": "defer_no_measured_gain",
+      "development_correct_gain": 0,
+      "development_new_errors": [],
+      "merge_skipped": [],
+      "final_disposition": "defer_no_measured_gain"
+    }
+  ],
+  "provisional_rows": [
+    "把手牵起来=holding_hands",
+    "十指紧扣=interlocked_fingers",
+    "露出笑容=smile",
+    "面颊泛红=blush",
+    "哭得掉眼泪=crying",
+    "把嘴张开=open_mouth",
+    "站着=standing",
+    "双膝跪地=kneeling",
+    "跪地=kneeling",
+    "蹲着=squatting",
+    "两只胳膊举起来=arms_up",
+    "两条腿并在一起=legs_together",
+    "白色连身裙=white_dress",
+    "白色半身裙=white_skirt",
+    "黑色裤袜=black_pantyhose",
+    "白色裤袜=white_pantyhose",
+    "连体式泳装=one-piece_swimsuit",
+    "帽衫=hoodie",
+    "牛仔热裤=denim_shorts",
+    "雨衣=raincoat",
+    "举着伞=holding_umbrella",
+    "捧着书=holding_book",
+    "端着杯子=holding_cup",
+    "握着手机=holding_phone",
+    "握着剑=holding_sword",
+    "双肩包=backpack",
+    "毛绒公仔=stuffed_toy",
+    "太阳眼镜=sunglasses",
+    "满天繁星=starry_sky"
+  ],
+  "semantic_deferred_concepts": [
+    "hug",
+    "headpat",
+    "kiss",
+    "closed_eyes",
+    "wink",
+    "on_back",
+    "on_stomach",
+    "crossed_arms",
+    "sweater",
+    "hair_bow",
+    "choker",
+    "scarf",
+    "snow",
+    "beach"
+  ],
+  "holdout_policy": "Do not rerun the reduced set on this acceptance set to claim validation; use a fresh holdout next task"
+}

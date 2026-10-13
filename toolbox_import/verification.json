@@ -1,0 +1,15 @@
+{
+  "count_in_config": 43691,
+  "count_in_editor_snapshot": 43691,
+  "count_unique_aliases": 43691,
+  "repeat_import_additions": 0,
+  "editor_snapshot_ms": 322.49,
+  "match_cold_ms": 432.68,
+  "match_warm_median_ms": 119.03,
+  "match_warm_max_ms": 126.68,
+  "benchmark_iterations": 20,
+  "benchmark_prompt": "一个女孩穿白色连衣裙，手持玫瑰，露出微笑，旁边有𫚉鱼",
+  "matched_count": 7,
+  "invalid_occurrences": 4344,
+  "scope": "Local config/snapshot/matching only; no active-plugin reload, model call or image generation."
+}

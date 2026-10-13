@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import threading
+from copy import deepcopy
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
+    from .vocabulary_review import VocabularyReview
     from .agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from .autofilter_settings import AutofilterSettings
     from .artist_session_settings import ArtistSessionSettings
@@ -43,6 +45,7 @@ try:
     )
     from .prompt_block_rules import matches_blocked_prompt
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from vocabulary_review import VocabularyReview
     from agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from autofilter_settings import AutofilterSettings
     from artist_session_settings import ArtistSessionSettings
@@ -108,6 +111,12 @@ class ComfyUIAgentPlugin(Star):
         self._noun_translation_lock = asyncio.Lock()
         self._noun_web_job: dict[str, Any] = {"state": "idle", "message": ""}
         self._noun_web_task: asyncio.Task | None = None
+        self._noun_snapshot_lock = threading.RLock()
+        self._noun_snapshot_cache = None
+        self._vocabulary_review = VocabularyReview(
+            Path(__file__).parent / "third_party/llm_nai_toolbox/vocabulary_review_catalog.json",
+            plugin_data_path / "vocabulary_review_decisions.json",
+        )
         self._multi_generation_semaphore = asyncio.Semaphore(
             max(1, self._int("multi_max_concurrent_generations", 1))
         )
@@ -174,6 +183,9 @@ class ComfyUIAgentPlugin(Star):
         )
         for path, handler, methods, label in (
             ("noun-translation", self.get_noun_translation, ["GET"], "查看名词翻译进度"),
+            ("noun-translation/status", self.get_noun_translation_status, ["GET"], "查看名词翻译任务状态"),
+            ("vocabulary-review", self.get_vocabulary_review, ["GET"], "查看词汇候选与释义"),
+            ("vocabulary-review/decision", self.save_vocabulary_review, ["POST"], "保存词汇审查记录"),
             ("noun-translation/enabled", self.set_noun_translation_enabled, ["POST"], "启用或停用名词翻译参与生图"),
             ("noun-translation/run", self.run_noun_translation, ["POST"], "启动名词翻译或复核"),
             ("noun-translation/import", self.import_noun_translation, ["POST"], "批量导入名词翻译"),
@@ -649,14 +661,35 @@ class ComfyUIAgentPlugin(Star):
         return parse_existing_mappings(self.config.get("danbooru_term_mappings", []))
 
     def _noun_translation_snapshot(self) -> dict[str, Any]:
-        candidates = select_general_tags(self._noun_catalog_path())
         translated_path = self._plugin_data_path / "noun_translation_review.json"
         verified_path = self._plugin_data_path / "noun_translation_verified.json"
+        catalog_path = self._noun_catalog_path()
+        existing = self._existing_term_mappings()
+        def signature(path):
+            stat = path.stat() if path.exists() else None
+            return (str(path), stat.st_mtime_ns, stat.st_size) if stat else (str(path), None)
+        key = (signature(catalog_path), signature(translated_path), signature(verified_path), tuple(existing.items()))
+        lock = getattr(self, "_noun_snapshot_lock", None)
+        if lock is None:
+            self._noun_snapshot_lock = lock = threading.RLock()
+        with lock:
+            cached = getattr(self, "_noun_snapshot_cache", None)
+            if cached and cached[0] == key:
+                return {**deepcopy(cached[1]), "job": dict(self._noun_web_job),
+                        "enabled": bool(self.config.get("danbooru_term_mappings_enabled", True))}
+            # Keep computation in the same lock; an overlapping refresh need not
+            # duplicate expensive local work. The HTTP handler runs it off-loop.
+            value = ComfyUIAgentPlugin._compute_noun_translation_snapshot(
+                self, catalog_path, translated_path, verified_path, existing)
+            self._noun_snapshot_cache = (key, value)
+            return deepcopy(value)
+
+    def _compute_noun_translation_snapshot(self, catalog_path, translated_path, verified_path, existing):
+        candidates = select_general_tags(catalog_path)
         translated = json.loads(translated_path.read_text(encoding="utf-8")) if translated_path.exists() else []
         verified = json.loads(verified_path.read_text(encoding="utf-8")) if verified_path.exists() else []
         if not isinstance(translated, list) or not isinstance(verified, list):
             raise ValueError("翻译断点文件格式无效")
-        existing = self._existing_term_mappings()
         reviewed = review_rows(translated, existing_mappings=existing)
         plan = build_import_plan(translated, verified, existing)
         rows = translation_review_rows(reviewed, verified, existing, plan)
@@ -675,11 +708,48 @@ class ComfyUIAgentPlugin(Star):
     async def get_noun_translation(self):
         try:
             self._ensure_dashboard_user()
-            return json_response(self._noun_translation_snapshot())
+            snapshot = await asyncio.to_thread(self._noun_translation_snapshot)
+            return json_response(snapshot)
         except PermissionError as exc:
             return error_response(str(exc), status_code=403)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             return error_response(str(exc), status_code=400)
+
+    async def get_noun_translation_status(self):
+        try:
+            self._ensure_dashboard_user()
+            return json_response({"job": dict(self._noun_web_job),
+                                  "enabled": bool(self.config.get("danbooru_term_mappings_enabled", True))})
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+
+    async def get_vocabulary_review(self):
+        try:
+            self._ensure_dashboard_user()
+            params = request.args
+            existing = self._existing_term_mappings()
+            value = await asyncio.to_thread(self._vocabulary_review.snapshot,
+                existing=existing, query=params.get("query", ""), state=params.get("state", "focus"),
+                page=int(params.get("page", 1)), page_size=int(params.get("page_size", 30)))
+            return json_response(value)
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except (OSError, ValueError, TypeError) as exc:
+            return error_response(str(exc), status_code=400)
+
+    async def save_vocabulary_review(self):
+        try:
+            self._ensure_dashboard_user()
+            payload = await request.json(default={})
+            value = await asyncio.to_thread(self._vocabulary_review.decide, payload)
+            return json_response(value)
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except (ValueError, TypeError) as exc:
+            return error_response(str(exc), status_code=409 if "刷新" in str(exc) else 400)
+        except OSError:
+            logger.exception("词汇审查记录保存失败")
+            return error_response("审查记录保存失败，未应用词库", status_code=500)
 
     async def set_noun_translation_enabled(self):
         try:

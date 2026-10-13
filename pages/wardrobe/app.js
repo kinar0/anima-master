@@ -22,7 +22,7 @@ const bridge = window.AstrBotPluginPage || fallbackBridge;
 const META = {
   outfits: { kicker: "CHARACTER WARDROBES", title: "角色自己的变体衣柜", description: "按角色保存任意命名服装；服装名称、所属角色与学习来源分别维护。通用校服和命名套组请放到右侧分类。" },
   outfitSets: { kicker: "NAMED OUTFIT SETS", title: "通用服装套组", description: "可由任意角色穿着的命名套组。每套独立保存 canonical tag、可见组件和别名；不会进入任何角色自己的变体衣柜。" },
-  terms: { kicker: "TERM TRANSLATIONS", title: "名词翻译", description: "将常用中文名词稳定映射为 canonical Danbooru tag，命中提示词时直接使用。" },
+  terms: { kicker: "TERM TRANSLATIONS", title: "名词翻译", description: "将中文名词映射为 canonical Danbooru tag，命中后供模型参考，由模型决定是否采用。" },
 };
 const $ = (selector) => document.querySelector(selector);
 const elements = {
@@ -32,6 +32,8 @@ let state = { revision: "", outfits: [], outfitSets: [], terms: [], tab: "outfit
 let pristine = null;
 let toastTimer = null;
 let indexedView = null;
+let editVersion = 0;
+let loadVersion = 0;
 const pagination = new window.WardrobePagination(
   [$("#library-pagination-top"), $("#library-pagination-bottom")],
   () => { render(); $("#library-pagination-top").scrollIntoView({ block: "start" }); },
@@ -49,7 +51,7 @@ function showToast(message) { clearTimeout(toastTimer); elements.toast.textConte
 function errorText(error) { return error instanceof Error ? error.message : String(error); }
 function setBusy(value) { state.busy = value; elements.refresh.disabled = value; elements.add.disabled = value; updateDirty(); }
 function updateDirty() { const disabled = state.busy || !state.dirty; elements.save.disabled = disabled; elements.dirtySave.disabled = disabled; elements.dirtyBar.hidden = !state.dirty; elements.dataStatus.textContent = state.dirty ? "待保存" : "已同步"; }
-function markDirty() { state.dirty = true; indexedView = null; updateDirty(); renderCounts(); }
+function markDirty() { editVersion += 1; state.dirty = true; indexedView = null; updateDirty(); renderCounts(); }
 function inputField(label, value, onInput, { textarea = false, placeholder = "", className = "" } = {}) {
   const wrap = node("div", `field ${className}`); const caption = node("label", "", label); const control = node(textarea ? "textarea" : "input"); control.value = value || ""; control.placeholder = placeholder; control.addEventListener("input", () => { onInput(control.value); markDirty(); }); wrap.append(caption, control); return wrap;
 }
@@ -79,7 +81,7 @@ function mappingEntry(item, index, isSet) {
     : inputField("中文名词 / 触发词", item.alias, (value) => item.alias = value, { placeholder: "百褶裙" });
   if (isSet) left.append(chips(setAliases, "mint"));
   const right = inputField("Canonical Danbooru Tag", item.tag, (value) => item.tag = value, { placeholder: isSet ? "tsukinomori_school_uniform" : "pleated_skirt", className: "wide" }); right.append(chips(item.tag ? [item.tag] : []));
-  const meta = node("div", "field-stack"); if (isSet) { const variantField = node("div", "field"); variantField.append(node("label", "", "套组变体")); const variantSelect = node("select"); [["default","通用 / 未区分"],["casual","官方常服 / Casual"],["summer","夏季"],["winter","冬季"],["stage","演出 / 舞台"]].forEach(([value,label]) => { const option = node("option", "", label); option.value = value; option.selected = (item.variant || "default") === value; variantSelect.append(option); }); variantSelect.addEventListener("change", () => { item.variant = variantSelect.value; markDirty(); }); variantField.append(variantSelect); const components = inputField("套组组件 Tags", (item.componentTags || []).join(", "), (value) => item.componentTags = splitList(value), { textarea: true, placeholder: "grey_jacket, white_shirt, green_skirt, ..." }); components.append(node("p", "mapping-note", "这些组件属于套组本身，可绑定给任何穿着者；不要在这里保存角色外貌。"), chips(item.componentTags || [])); const line = node("div", "meta-line"); line.append(node("span", `pill ${item.origin === "learned" ? "learned" : ""}`, item.origin === "learned" ? "自动学习" : "手动配置")); meta.append(variantField, components, line); } else meta.append(node("p", "mapping-note", "用户提示词出现左侧名词时，右侧 tag 会直接加入 hard tags。"));
+  const meta = node("div", "field-stack"); if (isSet) { const variantField = node("div", "field"); variantField.append(node("label", "", "套组变体")); const variantSelect = node("select"); [["default","通用 / 未区分"],["casual","官方常服 / Casual"],["summer","夏季"],["winter","冬季"],["stage","演出 / 舞台"]].forEach(([value,label]) => { const option = node("option", "", label); option.value = value; option.selected = (item.variant || "default") === value; variantSelect.append(option); }); variantSelect.addEventListener("change", () => { item.variant = variantSelect.value; markDirty(); }); variantField.append(variantSelect); const components = inputField("套组组件 Tags", (item.componentTags || []).join(", "), (value) => item.componentTags = splitList(value), { textarea: true, placeholder: "grey_jacket, white_shirt, green_skirt, ..." }); components.append(node("p", "mapping-note", "这些组件属于套组本身，可绑定给任何穿着者；不要在这里保存角色外貌。"), chips(item.componentTags || [])); const line = node("div", "meta-line"); line.append(node("span", `pill ${item.origin === "learned" ? "learned" : ""}`, item.origin === "learned" ? "自动学习" : "手动配置")); meta.append(variantField, components, line); } else meta.append(node("p", "mapping-note", "用户提示词出现左侧名词时，右侧 tag 仅供模型参考，不会强制加入最终提示词。"));
   card.append(left, right, meta, deleteButton(index)); return card;
 }
 function renderCounts() {
@@ -109,10 +111,26 @@ function hydrate(data) {
   indexedView = null;
   state.revision = data.revision || ""; state.outfits = clone(data.outfits || []); state.outfitSets = clone(data.outfitSets || []); state.terms = clone(data.terms || []); state.dirty = false; pristine = clone({ revision: state.revision, outfits: state.outfits, outfitSets: state.outfitSets, terms: state.terms }); elements.revision.textContent = `revision ${state.revision.slice(0, 9) || "—"}`; render();
 }
-async function load() { setBusy(true); try { hydrate(await bridge.apiGet("wardrobe")); elements.connection.classList.add("is-ready"); elements.connection.querySelector("span").textContent = "已连接"; } catch (error) { showToast(`读取失败：${errorText(error)}`); elements.connection.querySelector("span").textContent = "连接失败"; } finally { setBusy(false); } }
+async function load() {
+  if (state.dirty) { showToast("有未保存的修改，请先保存或放弃后再刷新。"); return; }
+  const version = ++loadVersion;
+  const editing = editVersion;
+  setBusy(true);
+  try {
+    const data = await bridge.apiGet("wardrobe");
+    if (version !== loadVersion) return;
+    if (editing !== editVersion || state.dirty) { showToast("读取期间有新编辑，已保留修改。"); return; }
+    hydrate(data);
+    elements.connection.classList.add("is-ready");
+    elements.connection.querySelector("span").textContent = "已连接";
+  } catch (error) {
+    if (version === loadVersion) { showToast(`读取失败：${errorText(error)}`); elements.connection.querySelector("span").textContent = "连接失败"; }
+  } finally { if (version === loadVersion) setBusy(false); }
+}
 async function save() {
   if (!state.dirty || state.busy) return;
   setBusy(true);
+  const editing = editVersion;
   try {
     const result = await bridge.apiPost("wardrobe/save", {
       baseRevision: state.revision,
@@ -124,8 +142,14 @@ async function save() {
       || !Array.isArray(result.outfits) || !Array.isArray(result.outfitSets) || !Array.isArray(result.terms)) {
       throw new Error("服务端没有返回可用的词库数据，未保存的修改仍保留。");
     }
-    hydrate(result);
-    showToast("服装词库已保存并立即生效。");
+    if (editing === editVersion) {
+      hydrate(result);
+      showToast("服装词库已保存并立即生效。");
+    } else {
+      state.revision = result.revision;
+      pristine = clone(result);
+      showToast("已保存提交时的内容；保存期间的新编辑仍保留，尚未保存。");
+    }
   } catch (error) {
     showToast(`保存失败：${errorText(error)}`);
   } finally {

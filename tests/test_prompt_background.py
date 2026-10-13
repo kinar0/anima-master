@@ -283,7 +283,7 @@ def test_named_character_lower_body_prompt_does_not_gain_full_body() -> None:
     )
 
     assert "lower body" in result.final_prompt
-    assert "toyokawa sakiko (bang dream!)" in result.final_prompt
+    assert r"toyokawa sakiko \(bang dream!\)" in result.final_prompt
     assert "full body" not in result.final_prompt
     assert "simple background" in result.final_prompt
     assert "white background" in result.final_prompt

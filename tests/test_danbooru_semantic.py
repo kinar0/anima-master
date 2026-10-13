@@ -3124,7 +3124,7 @@ def test_configured_named_outfit_mapping_validates_and_accepts_separators() -> N
     assert invalid is None
 
 
-def test_configured_term_mapping_is_returned_as_request_hard_tag() -> None:
+def test_configured_term_mapping_is_returned_only_as_vocabulary_reference() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
             pass
@@ -3144,7 +3144,8 @@ def test_configured_term_mapping_is_returned_as_request_hard_tag() -> None:
         result = resolver.cached_term_mappings_for_prompt("少女戴着舞会面具")
 
     assert result is not None
-    assert result.confirmed_tags == ("masquerade_mask",)
+    assert result.confirmed_tags == ()
+    assert result.candidate_tags == ("masquerade_mask",)
 
 
 def test_term_mapping_switch_disables_matching_without_deleting_entries() -> None:
@@ -3198,14 +3199,15 @@ def test_configured_term_mapping_ignores_explicitly_negated_occurrence() -> None
         "不要白丝袜，另一名少女穿白丝袜"
     )
     assert positive is not None
-    assert positive.confirmed_tags == ("white_pantyhose",)
+    assert positive.confirmed_tags == ()
+    assert positive.candidate_tags == ("white_pantyhose",)
     assert resolver.matched_term_mappings_for_prompt(
         "不要白丝袜，另一名少女穿白丝袜"
     ) == (("白丝袜", "white_pantyhose"),)
     assert resolver.cached_term_mappings_for_prompt("not a mask") is None
     kimono = resolver.cached_term_mappings_for_prompt("kimono mask")
     assert kimono is not None
-    assert kimono.confirmed_tags == ("masquerade_mask",)
+    assert kimono.candidate_tags == ("masquerade_mask",)
 
 
 def test_configured_term_mapping_prefers_longest_alias_per_occurrence() -> None:

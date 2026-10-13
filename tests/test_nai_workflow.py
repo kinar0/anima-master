@@ -26,6 +26,35 @@ from nai_character_mode import (  # noqa: E402
 )
 
 
+def test_nai_writer_contract_separates_counts_and_allows_original_chinese() -> None:
+    instruction = build_nai_character_plan_prompt(
+        "书生角色甲站立", "角色甲 => character_a",
+        {"width": 832, "height": 1216, "aspect_ratio": "13:19", "orientation": "portrait"},
+    )
+    assert "unnumbered gender tag girl, boy, or other" in instruction
+    assert "Ngirls, Mboys for a mixed group" in instruction
+    assert "do not infer a gender change from titles" in instruction
+    assert "retain the user's original Chinese" in instruction
+    assert "source_text must quote the original request in its original language" in instruction
+    assert "Write all prompt strings in English" not in instruction
+    assert "artist tags, quality" not in instruction
+
+
+@pytest.mark.parametrize("tag,expected", [("1girl", "girl"), ("1boy", "boy"), ("2girls", "girl"), ("1person", "other")])
+def test_nai_instance_population_tags_are_normalized_keeping_chinese_content(tag, expected):
+    raw = json.dumps({
+        "composition_analysis": {"viewpoint": "正面", "layout": "中央", "relations": "单人"},
+        "global_prompt": "1girl, 白色背景",
+        "characters": [{"name": "character_a", "source_text": "角色甲身穿道袍",
+                        "prompt": tag + ", 身穿道袍，抬手作揖", "position_reason": "位于中央", "x": .5, "y": .5}],
+    }, ensure_ascii=False)
+    parsed = parse_nai_character_plan(raw)
+    character = parsed["characters"][0]
+    assert character["prompt"] == "character_a, " + expected + ", 身穿道袍, 抬手作揖"
+    assert character["source_text"] == "角色甲身穿道袍"
+    assert parsed["global_prompt"] == "1girl, 白色背景"
+
+
 def test_nai_noun_coverage_diagnostic_tracks_standalone_character_scope() -> None:
     canvas = {"width": 1024, "height": 1536, "aspect_ratio": "2:3", "orientation": "portrait"}
     instruction = build_nai_character_plan_prompt(
@@ -224,6 +253,33 @@ def test_nai_r_switch_and_repeated_character_instances(tmp_path):
     first = result[selector["character1"][0]]["inputs"]["comfyui_prompt"]
     second = result[selector["character2"][0]]["inputs"]["comfyui_prompt"]
     assert "school uniform" in first and "evening dress" in second
+    assert result[selector_id]["class_type"] == "CharacterPromptSelect"
+    converter_ids = []
+    for index in (1, 2):
+        link = selector[f"character{index}"]
+        assert link[1] == 0
+        assert result[link[0]]["class_type"] == "ComfyUIToNovelAIV4"
+        converter_ids.append(link[0])
+    assert len(set(converter_ids)) == 2
+    assert selector["character3"] == ""
+
+
+def test_character_conversion_keeps_weight_escape_prose_and_direction_inputs():
+    characters = [
+        {"name": "A", "prompt": r"girl, character \(series\), (pink hair:1.2), source#hug, holding B gently", "x": .2, "y": .4},
+        {"name": "B", "prompt": r"girl, (blue hair:0.9), target#hug, leaning against A", "x": .8, "y": .6},
+    ]
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, "2girls", "blurry",
+        1024, 1536, 28, 6, 123, nai_characters=characters,
+    )
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    for index, character in enumerate(characters, 1):
+        node_id, port = selector[f"character{index}"]
+        assert port == 0 and graph[node_id]["class_type"] == "ComfyUIToNovelAIV4"
+        assert graph[node_id]["inputs"]["comfyui_prompt"] == character["prompt"]
+        assert selector[f"character{index}_x"] == character["x"]
+        assert selector[f"character{index}_y"] == character["y"]
 
 
 def test_nai_directional_action_tags_reach_the_correct_character_boxes():

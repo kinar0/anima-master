@@ -7,8 +7,10 @@ from typing import Any
 
 try:
     from .tag_cleaner import join_prompt_parts, normalize_tag_key, split_tags
+    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from tag_cleaner import join_prompt_parts, normalize_tag_key, split_tags
+    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 
 
 @dataclass(frozen=True)
@@ -32,7 +34,8 @@ class PromptConstraintResult:
 
 
 def build_constraint_plan_prompt(
-    user_prompt: str, llm_content: str, fixed_character_name: str = ""
+    user_prompt: str, llm_content: str, fixed_character_name: str = "",
+    *, visible_character_context: str = "",
 ) -> str:
     """Build the LLM request for a low-CFG prompt constraint plan.
 
@@ -58,6 +61,7 @@ Your job is to inspect the user's original request and the candidate Danbooru-st
 Do not use generic keyword matching. Reason from the user's intent.
 Do not invent a new scene. Only preserve constraints that are explicitly requested or directly necessary for the requested action/object relationship.
 {fixed_note}
+{APPEARANCE_VISIBILITY_POLICY}
 
 Return JSON only, with this exact shape:
 {{
@@ -83,6 +87,9 @@ User request:
 
 Candidate tags:
 {llm_content}
+
+Final character descriptions (visibility context, not extra priority tags):
+{visible_character_context}
 """
 
 

@@ -1,0 +1,20 @@
+{
+  "config_entire_file_unchanged": true,
+  "original_mappings_snapshot_unchanged": true,
+  "evaluation_unchanged": true,
+  "existing_files_checked": 164,
+  "existing_files_changed": [
+    "tests/test_prompt_direct_writer.py",
+    "multi_person_prompt.py",
+    "nai_character_mode.py",
+    "prompt_constraints.py",
+    "prompt_pipeline.py",
+    "prompt_templates.py",
+    "tests/test_multi_person_prompt.py",
+    "tests/test_nai_workflow.py",
+    "tests/test_prompt_strategy.py"
+  ],
+  "candidate_applied": false,
+  "runtime_sync": "unknown; no reload/restart/UI operation",
+  "evaluated_matcher_unchanged": true
+}

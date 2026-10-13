@@ -689,9 +689,9 @@ def test_prompt_pipeline_uses_default_creative_generation():
     )
 
     assert result.summary.get("danbooru_fast_path") is not True
-    assert result.summary["llm_content_tag_count"] == 56
-    assert result.summary["background_mode"] == "default_portrait"
-    assert "white background" in result.final_prompt
+    assert result.summary["llm_content_tag_count"] == 52
+    assert result.summary["background_mode"] == "unresolved"
+    assert "white background" not in result.final_prompt
     assert len(context.calls) == 2
     assert "只输出七个单行花括号字段" in context.calls[0]["prompt"]
     assert "wardrobe.kind" not in context.calls[0]["prompt"]
@@ -1523,7 +1523,7 @@ def test_raw_prompt_regex_does_not_unlock_identity_dimensions() -> None:
     assert "twin drills" not in merged
     assert "grey_eyes" in merged
     assert "yellow eyes" not in merged
-    assert "flat_chest" in merged
+    assert "flat_chest" not in merged  # Writer did not express this dimension.
 
 
 def test_identity_merge_preserves_mixed_is_predicate_grammar() -> None:
@@ -1535,8 +1535,7 @@ def test_identity_merge_preserves_mixed_is_predicate_grammar() -> None:
     )
 
     assert merged == (
-        "chihaya_anon is a loli and has pink hair, grey eyes, long_hair, "
-        "flat_chest"
+        "chihaya_anon is a loli and has pink hair, grey eyes"
     )
     assert "has is a loli" not in merged
 
@@ -1625,8 +1624,8 @@ def test_heterochromia_does_not_prescribe_or_remove_one_eye_colour() -> None:
 
     assert dimensions == frozenset()
     assert "heterochromia" in merged
-    assert "grey_eyes" in merged
-    assert "pink_hair" in merged
+    assert "grey_eyes" not in merged  # Do not prescribe a missing colour.
+    assert "pink_hair" not in merged
 
 
 def test_llm1_appearance_hint_allows_llm2_eye_detail_without_deleting_profile() -> None:
@@ -1641,7 +1640,7 @@ def test_llm1_appearance_hint_allows_llm2_eye_detail_without_deleting_profile() 
     assert "golden eye" in merged
     assert "grey eye" in merged
     assert "grey_eyes" not in merged
-    assert "pink_hair" in merged
+    assert "pink_hair" not in merged
 
 
 def test_identity_merge_keeps_stable_dimensions_and_additive_dyed_eye_colour() -> None:
@@ -1661,7 +1660,7 @@ def test_identity_merge_keeps_stable_dimensions_and_additive_dyed_eye_colour() -
     assert "yellow eyes" in merged
     assert "pink eyes" in merged
     assert "huge breasts" in merged
-    assert "hair_ornament" in merged
+    assert "hair_ornament" not in merged
     assert "small_breasts" not in merged
     assert "green_hair" not in merged
     assert "yellow_eyes" not in merged
@@ -1712,7 +1711,7 @@ def test_identity_merge_preserves_writer_profile_facts_instead_of_blindly_append
 
     assert "long green hair" in merged
     assert "yellow eyes" in merged
-    assert "hair_ornament" in merged
+    assert "hair_ornament" not in merged
     assert "green_hair" not in merged
     assert "yellow_eyes" not in merged
 
@@ -3989,7 +3988,7 @@ def test_pipeline_binds_natural_stage_request_to_character_stage_profile() -> No
     assert "haneoka_school_uniform" not in context.calls[1]["prompt"]
     writer_prompt = context.calls[1]["prompt"]
     assert "本地角色身份/稳定外貌" not in writer_prompt
-    assert writer_prompt.count("Stable appearance by wearer") == 1
+    assert writer_prompt.count("Stable appearance facts by wearer") == 1
     assert "confirmed hard tags: chihaya_anon" not in writer_prompt
 
 
@@ -4008,7 +4007,7 @@ def test_nai_position_planner_console_trace_follows_prompt_debug_switch() -> Non
 
     class _Context:
         def __init__(self, plan_output):
-            self.outputs = [writer, plan_output]
+            self.outputs = [plan_output]
 
         async def get_current_chat_provider_id(self, _umo):
             return "provider"
@@ -4064,19 +4063,19 @@ def test_nai_position_planner_console_trace_follows_prompt_debug_switch() -> Non
 
     assert enabled_result.summary["nai_character_count"] == 1
     assert enabled_result.summary["nai_character_plan_raw"] == plan
-    assert enabled_result.final_prompt == "1girl, white background"
+    assert "1girl, white background" in enabled_result.final_prompt
     assert enabled_result.summary["nai_dropped_global_character_tags"] == [
         "looking at viewer"
     ]
-    assert any("NAI -r position planner prompt" in line for line in enabled_log)
-    assert any("NAI -r position planner raw output" in line for line in enabled_log)
+    assert any("NAI -r direct writer prompt" in line for line in enabled_log)
+    assert any("NAI -r direct writer raw output" in line for line in enabled_log)
     assert any("center of canvas" in line for line in enabled_log)
     assert disabled_result.summary["nai_character_count"] == 1
     assert "nai_character_plan_raw" not in disabled_result.summary
-    assert not any("NAI -r position planner" in line for line in disabled_log)
+    assert not any("NAI -r direct writer" in line for line in disabled_log)
     assert failed_result.summary["skipped_reason"] == "nai_character_plan_failed"
     assert failed_result.summary["nai_character_plan_raw"] == "not json"
-    assert any("NAI -r position planner failed" in line for line in failed_log)
+    assert any("NAI -r direct writer failed" in line for line in failed_log)
 
 
 @pytest.mark.parametrize("alias,tag,character_prompt,global_prompt,character_count,invalid", [
@@ -4109,7 +4108,7 @@ def test_nai_r_noun_coverage_never_retries_or_blocks_valid_layout(
 
     class _Context:
         def __init__(self):
-            self.outputs = [writer, "not json" if invalid else layout]
+            self.outputs = ["not json" if invalid else layout]
             self.prompts = []
 
         async def get_current_chat_provider_id(self, _umo):
@@ -4171,14 +4170,14 @@ def test_nai_r_noun_coverage_never_retries_or_blocks_valid_layout(
     event = type("_Event", (), {"unified_msg_origin": "session"})()
     result = asyncio.run(pipeline.build(event, f"-r {alias}女孩站立"))
 
-    assert len(context.prompts) == 2
+    assert len(context.prompts) == 1
     if not mapping_enabled:
         assert "本地名词翻译" not in context.prompts[0]
-        assert f"{alias} => {tag}" not in context.prompts[1]
+        assert f"{alias} => {tag}" not in context.prompts[0]
         assert result.summary["danbooru_explicit_term_tags"] == []
     else:
-        assert f"{alias} => {tag}" in context.prompts[1]
-        assert "not a required tag checklist" in context.prompts[1]
+        assert f"{alias} => {tag}" in context.prompts[0]
+        assert "not a required tag checklist" in context.prompts[0]
     if invalid:
         assert result.final_prompt == ""
         assert result.summary["skipped_reason"] == "nai_character_plan_failed"
@@ -4220,7 +4219,7 @@ def test_nai_r_accepts_noun_mapping_preserved_as_directional_action() -> None:
 
     class _Context:
         def __init__(self):
-            self.outputs = [writer, layout]
+            self.outputs = [layout]
             self.prompts = []
 
         async def get_current_chat_provider_id(self, _umo):
@@ -4276,10 +4275,10 @@ def test_nai_r_accepts_noun_mapping_preserved_as_directional_action() -> None:
     event = type("_Event", (), {"unified_msg_origin": "session"})()
     result = asyncio.run(pipeline.build(event, "-r 两个女孩在深海底十指相扣"))
 
-    assert result.final_prompt == "2girls, underwater"
+    assert "2girls, underwater" in result.final_prompt
     assert result.summary["nai_character_count"] == 2
-    assert len(context.prompts) == 2
-    assert "十指相扣 => interlocked_fingers" in context.prompts[1]
+    assert len(context.prompts) == 1
+    assert "十指相扣 => interlocked_fingers" in context.prompts[0]
     assert "source#interlocked_fingers" in result.summary["nai_characters"][0]["prompt"]
     assert "target#interlocked_fingers" in result.summary["nai_characters"][1]["prompt"]
 
@@ -5044,7 +5043,7 @@ def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
     ],
 )
 @pytest.mark.parametrize("mapping_enabled", [True, False])
-def test_noun_translations_reach_writer_and_fill_missing_tags_during_outfit_transfer(
+def test_noun_translations_reach_writer_without_forcing_output_during_outfit_transfer(
     writer_tags: str, fallback_tags: list[str], mapping_enabled: bool,
 ) -> None:
     class _Response:
@@ -5216,20 +5215,18 @@ def test_noun_translations_reach_writer_and_fill_missing_tags_during_outfit_tran
     assert result.summary["danbooru_explicit_term_tags"] == (
         ["tutu", "white_pantyhose", "large_breasts"] if mapping_enabled else []
     )
-    assert result.summary["danbooru_term_fallback_tags"] == (
-        fallback_tags if mapping_enabled else []
-    )
+    assert result.summary["danbooru_term_fallback_tags"] == []
     writer_prompt = context.calls[-1]["prompt"]
     assert ("本地名词翻译" in writer_prompt) is mapping_enabled
     assert ("芭蕾舞裙 => tutu" in writer_prompt) is mapping_enabled
     assert ("白丝袜 => white_pantyhose" in writer_prompt) is mapping_enabled
     assert ("巨乳 => large_breasts" in writer_prompt) is mapping_enabled
     assert ("tutu" in result.final_prompt) is (
-        mapping_enabled or "tutu" in writer_tags
+        "tutu" in writer_tags
     )
     assert "white pantyhose" in result.final_prompt
     assert ("large breasts" in result.final_prompt) is (
-        mapping_enabled or "large_breasts" in writer_tags
+        "large_breasts" in writer_tags
     )
 
 

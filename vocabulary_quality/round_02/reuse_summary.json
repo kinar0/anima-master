@@ -1,0 +1,22 @@
+{
+  "selected_concepts": 1759,
+  "focus_concepts": 48,
+  "with_gloss": 1642,
+  "alias_proposals": 5926,
+  "ambiguous_alias_occurrences": 1892,
+  "source": {
+    "version": "0.9.8",
+    "upstream": "https://github.com/sadlywish/llm-nai-toolbox",
+    "notice": "third_party/llm_nai_toolbox/NOTICE.md",
+    "sha256": {
+      "tags_index_v2.json": "9f65b55527f4e219d8e41f41dc3f9c717774539d7c473552ffcc15250d35466f",
+      "tag_gloss.json": "77ad49e97fe04241b7d930a77c2319350a0ff278d4751331b2a793c6ac73cf87",
+      "tag_browse.json": "4f90a3608afa494025cc783510d4752c5ead52da5eb7360b1c210dfa379a46ca"
+    },
+    "scope": "当前词库、首轮缺口与相邻歧义概念；维护材料，不参与运行匹配"
+  },
+  "catalog_sha256": "dd67d5dcea56f055d77008a153d172984b02546acdba2fba51a36c0f2bcf4fef",
+  "applied": false,
+  "local_exact_concepts": 1659,
+  "local_missing_concepts": 100
+}

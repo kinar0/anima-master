@@ -1,0 +1,7 @@
+{
+  "sha256": "41b2c566dcc64c92eefc7f3d3cd99eee4fddda4a3ae573508574128bb45bb06d",
+  "order": "evaluation frozen before candidates; acceptance is reporting-only",
+  "sample_count": 132,
+  "acceptance_count": 36,
+  "source": "all synthetic; one semantic judgement incorporates user clarification about aftersex"
+}

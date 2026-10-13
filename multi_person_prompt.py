@@ -5,6 +5,11 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+try:
+    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
+except ImportError:  # Direct script-style imports.
+    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
+
 
 @dataclass(frozen=True)
 class MultiPersonCharacter:
@@ -118,6 +123,7 @@ For an existing named character, preserve the user's written name in "name" and 
 When a person matches one of the locally saved characters below, their saved tags are authoritative. Leave "appearance" empty and do not restate or alter their hair, eyes, species, ears, tail, body type, age, or fixed accessories. Only plan mutable clothing, expression, pose, and props.
 
 Return JSON only with this exact shape:
+{APPEARANCE_VISIBILITY_POLICY}
 {{
   "count_tags": ["2girls"],
   "common_tags": ["medium shot", "outdoors"],
@@ -165,7 +171,7 @@ Rules:
 - Do not put character names or character-specific appearance in common_tags.
 - role is optional semantic bookkeeping and is not used to identify a person in the final interaction sentence.
 - visual_label must be a unique 2 to 6 word visible description derived from identity_anchors, such as "white-haired fox girl" or "silver-haired vampire girl". Do not use names, ordinal labels, rider, supporter, top, bottom, left, or right as visual_label.
-- identity_anchors must contain only 3 to 6 concise visible identity traits. For locally saved characters, select them only from the saved defining tags.
+- identity_anchors must contain at most 6 concise visible identity traits, or be empty when no defining trait is visible. For locally saved characters, select them only from the saved defining tags; they are facts, not a mandatory checklist.
 - emphasized_anchors may contain at most 3 identity_anchors that the user explicitly requested and that are unusual, contrastive, or likely to be confused between people. Never invent emphasis.
 - For locally saved characters, appearance must be empty and saved defining tags must never be contradicted.
 - Do not output quality tags, safety tags, artist tags, Markdown, or explanations.
@@ -322,10 +328,6 @@ def render_multi_person_character(
         details.append(identity)
     if identity_anchors:
         details.extend(identity_anchors)
-    elif fixed_tags:
-        details.extend(
-            part.strip(" ()") for part in fixed_tags.split(",") if part.strip(" ()")
-        )
     if not identity_anchors and not fixed_tags and character.appearance:
         details.append(character.appearance)
     if character.clothing:

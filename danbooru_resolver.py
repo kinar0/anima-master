@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .term_match_context import TermMatchContext
+    from .mapping_syntax import parse_mapping_entry
     from .danbooru_tags import (
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
@@ -31,6 +33,8 @@ try:
         resolve_local_cli_path,
     )
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from term_match_context import TermMatchContext
+    from mapping_syntax import parse_mapping_entry
     from danbooru_tags import (
         DEFAULT_DONMAI_BASE_URLS,
         DEFAULT_USER_AGENT,
@@ -103,6 +107,9 @@ class DanbooruResolver:
         self._config = dict(config or {})
         self._profile_cache_path = profile_cache_path
         self._profile_cache_data: dict[str, Any] | None = None
+        self._term_match_snapshot: Any = None
+        self._term_match_mappings: dict[str, str] = {}
+        self._term_match_initials: dict[str, list[str]] = {}
 
     @staticmethod
     def _profile_alias_key(value: str) -> str:
@@ -1268,12 +1275,9 @@ class DanbooruResolver:
             )
         elif isinstance(configured, (list, tuple)):
             for item in configured:
-                match = re.fullmatch(
-                    r"\s*(.+?)\s*(?:=>|=|＝|→|：|:)\s*(.+?)\s*",
-                    str(item or ""),
-                )
-                if match:
-                    raw_pairs.append((match.group(1), match.group(2)))
+                pair = parse_mapping_entry(item)
+                if pair:
+                    raw_pairs.append(pair)
         groups: list[tuple[str, str, list[str]]] = []
         for raw_aliases, raw_tag in raw_pairs:
             tag = str(raw_tag or "").strip().lower().replace(" ", "_")
@@ -1298,12 +1302,9 @@ class DanbooruResolver:
             pairs.extend(configured.items())
         elif isinstance(configured, (list, tuple)):
             for item in configured:
-                match = re.fullmatch(
-                    r"\s*(.+?)\s*(?:=>|=|＝|→|：|:)\s*(.+?)\s*",
-                    str(item or ""),
-                )
-                if match:
-                    pairs.append((match.group(1), match.group(2)))
+                pair = parse_mapping_entry(item)
+                if pair:
+                    pairs.append(pair)
         mappings: dict[str, str] = {}
         for raw_alias, raw_tag in pairs:
             alias = str(raw_alias or "").strip().lower()
@@ -1455,13 +1456,29 @@ class DanbooruResolver:
         """Return positive mappings, preferring the longest overlapping alias."""
         if not self._config.get("danbooru_term_mappings_enabled", True):
             return ()
-        text = str(user_prompt or "").lower()
-        mappings = self._configured_mappings("danbooru_term_mappings")
+        text = self._profile_alias_key(re.sub(r"\r\n?|\n", "；", str(user_prompt or "")))
+        context = TermMatchContext(text)
+        raw = self._config.get("danbooru_term_mappings", [])
+        snapshot = tuple(raw.items()) if isinstance(raw, dict) else tuple(raw or ())
+        if snapshot != self._term_match_snapshot:
+            mappings = self._configured_mappings("danbooru_term_mappings")
+            initials: dict[str, list[str]] = {}
+            for alias in mappings:
+                normalized = self._profile_alias_key(alias)
+                initials.setdefault(normalized[0], []).append(alias)
+            self._term_match_snapshot = snapshot
+            self._term_match_mappings = mappings
+            self._term_match_initials = initials
+        mappings = self._term_match_mappings
+        possible = {
+            alias for char in set(self._profile_alias_key(text))
+            for alias in self._term_match_initials.get(char, ())
+        }
         occurrences = [
             (start, end, alias, tag)
-            for alias, tag in mappings.items()
+            for alias in possible
+            for tag in (mappings[alias],)
             for start, end in self._alias_match_spans(text, alias)
-            if not self._mapping_alias_is_negated(text, start)
         ]
         selected: list[tuple[int, int, str, str]] = []
         for occurrence in sorted(
@@ -1471,22 +1488,25 @@ class DanbooruResolver:
             if not any(start < kept_end and kept_start < end
                        for kept_start, kept_end, _name, _value in selected):
                 selected.append(occurrence)
-        matched_aliases = {alias for _start, _end, alias, _tag in selected}
+        # Decide overlap before polarity: suppressing a long negative alias
+        # must not expose a misleading short alias inside the same occurrence.
+        matched_aliases = {alias for start, end, alias, _tag in selected
+                           if not context.suppressed(start, end)}
         return tuple((alias, tag) for alias, tag in mappings.items()
                      if alias in matched_aliases)
 
     def cached_term_mappings_for_prompt(
         self, user_prompt: str
     ) -> SemanticLookupResult | None:
-        """Return user-trusted noun translations explicitly present in a request."""
+        """Return vocabulary references; a match does not establish visual facts."""
         matched = tuple(dict.fromkeys(
             tag for _alias, tag in self.matched_term_mappings_for_prompt(user_prompt)
         ))
         if not matched:
             return None
         return SemanticLookupResult(
-            confirmed_tags=matched,
-            status="profile_cache",
+            candidate_tags=matched,
+            status="vocabulary_reference",
         )
 
     @staticmethod
