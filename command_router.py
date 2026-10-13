@@ -169,6 +169,24 @@ def parse_hard_route(text: str) -> tuple[str, str] | None:
         if not rest:
             return "help", ""
         rest_lower = rest.lower()
+        # Administrative commands must be recognized before the /anm fallback,
+        # which otherwise treats every unknown suffix as an image prompt.
+        for keyword, action in (
+            ("term_preview", "term_preview"),
+            ("名词翻译预览", "term_preview"),
+            ("term_translate", "term_translate"),
+            ("批量名词翻译", "term_translate"),
+            ("term_verify", "term_verify"),
+            ("名词翻译审核", "term_verify"),
+            ("term_import", "term_import"),
+            ("名词翻译导入", "term_import"),
+        ):
+            if not rest_lower.startswith(keyword.lower()):
+                continue
+            remainder = rest[len(keyword):]
+            if remainder and remainder[0] not in " \t\r\n，,：:":
+                continue
+            return action, remainder.strip(" ，,：:")
         action_map = [
             ("help", "help"),
             ("帮助", "help"),

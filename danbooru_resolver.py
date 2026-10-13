@@ -1449,23 +1449,39 @@ class DanbooruResolver:
             )
         return tuple(anchors)
 
+    def matched_term_mappings_for_prompt(
+        self, user_prompt: str
+    ) -> tuple[tuple[str, str], ...]:
+        """Return positive mappings, preferring the longest overlapping alias."""
+        if not self._config.get("danbooru_term_mappings_enabled", True):
+            return ()
+        text = str(user_prompt or "").lower()
+        mappings = self._configured_mappings("danbooru_term_mappings")
+        occurrences = [
+            (start, end, alias, tag)
+            for alias, tag in mappings.items()
+            for start, end in self._alias_match_spans(text, alias)
+            if not self._mapping_alias_is_negated(text, start)
+        ]
+        selected: list[tuple[int, int, str, str]] = []
+        for occurrence in sorted(
+            occurrences, key=lambda item: (-(item[1] - item[0]), item[0], item[2])
+        ):
+            start, end, _alias, _tag = occurrence
+            if not any(start < kept_end and kept_start < end
+                       for kept_start, kept_end, _name, _value in selected):
+                selected.append(occurrence)
+        matched_aliases = {alias for _start, _end, alias, _tag in selected}
+        return tuple((alias, tag) for alias, tag in mappings.items()
+                     if alias in matched_aliases)
+
     def cached_term_mappings_for_prompt(
         self, user_prompt: str
     ) -> SemanticLookupResult | None:
         """Return user-trusted noun translations explicitly present in a request."""
-        text = str(user_prompt or "").lower()
-        matched = tuple(
-            dict.fromkeys(
-                tag
-                for alias, tag in self._configured_mappings(
-                    "danbooru_term_mappings"
-                ).items()
-                if any(
-                    not self._mapping_alias_is_negated(text, start)
-                    for start, _end in self._alias_match_spans(text, alias)
-                )
-            )
-        )
+        matched = tuple(dict.fromkeys(
+            tag for _alias, tag in self.matched_term_mappings_for_prompt(user_prompt)
+        ))
         if not matched:
             return None
         return SemanticLookupResult(
@@ -1636,8 +1652,13 @@ class DanbooruResolver:
         raw_terms = payload.get("terms")
         if not all(isinstance(value, list) for value in (raw_outfits, raw_sets, raw_terms)):
             raise WardrobeValidationError("服装词库列表格式无效。")
-        if len(raw_outfits) > 300 or len(raw_sets) > 500 or len(raw_terms) > 500:
-            raise WardrobeValidationError("服装词库条目数量过多。")
+        if len(raw_outfits) > 300:
+            raise WardrobeValidationError("角色衣柜条目不能超过 300 条。")
+        if len(raw_sets) > 500:
+            raise WardrobeValidationError("通用套组条目不能超过 500 条。")
+        # The paged editor supports larger catalogs without mounting every row.
+        if len(raw_terms) > 50000:
+            raise WardrobeValidationError("名词翻译条目不能超过 50000 条。")
 
         old_profiles = self._profile_data().get("profiles", {})
         new_profiles: dict[str, Any] = {}

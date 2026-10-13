@@ -31,6 +31,11 @@ const elements = {
 let state = { revision: "", outfits: [], outfitSets: [], terms: [], tab: "outfits", search: "", outfitSort: "added_desc", dirty: false, busy: false };
 let pristine = null;
 let toastTimer = null;
+let indexedView = null;
+const pagination = new window.WardrobePagination(
+  [$("#library-pagination-top"), $("#library-pagination-bottom")],
+  () => { render(); $("#library-pagination-top").scrollIntoView({ block: "start" }); },
+);
 
 const clone = (value) => typeof structuredClone === "function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));
 const splitList = (value) => [...new Set(String(value || "").split(/[,，\n]+/).map((item) => item.trim()).filter(Boolean))];
@@ -44,7 +49,7 @@ function showToast(message) { clearTimeout(toastTimer); elements.toast.textConte
 function errorText(error) { return error instanceof Error ? error.message : String(error); }
 function setBusy(value) { state.busy = value; elements.refresh.disabled = value; elements.add.disabled = value; updateDirty(); }
 function updateDirty() { const disabled = state.busy || !state.dirty; elements.save.disabled = disabled; elements.dirtySave.disabled = disabled; elements.dirtyBar.hidden = !state.dirty; elements.dataStatus.textContent = state.dirty ? "待保存" : "已同步"; }
-function markDirty() { state.dirty = true; updateDirty(); renderCounts(); }
+function markDirty() { state.dirty = true; indexedView = null; updateDirty(); renderCounts(); }
 function inputField(label, value, onInput, { textarea = false, placeholder = "", className = "" } = {}) {
   const wrap = node("div", `field ${className}`); const caption = node("label", "", label); const control = node(textarea ? "textarea" : "input"); control.value = value || ""; control.placeholder = placeholder; control.addEventListener("input", () => { onInput(control.value); markDirty(); }); wrap.append(caption, control); return wrap;
 }
@@ -81,18 +86,27 @@ function renderCounts() {
   const counts = { outfits: state.outfits.length, outfitSets: state.outfitSets.length, terms: state.terms.length };
   $("#outfit-count").textContent = counts.outfits; $("#set-count").textContent = counts.outfitSets; $("#term-count").textContent = counts.terms; $("#outfit-badge").textContent = counts.outfits; $("#set-badge").textContent = counts.outfitSets; $("#term-badge").textContent = counts.terms;
 }
-function render() {
-  const meta = META[state.tab]; elements.sectionKicker.textContent = meta.kicker; elements.sectionTitle.textContent = meta.title; elements.sectionDescription.textContent = meta.description;
-  elements.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === state.tab)); elements.sortControl.hidden = state.tab !== "outfits"; elements.list.replaceChildren();
+function visibleEntries() {
+  if (indexedView) return indexedView;
   const indexed = state[state.tab].map((item, index) => ({ item, index })).filter(({ item }) => matches(item));
   if (state.tab === "outfits") {
     const direction = state.outfitSort === "added_asc" ? 1 : -1;
     indexed.sort((left, right) => direction * (addedAt(left.item) - addedAt(right.item)) || left.index - right.index);
   }
-  indexed.forEach(({ item, index }) => elements.list.append(state.tab === "outfits" ? outfitEntry(item, index) : mappingEntry(item, index, state.tab === "outfitSets")));
+  indexedView = indexed;
+  return indexed;
+}
+function render() {
+  const meta = META[state.tab]; elements.sectionKicker.textContent = meta.kicker; elements.sectionTitle.textContent = meta.title; elements.sectionDescription.textContent = meta.description;
+  elements.tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.tab === state.tab)); elements.sortControl.hidden = state.tab !== "outfits"; elements.list.replaceChildren();
+  const indexed = visibleEntries();
+  pagination.scope = state.tab;
+  const { start, end } = pagination.update(indexed.length, state[state.tab].length);
+  indexed.slice(start, end).forEach(({ item, index }) => elements.list.append(state.tab === "outfits" ? outfitEntry(item, index) : mappingEntry(item, index, state.tab === "outfitSets")));
   elements.empty.hidden = indexed.length > 0; renderCounts(); updateDirty();
 }
 function hydrate(data) {
+  indexedView = null;
   state.revision = data.revision || ""; state.outfits = clone(data.outfits || []); state.outfitSets = clone(data.outfitSets || []); state.terms = clone(data.terms || []); state.dirty = false; pristine = clone({ revision: state.revision, outfits: state.outfits, outfitSets: state.outfitSets, terms: state.terms }); elements.revision.textContent = `revision ${state.revision.slice(0, 9) || "—"}`; render();
 }
 async function load() { setBusy(true); try { hydrate(await bridge.apiGet("wardrobe")); elements.connection.classList.add("is-ready"); elements.connection.querySelector("span").textContent = "已连接"; } catch (error) { showToast(`读取失败：${errorText(error)}`); elements.connection.querySelector("span").textContent = "连接失败"; } finally { setBusy(false); } }
@@ -118,11 +132,23 @@ async function save() {
     setBusy(false);
   }
 }
-function addEntry() { if (state.tab === "outfits") state.outfits.unshift({ key: "新角色服装档案", aliases: ["服装别名"], sourceTags: [], ownerTags: [], tags: [], appearanceTags: [], qualifier: "default", evidence: {} }); else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新通用服装套组", aliases: ["新通用服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", componentTags: [], variant: "default", origin: "learned", profileKey: `manual_named_${Date.now()}` }); else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" }); markDirty(); render(); }
+function addEntry() {
+  if (state.tab === "outfits") state.outfits.unshift({ key: "新角色服装档案", aliases: ["服装别名"], sourceTags: [], ownerTags: [], tags: [], appearanceTags: [], qualifier: "default", evidence: {} });
+  else if (state.tab === "outfitSets") state.outfitSets.unshift({ alias: "新通用服装套组", aliases: ["新通用服装套组", "canonical outfit tag"], tag: "canonical_outfit_tag", componentTags: [], variant: "default", origin: "learned", profileKey: `manual_named_${Date.now()}` });
+  else state.terms.unshift({ alias: "新名词", tag: "canonical_tag" });
+  state.search = ""; elements.search.value = "";
+  markDirty();
+  const position = visibleEntries().findIndex(({ index }) => index === 0);
+  pagination.current.page = Math.floor(position / pagination.current.size) + 1;
+  render();
+  const card = elements.list.children[position % pagination.current.size];
+  card?.scrollIntoView({ block: "nearest" });
+  card?.querySelector("input, textarea")?.focus();
+}
 
-elements.tabs.forEach((tab) => tab.addEventListener("click", () => { state.tab = tab.dataset.tab; render(); }));
-elements.sort.addEventListener("change", () => { state.outfitSort = elements.sort.value; render(); });
-elements.search.addEventListener("input", () => { state.search = elements.search.value.trim(); render(); }); elements.add.addEventListener("click", addEntry); elements.save.addEventListener("click", save); elements.dirtySave.addEventListener("click", save); elements.refresh.addEventListener("click", load); elements.discard.addEventListener("click", () => pristine && hydrate(pristine));
+elements.tabs.forEach((tab) => tab.addEventListener("click", () => { if (state.tab === tab.dataset.tab) return; state.tab = tab.dataset.tab; indexedView = null; render(); }));
+elements.sort.addEventListener("change", () => { state.outfitSort = elements.sort.value; indexedView = null; pagination.reset(); render(); });
+elements.search.addEventListener("input", () => { state.search = elements.search.value.trim(); indexedView = null; pagination.scopes.forEach((value) => value.page = 1); render(); }); elements.add.addEventListener("click", addEntry); elements.save.addEventListener("click", save); elements.dirtySave.addEventListener("click", save); elements.refresh.addEventListener("click", load); elements.discard.addEventListener("click", () => pristine && hydrate(pristine));
 window.addEventListener("keydown", (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); save(); } }); window.addEventListener("beforeunload", (event) => { if (state.dirty) { event.preventDefault(); event.returnValue = ""; } });
 
 async function initialize() { await bridge.ready(); document.documentElement.dataset.theme = bridge.getTheme?.() || new URLSearchParams(location.search).get("theme") || "light"; bridge.onContext?.(() => { document.documentElement.dataset.theme = bridge.getTheme?.() || "light"; }); await load(); }

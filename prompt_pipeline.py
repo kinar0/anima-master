@@ -37,6 +37,7 @@ try:
     )
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
+        missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
         resolve_nai_canvas,
@@ -127,6 +128,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from nai_character_mode import (
         build_nai_character_plan_prompt,
+        missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
         resolve_nai_canvas,
@@ -5247,8 +5249,13 @@ class PromptPipeline:
         cached_term_getter = getattr(
             self._danbooru_resolver, "cached_term_mappings_for_prompt", None
         )
+        term_mappings_enabled = bool(
+            prompt_config.get("danbooru_term_mappings_enabled", True)
+        )
         cached_term_result = (
-            cached_term_getter(prompt) if callable(cached_term_getter) else None
+            cached_term_getter(prompt)
+            if term_mappings_enabled and callable(cached_term_getter)
+            else None
         )
         explicit_term_tags = tuple(
             dict.fromkeys(
@@ -5256,6 +5263,14 @@ class PromptPipeline:
                 if cached_term_result is not None
                 else ()
             )
+        )
+        matched_term_getter = getattr(
+            self._danbooru_resolver, "matched_term_mappings_for_prompt", None
+        )
+        matched_term_mappings = (
+            tuple(matched_term_getter(prompt))
+            if term_mappings_enabled and callable(matched_term_getter)
+            else ()
         )
         cached_profile_getter = getattr(
             self._danbooru_resolver, "cached_outfit_profiles_for_prompt", None
@@ -5280,7 +5295,6 @@ class PromptPipeline:
             cached_source_result,
             cached_profile_result,
             cached_named_result,
-            cached_term_result,
         )
         semantic_available = getattr(
             self._danbooru_resolver, "semantic_lookup_available", None
@@ -5630,7 +5644,6 @@ class PromptPipeline:
                         cached_source_result,
                         cached_profile_result,
                         cached_named_result,
-                        cached_term_result,
                         resolved_semantic,
                         bound_wardrobe_result,
                     )
@@ -5933,7 +5946,6 @@ class PromptPipeline:
         semantic_required_tags = tuple(
             dict.fromkeys(
                 (
-                    *explicit_term_tags,
                     *semantic_confirmed_tags,
                     *(() if character_effective_outfits else effective_outfit.effective_tags),
                     *(() if character_effective_outfits else semantic_visible_outfit_tags),
@@ -6098,6 +6110,22 @@ class PromptPipeline:
             original_theme=background_intent_prompt,
             keyword_prompt_rules=keyword_rules,
         )
+        if explicit_term_tags:
+            translation_lines = (
+                tuple(
+                    f"- {alias} => {tag}"
+                    for alias, tag in matched_term_mappings
+                    if tag in explicit_term_tags
+                )
+                or tuple(f"- {tag}" for tag in explicit_term_tags)
+            )
+            llm_prompt += (
+                "\n\n本地名词翻译（仅对应用户原文中未被否定的概念）："
+                "\n" + "\n".join(translation_lines)
+                + "\n请按原文决定这些概念属于谁、是否可见。适用时在 Tags 中"
+                "单独写出 canonical tag；人物专属描述仍写在对应人物的"
+                " Identity/Details 中，不要把别人的特征分配给该人物。"
+            )
         allow_futa = has_positive_futa_request(prompt)
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
@@ -6932,6 +6960,31 @@ class PromptPipeline:
             structured_extra_tags = tuple(split_tags(
                 strip_default_portrait_tags(", ".join(structured_extra_tags))
             ))
+        # Noun mappings are writer evidence first. A prose sentence such as
+        # "A has large breasts" does not replace a standalone Danbooru tag.
+        # Add only mappings absent from the actual tag stream after all
+        # wardrobe and appearance filters have run.
+        present_tag_keys = {
+            WardrobeAuthority._key(tag)
+            for tag in (
+                *split_tags(llm_content),
+                *structured_extra_tags,
+                *required_core_tags,
+            )
+        }
+        missing_term_tags = tuple(
+            tag for tag in wardrobe_authority.filter_tags(explicit_term_tags)
+            if WardrobeAuthority._key(tag) not in present_tag_keys
+        )
+        if structured_prompt_mode:
+            structured_extra_tags = tuple(dict.fromkeys(
+                (*structured_extra_tags, *missing_term_tags)
+            ))
+        else:
+            required_core_tags = tuple(dict.fromkeys(
+                (*required_core_tags, *missing_term_tags)
+            ))
+        summary["danbooru_term_fallback_tags"] = list(missing_term_tags)
         built = build_final_prompt(
             user_prompt=prompt,
             llm_content=llm_content,
@@ -7137,8 +7190,16 @@ class PromptPipeline:
                 nai_canvas = resolve_nai_canvas(
                     prompt_config, requested_canvas, explicit_size=canvas_size_explicit
                 )
+                nai_term_tags = wardrobe_authority.filter_tags(explicit_term_tags)
                 plan_prompt = build_nai_character_plan_prompt(
-                    prompt, built.final_prompt, nai_canvas
+                    prompt, built.final_prompt, nai_canvas,
+                    noun_mappings=(
+                        tuple(
+                            (alias, tag) for alias, tag in matched_term_mappings
+                            if tag in nai_term_tags
+                        )
+                        or tuple((tag, tag) for tag in nai_term_tags)
+                    ),
                 )
                 if debug_nai_plan:
                     self.logger.info(
@@ -7168,9 +7229,23 @@ class PromptPipeline:
                         "[comfyui_agent] NAI -r position planner raw output:\n%s",
                         plan_raw,
                     )
+                nai_scoped_term_tags = tuple(
+                    tag for tag in nai_term_tags
+                    if appearance_dimension(tag)
+                    or outfit_tag_slot(tag)
+                    or any(
+                        mapped_tag == tag
+                        and alias
+                        and anchor.role in {"clothing", "outfit"}
+                        and alias.casefold() in anchor.source_text.casefold()
+                        for alias, mapped_tag in matched_term_mappings
+                        for anchor in semantic_anchors
+                    )
+                )
                 nai_plan = parse_nai_character_plan(
                     plan_raw,
                     character_limit=nai_canvas["character_limit"],
+                    character_scoped_tags=nai_scoped_term_tags,
                 )
                 _enforce_nai_appearance_omissions(
                     nai_plan["characters"],
@@ -7198,6 +7273,13 @@ class PromptPipeline:
                         nai_plan["global_prompt"],
                         active_artist_tags(prompt_config, preset_index),
                     )
+                missing_nai_terms = missing_nai_noun_tags(
+                    nai_plan, nai_term_tags,
+                    character_scoped_tags=nai_scoped_term_tags,
+                )
+                # Vocabulary coverage is diagnostic, not layout validity. Do
+                # not rewrite a usable plan or guess ownership to fill a tag.
+                summary["nai_missing_noun_tags"] = list(missing_nai_terms)
             except Exception as exc:
                 summary.update(
                     skipped_reason="nai_character_plan_failed", llm_error=str(exc)

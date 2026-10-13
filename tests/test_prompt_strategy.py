@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -4078,6 +4079,211 @@ def test_nai_position_planner_console_trace_follows_prompt_debug_switch() -> Non
     assert any("NAI -r position planner failed" in line for line in failed_log)
 
 
+@pytest.mark.parametrize("alias,tag,character_prompt,global_prompt,character_count,invalid", [
+    ("爱心", "heart", "girl, standing", "1girl, white background", 1, False),
+    ("闪光", "sparkles", "girl, standing", "2girls, garden", 2, False),
+    ("印花裙", "patterned_dress", "girl wearing a patterned dress", "2girls, garden", 2, False),
+    ("巨乳", "large_breasts", "girl has large breasts", "1girl, large breasts, white background", 1, False),
+    ("巨乳", "large_breasts", "girl, large breasts, standing", "1girl, white background", 1, False),
+    ("爱心", "heart", "girl, standing", "1girl, white background", 1, True),
+])
+@pytest.mark.parametrize("mapping_enabled", [True, False])
+def test_nai_r_noun_coverage_never_retries_or_blocks_valid_layout(
+    alias, tag, character_prompt, global_prompt, character_count, invalid,
+    mapping_enabled: bool,
+) -> None:
+    writer = (
+        "{Count: 1girl}\n{Characters:}\n{Copyright:}\n"
+        "{Identity: a girl has large breasts}\n{Details: standing}\n"
+        "{Tags: white background}\n{Nltags:}"
+    )
+
+    layout = json.dumps({
+        "composition_analysis": {"viewpoint": "front", "layout": "pair", "relations": "standing"},
+        "global_prompt": global_prompt,
+        "characters": [{
+            "name": f"person_{index}", "prompt": character_prompt if index == 0 else "girl, sitting",
+            "position_reason": "separate region", "x": .3 + .3 * index, "y": .5,
+        } for index in range(character_count)],
+    })
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [writer, "not json" if invalid else layout]
+            self.prompts = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.prompts.append(kwargs["prompt"])
+            assert self.outputs, "noun coverage must not trigger another model call"
+            return type("_Response", (), {"completion_text": self.outputs.pop(0)})()
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return type("_Plan", (), {
+                "use_web_search": False, "use_deep_thinking": False,
+                "search_reason": "", "thinking_reason": "",
+            })()
+
+    term_resolver = DanbooruResolver(
+        logger=_Logger(), cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={"danbooru_term_mappings_enabled": mapping_enabled,
+                "danbooru_term_mappings": [f"{alias}={tag}"]},
+    )
+
+    class _Resolver:
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        def cached_term_mappings_for_prompt(self, prompt):
+            return term_resolver.cached_term_mappings_for_prompt(prompt)
+
+        def matched_term_mappings_for_prompt(self, prompt):
+            return term_resolver.matched_term_mappings_for_prompt(prompt)
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content)
+
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context,
+        config={"danbooru_term_mappings_enabled": mapping_enabled},
+        logger=_Logger(),
+        danbooru_resolver=_Resolver(), researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    result = asyncio.run(pipeline.build(event, f"-r {alias}女孩站立"))
+
+    assert len(context.prompts) == 2
+    if not mapping_enabled:
+        assert "本地名词翻译" not in context.prompts[0]
+        assert f"{alias} => {tag}" not in context.prompts[1]
+        assert result.summary["danbooru_explicit_term_tags"] == []
+    else:
+        assert f"{alias} => {tag}" in context.prompts[1]
+        assert "not a required tag checklist" in context.prompts[1]
+    if invalid:
+        assert result.final_prompt == ""
+        assert result.summary["skipped_reason"] == "nai_character_plan_failed"
+        assert result.summary["llm_error"] == "nai_character_plan_invalid_json"
+    else:
+        assert result.final_prompt
+        assert result.summary["nai_character_count"] == character_count
+        assert not result.summary.get("llm_error")
+        assert result.summary["nai_missing_noun_tags"] == (
+            [tag] if mapping_enabled and character_prompt != "girl, large breasts, standing" else []
+        )
+        assert character_prompt in result.summary["nai_characters"][0]["prompt"]
+        if character_count == 2:
+            assert "sitting" in result.summary["nai_characters"][1]["prompt"]
+            assert tag.replace("_", " ") not in result.summary["nai_characters"][1]["prompt"]
+
+
+def test_nai_r_accepts_noun_mapping_preserved_as_directional_action() -> None:
+    writer = (
+        "{Count: 2girls}\n{Characters:}\n{Copyright:}\n"
+        "{Identity:}\n{Details:}\n{Tags: underwater}\n"
+        "{Nltags: Two girls reach toward one another with interlocked fingers.}"
+    )
+    layout = json.dumps({
+        "composition_analysis": {
+            "viewpoint": "side", "layout": "left and right", "relations": "hands joined"
+        },
+        "global_prompt": "2girls, underwater",
+        "characters": [{
+            "name": "A", "prompt": "girl, reaching toward B",
+            "interaction_tags": ["source#interlocked_fingers"],
+            "position_reason": "left", "x": .3, "y": .5,
+        }, {
+            "name": "B", "prompt": "girl, reaching toward A",
+            "interaction_tags": ["target#interlocked_fingers"],
+            "position_reason": "right", "x": .7, "y": .5,
+        }],
+    })
+
+    class _Context:
+        def __init__(self):
+            self.outputs = [writer, layout]
+            self.prompts = []
+
+        async def get_current_chat_provider_id(self, _umo):
+            return "provider"
+
+        async def llm_generate(self, **kwargs):
+            self.prompts.append(kwargs["prompt"])
+            assert self.outputs, "valid directional tags must not trigger layout repair"
+            return type("_Response", (), {"completion_text": self.outputs.pop(0)})()
+
+    class _Researcher:
+        def plan(self, _prompt):
+            return type("_Plan", (), {
+                "use_web_search": False, "use_deep_thinking": False,
+                "search_reason": "", "thinking_reason": "",
+            })()
+
+    term_resolver = DanbooruResolver(
+        logger=_Logger(), cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={"danbooru_term_mappings": ["十指相扣=interlocked_fingers"]},
+    )
+
+    class _Resolver:
+        cached_term_mappings_for_prompt = term_resolver.cached_term_mappings_for_prompt
+        matched_term_mappings_for_prompt = term_resolver.matched_term_mappings_for_prompt
+
+        def required_core_tags_for_prompt(self, _prompt):
+            return ()
+
+        def required_profile_tags_for_prompt(self, _prompt):
+            return ()
+
+        def profile_hints_for_prompt(self, _prompt):
+            return {}
+
+        async def resolve_detailed(self, *, llm_content, **_kwargs):
+            return DanbooruResolveOutcome(text=llm_content)
+
+    context = _Context()
+    pipeline = PromptPipeline(
+        context=context, config={}, logger=_Logger(),
+        danbooru_resolver=_Resolver(), researcher=_Researcher(),
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        shorten=_shorten,
+    )
+    event = type("_Event", (), {"unified_msg_origin": "session"})()
+    result = asyncio.run(pipeline.build(event, "-r 两个女孩在深海底十指相扣"))
+
+    assert result.final_prompt == "2girls, underwater"
+    assert result.summary["nai_character_count"] == 2
+    assert len(context.prompts) == 2
+    assert "十指相扣 => interlocked_fingers" in context.prompts[1]
+    assert "source#interlocked_fingers" in result.summary["nai_characters"][0]["prompt"]
+    assert "target#interlocked_fingers" in result.summary["nai_characters"][1]["prompt"]
+
+
 def test_creative_outfit_keeps_profile_identity_without_default_clothes() -> None:
     semantic_json = (
         '{"anchors":[{"id":"anon","role":"target_character",'
@@ -4829,15 +5035,26 @@ def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
     assert standalone.summary["outfit_transfer"] is False
 
 
-def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
+@pytest.mark.parametrize(
+    ("writer_tags", "fallback_tags"),
+    [
+        ("", ["tutu", "white_pantyhose", "large_breasts"]),
+        ("tutu, white_pantyhose, ", ["large_breasts"]),
+        ("tutu, white_pantyhose, large_breasts, ", []),
+    ],
+)
+@pytest.mark.parametrize("mapping_enabled", [True, False])
+def test_noun_translations_reach_writer_and_fill_missing_tags_during_outfit_transfer(
+    writer_tags: str, fallback_tags: list[str], mapping_enabled: bool,
+) -> None:
     class _Response:
         completion_text = (
             "{Count: 1girl, solo}\n"
             "{Characters: wakaba_mutsumi}\n"
             "{Copyright: bang_dream!}\n"
-            "{Identity: wakaba_mutsumi has green hair and green eyes}\n"
+            "{Identity: wakaba_mutsumi has green hair, green eyes and large breasts}\n"
             "{Details: wakaba_mutsumi wears a ballet dress and white pantyhose}\n"
-            "{Tags: black_dress, black_skirt, black_jacket, standing, "
+            "{Tags: " + writer_tags + "black_dress, black_skirt, black_jacket, standing, "
             "background_mode_default_portrait}\n"
             "{Nltags: wakaba_mutsumi wears a ballet dress and white pantyhose.}"
         )
@@ -4880,9 +5097,11 @@ def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
         get_float=lambda _key, default: default,
         get_str=lambda _key, default: default,
         config={
+            "danbooru_term_mappings_enabled": mapping_enabled,
             "danbooru_term_mappings": [
                 "芭蕾舞裙=tutu",
                 "白丝袜=white_pantyhose",
+                "巨乳=large_breasts",
             ]
         },
     )
@@ -4899,6 +5118,9 @@ def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
 
         def cached_term_mappings_for_prompt(self, prompt):
             return term_resolver.cached_term_mappings_for_prompt(prompt)
+
+        def matched_term_mappings_for_prompt(self, prompt):
+            return term_resolver.matched_term_mappings_for_prompt(prompt)
 
         def cached_outfit_source(self, source):
             assert source == "mortis"
@@ -4970,9 +5192,10 @@ def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
         async def resolve_detailed(self, *, llm_content, **_kwargs):
             return DanbooruResolveOutcome(text=llm_content, status="not_requested")
 
+    context = _Context()
     pipeline = PromptPipeline(
-        context=_Context(),
-        config={},
+        context=context,
+        config={"danbooru_term_mappings_enabled": mapping_enabled},
         logger=_Logger(),
         danbooru_resolver=_Resolver(),
         researcher=_Researcher(),
@@ -4985,19 +5208,29 @@ def test_explicit_garment_terms_survive_outfit_transfer_allowlist() -> None:
     event = type("_Event", (), {"unified_msg_origin": "session"})()
 
     result = asyncio.run(
-        pipeline.build(event, "若叶睦穿着mortis的衣服、芭蕾舞裙和白丝袜")
+        pipeline.build(event, "巨乳的若叶睦穿着mortis的衣服、芭蕾舞裙和白丝袜")
     )
 
     assert result.summary["outfit_transfer"] is False
     assert result.summary["semantic_character_outfits"][0]["wardrobe_kind"] == "outfit_source"
-    assert result.summary["danbooru_explicit_term_tags"] == [
-        "tutu",
-        "white_pantyhose",
-    ]
-    assert "tutu" in result.summary["required_core_tags"]
-    assert "white_pantyhose" in result.summary["required_core_tags"]
-    assert "tutu" in result.final_prompt
+    assert result.summary["danbooru_explicit_term_tags"] == (
+        ["tutu", "white_pantyhose", "large_breasts"] if mapping_enabled else []
+    )
+    assert result.summary["danbooru_term_fallback_tags"] == (
+        fallback_tags if mapping_enabled else []
+    )
+    writer_prompt = context.calls[-1]["prompt"]
+    assert ("本地名词翻译" in writer_prompt) is mapping_enabled
+    assert ("芭蕾舞裙 => tutu" in writer_prompt) is mapping_enabled
+    assert ("白丝袜 => white_pantyhose" in writer_prompt) is mapping_enabled
+    assert ("巨乳 => large_breasts" in writer_prompt) is mapping_enabled
+    assert ("tutu" in result.final_prompt) is (
+        mapping_enabled or "tutu" in writer_tags
+    )
     assert "white pantyhose" in result.final_prompt
+    assert ("large breasts" in result.final_prompt) is (
+        mapping_enabled or "large_breasts" in writer_tags
+    )
 
 
 def test_cached_seasonal_named_outfit_is_deterministically_queried() -> None:

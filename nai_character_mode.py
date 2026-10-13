@@ -163,9 +163,22 @@ def resolve_nai_canvas(
 
 
 def build_nai_character_plan_prompt(
-    user_prompt: str, final_prompt: str, canvas: dict[str, Any]
+    user_prompt: str, final_prompt: str, canvas: dict[str, Any],
+    *, noun_mappings: tuple[tuple[str, str], ...] = (),
 ) -> str:
     width, height = int(canvas["width"]), int(canvas["height"])
+    noun_rule = ""
+    if noun_mappings:
+        noun_rule = (
+            "Configured noun translations (source phrase => canonical tag):\n"
+            + "\n".join(f"- {alias} => {tag}" for alias, tag in noun_mappings)
+            + "\nUse these translations as vocabulary references when they fit the "
+            "user's intended scene. Preserve the meaning and ownership; a natural "
+            "English description or a valid directional action tag is also fine. "
+            "This is not a required tag checklist. "
+            "Never assign one person's trait or "
+            "clothing to another instance.\n"
+        )
     return (
         "Plan the composition for this NAI image request before assigning any "
         "character coordinates. First identify every visible character instance, "
@@ -251,12 +264,48 @@ def build_nai_character_plan_prompt(
         f"{canvas['aspect_ratio']} ({canvas['orientation']}); "
         f"width/height={width / height:.4f}.\n"
         f"User request:\n{user_prompt}\n"
+        f"{noun_rule}"
         f"Validated full prompt and character evidence:\n{final_prompt}"
+    )
+
+
+def missing_nai_noun_tags(
+    plan: dict[str, Any], tags: tuple[str, ...],
+    *, character_scoped_tags: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+    """Report exact mapped-tag coverage for diagnostics, never plan validity."""
+    def key(value: str) -> str:
+        return re.sub(r"\s+", "_", str(value or "").replace("\\", "").strip().casefold())
+
+    global_keys = {key(part) for part in split_tags(plan["global_prompt"])}
+    character_keys = {
+        key(part)
+        for character in plan["characters"]
+        for part in split_tags(character["prompt"])
+    }
+    # parse_nai_character_plan emits only validated interaction_tags into the
+    # character prompt. Their action is already conditioned with its direction;
+    # an ordinary duplicate is unnecessary for exact coverage diagnostics.
+    character_keys.update(
+        key(part.partition("#")[2])
+        for character in plan["characters"]
+        for part in split_tags(character["prompt"])
+        if _DIRECTIONAL_ACTION_TAG_RE.fullmatch(part)
+    )
+    scoped_keys = {key(tag) for tag in character_scoped_tags}
+    return tuple(
+        tag for tag in tags
+        if key(tag) not in (
+            character_keys
+            if key(tag) in scoped_keys or _is_character_scoped_tag(tag)
+            else character_keys | global_keys
+        )
     )
 
 
 def parse_nai_character_plan(
     raw: str, *, character_limit: int = MAX_NAI_CHARACTERS,
+    character_scoped_tags: tuple[str, ...] = (),
 ) -> dict[str, Any]:
     """Validate model output before any NAI workflow is submitted."""
     value = str(raw or "").strip()
@@ -343,8 +392,9 @@ def parse_nai_character_plan(
     names = {re.sub(r"[\s_]+", "", item["name"].casefold()) for item in cleaned}
     dropped_global_character_tags: list[str] = []
     retained_global_parts: list[str] = []
+    scoped_keys = {_normalized_nai_tag(tag) for tag in character_scoped_tags}
     for part in global_parts:
-        if _is_character_scoped_tag(part):
+        if _is_character_scoped_tag(part) or _normalized_nai_tag(part) in scoped_keys:
             dropped_global_character_tags.append(part)
             continue
         retained_global_parts.append(part)

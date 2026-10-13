@@ -565,11 +565,17 @@
           "type": "string"
         }
       },
+      "danbooru_term_mappings_enabled": {
+        "description": "启用名词翻译参与生图",
+        "type": "bool",
+        "default": true,
+        "hint": "关闭后，普通模式和 NAI -r 均不把名词映射交给提示词模型，也不按映射补 tag；已保存映射、批量翻译断点和页面管理仍保留。"
+      },
       "danbooru_term_mappings": {
         "description": "名词翻译映射",
         "type": "list",
         "default": [],
-        "hint": "每行一个映射，格式：中文名词=canonical_tag。命中用户提示词时直接加入对应 hard tag。推荐使用插件页面“服装词库”进行可视化编辑。",
+        "hint": "每行一个映射，格式：中文名词=canonical_tag。命中后先供第二阶段模型参考；仅当最终输出缺少独立 tag 时补入。推荐使用插件页面“服装词库”进行可视化编辑。",
         "collapsed": true,
         "items": {
           "type": "string"

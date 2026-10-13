@@ -1,4 +1,6 @@
 import asyncio
+import json
+import os
 import sys
 import threading
 from contextvars import ContextVar
@@ -35,6 +37,10 @@ try:
     from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
     from .generation_request_guard import generation_request_guard
+    from .noun_translation_batch import (
+        build_import_plan, parse_existing_mappings, review_rows,
+        select_general_tags, translate_with_astrbot, translation_review_rows, verify_with_astrbot,
+    )
     from .prompt_block_rules import matches_blocked_prompt
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
@@ -58,6 +64,10 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from danbooru_resolver import WardrobeValidationError
     from usage_limiter import DailyUsageLimiter
     from generation_request_guard import generation_request_guard
+    from noun_translation_batch import (
+        build_import_plan, parse_existing_mappings, review_rows,
+        select_general_tags, translate_with_astrbot, translation_review_rows, verify_with_astrbot,
+    )
     from prompt_block_rules import matches_blocked_prompt
 
 
@@ -70,6 +80,7 @@ class ComfyUIAgentPlugin(Star):
         plugin_data_path = (
             Path(get_astrbot_plugin_data_path()) / "astrbot_plugin_anima_master"
         )
+        self._plugin_data_path = plugin_data_path
         chiyo_snapshot_path = plugin_data_path / "chiyo_preset_base.json"
         if bool(flatten_config(config or {}).get("reset_to_defaults", False)):
             chiyo_snapshot_path.unlink(missing_ok=True)
@@ -94,6 +105,9 @@ class ComfyUIAgentPlugin(Star):
         self._config_store = config
         self._schema_path = schema_path
         self._wardrobe_lock = asyncio.Lock()
+        self._noun_translation_lock = asyncio.Lock()
+        self._noun_web_job: dict[str, Any] = {"state": "idle", "message": ""}
+        self._noun_web_task: asyncio.Task | None = None
         self._multi_generation_semaphore = asyncio.Semaphore(
             max(1, self._int("multi_max_concurrent_generations", 1))
         )
@@ -158,6 +172,15 @@ class ComfyUIAgentPlugin(Star):
             ["POST"],
             "保存 Anima 服装词库",
         )
+        for path, handler, methods, label in (
+            ("noun-translation", self.get_noun_translation, ["GET"], "查看名词翻译进度"),
+            ("noun-translation/enabled", self.set_noun_translation_enabled, ["POST"], "启用或停用名词翻译参与生图"),
+            ("noun-translation/run", self.run_noun_translation, ["POST"], "启动名词翻译或复核"),
+            ("noun-translation/import", self.import_noun_translation, ["POST"], "批量导入名词翻译"),
+        ):
+            context.register_web_api(
+                f"/astrbot_plugin_anima_master/{path}", handler, methods, label,
+            )
         context.register_web_api(
             "/astrbot_plugin_anima_master/autofilter",
             self.get_autofilter,
@@ -581,6 +604,19 @@ class ComfyUIAgentPlugin(Star):
             route = parse_hard_route(event.get_message_outline())
         if not route:
             return
+        action, prompt = route
+        if action in {"term_preview", "term_translate", "term_verify", "term_import"}:
+            event.stop_event()
+            if action == "term_preview":
+                message = self._term_preview_text(event)
+            elif action == "term_translate":
+                message = await self._term_translate_text(event, prompt)
+            elif action == "term_verify":
+                message = await self._term_verify_text(event, prompt)
+            else:
+                message = await self._term_import_text(event, prompt)
+            await event.send(event.plain_result(message))
+            return
         if not self._is_allowed(event):
             await event.send(
                 event.plain_result("ComfyUI 助手已关闭，或当前用户没有使用权限。")
@@ -588,7 +624,6 @@ class ComfyUIAgentPlugin(Star):
             event.stop_event()
             return
 
-        action, prompt = route
         logger.info(
             "[comfyui_agent] hard route action=%s sender=%s",
             action,
@@ -604,6 +639,310 @@ class ComfyUIAgentPlugin(Star):
     async def cmd_status(self, event: AstrMessageEvent):
         event.stop_event()
         yield event.plain_result(await self._handle_action(event, "status", ""))
+
+    def _noun_catalog_path(self) -> Path:
+        skills_root = str(os.environ.get("COMFYUI_GOOD_ANIMA_SKILLS_DIR") or "").strip()
+        root = Path(skills_root) if skills_root else Path.home() / ".codex" / "skills"
+        return root / "danbooru-tags" / "anima-1.0.csv"
+
+    def _existing_term_mappings(self) -> dict[str, str]:
+        return parse_existing_mappings(self.config.get("danbooru_term_mappings", []))
+
+    def _noun_translation_snapshot(self) -> dict[str, Any]:
+        candidates = select_general_tags(self._noun_catalog_path())
+        translated_path = self._plugin_data_path / "noun_translation_review.json"
+        verified_path = self._plugin_data_path / "noun_translation_verified.json"
+        translated = json.loads(translated_path.read_text(encoding="utf-8")) if translated_path.exists() else []
+        verified = json.loads(verified_path.read_text(encoding="utf-8")) if verified_path.exists() else []
+        if not isinstance(translated, list) or not isinstance(verified, list):
+            raise ValueError("翻译断点文件格式无效")
+        existing = self._existing_term_mappings()
+        reviewed = review_rows(translated, existing_mappings=existing)
+        plan = build_import_plan(translated, verified, existing)
+        rows = translation_review_rows(reviewed, verified, existing, plan)
+        return {
+            "total": len(candidates), "translated": len(translated), "verified": len(verified),
+            "flagged": sum(bool(row["review_flags"]) for row in reviewed),
+            "importable": len(plan["additions"]), "skipped": len(plan["skipped"]),
+            "manual_review": sum(row["needs_manual_review"] for row in rows),
+            "existing": sum(item["state"] == "existing" for row in rows
+                            for item in row["alias_statuses"]),
+            "enabled": bool(self.config.get("danbooru_term_mappings_enabled", True)),
+            "additions": plan["additions"], "skipped_aliases": plan["skipped"],
+            "rows": rows, "job": dict(self._noun_web_job),
+        }
+
+    async def get_noun_translation(self):
+        try:
+            self._ensure_dashboard_user()
+            return json_response(self._noun_translation_snapshot())
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return error_response(str(exc), status_code=400)
+
+    async def set_noun_translation_enabled(self):
+        try:
+            self._ensure_dashboard_user()
+            payload = await request.json(default={})
+            if not isinstance(payload, dict) or type(payload.get("enabled")) is not bool:
+                raise ValueError("enabled 必须是布尔值")
+            if self._config_store is None:
+                raise RuntimeError("配置存储不可用，开关未修改。")
+            enabled = payload["enabled"]
+            async with self._wardrobe_lock:
+                updated = {**self.config, "danbooru_term_mappings_enabled": enabled}
+                self._config_store.save_config(
+                    replace_config=group_config(updated, self._schema_path)
+                )
+                self.config["danbooru_term_mappings_enabled"] = enabled
+                self._services.danbooru_resolver._config[
+                    "danbooru_term_mappings_enabled"
+                ] = enabled
+            return json_response({"enabled": enabled})
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except ValueError as exc:
+            return error_response(str(exc), status_code=400)
+        except Exception:
+            logger.exception("名词翻译开关保存失败")
+            return error_response("保存开关失败，请查看 AstrBot 日志。", status_code=500)
+
+    async def _run_noun_web_job(self, action: str, provider_id: str) -> None:
+        try:
+            async with self._noun_translation_lock:
+                if action == "translate":
+                    candidates = select_general_tags(self._noun_catalog_path())
+                    checkpoint = self._plugin_data_path / "noun_translation_review.json"
+                    result = await translate_with_astrbot(self.context, provider_id, candidates, checkpoint)
+                    rows = review_rows(json.loads(checkpoint.read_text(encoding="utf-8")),
+                                       existing_mappings=self._existing_term_mappings())
+                    (self._plugin_data_path / "noun_translation_flagged.json").write_text(
+                        json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+                    verification = await verify_with_astrbot(
+                        self.context, provider_id, checkpoint,
+                        self._plugin_data_path / "noun_translation_verified.json",
+                        self._existing_term_mappings())
+                    message = (f"本轮新译 {result['newly_translated']} 条、新复核 "
+                               f"{verification['newly_verified']} 条；累计翻译 "
+                               f"{result['completed']}/{len(candidates)}、复核 "
+                               f"{verification['verified']} 条。本轮模型调用 "
+                               f"{result['calls'] + verification['calls']} 次。")
+                else:
+                    result = await verify_with_astrbot(
+                        self.context, provider_id,
+                        self._plugin_data_path / "noun_translation_review.json",
+                        self._plugin_data_path / "noun_translation_verified.json",
+                        self._existing_term_mappings())
+                    message = (f"本轮新复核 {result['newly_verified']} 条；"
+                               f"累计复核 {result['verified']} 条，剩余 {result['remaining']} 条；"
+                               f"本轮模型调用 {result['calls']} 次。")
+            self._noun_web_job = {"state": "done", "message": message}
+        except Exception as exc:
+            logger.exception("名词翻译网页任务失败")
+            self._noun_web_job = {"state": "error", "message": str(exc)}
+
+    async def run_noun_translation(self):
+        try:
+            self._ensure_dashboard_user()
+            payload = await request.json(default={})
+            if not isinstance(payload, dict):
+                raise ValueError("请求内容必须是对象")
+            action = payload.get("action")
+            provider_id = str(payload.get("provider_id") or "").strip()
+            if action not in {"translate", "verify"} or not provider_id or any(
+                char.isspace() for char in provider_id
+            ):
+                raise ValueError("请选择翻译或复核，并填写有效的 provider ID。")
+            if self._noun_translation_lock.locked() or self._noun_web_job["state"] == "running":
+                return error_response("已有名词翻译任务正在运行。", status_code=409)
+            self._noun_web_job = {"state": "running", "message": "翻译中…" if action == "translate" else "复核中…"}
+            self._noun_web_task = asyncio.create_task(self._run_noun_web_job(action, provider_id))
+            return json_response({"job": dict(self._noun_web_job)})
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except ValueError as exc:
+            return error_response(str(exc), status_code=400)
+
+    async def import_noun_translation(self):
+        try:
+            self._ensure_dashboard_user()
+            if self._noun_translation_lock.locked() or self._noun_web_job["state"] == "running":
+                return error_response("翻译任务运行中，请完成后再导入。", status_code=409)
+            payload = await request.json(default={})
+            if not isinstance(payload, dict):
+                raise ValueError("请求内容必须是对象")
+            if payload.get("mode") != "apply":
+                raise ValueError("导入模式无效")
+            async with self._wardrobe_lock:
+                translated = json.loads((self._plugin_data_path / "noun_translation_review.json").read_text(encoding="utf-8"))
+                verified = json.loads((self._plugin_data_path / "noun_translation_verified.json").read_text(encoding="utf-8"))
+                plan = build_import_plan(translated, verified, self._existing_term_mappings())
+                additions = plan["additions"]
+                if additions:
+                    if self._config_store is None:
+                        raise RuntimeError("配置存储不可用，未执行导入。")
+                    updated = list(self.config.get("danbooru_term_mappings", [])) + [
+                        f"{alias}={tag}" for alias, tag in additions.items()]
+                    self._config_store.save_config(replace_config=group_config(
+                        {**self.config, "danbooru_term_mappings": updated}, self._schema_path))
+                    self.config["danbooru_term_mappings"] = updated
+                    self._services.danbooru_resolver._config["danbooru_term_mappings"] = updated
+            return json_response({"imported": len(additions), "skipped": len(plan["skipped"]),
+                                  "existing": len(plan["existing"])})
+        except PermissionError as exc:
+            return error_response(str(exc), status_code=403)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return error_response(str(exc), status_code=400)
+        except Exception:
+            logger.exception("名词翻译网页导入失败")
+            return error_response("导入失败，请查看 AstrBot 日志。", status_code=500)
+
+    def _term_preview_text(self, event: AstrMessageEvent) -> str:
+        if not event.is_admin():
+            return "仅管理员可查看批量名词翻译任务。"
+        try:
+            candidates = select_general_tags(self._noun_catalog_path())
+        except (OSError, ValueError) as exc:
+            return str(exc)
+        sample = "、".join(row["tag"] for row in candidates[:12])
+        progress = ""
+        checkpoint = self._plugin_data_path / "noun_translation_review.json"
+        if checkpoint.exists():
+            try:
+                reviewed = review_rows(
+                    json.loads(checkpoint.read_text(encoding="utf-8")),
+                    existing_mappings=self._existing_term_mappings(),
+                )
+                progress = (
+                    f"已试译 {len(reviewed)}/{len(candidates)}；"
+                    f"待审标记 {sum(bool(row['review_flags']) for row in reviewed)} 条，"
+                    f"空别名 {sum(not row['aliases'] for row in reviewed)} 条。"
+                )
+            except (OSError, ValueError, KeyError, TypeError):
+                progress = "已有断点文件，但格式需要检查。"
+        return (
+            f"全部候选 {len(candidates)} 个通用 tag（帖子数至少 1000，按热度排序）。"
+            f"{progress}"
+            f"前 12 个：{sample}。运行 /anm term_translate <DeepSeek provider ID> "
+            "每次最多翻译 50 个；只写待审核断点，不导入现有词库。"
+        )
+
+    @comfyui_group.command("term_preview", alias={"名词翻译预览"})
+    async def cmd_term_preview(self, event: AstrMessageEvent):
+        event.stop_event()
+        yield event.plain_result(self._term_preview_text(event))
+
+    async def _term_translate_text(self, event: AstrMessageEvent, provider_id: str) -> str:
+        if not event.is_admin():
+            return "仅管理员可运行批量名词翻译。"
+        if not provider_id or any(char.isspace() for char in provider_id):
+            return "用法：/anm term_translate <DeepSeek provider ID>"
+        if self._noun_translation_lock.locked():
+            return "名词翻译已有任务正在运行，请稍后重试。"
+        try:
+            async with self._noun_translation_lock:
+                candidates = select_general_tags(self._noun_catalog_path())
+                checkpoint = self._plugin_data_path / "noun_translation_review.json"
+                result = await translate_with_astrbot(
+                    self.context, provider_id, candidates, checkpoint,
+                )
+                rows = review_rows(
+                    json.loads(checkpoint.read_text(encoding="utf-8")),
+                    existing_mappings=self._existing_term_mappings(),
+                )
+                review_path = self._plugin_data_path / "noun_translation_flagged.json"
+                review_path.write_text(
+                    json.dumps(rows, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                verification = await verify_with_astrbot(
+                    self.context, provider_id, checkpoint,
+                    self._plugin_data_path / "noun_translation_verified.json",
+                    self._existing_term_mappings(),
+                )
+        except (OSError, ValueError, RuntimeError) as exc:
+            return f"名词翻译暂停：{exc}"
+        return (
+            f"本次调用 {result['calls']} 次、新译 {result['newly_translated']} 条；"
+            f"累计已译 {result['completed']}/{len(candidates)}，"
+            f"待译 {result['remaining']}。本次 token：输入 {result['input_tokens']}、"
+            f"缓存输入 {result['cached_tokens']}、输出 {result['output_tokens']}。"
+            f"本轮新复核 {verification['newly_verified']} 条，"
+            f"累计已复核 {verification['verified']}/{result['completed']}，"
+            f"复核调用 {verification['calls']} 次、输入 {verification['input_tokens']}、"
+            f"缓存输入 {verification['cached_tokens']}、输出 {verification['output_tokens']} token。"
+            f"待审核文件：{review_path}。"
+            "结果不会自动进入生图词库。"
+        )
+
+    @comfyui_group.command("term_translate", alias={"批量名词翻译"})
+    async def cmd_term_translate(self, event: AstrMessageEvent, provider_id: str):
+        event.stop_event()
+        yield event.plain_result(await self._term_translate_text(event, str(provider_id)))
+
+    async def _term_verify_text(self, event: AstrMessageEvent, provider_id: str) -> str:
+        if not event.is_admin():
+            return "仅管理员可审核批量译文。"
+        if not provider_id or any(char.isspace() for char in provider_id):
+            return "用法：/anm term_verify <DeepSeek provider ID>"
+        if self._noun_translation_lock.locked():
+            return "名词翻译已有任务正在运行，请稍后重试。"
+        try:
+            async with self._noun_translation_lock:
+                result = await verify_with_astrbot(
+                    self.context, provider_id,
+                    self._plugin_data_path / "noun_translation_review.json",
+                    self._plugin_data_path / "noun_translation_verified.json",
+                    self._existing_term_mappings(),
+                )
+        except (OSError, ValueError, RuntimeError) as exc:
+            return f"名词翻译审核暂停：{exc}"
+        return (f"本轮新复核 {result['newly_verified']} 条，"
+                f"累计已复核 {result['verified']} 条，剩余 {result['remaining']} 条；"
+                f"本次模型调用 {result['calls']} 次，输入 {result['input_tokens']}、"
+                f"缓存输入 {result['cached_tokens']}、输出 {result['output_tokens']} token。"
+                "运行 /anm term_import preview 查看可导入数。")
+
+    @comfyui_group.command("term_verify", alias={"名词翻译审核"})
+    async def cmd_term_verify(self, event: AstrMessageEvent, provider_id: str):
+        event.stop_event()
+        yield event.plain_result(await self._term_verify_text(event, str(provider_id)))
+
+    async def _term_import_text(self, event: AstrMessageEvent, mode: str) -> str:
+        if not event.is_admin():
+            return "仅管理员可导入批量译文。"
+        if mode not in {"preview", "apply"}:
+            return "用法：/anm term_import preview 或 /anm term_import apply"
+        try:
+            async with self._wardrobe_lock:
+                translated = json.loads((self._plugin_data_path / "noun_translation_review.json").read_text(encoding="utf-8"))
+                verified = json.loads((self._plugin_data_path / "noun_translation_verified.json").read_text(encoding="utf-8"))
+                plan = build_import_plan(translated, verified, self._existing_term_mappings())
+                additions = plan["additions"]
+                if mode == "apply" and additions:
+                    if self._config_store is None:
+                        return "配置存储不可用，未执行导入。"
+                    current = self.config.get("danbooru_term_mappings", [])
+                    updated = list(current) + [f"{alias}={tag}" for alias, tag in additions.items()]
+                    new_config = {**self.config, "danbooru_term_mappings": updated}
+                    self._config_store.save_config(
+                        replace_config=group_config(new_config, self._schema_path)
+                    )
+                    self.config["danbooru_term_mappings"] = updated
+                    self._services.danbooru_resolver._config["danbooru_term_mappings"] = updated
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return f"名词翻译导入暂停：{exc}"
+        verb = "可导入" if mode == "preview" else "已导入"
+        return (f"{verb} {len(additions)} 个中文别名；"
+                f"已有 {len(plan['existing'])} 个相同映射，无需重复导入；"
+                f"跳过 {len(plan['skipped'])} 个冲突或不安全别名。"
+                "未通过自动复核的别名不会导入。")
+
+    @comfyui_group.command("term_import", alias={"名词翻译导入"})
+    async def cmd_term_import(self, event: AstrMessageEvent, mode: str):
+        event.stop_event()
+        yield event.plain_result(await self._term_import_text(event, str(mode)))
 
     @comfyui_group.command("diagnose", alias={"诊断", "部署诊断", "diagnosis"})
     async def cmd_diagnose(self, event: AstrMessageEvent):

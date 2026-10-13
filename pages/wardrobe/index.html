@@ -51,11 +51,40 @@
           <p id="section-description">角色本人拥有的任意命名服装；所属角色与学习来源分别保存。通用校服或命名套组使用独立分类。</p>
         </section>
 
+        <nav id="library-pagination-top" class="library-pagination"></nav>
         <div id="list" class="entry-list"></div>
         <div id="empty-state" class="empty-state" hidden>
           <div>✦</div><h3>这里还没有条目</h3><p>新增一条映射，或换一个搜索关键词。</p>
         </div>
+        <nav id="library-pagination-bottom" class="library-pagination"></nav>
       </main>
+      <section id="noun-translation" class="batch-panel" aria-label="批量名词翻译">
+        <div class="batch-heading">
+          <div><p class="eyebrow">BATCH TRANSLATION</p><h2>批量名词翻译</h2><p>从插件自带的 Anima 通用标签中分批翻译，每轮最多 50 个并自动复核。复核通过的别名经预览后才会进入生图词库。</p></div>
+          <div class="batch-heading-actions"><label class="batch-switch"><input id="batch-enabled" type="checkbox" disabled /><span>名词翻译参与生图<small>关闭后保留词库和断点，但不向模型提供映射或补入 tag</small></span></label><button id="batch-refresh" class="button ghost" type="button">刷新进度</button></div>
+        </div>
+        <div class="batch-stats" aria-live="polite">
+          <div><span>已翻译</span><strong id="batch-translated">—</strong></div>
+          <div><span>已复核</span><strong id="batch-verified">—</strong></div>
+          <div><span>可导入别名</span><strong id="batch-importable">—</strong></div>
+          <div><span>已在词库的别名</span><strong id="batch-existing">—</strong></div>
+          <div><span>需人工复核的标签</span><strong id="batch-review-count">—</strong></div>
+        </div>
+        <div class="batch-actions">
+          <label>DeepSeek provider ID <input id="batch-provider" autocomplete="off" placeholder="例如 deepseek/deepseek-v4-flash" /></label>
+          <button id="batch-translate" class="button primary" type="button" disabled>翻译下一批并复核</button>
+          <button id="batch-verify" class="button soft" type="button" disabled>复核未完成条目</button>
+          <button id="batch-import" class="button ghost" type="button" disabled>导入可用别名</button>
+        </div>
+        <p id="batch-status" class="batch-status" role="status">正在读取翻译进度…</p>
+        <div class="batch-review-heading">
+          <h3>断点预览</h3>
+          <label>筛选 <select id="batch-filter"><option value="all">全部</option><option value="review">需人工复核</option><option value="ready">可导入</option><option value="existing">已在词库（全部别名）</option><option value="pending">待模型复核</option><option value="conflict">冲突或格式问题</option><option value="rejected">模型未通过或无译名</option></select></label>
+        </div>
+        <p class="batch-status">人工复核只列出尚未解决的冲突、格式问题、未通过别名或无译名条目。部分成功的标签会逐个列出别名状态，也可能同时出现在“可导入”中；全部别名已在词库的条目不计入人工复核。可在上方“名词翻译”列表修订，保存后点击“刷新进度”。</p>
+        <div class="batch-table-wrap"><table class="batch-table"><thead><tr><th>Canonical tag</th><th>初译别名</th><th>复核结果</th><th>导入状态</th></tr></thead><tbody id="batch-rows"></tbody></table></div>
+        <nav id="batch-pagination" class="batch-pagination"></nav>
+      </section>
       <section id="autofilter-settings" class="autofilter-panel" aria-label="图片打码设置">
         <div class="autofilter-heading"><div><p class="eyebrow">IMAGE DELIVERY</p><h2>按会话发送前打码</h2><p>群聊和私聊分别设置，默认关闭。开启后使用 autofilter2.json 打码；发送时仅替换加载图像和 Windows 安全的输出文件名前缀。</p></div><button id="autofilter-refresh" class="button ghost" type="button">刷新会话</button></div>
         <div class="autofilter-add"><input id="autofilter-session" placeholder="完整会话 ID（平台:消息类型:会话 ID）" aria-label="完整会话 ID" /><button id="autofilter-add" class="button primary" type="button">添加会话</button></div>
@@ -68,7 +97,9 @@
       <div><button id="discard-button" type="button">放弃</button><button id="dirty-save-button" type="button">立即保存</button></div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <script src="./pagination.js"></script>
     <script type="module" src="./app.js"></script>
+    <script type="module" src="./noun_translation.js"></script>
     <script type="module" src="./autofilter.js"></script>
   </body>
 </html>

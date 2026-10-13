@@ -100,6 +100,7 @@
         "danbooru_named_outfit_mappings",
         "danbooru_series_alias_mappings",
         "danbooru_character_alias_mappings",
+        "danbooru_term_mappings_enabled",
         "danbooru_term_mappings",
         "danbooru_tag_base_urls",
         "danbooru_tag_user_agent",

@@ -3147,6 +3147,31 @@ def test_configured_term_mapping_is_returned_as_request_hard_tag() -> None:
     assert result.confirmed_tags == ("masquerade_mask",)
 
 
+def test_term_mapping_switch_disables_matching_without_deleting_entries() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(), cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={"danbooru_term_mappings_enabled": False,
+                "danbooru_term_mappings": ["舞会面具=masquerade_mask"]},
+    )
+    assert resolver.matched_term_mappings_for_prompt("少女戴着舞会面具") == ()
+    assert resolver.cached_term_mappings_for_prompt("少女戴着舞会面具") is None
+    assert resolver.wardrobe_snapshot()["terms"] == [
+        {"alias": "舞会面具", "tag": "masquerade_mask"},
+    ]
+    resolver._config["danbooru_term_mappings_enabled"] = True
+    assert resolver.matched_term_mappings_for_prompt("少女戴着舞会面具") == (
+        ("舞会面具", "masquerade_mask"),
+    )
+
+
 def test_configured_term_mapping_ignores_explicitly_negated_occurrence() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):
@@ -3168,15 +3193,43 @@ def test_configured_term_mapping_ignores_explicitly_negated_occurrence() -> None
     )
 
     assert resolver.cached_term_mappings_for_prompt("少女不要白丝袜") is None
+    assert resolver.matched_term_mappings_for_prompt("少女不要白丝袜") == ()
     positive = resolver.cached_term_mappings_for_prompt(
         "不要白丝袜，另一名少女穿白丝袜"
     )
     assert positive is not None
     assert positive.confirmed_tags == ("white_pantyhose",)
+    assert resolver.matched_term_mappings_for_prompt(
+        "不要白丝袜，另一名少女穿白丝袜"
+    ) == (("白丝袜", "white_pantyhose"),)
     assert resolver.cached_term_mappings_for_prompt("not a mask") is None
     kimono = resolver.cached_term_mappings_for_prompt("kimono mask")
     assert kimono is not None
     assert kimono.confirmed_tags == ("masquerade_mask",)
+
+
+def test_configured_term_mapping_prefers_longest_alias_per_occurrence() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    resolver = DanbooruResolver(
+        logger=_Logger(), cache={},
+        get_bool=lambda _key, default: default,
+        get_int=lambda _key, default: default,
+        get_float=lambda _key, default: default,
+        get_str=lambda _key, default: default,
+        config={"danbooru_term_mappings": [
+            "衬衫=shirt", "白衬衫=white_shirt", "长发=long_hair",
+            "超长发=very_long_hair",
+        ]},
+    )
+    assert resolver.matched_term_mappings_for_prompt("少女穿白衬衫，留超长发") == (
+        ("白衬衫", "white_shirt"), ("超长发", "very_long_hair"),
+    )
+    assert resolver.matched_term_mappings_for_prompt("少女穿白衬衫和衬衫") == (
+        ("衬衫", "shirt"), ("白衬衫", "white_shirt"),
+    )
 
 
 def test_wardrobe_editor_round_trip_updates_profiles_and_mappings() -> None:
@@ -3235,6 +3288,45 @@ def test_wardrobe_editor_round_trip_updates_profiles_and_mappings() -> None:
     assert resolver._config["danbooru_term_mappings"] == [
         "舞会面具=masquerade_mask"
     ]
+
+
+def test_wardrobe_editor_allows_manual_term_after_large_batch_import() -> None:
+    class _Logger:
+        def warning(self, *_args, **_kwargs):
+            pass
+
+    with tempfile.TemporaryDirectory() as directory:
+        imported = [f"词条{index}=tag_{index}" for index in range(30000)]
+        resolver = DanbooruResolver(
+            logger=_Logger(), cache={},
+            profile_cache_path=Path(directory) / "profiles.json",
+            get_bool=lambda _key, default: default,
+            get_int=lambda _key, default: default,
+            get_float=lambda _key, default: default,
+            get_str=lambda _key, default: default,
+            config={"danbooru_term_mappings": imported},
+        )
+        initial = resolver.wardrobe_snapshot()
+        assert len(initial["terms"]) == 30000
+        saved = resolver.save_wardrobe({
+            "baseRevision": initial["revision"],
+            "outfits": initial["outfits"],
+            "outfitSets": initial["outfitSets"],
+            "terms": [*initial["terms"], {"alias": "手工新词", "tag": "new_tag"}],
+        })
+        assert len(saved["terms"]) == 30001
+        assert "手工新词=new_tag" in resolver._config["danbooru_term_mappings"]
+
+        too_many = {
+            "baseRevision": saved["revision"],
+            "outfits": saved["outfits"],
+            "outfitSets": saved["outfitSets"],
+            "terms": [saved["terms"][0]] * 50001,
+        }
+        with pytest.raises(resolver_module.WardrobeValidationError,
+                           match="名词翻译条目不能超过 50000 条"):
+            resolver.save_wardrobe(too_many)
+        assert len(resolver._config["danbooru_term_mappings"]) == 30001
 
 
 def test_wardrobe_editor_rekeys_manual_casual_profile() -> None:

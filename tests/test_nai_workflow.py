@@ -18,11 +18,112 @@ from agent_tools.comfyui_workflows import custom_t2i_workflow, workflow  # noqa:
 from generation_task import GenerationTaskRunner  # noqa: E402
 from nai_character_mode import (  # noqa: E402
     build_nai_character_plan_prompt,
+    missing_nai_noun_tags,
     parse_nai_character_plan,
     preserve_nai_global_artist_tags,
     resolve_nai_canvas,
     strip_nai_character_switch,
 )
+
+
+def test_nai_noun_coverage_diagnostic_tracks_standalone_character_scope() -> None:
+    canvas = {"width": 1024, "height": 1536, "aspect_ratio": "2:3", "orientation": "portrait"}
+    instruction = build_nai_character_plan_prompt(
+        "巨乳女孩站立", "1girl, large breasts", canvas,
+        noun_mappings=(("巨乳", "large_breasts"),),
+    )
+    assert "巨乳 => large_breasts" in instruction
+    assert "not a required tag checklist" in instruction
+    assert "does not replace the standalone tag" not in instruction
+    plan = {
+        "global_prompt": "1girl, white background, large breasts",
+        "characters": [{"name": "girl", "prompt": "girl has large breasts"}],
+    }
+    assert missing_nai_noun_tags(plan, ("large_breasts",)) == ("large_breasts",)
+    plan["characters"][0]["prompt"] = "girl, large breasts"
+    assert missing_nai_noun_tags(plan, ("large_breasts",)) == ()
+    plan["global_prompt"] = "1girl, garden"
+    assert missing_nai_noun_tags(plan, ("garden",)) == ()
+
+    raw = json.dumps({
+        "composition_analysis": {
+            "viewpoint": "front", "layout": "pair", "relations": "standing"
+        },
+        "global_prompt": "2girls, tutu, garden",
+        "characters": [
+            {"name": "A", "prompt": "A, tutu", "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": "B, suit", "position_reason": "right", "x": .7, "y": .5},
+        ],
+    })
+    parsed = parse_nai_character_plan(raw, character_scoped_tags=("tutu",))
+    assert parsed["global_prompt"] == "2girls, garden"
+    assert parsed["dropped_global_character_tags"] == ["tutu"]
+    assert missing_nai_noun_tags(
+        parsed, ("tutu",), character_scoped_tags=("tutu",)
+    ) == ()
+
+
+@pytest.mark.parametrize("direction", ["source", "target", "mutual"])
+@pytest.mark.parametrize("action", ["interlocked_fingers", "holding_hands", "hug"])
+def test_nai_noun_action_survives_valid_directional_character_tag(direction, action):
+    raw = json.dumps({
+        "composition_analysis": {
+            "viewpoint": "side", "layout": "pair", "relations": "interaction"
+        },
+        "global_prompt": "2girls, underwater",
+        "characters": [{
+            "name": "A", "prompt": "girl, reaching toward B",
+            "interaction_tags": [f"{direction}#{action.replace('_', ' ')}"],
+            "position_reason": "left", "x": .3, "y": .5,
+        }, {
+            "name": "B", "prompt": "girl", "position_reason": "right",
+            "x": .7, "y": .5,
+        }],
+    })
+    plan = parse_nai_character_plan(raw)
+
+    assert missing_nai_noun_tags(
+        plan, (action,), character_scoped_tags=(action,)
+    ) == ()
+    # A related action is not evidence for a different canonical mapping.
+    assert missing_nai_noun_tags(plan, (f"{action}_other",)) == (f"{action}_other",)
+
+
+@pytest.mark.parametrize("prompt", [
+    "girl, hands joined in interlocked_fingers",
+    "girl, source#interlocked_fingers#hug",
+    "girl, source#interlocked_fingers, hug",
+    "girl, source#interlocked_fingers and hug",
+])
+def test_nai_noun_action_rejects_prose_and_discarded_directional_copies(prompt):
+    raw = json.dumps({
+        "composition_analysis": {
+            "viewpoint": "side", "layout": "pair", "relations": "interaction"
+        },
+        "global_prompt": "2girls, underwater, mutual#interlocked_fingers",
+        "characters": [{
+            "name": "A", "prompt": prompt, "interaction_tags": [],
+            "position_reason": "left", "x": .3, "y": .5,
+        }],
+    })
+    plan = parse_nai_character_plan(raw)
+
+    assert missing_nai_noun_tags(plan, ("interlocked_fingers",)) == (
+        "interlocked_fingers",
+    )
+
+
+def test_nai_noun_action_requires_directional_tag_in_emitted_prompt():
+    plan = {
+        "global_prompt": "2girls, underwater",
+        "characters": [{
+            "prompt": "girl, reaching",
+            "interaction_tags": ["mutual#interlocked_fingers"],
+        }],
+    }
+    assert missing_nai_noun_tags(plan, ("interlocked_fingers",)) == (
+        "interlocked_fingers",
+    )
 
 
 def test_nai_global_restores_exact_configured_artist_tags():
@@ -443,13 +544,17 @@ def test_nai_r_passes_this_request_size_to_planner():
     summary = {
         "nai_r_mode": True,
         "nai_characters": [{"name": "girl", "prompt": "girl", "x": .5, "y": .5}],
+        "nai_missing_noun_tags": ["heart"],
     }
 
     async def build_prompt(_event, _prompt, **kwargs):
         observed.append(kwargs)
         return "1girl, side view"
 
-    async def run_tool(_args):
+    submitted = []
+
+    async def run_tool(args):
+        submitted.append(args)
         return {"ok": True, "outputs": []}
 
     runner = GenerationTaskRunner(
@@ -476,6 +581,9 @@ def test_nai_r_passes_this_request_size_to_planner():
     assert result["ok"] is True
     assert observed[0]["canvas_size"] == (1536, 1024)
     assert observed[0]["canvas_size_explicit"] is True
+    assert len(submitted) == 1
+    assert submitted[0][submitted[0].index("--prompt") + 1] == "1girl, side view"
+    assert json.loads(submitted[0][submitted[0].index("--nai-characters") + 1]) == summary["nai_characters"]
 
 
 @pytest.mark.parametrize("override,size", [(False, True), (True, False)])
