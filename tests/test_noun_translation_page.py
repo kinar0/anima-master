@@ -3,6 +3,10 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+from astrbot.api.web import PluginRequest, bind_request_context
+from starlette.requests import Request
+
 import main
 from main import ComfyUIAgentPlugin
 from noun_translation_batch import parse_existing_mappings
@@ -130,7 +134,7 @@ def test_review_endpoints_require_login_and_never_use_config_save(tmp_path,monke
     handler._vocabulary_review=VocabularyReview(path,tmp_path/"human_notes.json")
     monkeypatch.setattr(main,"json_response",lambda value:value)
     monkeypatch.setattr(main,"error_response",lambda message,status_code:(message,status_code))
-    monkeypatch.setattr(main,"request",SimpleNamespace(args={}))
+    monkeypatch.setattr(main,"request",SimpleNamespace(query={}))
     snapshot=asyncio.run(ComfyUIAgentPlugin.get_vocabulary_review(handler))
     async def body(*,default):
         return {"base_revision":snapshot["revision"],"tag":"dress","state":"deferred","note":"待核对"}
@@ -143,3 +147,80 @@ def test_review_endpoints_require_login_and_never_use_config_save(tmp_path,monke
     handler._ensure_dashboard_user=denied
     assert asyncio.run(ComfyUIAgentPlugin.get_vocabulary_review(handler))[1]==403
     assert asyncio.run(ComfyUIAgentPlugin.save_vocabulary_review(handler))[1]==403
+
+
+def _review_request(handler, query=b"", username="review-tester"):
+    """Use the same request wrapper/proxy binding as AstrBot's Web handler."""
+    raw_request = Request({
+        "type": "http", "method": "GET", "path": "/vocabulary-review",
+        "query_string": query, "headers": [], "scheme": "http",
+        "server": ("testserver", 80), "client": ("testclient", 12345),
+    })
+    plugin_request = PluginRequest(raw_request, username=username)
+
+    async def invoke():
+        with bind_request_context(plugin_request):
+            return await ComfyUIAgentPlugin.get_vocabulary_review(handler)
+
+    return asyncio.run(invoke())
+
+
+def _review_handler(tmp_path):
+    from vocabulary_review import VocabularyReview
+    handler, store = _handler(tmp_path)
+    path = tmp_path / "maintenance.json"
+    path.write_text(json.dumps({"records": [
+        {"tag": tag, "definition": tag, "aliases": [], "focus": True}
+        for tag in ("dress", "skirt", "headpat")
+    ]}), encoding="utf-8")
+    handler._vocabulary_review = VocabularyReview(path, tmp_path / "human_notes.json")
+    handler._ensure_dashboard_user = ComfyUIAgentPlugin._ensure_dashboard_user
+    return handler, store
+
+
+@pytest.mark.parametrize("query,total,page,tags", [
+    (b"", 3, 1, ["dress", "skirt", "headpat"]),
+    (b"state=focus&page=2&page_size=1", 3, 2, ["skirt"]),
+    (b"query=dress&state=all", 1, 1, ["dress"]),
+    (b"state=modified", 0, 1, []),
+])
+def test_review_get_uses_real_astrbot_query_parameters(tmp_path, query, total, page, tags):
+    handler, store = _review_handler(tmp_path)
+    response = _review_request(handler, query)
+    assert response.status_code == 200
+    data = json.loads(response.body)
+    assert (data["total"], data["page"]) == (total, page)
+    assert [row["tag"] for row in data["rows"]] == tags
+    assert data["applied"] is False
+    assert store.saved == []
+    assert not handler._vocabulary_review.decisions_path.exists()
+
+
+@pytest.mark.parametrize("query", [b"page=not-a-number", b"state=unknown"])
+def test_review_real_request_rejects_invalid_query(tmp_path, query):
+    handler, _ = _review_handler(tmp_path)
+    response = _review_request(handler, query)
+    assert response.status_code == 400
+    assert json.loads(response.body)["status"] == "error"
+
+
+def test_review_real_request_requires_dashboard_login(tmp_path):
+    handler, store = _review_handler(tmp_path)
+    response = _review_request(handler, username=None)
+    assert response.status_code == 403
+    assert store.saved == []
+
+
+def test_review_real_request_reads_bundled_catalog_without_applying(tmp_path):
+    handler, store = _review_handler(tmp_path)
+    handler._vocabulary_review.catalog_path = (
+        Path(main.__file__).parent / "third_party/llm_nai_toolbox/vocabulary_review_catalog.json"
+    )
+    response = _review_request(handler, b"state=focus&page=1&page_size=30")
+    assert response.status_code == 200
+    data = json.loads(response.body)
+    assert len(data["rows"]) == min(30, data["total"])
+    assert data["catalog_total"] > 0
+    assert data["applied"] is False
+    assert store.saved == []
+    assert not handler._vocabulary_review.decisions_path.exists()

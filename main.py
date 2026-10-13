@@ -726,7 +726,7 @@ class ComfyUIAgentPlugin(Star):
     async def get_vocabulary_review(self):
         try:
             self._ensure_dashboard_user()
-            params = request.args
+            params = request.query
             existing = self._existing_term_mappings()
             value = await asyncio.to_thread(self._vocabulary_review.snapshot,
                 existing=existing, query=params.get("query", ""), state=params.get("state", "focus"),
