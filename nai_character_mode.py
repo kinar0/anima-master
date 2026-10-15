@@ -297,7 +297,65 @@ def build_nai_character_plan_prompt(
         f"{noun_rule}"
         f"Local character evidence (not a previously written full prompt):\n{final_prompt}"
         + APPEARANCE_VISIBILITY_POLICY
+        + "\nBefore returning JSON, perform a second internal composition and tag-allocation "
+        "review of the scene you have just designed against the full original request "
+        "and local evidence. This review belongs to this same writing call. "
+        "Check all seven semantic responsibilities without outputting seven fields: "
+        "population, confirmed identities, confirmed copyright, visible appearance, "
+        "clothing/actions/expressions/props, shared visual conditions, and coherent "
+        "natural-language relations. Preserve every explicit requirement and "
+        "instance-specific difference. For abstract themes, use relevant visible "
+        "anchors instead of replacing the theme with generic decorative scenery. "
+        "Keep supported weights and canonical spellings, and do not pad to a "
+        "fixed tag count or repeat synonyms. Each prompt should form a coherent "
+        "description; relations must reach the actual prompts, not only analysis. "
+        "Review the positions again against the actual canvas, camera, "
+        "left/right/front/back, relative height/depth, panel boundaries, framing, "
+        "body/head orientation, gaze, and necessary contact. Repair contradictory "
+        "poses or impossible contact without changing the user's explicit camera "
+        "or instance differences; do not use a fixed coordinate template. "
+        "Audit every tag and prose clause for ownership. Put whole-image conditions "
+        "in global_prompt, and all instance conditions in the applicable character "
+        "prompts, repeating shared instance conditions on every applicable wearer. "
+        "Removing a local tag from global_prompt must not lose its meaning: "
+        "redistribute it unless it contradicts the request, visibility or authority. "
+        "Do not copy all local evidence into every box or turn an outfit donor "
+        "into a visible person. Review every person-to-person action: actor, "
+        "recipient, action tag, direction and contact must agree in their actual "
+        "prompts. A directed pair uses source#tag and target#tag with the SAME "
+        "action tag on different instances; a genuinely mutual action uses "
+        "mutual#tag on every participant. Do not make a one-way action mutual. "
+        "Distinguish interaction groups and recipients in prose when more than "
+        "two instances share an action. Check that no role is inverted, no "
+        "counterpart is missing, and no individual action, proximity, one-sided "
+        "gaze or off-screen actor has acquired direction tags. Fix inconsistencies "
+        "before output; record the reviewed relations in composition_analysis.relations "
+        "and explain positions in position_reason. Output only the existing JSON "
+        "schema, with no extra seven-field draft or review schema."
     )
+
+
+def nai_interaction_validation_issues(plan: dict[str, Any]) -> tuple[str, ...]:
+    """Check direction-pair structure without guessing actions from request words."""
+    actions: dict[str, dict[str, set[int]]] = {}
+    for index, character in enumerate(plan["characters"]):
+        for tag in character.get("interaction_tags", ()):
+            direction, _, action = tag.casefold().partition("#")
+            roles = actions.setdefault(_normalized_nai_tag(action), {})
+            roles.setdefault(direction, set()).add(index)
+    issues = []
+    for action, roles in actions.items():
+        sources, targets = roles.get("source", set()), roles.get("target", set())
+        mutual = roles.get("mutual", set())
+        if any(not (targets - {index}) for index in sources):
+            issues.append(f"source#{action} has no target#{action} on another visible instance")
+        if any(not (sources - {index}) for index in targets):
+            issues.append(f"target#{action} has no source#{action} on another visible instance")
+        if mutual and len(mutual) < 2:
+            issues.append(f"mutual#{action} needs at least two visible participants")
+        if mutual & (sources | targets):
+            issues.append(f"{action} assigns mutual and directed roles to the same instance")
+    return tuple(issues)
 
 
 def missing_nai_noun_tags(

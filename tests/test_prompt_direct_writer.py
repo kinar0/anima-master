@@ -47,19 +47,21 @@ def semantic_character(name, clothing=None, changes=()):
                 clothing_changes=[], appearance_changes=list(changes))
 
 
-def run(prompt, semantic, writer, config=None, resolver=None, original_prompt=""):
+def run(prompt, semantic, writer, config=None, resolver=None, original_prompt="", repair=None):
     config = config or {}
 
     class Context:
         def __init__(self):
             self.outputs = [json.dumps(semantic, ensure_ascii=False), writer]
+            if repair is not None:
+                self.outputs.append(repair)
             self.calls = []
 
         async def get_current_chat_provider_id(self, _umo): return "provider"
 
         async def llm_generate(self, **kwargs):
             self.calls.append(kwargs)
-            assert self.outputs, "The valid plan must not cause a third full writer call"
+            assert self.outputs, "A valid direct plan must not cause a seven-field or extra review call"
             return type("Response", (), {"completion_text": self.outputs.pop(0)})()
 
     class Researcher:
@@ -86,6 +88,63 @@ def plan(characters, global_prompt="2girls, garden"):
         characters=[dict(name=name, prompt=text, x=x, y=.5, interaction_tags=[],
                          position_reason="separate visible region") for name, text, x in characters],
     ))
+
+
+def test_restored_scene_responsibilities_stay_inside_the_direct_nai_writer():
+    output = plan([("character_a", "girl, pink hair, feeding character_b with a spoon", .3),
+                   ("character_b", "girl, blue hair, accepting food from character_a", .7)])
+    result, calls = run(
+        "-r 角色甲用勺子喂角色乙", {"characters": [
+            semantic_character("角色甲"), semantic_character("角色乙")
+        ]}, output, {"debug_prompt_enabled": True,
+                    "prompt_builder_template": "CUSTOM SEVEN FIELD WRITER {theme}"},
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    writer = calls[1]
+    assert '"global_prompt"' in writer["prompt"]
+    assert "seven semantic responsibilities without outputting seven fields" in writer["prompt"]
+    assert "second internal composition and tag-allocation review" in writer["prompt"]
+    assert "source#tag" in writer["prompt"] and "target#tag" in writer["prompt"]
+    assert "mutual#tag" in writer["prompt"]
+    assert "Actual canvas: 1024x1536" in writer["prompt"]
+    assert "CUSTOM SEVEN FIELD WRITER" not in writer["prompt"]
+    assert "Anima" not in writer["system_prompt"]
+    assert "same writing call" in writer["prompt"]
+    assert result.summary["prompt_output_mode"] == "nai_instances"
+    assert result.summary["prompt_llm_initial_content"] == output
+    assert "nai_full_prompt_before_split" not in result.summary
+
+
+@pytest.mark.parametrize("repair_ok", [True, False])
+def test_direct_direction_review_repairs_only_invalid_pairs_once(repair_ok):
+    layout = json.loads(plan([("character_a", "girl, hugging character_b", .4),
+                              ("character_b", "girl, receiving a hug", .6)]))
+    layout["characters"][0]["interaction_tags"] = ["source#hug"]
+    invalid = json.dumps(layout)
+    layout["characters"][1]["interaction_tags"] = ["target#hug"]
+    fixed = json.dumps(layout)
+    result, calls = run("-r 角色甲抱住角色乙", {"characters": [
+        semantic_character("角色甲"), semantic_character("角色乙")
+    ]}, invalid, {"debug_prompt_enabled": True}, repair=fixed if repair_ok else invalid)
+    assert len(calls) == 3  # semantic planner, direct writer, one pair repair
+    assert result.summary["nai_character_plan_attempt_count"] == 2
+    assert result.summary["prompt_llm_attempt_count"] == 2
+    assert result.summary["nai_interaction_initial_validation_errors"]
+    assert "source#hug" in calls[2]["prompt"] and "target#hug" in calls[2]["prompt"]
+    assert result.summary["nai_character_plan_initial_raw"] == invalid
+    if repair_ok:
+        assert result.final_prompt
+        assert result.summary["nai_character_plan_accepted_attempt"] == "retry"
+        assert result.summary["prompt_llm_initial_content"] == invalid
+        assert result.summary["prompt_llm_retry_content"] == fixed
+        assert result.summary["nai_interaction_retry_validation_errors"] == []
+        assert "target#hug" in result.summary["nai_characters"][1]["prompt"]
+    else:
+        assert not result.final_prompt
+        assert result.summary["skipped_reason"] == "nai_character_plan_failed"
+        assert "nai_character_plan_invalid_interaction_pairs" in result.summary["llm_error"]
+        assert "nai_characters" not in result.summary
 
 
 def test_two_stages_keep_wearer_appearance_omission_and_distinct_clothes():

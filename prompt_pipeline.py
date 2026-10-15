@@ -37,6 +37,7 @@ try:
     )
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
+        nai_interaction_validation_issues,
         missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
@@ -131,6 +132,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from nai_character_mode import (
         build_nai_character_plan_prompt,
+        nai_interaction_validation_issues,
         missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
@@ -5180,12 +5182,13 @@ class PromptPipeline:
     ) -> PromptPipelineResult:
         """Second-stage NAI writer: local evidence directly to instance JSON."""
         debug = self._bool("debug_prompt_enabled", False)
-        plan_prompt = plan_raw = ""
+        plan_prompt = plan_raw = plan_initial_raw = ""
         trait_request = original_prompt or prompt
         allow_futa = has_positive_futa_request(trait_request)
         allow_male_genitals = has_positive_male_genital_request(trait_request)
         removed_sexual_traits: list[str] = []
         summary.update(prompt_output_mode="nai_instances", prompt_llm_attempt_count=1,
+                       nai_character_plan_attempt_count=1,
                        danbooru_term_fallback_tags=[], nai_dropped_instance_sources=[],
                        sensual_mode=sensual_mode,
                        sexual_trait_authority={"futa_allowed": allow_futa,
@@ -5280,20 +5283,56 @@ class PromptPipeline:
                 self.logger.info("[comfyui_agent] NAI -r direct writer prompt:\n%s", plan_prompt)
             response = await self.context.llm_generate(
                 chat_provider_id=provider_id, prompt=plan_prompt,
-                system_prompt="Write final NAI global and character-instance prompts. Return valid JSON only.",
+                system_prompt="Write final NAI global and character-instance prompts. Review scene completeness, tag ownership, positions and source#/target#/mutual# roles before returning valid JSON only.",
                 max_tokens=max(1200, min(7200, max(
                     self._int("prompt_builder_max_tokens", 1800),
                     1200 + 260 * canvas["character_limit"],
                 ))), thinking={"type": "disabled"},
             )
             plan_raw = _extract_completion_text(response)
+            plan_initial_raw = plan_raw
             if debug:
+                summary["nai_character_plan_initial_raw"] = plan_raw
                 self.logger.info("[comfyui_agent] NAI -r direct writer raw output:\n%s", plan_raw)
             if is_chinese_model_refusal(plan_raw):
                 return self._model_refusal_result(summary, plan_raw)
             nai_plan = parse_nai_character_plan(
                 plan_raw, character_limit=canvas["character_limit"],
             )
+            issues = nai_interaction_validation_issues(nai_plan)
+            summary.update(nai_character_plan_attempt_count=1,
+                           nai_interaction_initial_validation_errors=list(issues))
+            if issues:
+                repair_prompt = (plan_prompt + "\nThe previous allocation failed interaction review:\n"
+                                 + "\n".join(issues) + "\nPrevious JSON:\n" + plan_raw
+                                 + "\nRecheck the original request and both participants. Repair the "
+                                 "complete JSON once, preserving valid identities, wardrobe and layout. "
+                                 "Use matching action tags for directed pairs; remove invented roles "
+                                 "instead of inventing an extra participant.")
+                summary["nai_character_plan_attempt_count"] = 2
+                summary["prompt_llm_attempt_count"] = 2
+                response = await self.context.llm_generate(
+                    chat_provider_id=provider_id, prompt=repair_prompt,
+                    system_prompt="Repair the NAI instance allocation after interaction review. Return valid JSON only.",
+                    max_tokens=max(1200, min(7200, max(
+                        self._int("prompt_builder_max_tokens", 1800),
+                        1200 + 260 * canvas["character_limit"],
+                    ))), thinking={"type": "disabled"},
+                )
+                retry_raw = _extract_completion_text(response)
+                if debug:
+                    summary.update(nai_character_plan_initial_raw=plan_raw,
+                                   nai_character_plan_retry_raw=retry_raw,
+                                   nai_character_plan_repair_prompt=repair_prompt,
+                                   prompt_llm_retry_content=retry_raw)
+                if is_chinese_model_refusal(retry_raw):
+                    return self._model_refusal_result(summary, retry_raw)
+                plan_raw = retry_raw
+                nai_plan = parse_nai_character_plan(plan_raw, character_limit=canvas["character_limit"])
+                issues = nai_interaction_validation_issues(nai_plan)
+                summary["nai_interaction_retry_validation_errors"] = list(issues)
+                if issues:
+                    raise ValueError("nai_character_plan_invalid_interaction_pairs: " + "; ".join(issues))
             bound_references = tuple(
                 item for item in local_references
                 if any(_character_outfit_matches(character["name"], item)
@@ -5412,13 +5451,14 @@ class PromptPipeline:
                     item.target_anchor_id for item in bound_references
                 ],
                 background_mode=marker, background_mode_source="writer",
-                prompt_llm_accepted_attempt="initial",
+                prompt_llm_accepted_attempt=("retry" if summary["nai_character_plan_attempt_count"] == 2 else "initial"),
+                nai_character_plan_accepted_attempt=("retry" if summary["nai_character_plan_attempt_count"] == 2 else "initial"),
                 final_prompt_head=self._shorten(nai_plan["global_prompt"], 600),
                 final_prompt_chars=len(nai_plan["global_prompt"]),
             )
             if debug:
                 summary.update(nai_character_plan_prompt=plan_prompt, nai_character_plan_raw=plan_raw,
-                               llm_prompt=plan_prompt, prompt_llm_initial_content=plan_raw,
+                               llm_prompt=plan_prompt, prompt_llm_initial_content=plan_initial_raw,
                                final_prompt=nai_plan["global_prompt"])
                 self.logger.info("[comfyui_agent] NAI -r direct writer final plan:\n%s", json.dumps(nai_plan, ensure_ascii=False))
             return PromptPipelineResult(nai_plan["global_prompt"], summary)

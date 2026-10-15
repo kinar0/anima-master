@@ -97,7 +97,7 @@ custom_workflow_override_parameters = false
 解析后按当前画师组（含本次 `-sN` 选择）恢复全局画师串，并替换同名的错误副本；
 `(yd_(orange_maru):1.1)` 等嵌套括号加权项保留原始写法。
 
-重复身份涉及修改时，专用 JSON 用 `source_text` 的原文片段（或片段数组）声明每格适用的要求，衣柜不同再用 `anchor_id` 区分本地计划；这些辅助字段只用于权限和诊断，不写进 `ComfyUIToNovelAIV4` 的 prompt。无法定位实例或原文证据时停止，正常主链不追加第三次拆分。
+重复身份涉及修改时，专用 JSON 用 `source_text` 的原文片段（或片段数组）声明每格适用的要求，衣柜不同再用 `anchor_id` 区分本地计划；这些辅助字段只用于权限和诊断，不写进 `ComfyUIToNovelAIV4` 的 prompt。无法定位实例或原文证据时停止，正常主链不追加第三次拆分或审查调用；方向配对结构错误时可额外修复一次。
 
 按 NovelAI 的 base prompt / character prompt 边界，布局任务书把无数字性别、身份、
 外貌、服装、姿势、表情、身体与头脸朝向、视线、动作、所持物以及人物与环境的
@@ -120,8 +120,7 @@ NAI 提示词支持生成节点上的直接字符串，以及经 `Textbox`、
 布局模型从完整原文判断是否存在可见人物之间的明确动作，不依赖固定动作词组；有明确动作时，主动方的角色框使用
 `source#hug`，被拥抱方使用 `target#hug`；若双方相互拥抱，则两边各用
 `mutual#hug`。`#` 后只能是一项 Danbooru 动作 tag，不能接逗号分隔的多个
-tag 或整句话；单人动作应留空。主机丢弃格式错误的方向标签，但是否有互动及其方向由布局模型判断，
-其余角色提示词和坐标继续使用。方向标签只进入各自角色框，不会放进全局提示词。此语法见
+tag 或整句话；单人动作应留空。模型在同次直接写作中复核互动、方向、坐标和 tag 归属。主机丢弃格式错误的方向标签，并核对同动作 source/target 位于不同实例、mutual 至少两人且不与同实例的 directed 角色冲突；配对不完整时修复一次，仍失败停止。方向标签只进入各自角色框，不会放进全局提示词。此语法见
 [NovelAI 多角色提示词文档](https://docs.novelai.net/en/image/multiplecharacters/#action-tags)；
 官方也说明它并非每次都可靠。
 规划结果还记录简短的整体构图分析和逐角色位置理由，供任务摘要排查；主机只
@@ -165,7 +164,7 @@ tag 或整句话；单人动作应留空。主机丢弃格式错误的方向标�
 - `blocked_prompt_rules`：配置页的“屏蔽词组对规则”可视化组件可添加任意多条规则。每条有“左组词条”和“右组词条”两个可增删列表，分别填 A/B、C/D 等。任一规则中左组任意一个词条与右组任意一个词条同时出现，即拒绝生成；不同规则之间不会交叉配对。例如第一条为 A/B、第二条为 C/D，A+D 不会因这两条规则而命中。每条规则的两组都需要至少一个非空词条。同组内多个词条不要求同时出现。按子串匹配，不要求顺序或相邻，不区分英文字母大小写，也检查 `#` 后的手工尾缀。拒绝发生在额度扣减、模型调用和 ComfyUI 连接检查前；原样和多人模式同样生效。改图功能开启时也检查改图输入。上一版的固定 A/B 列表会在重载时迁移为一条组对规则。
 - `blocked_prompt_combinations`：旧版 `&&` 组合仍在配置页保留并继续生效。任一旧规则或任一组对规则命中即拒绝；如需只使用组对规则，请清空旧规则列表。
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
-- `prompt_builder_max_tokens`：普通提示词优化模型最大输出长度，同时约束两次 LLM；普通请求的第一次语义规划最多使用 900 tokens。`-r` 为容纳最多 22 个角色实例，将第一次语义规划的输出预算提高到 7200 tokens，专用第二阶段按 `max(1200, min(7200, max(prompt_builder_max_tokens, 1200 + 260 × 模型角色上限)))` 计算；正常没有第三次拆分写作。
+- `prompt_builder_max_tokens`：普通提示词优化模型最大输出长度，同时约束两次 LLM；普通请求的第一次语义规划最多使用 900 tokens。`-r` 为容纳最多 22 个角色实例，将第一次语义规划的输出预算提高到 7200 tokens，专用第二阶段按 `max(1200, min(7200, max(prompt_builder_max_tokens, 1200 + 260 × 模型角色上限)))` 计算；正常没有第三次拆分或审查写作；方向配对结构错误可额外修复一次。
 - `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，简单表情包或头像可以使用 30–45 个，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。普通模式会在去除较多同义词后尝试一次按缺失画面槽位补全。
 - `unspecified_wardrobe_policy`：按角色处理“没有实际服装基础”的策略。`scene_adaptive`（默认）把角色 default 作为软参考；中性场景更倾向沿用，涩气或强场景允许第二次 LLM 按情境替换或补全。也可固定为 `default_profile`（仍以软参考方式提供）或 `creative_fallback`（完全不加载 default）。
 - `scene_adaptive_wardrobe_markers`：场景自适应的强触发词列表。默认包含泳池边、出浴、睡眠前后、比赛、运动/训练结束、健身、游泳结束和演出结束等；普通公园、在家、吃饭不会触发。
@@ -310,7 +309,7 @@ Canonical Tag: haneoka_school_uniform
 
 开启后可能在日志和 `last_task.json` 中记录较长提示词，请注意隐私。
 
-`debug_prompt_enabled` 会同时记录第一次语义规划 LLM 的任务书、system prompt、完整原始回复、解析后的 anchors、恢复前后的 `character_plans`，以及第二次提示词 LLM 的任务书、回复和最终 prompt。`-r` 请求以 `NAI -r direct writer` 记录专用第二阶段实际画布、位置规划任务书、模型原始回复，以及解析和后处理后的完整位置规划（构图分析、每个角色的位置理由、XY 坐标、角色提示词、被丢弃的互动方向 tag，以及从全局提示词删除的明确角色实例 tag）。解析失败时也会记录原始回复和错误。任务摘要另保存 `nai_character_plan_prompt`、`nai_character_plan_raw` 与 `nai_dropped_global_character_tags`，便于复核规划结果。关闭该开关时不输出这些位置规划调试日志。
+`debug_prompt_enabled` 会同时记录第一次语义规划 LLM 的任务书、system prompt、完整原始回复、解析后的 anchors、恢复前后的 `character_plans`，以及第二次提示词 LLM 的任务书、回复和最终 prompt。`-r` 请求以 `NAI -r direct writer` 记录专用第二阶段实际画布、位置规划任务书、模型原始回复，以及解析和后处理后的完整位置规划（构图分析、每个角色的位置理由、XY 坐标、角色提示词、被丢弃的互动方向 tag，以及从全局提示词删除的明确角色实例 tag）。解析失败时也会记录原始回复和错误。任务摘要另保存 `nai_character_plan_prompt`、`nai_character_plan_raw` 与 `nai_dropped_global_character_tags`；方向配对错误、初稿/修复稿及尝试次数分别记录在 `nai_interaction_initial_validation_errors` / `nai_interaction_retry_validation_errors`、`nai_character_plan_initial_raw` / `nai_character_plan_retry_raw` 和 `nai_character_plan_attempt_count` 中，便于复核规划结果。关闭该开关时不输出这些位置规划调试日志。
 
 排查服装串档时，优先查看最近任务摘要中的这些字段：
 

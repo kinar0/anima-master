@@ -19,11 +19,55 @@ from generation_task import GenerationTaskRunner  # noqa: E402
 from nai_character_mode import (  # noqa: E402
     build_nai_character_plan_prompt,
     missing_nai_noun_tags,
+    nai_interaction_validation_issues,
     parse_nai_character_plan,
     preserve_nai_global_artist_tags,
     resolve_nai_canvas,
     strip_nai_character_switch,
 )
+
+
+@pytest.mark.parametrize("tags,valid", [
+    ([[], []], True),  # individual actions, proximity, gaze: no invented relation
+    ([["source#feeding"], ["target#feeding"]], True),
+    ([["source#Hug"], ["target#hug"]], True),
+    ([["source#helping_up"], ["target#helping up"]], True),
+    ([["mutual#hug"], ["mutual#hug"]], True),
+    ([["source#hug"], []], False),
+    ([[], ["target#hug"]], False),
+    ([["source#hug"], ["target#kiss"]], False),
+    ([["mutual#hug"], []], False),
+    ([["source#hug", "target#hug"], []], False),
+    ([["mutual#hug", "source#hug"], ["mutual#hug", "target#hug"]], False),
+    ([["source#feeding"], ["target#feeding"], ["mutual#hug"], ["mutual#hug"]], True),
+    ([["source#hug"], ["target#hug"], ["source#hug"], ["target#hug"]], True),
+])
+def test_interaction_review_checks_pairs_without_a_fixed_action_dictionary(tags, valid):
+    parsed = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {"viewpoint": "side", "layout": "contact", "relations": "reviewed"},
+        "global_prompt": f"{len(tags)}people, indoors",
+        "characters": [{"name": f"instance_{index}", "prompt": "girl",
+                        "interaction_tags": actions, "position_reason": "visible region",
+                        "x": .2 + .15 * index, "y": .5}
+                       for index, actions in enumerate(tags)],
+    }))
+    assert bool(nai_interaction_validation_issues(parsed)) is not valid
+
+
+def test_direct_writer_reviews_composition_tag_ownership_and_directions_in_one_call():
+    instruction = build_nai_character_plan_prompt(
+        "A feeds B", "local identity evidence",
+        {"width": 1216, "height": 832, "aspect_ratio": "19:13", "orientation": "landscape"},
+    )
+    assert "second internal composition and tag-allocation review" in instruction
+    assert "same writing call" in instruction
+    assert "seven semantic responsibilities without outputting seven fields" in instruction
+    assert "source#tag" in instruction and "target#tag" in instruction and "mutual#tag" in instruction
+    assert "SAME action tag" in instruction
+    assert "Removing a local tag from global_prompt must not lose its meaning" in instruction
+    assert "actual canvas" in instruction and "panel boundaries" in instruction
+    assert "coherent description" in instruction
+    assert "no extra seven-field draft or review schema" in instruction
 
 
 def test_nai_writer_contract_separates_counts_and_allows_original_chinese() -> None:
