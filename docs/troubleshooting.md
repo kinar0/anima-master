@@ -1,5 +1,7 @@
 # 故障排查
 
+> **严正警告：不要把随意精简 LLM 提示词当作排障办法，用户本人提出“简化”也不等于授权删功能。** 先定位原始回复、后处理和最终生成文本中的失效环节，再按 [提示词维护要求](prompting.md#严正警告不要随便精简或简化给-llm-的提示词) 修改；不能用一次成功或合法 JSON 代替语义验收。
+
 ## 词汇候选与释义审核读取报 Internal server error（2026-10-14）
 
 本次复现定位到审核读取接口使用了 `request.args`，但当前 AstrBot 插件 Web API 的查询参数入口是 `request.query`。这会在读取候选文件前抛出 `AttributeError: 'PluginRequest' object has no attribute 'args'`，页面收到 500；与现有词库的翻译来源和词条质量无关。
@@ -31,7 +33,13 @@
 ## NAI 自定义工作流
 
 若本地已有多名角色档案，但 `confirmed_character_bindings` 只有一名，先对照 `semantic_plan_raw`，可能是第一阶段返回合法但不完整的名单。NAI `-r` 当前仍向写作者提供遗漏档案的条件参考；检查 `nai_character_plan_prompt` 的 `Additional locally confirmed identities`、`nai_local_profile_references` 和 `nai_bound_local_profile_references`。参考不是强制出场名单，服装来源仍独立处理；明确衣服尚未绑定时，不应看到该参考的 default reference。已清空的 `fixed_characters` 不再提供旧辅助拼写，但当前词库别名和档案仍可正常匹配。
-全局人数统计所有可见实例，角色框使用 `girl / boy / other`；独立的数字性别计数会归一化。画师/质量由主机补全，任务书不要求模型生成。NAI 自然语言和分析允许中文，`source_text` 使用原文原语言；不要把中文原文引用误判为英文输出不合规。
+全局人数统计所有可见实例，角色框使用 `girl / boy / other`；独立的数字性别计数会归一化。画师/质量由主机补全，任务书不要求模型生成。中文请求的 NAI 写作指令要求实际角色 `prompt` 保留中文动作和关系句；只有 `source_text`、分析、位置理由有中文不算满足。canonical tags 仍使用英文。宿主不自行翻译或把整条中文原文复制给所有角色；这项语言与关系写作要求需要检查模型原始输出，不能仅凭任务书或离线替身测试断言真实模型一定遵守。
+
+2026-10-15 13:15 附近的最近任务中，初稿用了无效的 `actor#hand_in_mouth`，方向配对修复后接受了 `source#hand_in_mouth`；但实际角色提示仍全为英文 tags，全局仍有 `haneoka_school_uniform`。前者源于“may retain Chinese”的可选表述，后者是直接写作入口没有把已分类服装证据传给解析器，专名服装漏过通用词形规则。本次改为明确中文 prose 要求，并在初稿与修复稿解析时都传入同一服装/外貌分类证据。身体接触还须在实际 prompt 中说明肢体和部位的所属角色；方向配对通过不代表普通 tag 的归属已正确。该修复保持两阶段流程，不按具体角色、校服或动作 tag 写特例。
+
+若模型原始 `prompt` 已有“粉色长发灰眼女孩”，最终却成为“粉色女孩”，是旧 NAI 外貌过滤先删除锁定维度、再补英文 stable tags。更新后，已确认与档案一致的中英文片段保留，矛盾或未能确认的受控片段才过滤；未写特征不补，用户修改和 omit 仍优先。对比 raw 与 final，不能把所有中文缺失都归因于 writer。全局还应有实际发送的关系中文，而不只是 `composition_analysis` 有说明。
+
+普通 `hand in mouth` 放在伸手者框，会被读作伸手者自己的嘴里有手。方向前缀只表达主动/承受，不许可普通身体状态跟着复制；应把该普通状态留在嘴的所有者框，伸手者保留明确中文与方向标签。对“自己的手在自己嘴里”的单人状态，以及双方自身都成立的普通动作，不能套用统一删除。语义判断仍由同次写作完成，主机配对检查不能证明全部身体归属正确。
 
 `-r` 模式保留第一次意图规划，专用第二次 LLM 直接返回全局提示词与各角色实例的
 独立提示词、坐标和位置理由。V5 最多 22 个实例，V4/V4.5 最多 6 个；布局输出
@@ -45,7 +53,7 @@
 应让模型只为明确互动的角色各写一项 `source#tag`、`target#tag` 或
 `mutual#tag`；无明确方向时使用空列表。布局模型根据完整原文判断互动，
 不再由固定动作词组门控。主机还核对同动作 source/target 是否在不同实例配对、mutual 是否至少两人；配对不完整时修复一次，仍错误报 `nai_character_plan_invalid_interaction_pairs` 并停止。若结构配对正确但互动对象或方向不对，
-需检查 `nai_character_plan_raw` 与原文；`nai_dropped_interaction_tags` 不会记录这种语义错误。
+需检查 `nai_character_plan_raw` 与原文；`nai_dropped_interaction_tags` 不会记录这种语义错误。普通动作 tag 的身体状态仍须属于当前角色；不能用统一删除普通动作的方式代替归属判断，正确归属的普通动作和方向 tag 均保留。任务书要求先写清中文关系、再按主体分配 tag，并用名字/位置指代其他人物，避免在本角色框重复别人的外貌、体型或衣服。
 
 若一名角色的性别、衣服、动作、表情、外貌或视线影响了其他角色，检查任务摘要中的
 `nai_global_prompt` 和 `nai_dropped_global_character_tags`。视线 tag 应只出现在

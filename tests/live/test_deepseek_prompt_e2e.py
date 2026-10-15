@@ -485,3 +485,72 @@ def test_live_multi_person_route_uses_one_model_call_without_llm1(live_pipeline)
     assert "black hair" in final
     assert "blue eyes" in final
     assert "holding hands" in final
+
+
+@pytest.mark.parametrize("case,prompt", [
+    ("pinning", "-r 千早爱音羽丘校服，被丰川祥子羽丘校服摁在床上，两人对视，丰川祥子手塞进嘴里摸虎牙"),
+    ("different_clothes", "-r 千早爱音穿白色连衣裙坐在椅子上，丰川祥子穿羽丘校服站在旁边，祥子用手扶住爱音的肩膀，两人对视"),
+    ("explicit_mouth", "-r 千早爱音穿羽丘校服被丰川祥子摁在床上。丰川祥子也穿羽丘校服，把自己的手伸进千早爱音的嘴巴里摸爱音的虎牙。两人对视。"),
+    ("reciprocal_hug_dark", "-r 千早爱音穿白色连衣裙，丰川祥子穿羽丘校服，两人互相拥抱。房间昏暗无光，没有任何光源，不要补光。"),
+])
+def test_live_nai_chinese_and_per_instance_ownership(live_pipeline, tmp_path, case, prompt):
+    live_pipeline[0].config["debug_prompt_enabled"] = True
+    result, calls = _build(live_pipeline, prompt)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"nai_chinese_ownership_{case}.json"
+    report_path.write_text(json.dumps({
+        "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Live NAI ownership evidence: {report_path}")
+    assert result.final_prompt, result.summary.get("llm_error")
+    assert len(calls) in (2, 3)
+    assert not result.summary.get("nai_interaction_retry_validation_errors")
+    characters = {row["name"]: row["prompt"] for row in result.summary["nai_characters"]}
+    assert set(characters) == {"chihaya_anon", "togawa_sakiko"}
+    assert all(_CJK_RE.search(text) for text in characters.values()), characters
+    assert _CJK_RE.search(result.final_prompt), result.final_prompt
+    # A paired source tag does not license an unqualified self-body assertion.
+    from tag_cleaner import split_tags
+    assert all(not re.fullmatch(r"[-+]?\d+(?:\.\d+)?", atom)
+               for text in characters.values() for atom in split_tags(text)), characters
+    if case in {"pinning", "explicit_mouth"}:
+        source_atoms = {part.replace("_", " ").casefold() for part in split_tags(characters["togawa_sakiko"])}
+        assert not source_atoms & {"hand in mouth", "finger in mouth", "fingers in mouth"}, characters
+        assert any(term in characters["chihaya_anon"] for term in ("嘴", "口中", "mouth"))
+    else:
+        assert all(part.split("#", 1)[-1].replace("_", " ").casefold()
+                   not in {"hand in mouth", "finger in mouth", "fingers in mouth"}
+                   for text in characters.values() for part in split_tags(text)), characters
+    if case == "reciprocal_hug_dark":
+        assert all(any(term in text for term in ("拥抱", "hug")) for text in characters.values())
+    if case != "reciprocal_hug_dark":
+        # "No extra lighting effects" denies embellishment; it is not a light
+        # source. Strip only complete negated clauses, preserving any positive
+        # lighting in the same output for the assertion below.
+        lighting_text = ", ".join(part for part in split_tags(result.final_prompt)
+                                  if not re.fullmatch(
+                                      r"(?:无|没有|不加|不添加|不要)(?:任何|额外|特殊|默认)"
+                                      r"(?:灯光|照明|光照|光线)(?:效果)?[。.!]?|"
+                                      r"no (?:extra|special|additional) lighting(?: effects?)?[.!]?",
+                                      part.strip(), re.I))
+        assert not re.search(r"lighting|sunlight|moonlight|backlight|光照|光线|光影|灯光|柔光|阳光|月光",
+                             lighting_text, re.I), result.final_prompt
+    else:
+        assert not any(term in result.final_prompt.casefold()
+                       for term in ("soft lighting", "warm lighting", "sunlight", "lamp", "candle", "柔光", "阳光", "台灯", "烛光"))
+    accepted = json.loads(result.summary["nai_character_plan_raw"])
+    for raw_row in accepted["characters"]:
+        if raw_row["name"] == "chihaya_anon":
+            for phrase in ("粉色长发", "灰眼", "灰色眼睛"):
+                if phrase in raw_row["prompt"]:
+                    assert phrase in characters["chihaya_anon"], (raw_row["prompt"], characters)
+    assert "school uniform" not in result.final_prompt.replace("_", " ")
+    assert "haneoka school uniform" in characters["togawa_sakiko"].replace("_", " ")
+    if case in {"pinning", "explicit_mouth"}:
+        assert "haneoka school uniform" in characters["chihaya_anon"].replace("_", " ")
+    else:
+        assert "haneoka school uniform" not in characters["chihaya_anon"].replace("_", " ")
+        assert any(term in characters["chihaya_anon"].replace("_", " ")
+                   for term in ("white dress", "白色连衣裙"))

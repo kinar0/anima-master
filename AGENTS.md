@@ -48,6 +48,14 @@ this directory unless the task context explicitly says otherwise:
 Treat the task-provided working directory and permission boundaries as
 authoritative if they differ from this file.
 
+# LLM prompt maintenance: do not casually simplify
+
+**严正警告，适用于后来的维护者、AI 代理和用户本人：不要随便精简或简化给 LLM 的提示词。**
+提示词承载功能契约，不能仅因文字长、看似重复或为了节省 token，就删减职责、弱化强制要求、移除反例或把具体规则替换成泛泛自审。
+用户笼统要求“整理／精简／去重／优化”时，默认保留全部功能、约束强度和当前工作流；这不等于授权删功能或重新设计调用链。用户明确要求改变具体行为时，应说明对应契约变化。
+改动前逐项对照当前实际拼装文本、工作流文档与必要的 Git 历史；改动后检查模型原始输出和最终生成文本，按已有授权做必要回归并说明未验证范围。字符数下降、合法 JSON、纯替身测试或一次成功均不能单独证明等价。
+详细要求见 [提示词维护严正警告](docs/prompting.md#严正警告不要随便精简或简化给-llm-的提示词)。涉及提示词改写时必须先读该节。
+
 # Bug-fix prerequisite: understand the image-generation flow
 
 Before attempting to diagnose or fix any bug that can affect image generation,

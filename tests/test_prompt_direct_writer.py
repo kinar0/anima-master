@@ -110,9 +110,11 @@ def test_restored_scene_responsibilities_stay_inside_the_direct_nai_writer():
     assert "Actual canvas: 1024x1536" in writer["prompt"]
     assert "CUSTOM SEVEN FIELD WRITER" not in writer["prompt"]
     assert "Anima" not in writer["system_prompt"]
+    assert "Chinese requests require Chinese" in writer["system_prompt"]
+    assert "Lighting is opt-in" in writer["system_prompt"]
     assert "seven-field" not in writer["prompt"]
     assert writer["prompt"].count("角色甲用勺子喂角色乙") == 1
-    assert len(writer["prompt"]) < 10000
+    assert len(writer["prompt"]) < 12000
     assert result.summary["prompt_output_mode"] == "nai_instances"
     assert result.summary["prompt_llm_initial_content"] == output
     assert "nai_full_prompt_before_split" not in result.summary
@@ -134,6 +136,8 @@ def test_direct_direction_review_repairs_only_invalid_pairs_once(repair_ok):
     assert result.summary["prompt_llm_attempt_count"] == 2
     assert result.summary["nai_interaction_initial_validation_errors"]
     assert "source#hug" in calls[2]["prompt"] and "target#hug" in calls[2]["prompt"]
+    assert "Lighting is opt-in" in calls[2]["system_prompt"]
+    assert "affected body part's owner" in calls[2]["system_prompt"]
     assert result.summary["nai_character_plan_initial_raw"] == invalid
     if repair_ok:
         assert result.final_prompt
@@ -147,6 +151,96 @@ def test_direct_direction_review_repairs_only_invalid_pairs_once(repair_ok):
         assert result.summary["skipped_reason"] == "nai_character_plan_failed"
         assert "nai_character_plan_invalid_interaction_pairs" in result.summary["llm_error"]
         assert "nai_characters" not in result.summary
+
+
+@pytest.mark.parametrize("repair_needed", [False, True])
+@pytest.mark.parametrize("outfit_tag", ["haneoka_school_uniform", "aurora_academy_attire"])
+def test_nai_named_clothes_stay_with_wearers_including_after_pair_repair(outfit_tag, repair_needed):
+    class NamedClothing(Resolver):
+        def cached_outfit_profiles_for_prompt(self, prompt):
+            from dataclasses import replace
+            return replace(super().cached_outfit_profiles_for_prompt(prompt),
+                           named_outfit_tags=(outfit_tag,))
+
+    layout = json.loads(plan([
+        ("character_a", f"girl, {outfit_tag}, 张嘴接受角色乙喂来的食物", .3),
+        ("character_b", f"girl, {outfit_tag}, 用自己手里的勺子喂角色甲", .7),
+    ], f"2girls, {outfit_tag.replace('_', ' ')}, bed, table, unclassified_glow"))
+    layout["characters"][1]["interaction_tags"] = ["source#feeding"]
+    if not repair_needed:
+        layout["characters"][0]["interaction_tags"] = ["target#feeding"]
+    initial = json.dumps(layout, ensure_ascii=False)
+    layout["characters"][0]["interaction_tags"] = ["target#feeding"]
+    fixed = json.dumps(layout, ensure_ascii=False)
+    result, calls = run(
+        "-r 角色甲和角色乙都穿命名校服，角色乙用勺子喂角色甲", {"characters": [
+            semantic_character("角色甲", "命名校服"), semantic_character("角色乙", "命名校服")
+        ]}, initial, {"debug_prompt_enabled": True}, resolver=NamedClothing(),
+        repair=fixed if repair_needed else None,
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == (3 if repair_needed else 2)
+    assert outfit_tag.replace('_', ' ') not in result.final_prompt
+    assert result.summary["nai_dropped_global_character_tags"] == [outfit_tag.replace('_', ' ')]
+    assert all(term in result.final_prompt for term in ("bed", "table", "unclassified glow"))
+    recipient, actor = result.summary["nai_characters"]
+    assert outfit_tag in recipient["prompt"] and outfit_tag in actor["prompt"]
+    assert "张嘴接受角色乙喂来的食物" in recipient["prompt"]
+    assert "用自己手里的勺子喂角色甲" in actor["prompt"]
+    assert "target#feeding" in recipient["prompt"] and "source#feeding" in actor["prompt"]
+    if not repair_needed:
+        from agent_tools.comfyui_workflows import custom_t2i_workflow
+        graph = custom_t2i_workflow(
+            {"custom_workflow_path": "nai_api.json"}, result.final_prompt, "blurry",
+            1024, 1536, 28, 6, 123, nai_characters=result.summary["nai_characters"],
+        )
+        selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+        assert graph[selector["character1"][0]]["inputs"]["comfyui_prompt"] == recipient["prompt"]
+        assert graph[selector["character2"][0]]["inputs"]["comfyui_prompt"] == actor["prompt"]
+
+
+def test_nai_shared_named_outfit_anchor_is_not_filtered_from_second_wearer():
+    from danbooru_semantic import SemanticAnchor
+
+    class SharedOutfit(Resolver):
+        def cached_named_outfits_for_prompt(self, prompt):
+            return SemanticLookupResult(
+                named_outfit_tags=("aurora_academy_attire",),
+                anchors=(SemanticAnchor("uniform", "outfit", "outfit", "命名校服", "",
+                                        ("aurora_academy_attire",)),),
+            )
+
+    result, calls = run(
+        "-r 角色甲穿命名校服，角色乙也穿命名校服", {"characters": [
+            semantic_character("角色甲", "命名校服"), semantic_character("角色乙", "命名校服"),
+        ]}, plan([("character_a", "girl, aurora_academy_attire, 穿命名校服站立", .3),
+                  ("character_b", "girl, aurora_academy_attire, 也穿命名校服站立", .7)]),
+        resolver=SharedOutfit(),
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    assert all("aurora_academy_attire" in row["prompt"] for row in result.summary["nai_characters"])
+
+
+def test_nai_classified_clothes_are_not_assigned_to_a_wearer_by_host():
+    class NamedClothing(Resolver):
+        def cached_outfit_profiles_for_prompt(self, prompt):
+            from dataclasses import replace
+            return replace(super().cached_outfit_profiles_for_prompt(prompt),
+                           named_outfit_tags=("unfamiliar_named_costume",))
+
+    result, calls = run(
+        "-r 角色甲和角色乙站在陈列命名服装的房间", {"characters": [
+            semantic_character("角色甲"), semantic_character("角色乙")
+        ]}, plan([("character_a", "girl, standing, 站在房间左边", .3),
+                  ("character_b", "girl, sitting, 坐在房间右边", .7)],
+                 "2girls, room, unfamiliar_named_costume"), resolver=NamedClothing(),
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    assert "unfamiliar named costume" not in result.final_prompt
+    assert all("unfamiliar_named_costume" not in row["prompt"] for row in result.summary["nai_characters"])
+    assert "room" in result.final_prompt
 
 
 def test_two_stages_keep_wearer_appearance_omission_and_distinct_clothes():
@@ -171,7 +265,7 @@ def test_two_stages_keep_wearer_appearance_omission_and_distinct_clothes():
     first, second = result.summary["nai_characters"]
     assert "grey eyes" not in first["prompt"] and "grey_eyes" not in first["prompt"]
     assert "no visible eyes" in first["prompt"] and "white dress" in first["prompt"]
-    assert "yellow_eyes" in second["prompt"] and "blue dress" in second["prompt"]
+    assert "yellow eyes" in second["prompt"].replace("_", " ") and "blue dress" in second["prompt"]
     assert "sitting" in second["prompt"] and "waving" in first["prompt"]
     assert "white background" not in result.final_prompt
 
@@ -457,7 +551,7 @@ def test_repeated_identity_omission_applies_to_quoted_instance_only(source_mode)
     first, second = result.summary["nai_characters"]
     assert "grey eyes" not in first["prompt"] and "grey_eyes" not in first["prompt"]
     assert "no visible eyes" in first["prompt"]
-    assert "grey_eyes" in second["prompt"] and "smiling" in second["prompt"]
+    assert "grey eyes" in second["prompt"].replace("_", " ") and "smiling" in second["prompt"]
 
 
 def test_shared_and_local_clauses_can_both_bind_repeated_instances():
@@ -510,7 +604,7 @@ def test_optional_paraphrased_source_does_not_block_or_grant_authority(source, a
     if authority == "unique_change":
         assert "yellow eyes" not in character["prompt"] and "yellow_eyes" not in character["prompt"]
     elif authority == "repeated_baseline":
-        assert "yellow_eyes" in character["prompt"]
+        assert "yellow eyes" in character["prompt"].replace("_", " ")
 
 
 def test_anonymous_english_instance_name_can_bind_to_chinese_intent_anchor():

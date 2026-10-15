@@ -54,6 +54,32 @@ def test_interaction_review_checks_pairs_without_a_fixed_action_dictionary(tags,
     assert bool(nai_interaction_validation_issues(parsed)) is not valid
 
 
+@pytest.mark.parametrize("action", ["holding_hands", "hug", "helping_up"])
+def test_directional_action_keeps_ordinary_action_and_relation_prose(action):
+    from tag_cleaner import split_tags
+    parsed = parse_nai_character_plan(json.dumps({
+        "composition_analysis": {"viewpoint": "side", "layout": "pair", "relations": "contact"},
+        "global_prompt": "3girls, bed",
+        "characters": [
+            {"name": "A", "prompt": f"girl, {action.replace('_', ' ')}, holding a spoon, 用手帮助B",
+             "interaction_tags": [f"source#{action}"], "position_reason": "left", "x": .3, "y": .5},
+            {"name": "B", "prompt": f"girl, {action}, mouth_open, 接受A的帮助",
+             "interaction_tags": [f"target#{action}"], "position_reason": "right", "x": .7, "y": .5},
+            {"name": "C", "prompt": f"girl, {action}", "interaction_tags": [],
+             "position_reason": "behind", "x": .5, "y": .6},
+        ],
+    }, ensure_ascii=False))
+    source, target, individual = parsed["characters"]
+    for row, role in ((source, "source"), (target, "target")):
+        tags = split_tags(row["prompt"])
+        assert action in tags or action.replace('_', ' ') in tags
+        assert f"{role}#{action}" in tags
+    assert "holding a spoon" in source["prompt"] and "用手帮助B" in source["prompt"]
+    assert "mouth_open" in target["prompt"] and "接受A的帮助" in target["prompt"]
+    assert action in split_tags(individual["prompt"])
+    assert missing_nai_noun_tags(parsed, (action,)) == ()
+
+
 def test_direct_writer_reviews_composition_tag_ownership_and_directions_in_one_call():
     instruction = build_nai_character_plan_prompt(
         "A feeds B", "local identity evidence",
@@ -70,7 +96,7 @@ def test_direct_writer_reviews_composition_tag_ownership_and_directions_in_one_c
 
 
 
-def test_nai_writer_contract_separates_counts_and_allows_original_chinese() -> None:
+def test_nai_writer_contract_separates_counts_and_requires_chinese_prompt_prose() -> None:
     instruction = build_nai_character_plan_prompt(
         "书生角色甲站立", "角色甲 => character_a",
         {"width": 832, "height": 1216, "aspect_ratio": "13:19", "orientation": "portrait"},
@@ -79,6 +105,20 @@ def test_nai_writer_contract_separates_counts_and_allows_original_chinese() -> N
     assert "Ngirls, Mboys for a mixed group" in instruction
     assert "do not infer a gender change from titles" in instruction
     assert "retain the user's original Chinese" in instruction
+    assert "inside each actual instance prompt" in instruction
+    assert "Do not translate all prose into English or output tags alone" in instruction
+    assert "without a one-sentence limit" in instruction
+    assert "Refer to other participants by name or position" in instruction
+    assert "Chinese only in source_text, analysis or position_reason does not satisfy" in instruction
+    assert "whose limb contacts whose body part" in instruction
+    assert "A source prefix grants agency, not ownership" in instruction
+    assert "only to the owner of the affected body part" in instruction
+    assert "Both may keep an ordinary action only when" in instruction
+    assert "Include scene-level prose stating who is where" in instruction
+    assert "For a Chinese request this prose is Chinese" in instruction
+    assert "Add lighting descriptions only when requested" in instruction
+    assert "Compare tags with prose for each expressed appearance" in instruction
+    assert "even when everyone wears the same named outfit" in instruction
     assert "source_text must quote the exact applicable request clause" in instruction
     assert "Otherwise leave it empty" in instruction
     assert "original language, without translation" in instruction
@@ -426,9 +466,10 @@ def test_nai_position_prompt_requires_per_character_gaze_assignment():
         "两人的脸朝向viewer，但爱音看向祥子的胸口", "2girls, looking at viewer", canvas
     )
 
-    assert "Put instance conditions only in its prompt" in instruction
+    assert "Put individual conditions only in its prompt" in instruction
     assert "every applicable prompt" in instruction
-    assert "Do not invent a gaze toward the viewer" in instruction
+    assert "gaze toward the viewer" not in instruction
+    assert "2girls, looking at viewer" in instruction
     assert "Keep face direction separate from eye gaze" in instruction
     assert "held/used props" in instruction and "local environment contact" in instruction
     assert "A shared bed can stay global" in instruction

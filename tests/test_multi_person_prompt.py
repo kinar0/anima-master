@@ -196,7 +196,7 @@ def test_plan_prompt_marks_fixed_character_tags_as_authoritative() -> None:
     assert "order characters by semantic role" in prompt
     assert "Describe it from both sides" in prompt
     assert "bare symmetric word such as embrace" in prompt
-    assert "Do not invent a gaze toward the viewer" in prompt
+    assert "gaze toward the viewer" not in prompt
     assert "looking at viewer" not in prompt
 
 

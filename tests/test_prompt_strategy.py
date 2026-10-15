@@ -697,7 +697,7 @@ def test_prompt_pipeline_uses_default_creative_generation():
     assert "wardrobe.kind" not in context.calls[0]["prompt"]
     assert "Count must contain an exact Danbooru people-count tag" in context.calls[0]["system_prompt"]
     assert "场景类Tag门控" not in context.calls[0]["system_prompt"]
-    assert "不要把看向观众当作默认姿态" in context.calls[0]["prompt"]
+    assert "看向观众" not in context.calls[0]["prompt"]
     assert "looking at viewer" not in context.calls[0]["prompt"]
 
 
@@ -1940,6 +1940,28 @@ def test_multi_target_cached_named_outfit_repairs_only_explicit_wearer_clauses()
     assert repaired[0].wardrobe == SemanticWardrobe("named_outfit", "summer")
     assert repaired[1].wardrobe == SemanticWardrobe("named_outfit", "summer")
     assert repaired[2].wardrobe == SemanticWardrobe("creative_fallback")
+
+
+@pytest.mark.parametrize("outfit_name,outfit_tag", [
+    ("星辉礼服", "starlight_dress"), ("苍穹制服", "azure_uniform"),
+])
+def test_named_outfit_uses_each_wearers_accepted_clothing_anchor(outfit_name, outfit_tag) -> None:
+    targets = tuple(SemanticAnchor(name, "target_character", "character", name, "", ())
+                    for name in ("甲", "乙", "丙"))
+    clothing = SemanticAnchor("clothing", "clothing", "clothing", outfit_name, "", ())
+    outfit = SemanticAnchor("outfit", "outfit", "outfit", outfit_name, "", (outfit_tag,))
+    plans = tuple(SemanticCharacterPlan(
+        target.anchor_id, SemanticWardrobe("creative_fallback"),
+        clothing_anchor_id="clothing" if target.anchor_id != "丙" else "",
+    ) for target in targets)
+    repaired = repair_single_target_cached_named_outfit_plan(
+        plans, (*targets, clothing, outfit),
+        SemanticLookupResult(named_outfit_tags=(outfit_tag,), anchors=(outfit,)),
+        f"甲穿{outfit_name}，乙也穿{outfit_name}，丙站在陈列的{outfit_name}旁边",
+    )
+    assert repaired[0].wardrobe == SemanticWardrobe("named_outfit", "outfit")
+    assert repaired[1].wardrobe == SemanticWardrobe("named_outfit", "outfit")
+    assert repaired[2] == plans[2]
 
 
 def test_modified_named_uniform_repairs_planner_omission_without_losing_changes() -> None:

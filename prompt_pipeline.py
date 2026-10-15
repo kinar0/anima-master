@@ -101,7 +101,7 @@ try:
         build_llm_prompt, build_nai_futa_policy, has_positive_futa_request,
         SENSUAL_EXPRESSION_POLICY,
     )
-    from .tag_cleaner import clean_content_tags, display_tag_text, split_tags
+    from .tag_cleaner import clean_content_tags, display_tag_text, normalize_tag_key, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
     from danbooru_semantic import (
@@ -197,7 +197,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         build_llm_prompt, build_nai_futa_policy, has_positive_futa_request,
         SENSUAL_EXPRESSION_POLICY,
     )
-    from tag_cleaner import clean_content_tags, display_tag_text, split_tags
+    from tag_cleaner import clean_content_tags, display_tag_text, normalize_tag_key, split_tags
 
 
 def _extract_completion_text(response: Any) -> str:
@@ -1310,15 +1310,21 @@ _APPEARANCE_DIMENSION_PATTERNS: dict[str, re.Pattern[str]] = {
         re.I,
     ),
     "hair_color": re.compile(
+        r"\b(?:(?:very[ _-]+long|long|medium|short)[ _-]+)?"
         r"(?:red|blue|green|yellow|gold(?:en)?|blonde|silver|white|black|purple|"
         r"pink|brown|grey|gray|aqua|cyan|orange|violet)[ _-]+hair\b|"
+        r"(?:红|蓝|绿|黄|金|银|白|黑|紫|粉|棕|褐|灰|青|橙)(?:色)?"
+        r"(?:(?:超|中)?长|短|及腰)?(?:头发|发)(?!夹|带|饰)|"
         r"(?:红|蓝|绿|黄|金|银|白|黑|紫|粉|棕|褐|灰|青|橙)(?:色)?.{0,8}(?:头发|发色|发型)|"
         r"(?:头发|发色|发型).{0,8}(?:红|蓝|绿|黄|金|银|白|黑|紫|粉|棕|褐|灰|青|橙)(?:色)?",
         re.I,
     ),
     "hair_length": re.compile(
-        r"\b(?:very[ _-]+long|long|medium|short)[ _-]+hair\b|"
-        r"(?:超长|及腰|长|中长|短)(?:发|头发)",
+        r"\b(?:very[ _-]+long|long|medium|short)[ _-]+"
+        r"(?:(?:red|blue|green|yellow|gold(?:en)?|blonde|silver|white|black|purple|"
+        r"pink|brown|grey|gray|aqua|cyan|orange|violet)[ _-]+)?hair\b|"
+        r"(?:(?:红|蓝|绿|黄|金|银|白|黑|紫|粉|棕|褐|灰|青|橙)(?:色)?)?"
+        r"(?:超长|及腰|中长|长|短)(?:头发|发)",
         re.I,
     ),
     "hair_style": re.compile(
@@ -1334,13 +1340,13 @@ _APPEARANCE_DIMENSION_PATTERNS: dict[str, re.Pattern[str]] = {
         re.I,
     ),
     "chest_size": re.compile(
-        r"\b(?:flat[ _-]+chest|small|medium|large|huge)[ _-]+breasts?\b|"
+        r"\b(?:flat[ _-]+chest|(?:small|medium|large|huge)[ _-]+breasts?)\b|"
         r"(?:平胸|贫乳|小胸|巨乳|大胸|胸部.{0,5}(?:变大|变小|丰满))",
         re.I,
     ),
     "animal_ears": re.compile(r"\b(?:animal|cat|dog|fox|rabbit)[ _-]+ears?\b|(?:兽耳|猫耳|狗耳|狐耳|兔耳)", re.I),
     "tail": re.compile(r"\b(?:animal|cat|dog|fox|rabbit)?[ _-]*tails?\b|尾巴", re.I),
-    "horns": re.compile(r"\bhorns?\b|(?:犄角|兽角|头角|长角|角(?!色))", re.I),
+    "horns": re.compile(r"\bhorns?\b|(?:犄角|兽角|头角|长角|(?<![视镜眼墙])角(?!色|度|落))", re.I),
 }
 
 
@@ -1582,21 +1588,95 @@ def filter_character_appearance_prose(
     text: str,
     appearance_tags: tuple[str, ...],
     override_dimensions: frozenset[str],
+    *, preserve_matching: bool = False,
 ) -> str:
-    """Remove LLM-authored prose for profile-locked appearance dimensions."""
+    """Filter locked appearance, optionally retaining facts that match the profile.
+
+    Args:
+        text: Instance prose or tags to check.
+        appearance_tags: The wearer's saved appearance facts.
+        override_dimensions: Dimensions opened by grounded user changes.
+        preserve_matching: Keep supported English/Chinese wording for NAI prose.
+
+    Returns:
+        Text with conflicting locked appearance removed.
+    """
     locked_dimensions = {
         dimension
         for tag in appearance_tags
         if (dimension := appearance_dimension(tag))
         and dimension not in override_dimensions
     }
+    stable_by_dimension = {
+        dimension: tuple(_appearance_fact_tokens(tag) for tag in appearance_tags
+                         if appearance_dimension(tag) == dimension)
+        for dimension in locked_dimensions
+    } if preserve_matching else {}
+
+    def retain_matching_span(match: re.Match[str]) -> str:
+        facts = _appearance_fact_tokens(match.group())
+        matched_dimensions = appearance_dimensions(match.group()) & locked_dimensions
+        # A compound span such as "short pink hair" must satisfy both facts,
+        # not just the colour while silently preserving an incorrect length.
+        return match.group() if preserve_matching and matched_dimensions and all(
+            any(stable <= facts for stable in stable_by_dimension[dimension])
+            for dimension in matched_dimensions
+        ) else ""
+
     result = str(text or "")
-    for dimension in locked_dimensions:
-        result = _APPEARANCE_DIMENSION_PATTERNS[dimension].sub("", result)
+    for dimension in _APPEARANCE_DIMENSION_PATTERNS:
+        if dimension not in locked_dimensions:
+            continue
+        result = _APPEARANCE_DIMENSION_PATTERNS[dimension].sub(
+            retain_matching_span, result,
+        )
     result = re.sub(r"\s+,", ",", result)
     result = re.sub(r",\s*(?=,|;|$)", "", result)
     result = re.sub(r"\s+and\s+(?=,|;|$)", "", result, flags=re.I)
     return re.sub(r"\s{2,}", " ", result).strip(" ,;")
+
+
+# These are lexical equivalents for already classified appearance spans, not
+# request parsing or permission grants. Unknown facts keep the conservative path.
+_APPEARANCE_FACT_WORDS = {
+    "红": "red", "蓝": "blue", "绿": "green", "黄": "yellow", "金": "gold",
+    "银": "silver", "白": "white", "黑": "black", "紫": "purple", "粉": "pink",
+    "棕": "brown", "褐": "brown", "灰": "grey", "琥珀": "amber", "青": "cyan",
+    "橙": "orange", "金发": "blonde hair", "头发": "hair", "发": "hair",
+    "眼睛": "eye", "眼": "eye", "瞳色": "eye", "瞳": "eye",
+    "色": "", "是": "", "为": "", "的": "",
+    "超长": "very long", "及腰": "long", "中长": "medium", "长": "long", "短": "short",
+    "双马尾": "twintail", "双钻头": "twin drill", "钻头发": "drill hair",
+    "侧马尾": "side ponytail", "马尾": "ponytail", "麻花辫": "braid", "辫子": "braid",
+    "直发": "straight hair", "卷发": "curly hair", "波浪发": "wavy hair", "丸子头": "hair bun",
+    "苍白": "pale", "白皙": "fair", "小麦": "tan", "晒黑": "tan", "深色": "dark",
+    "皮肤": "skin", "肤色": "skin", "平胸": "flat chest", "贫乳": "small breast",
+    "小胸": "small breast", "巨乳": "large breast", "大胸": "large breast",
+    "兽耳": "animal ear", "猫耳": "cat ear", "狗耳": "dog ear", "狐耳": "fox ear",
+    "兔耳": "rabbit ear", "尾巴": "tail", "犄角": "horn", "兽角": "horn", "头角": "horn", "角": "horn",
+}
+_APPEARANCE_FACT_WORD_RE = re.compile("|".join(
+    re.escape(word) for word in sorted(_APPEARANCE_FACT_WORDS, key=len, reverse=True)
+))
+
+
+def _appearance_fact_tokens(value: str) -> frozenset[str]:
+    """Normalize known appearance vocabulary for evidence comparison only.
+
+    Args:
+        value: A canonical profile tag or an already classified appearance span.
+
+    Returns:
+        Comparable tokens without discarding untranslated Chinese.
+    """
+    normalized = _APPEARANCE_FACT_WORD_RE.sub(
+        lambda match: " " + _APPEARANCE_FACT_WORDS[match.group()] + " ", normalize_tag_key(value)
+    ).replace("_", " ")
+    aliases = {"gray": "grey", "golden": "gold", "blonde": "gold", "tanned": "tan"}
+    return frozenset(
+        aliases.get(word, word[:-1] if word.endswith("s") and not word.endswith("ss") else word)
+        for word in re.findall(r"[a-z0-9]+|[\u3400-\u9fff]+", normalized)
+    )
 
 
 def filter_shared_appearance_tags(
@@ -2475,8 +2555,8 @@ def repair_single_target_cached_named_outfit_plan(
 ) -> tuple[SemanticCharacterPlan, ...]:
     """Repair locally known named outfits from wearer-scoped explicit clauses.
 
-    A repair requires one exact cached outfit alias after a wearing verb in a
-    clause that also names the target. This supports multiple characters without
+    A repair requires one cached outfit alias in the accepted wearer's clothing
+    evidence or after a direct wearing verb. This supports multiple characters without
     distributing one wearer's outfit to another or treating scene context as an
     assignment. Existing outfit-source cosplay relations are never rewritten.
     """
@@ -2487,6 +2567,7 @@ def repair_single_target_cached_named_outfit_plan(
         for anchor in anchors
         if anchor.role == "target_character"
     }
+    anchor_by_id = {anchor.anchor_id: anchor for anchor in anchors}
     cached_tags = {
         tag.lower() for tag in cached_named_result.named_outfit_tags if tag
     }
@@ -2511,7 +2592,16 @@ def repair_single_target_cached_named_outfit_plan(
             repaired.append(plan)
             continue
         matches: dict[str, SemanticAnchor] = {}
-        for phrase in explicit_worn_clothing_phrases(user_prompt, target.source_text):
+        phrases = explicit_worn_clothing_phrases(user_prompt, target.source_text)
+        clothing = anchor_by_id.get(plan.clothing_anchor_id)
+        # LLM1 already binds this exact clothing phrase to this wearer. Reusing
+        # the same outfit anchor for another wearer must not turn that relation
+        # into an unresolved plan merely because the second clause says "also".
+        if (clothing is not None and clothing.role in {"clothing", "outfit"}
+                and clothing.source_text.strip()
+                and clothing.source_text in user_prompt):
+            phrases = (clothing.source_text, *phrases)
+        for phrase in phrases:
             # A later scene mention is not the object of the wear verb.
             worn_object = re.split(
                 r"(?:站在|坐在|看着|望着|走到|跑到|放在|挂在|陈列在|"
@@ -5200,6 +5290,21 @@ class PromptPipeline:
             # References do not change the authoritative LLM1 roster. A name in
             # the writer's visible-instance list binds its own local row below.
             target_outfits = outfits
+            # Evidence classifies these as clothing/appearance even when their
+            # canonical names do not match the parser's generic tag patterns.
+            # This removes global leakage only; it cannot choose a wearer.
+            character_scoped_tags = tuple(dict.fromkeys((
+                *semantic_result.named_outfit_tags,
+                *semantic_result.outfit_profile_tags,
+                *semantic_result.appearance_profile_tags,
+                *wardrobe_authority.cached_tags,
+                *wardrobe_authority.explicit_tags,
+                *wardrobe_authority.selected_tags,
+                *wardrobe_authority.source_grounding_tags,
+                *wardrobe_authority.unbound_grounding_tags,
+                *(tag for item in (*target_outfits, *local_references)
+                  for tag in (*item.appearance_tags, *item.effective.effective_tags)),
+            )))
             canvas = resolve_nai_canvas(
                 prompt_config, canvas_size or (
                     self._int("width", 1024), self._int("height", 1536)
@@ -5255,9 +5360,23 @@ class PromptPipeline:
             if debug:
                 self.logger.info("[comfyui_agent] NAI -r direct writer canvas:\n%s", canvas)
                 self.logger.info("[comfyui_agent] NAI -r direct writer prompt:\n%s", plan_prompt)
+            writer_system_prompt = (
+                "Write only the requested NAI JSON. Put user-language prose in both "
+                "actual global and instance prompts; Chinese requests require Chinese. "
+                "A bare body-state tag applies to the affected body part's owner, "
+                "not automatically to an action's source or both participants. "
+                "For example, A puts A's hand inside B's mouth: only B may have bare "
+                "hand_in_mouth; A uses source#hand_in_mouth and named prose, "
+                "B uses target#hand_in_mouth. Apply this body-owner test to every contact. "
+                "Require confirmed canonical identity and still-applicable named-outfit tags "
+                "in each wearer's actual prompt; Chinese names alone are not tag anchors. "
+                "Lighting is opt-in: never add default soft/cinematic/fill lighting. "
+                "Explicit darkness and other stated absences override embellishment. "
+                "Follow the supplied schema, user edits and local authority."
+            )
             response = await self.context.llm_generate(
                 chat_provider_id=provider_id, prompt=plan_prompt,
-                system_prompt="Write NAI global and per-instance prompts. Follow the supplied schema and authority; return valid JSON only.",
+                system_prompt=writer_system_prompt,
                 max_tokens=max(1200, min(7200, max(
                     self._int("prompt_builder_max_tokens", 1800),
                     1200 + 260 * canvas["character_limit"],
@@ -5272,6 +5391,7 @@ class PromptPipeline:
                 return self._model_refusal_result(summary, plan_raw)
             nai_plan = parse_nai_character_plan(
                 plan_raw, character_limit=canvas["character_limit"],
+                character_scoped_tags=character_scoped_tags,
             )
             issues = nai_interaction_validation_issues(nai_plan)
             summary.update(nai_character_plan_attempt_count=1,
@@ -5287,7 +5407,7 @@ class PromptPipeline:
                 summary["prompt_llm_attempt_count"] = 2
                 response = await self.context.llm_generate(
                     chat_provider_id=provider_id, prompt=repair_prompt,
-                    system_prompt="Repair the NAI instance allocation after interaction review. Return valid JSON only.",
+                    system_prompt=writer_system_prompt + " Repair the reported errors while preserving valid content.",
                     max_tokens=max(1200, min(7200, max(
                         self._int("prompt_builder_max_tokens", 1800),
                         1200 + 260 * canvas["character_limit"],
@@ -5302,7 +5422,10 @@ class PromptPipeline:
                 if is_chinese_model_refusal(retry_raw):
                     return self._model_refusal_result(summary, retry_raw)
                 plan_raw = retry_raw
-                nai_plan = parse_nai_character_plan(plan_raw, character_limit=canvas["character_limit"])
+                nai_plan = parse_nai_character_plan(
+                    plan_raw, character_limit=canvas["character_limit"],
+                    character_scoped_tags=character_scoped_tags,
+                )
                 issues = nai_interaction_validation_issues(nai_plan)
                 summary["nai_interaction_retry_validation_errors"] = list(issues)
                 if issues:
@@ -5333,12 +5456,19 @@ class PromptPipeline:
                     expressed_dimensions = appearance_dimensions(character["prompt"])
                     # Remove only the profile-controlled appearance spans, keeping
                     # the surrounding actions, clothing and natural language intact.
-                    text = filter_character_appearance_prose(character["prompt"], saved, opened)
+                    text = ", ".join(
+                        part if part == character["name"] or re.match(r"^(?:source|target|mutual)#", part, re.I)
+                        else filter_character_appearance_prose(part, saved, opened, preserve_matching=True)
+                        for part in split_tags(character["prompt"])
+                    )
                     text = _without_omitted_appearance(text, omitted)
                     stable = tuple(tag for tag in saved
                                    if appearance_dimension(tag) in expressed_dimensions
                                    and appearance_dimension(tag) not in replacement)
-                    text = ", ".join(part for part in (text, ", ".join(stable)) if part)
+                    written_tags = {normalize_tag_key(part) for part in split_tags(text)}
+                    text = ", ".join(part for part in (
+                        text, ", ".join(tag for tag in stable if normalize_tag_key(tag) not in written_tags)
+                    ) if part)
                     # A removal for one wearer must not become a stale tag or
                     # forbidden slot for another wearer in the same image.
                     scoped = build_wardrobe_authority(
