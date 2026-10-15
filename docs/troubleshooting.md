@@ -272,7 +272,7 @@ Identity/Details 不会再因为角色名没有位于分句开头而令整份回
 ## 女性角色被错误写成扶她
 
 NAI `-r` 同样检查 `sexual_trait_authority` 与原始用户输入。只有正向明确要求才追加 NAI 扶她写作规则；参考图反推或引用补充中的 `futanari` 不得开启权限。扶她人数在全局，特征只在所属角色框；普通色气模式仍由配置/触发词决定，不能据此给同伴新增性征。未经要求的中文“扶她”等断言也会被过滤。
-色气指引与普通七字段现在共用一份完整文本。若 `sensual_mode=true` 但专用任务书仍只有旧英文一句，先确认插件重载；若为 false，检查 `sensual_mode_enabled` 与自定义 `sensual_mode_markers`。最后的服装权限块应出现在色气指引之后，防止表现力要求恢复被删除服装。
+色气指引与普通七字段仍共用一份完整文本，NAI 末尾服装权限改用等价的精简英文说明。若 `sensual_mode=true` 但专用任务书仍只有旧英文一句，先确认插件重载；若为 false，检查 `sensual_mode_enabled` 与自定义 `sensual_mode_markers`。最后的服装权限块应出现在色气指引之后，防止表现力要求恢复被删除服装。
 
 先检查 `semantic_plan_raw` 与角色视觉档案。如果两者只有正常发色、瞳色、胸部尺寸等信息，而 `prompt_llm_initial_content` 首次出现 `futanari / futa with female / penis / erection`，错误来自第二阶段模型，不是角色档案。当前默认任务书不会在普通请求中展示扶她示例；只有用户原文正向明确写出扶她时才动态加入计数规则。
 

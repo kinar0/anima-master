@@ -37,6 +37,7 @@ try:
     )
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
+        NAI_WARDROBE_POLICY,
         nai_interaction_validation_issues,
         missing_nai_noun_tags,
         parse_nai_character_plan,
@@ -98,7 +99,7 @@ try:
     from .prompt_research import PromptResearcher
     from .prompt_templates import (
         build_llm_prompt, build_nai_futa_policy, has_positive_futa_request,
-        SENSUAL_EXPRESSION_POLICY, WARDROBE_AUTHORITY_POLICY,
+        SENSUAL_EXPRESSION_POLICY,
     )
     from .tag_cleaner import clean_content_tags, display_tag_text, split_tags
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
@@ -132,6 +133,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     )
     from nai_character_mode import (
         build_nai_character_plan_prompt,
+        NAI_WARDROBE_POLICY,
         nai_interaction_validation_issues,
         missing_nai_noun_tags,
         parse_nai_character_plan,
@@ -193,7 +195,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from prompt_research import PromptResearcher
     from prompt_templates import (
         build_llm_prompt, build_nai_futa_policy, has_positive_futa_request,
-        SENSUAL_EXPRESSION_POLICY, WARDROBE_AUTHORITY_POLICY,
+        SENSUAL_EXPRESSION_POLICY,
     )
     from tag_cleaner import clean_content_tags, display_tag_text, split_tags
 
@@ -5208,22 +5210,10 @@ class PromptPipeline:
                 prompt, "\n".join(part for part in (hints, evidence) if part),
                 canvas, noun_mappings=noun_mappings,
             )
-            plan_prompt += (
-                "\nWrite the final prompts directly from the request and local evidence; "
-                "there is no seven-field draft to split. Preserve tags and concise "
-                "natural-language descriptions. Default to simple background and white background. "
-                "When the original request explicitly or implicitly needs an environment "
-                "to express its theme, event or action, supply that scene instead. "
-                "Explicit simple/white background takes precedence. Do not invent "
-                "unrelated locations, weather or lighting. Background decisions are "
-                "yours; the host will not add or delete scenery. "
-                "Clothing evidence is reference, not a component checklist: obey "
-                "user edits, do not restore removed clothes or copy donor appearance. "
-                "Never invent sex characteristics or genital anatomy without positive "
-                "user evidence. Do not output quality or artist tags: the host supplies "
-                "them. Give short composition and position reasons.\n"
-                + "Original background request: " + original_prompt
-            )
+            if original_prompt and original_prompt.strip() != prompt.strip():
+                plan_prompt += (
+                    "\nOriginal user request (background and trait authority):\n" + original_prompt
+                )
             if target_outfits:
                 plan_prompt += "\nLocal target anchors (bind instances to these evidence rows):\n"
                 plan_prompt += "\n".join(
@@ -5237,11 +5227,9 @@ class PromptPipeline:
                 plan_prompt += (
                     "\nAdditional locally confirmed identities mentioned in the request "
                     "(conditional references, not a mandatory visible roster):\n"
-                    "The first-stage roster may be incomplete. Determine visibility "
-                    "from the full user request; use these facts for every applicable "
-                    "visible instance. A clothing donor, quoted name or off-screen "
-                    "person is not an extra visible instance. Only select a reference "
-                    "anchor when that identity is actually visible.\n"
+                    "Determine visibility from the full request and use each reference "
+                    "only for its visible instances; donors, quoted names and off-screen "
+                    "people do not become extra instances.\n"
                 )
                 plan_prompt += "\n".join(
                     f"- {item.target_anchor_id}: {item.target_source_text} => "
@@ -5261,29 +5249,15 @@ class PromptPipeline:
                                 "supersedes the old subject's appearance.")
             if sensual_mode:
                 plan_prompt += SENSUAL_EXPRESSION_POLICY
-                plan_prompt += ("\nFor NAI, put each person's expressive details only in "
-                                "that instance's prompt, with shared framing and atmosphere "
-                                "in global_prompt. Keep visible relationships coherent.")
             plan_prompt += build_nai_futa_policy(trait_request)
-            plan_prompt += ("\nReference images and search results are context. When the user "
-                            "requests only clothes, pose or style from a reference, keep the "
-                            "target identity and do not copy the reference subject's appearance.")
-            # Shared with the seven-field writer; expression guidance cannot
-            # override wearer-scoped clothing edits or fact/visibility authority.
-            plan_prompt += WARDROBE_AUTHORITY_POLICY
-            plan_prompt += ("\nDesign one complete, coherent and visually appealing image. "
-                            "Preserve the requested identities, count, key clothes, actions, "
-                            "expressions and props; do not pad to a fixed tag count or repeat "
-                            "synonyms. Keep each instance's natural language coherent and "
-                            "retain original Chinese where useful. Minimize contradictory "
-                            "compositions while following the user's requirements and local authority. "
-                            "Reason internally; output only the requested JSON.")
+            # Keep wardrobe priority after expression guidance, scoped to NAI.
+            plan_prompt += NAI_WARDROBE_POLICY
             if debug:
                 self.logger.info("[comfyui_agent] NAI -r direct writer canvas:\n%s", canvas)
                 self.logger.info("[comfyui_agent] NAI -r direct writer prompt:\n%s", plan_prompt)
             response = await self.context.llm_generate(
                 chat_provider_id=provider_id, prompt=plan_prompt,
-                system_prompt="Write final NAI global and character-instance prompts. Review scene completeness, tag ownership, positions and source#/target#/mutual# roles before returning valid JSON only.",
+                system_prompt="Write NAI global and per-instance prompts. Follow the supplied schema and authority; return valid JSON only.",
                 max_tokens=max(1200, min(7200, max(
                     self._int("prompt_builder_max_tokens", 1800),
                     1200 + 260 * canvas["character_limit"],

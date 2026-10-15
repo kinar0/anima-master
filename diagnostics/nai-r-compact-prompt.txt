@@ -1,0 +1,48 @@
+2026-10-15 当前任务书离线组装示例。使用中性请求、空本地档案，未调用真实模型或 ComfyUI。
+实际角色、衣柜、词汇、引用及可选表现力规则会按请求追加。
+
+SYSTEM PROMPT
+Write NAI global and per-instance prompts. Follow the supplied schema and authority; return valid JSON only.
+
+USER MESSAGE
+Design a complete, coherent NAI image from the request and local evidence. Preserve explicit identities, count, clothing, actions, expressions, props and instance differences. Express abstract themes through relevant visible anchors. Use concise Danbooru tags and coherent natural language; preserve supported weights without padding a fixed tag count or repeating synonyms.
+Output JSON only, using this schema:
+{"composition_analysis":{"viewpoint":"...","layout":"...","relations":"..."},"global_prompt":"...","characters":[{"name":"canonical character tag or short identity","anchor_id":"matching local target anchor, or empty","source_text":"exact request clause or clause array, or empty","prompt":"girl / boy / other, identity and visible instance details","interaction_tags":[],"position_reason":"...","x":0.5,"y":0.5}]}
+Instances and evidence:
+Create one entry per visible instance, including anonymous people and each appearance of a repeated identity in different panels. Do not add visible people from viewer, quoted names or off-screen clothing sources. Use the same confirmed canonical spelling in name and prompt; anonymous people use a short identity, not an invented canonical tag. Different local wardrobe plans for one identity require the matching anchor_id; never choose by array order. For repeated identities with locally recorded clothing edits or appearance changes, source_text must quote the exact applicable request clause, or an array of exact clauses for shared and local requirements. Otherwise leave it empty. Quote in the original language, without translation, paraphrase or joining non-contiguous text. User-specified instance differences override identity-level baselines.
+Scope and population:
+global_prompt contains total population, confirmed copyright, shared scene/environment objects, whole-image camera/framing, lighting, colour and layout. Count every visible instance once: 1girl/1boy for one known gender, Ngirls/Nboys for one gender, Ngirls, Mboys for a mixed group, or Npeople when gender is unknown. Each instance uses the unnumbered gender tag girl, boy, or other, never a numeric population tag. Follow explicit user gender, then reliable identity facts; do not infer a gender change from titles, clothing, poses or chest size. Put instance conditions only in its prompt: identity, visible appearance, clothing/accessories, expression, pose, action, held/used props, body/head orientation, gaze and local environment contact. Repeat a shared instance condition in every applicable prompt. A shared bed can stay global; lying on that bed belongs to its occupant. A panel-specific camera/crop belongs to its instance; only whole-page framing belongs globally. Keep face direction separate from eye gaze. Do not invent a gaze toward the viewer. Reassign misplaced global instance conditions without losing their supported meaning or copying all evidence into every box.
+Composition:
+Interpret camera, relative height/depth, facing and contact together before placing instances. Use the actual canvas aspect ratio and respect explicit left/right and panel boundaries. Set x/y to the centre of each visible region, in [0,1], x left-to-right and y top-to-bottom; do not use a fixed coordinate template for pose words. Distinguish horizontal and vertical separation when the view requires it. Keep composition_analysis and position_reason brief.
+Interactions:
+Identify explicit actions between visible people from meaning, including actions beyond common examples. For each directed action, assign the actor source#tag and recipient target#tag with the same action tag on different instances. Use mutual#tag on every participant only for a genuinely reciprocal action; do not mix directed and mutual roles for the same action on one instance. Each interaction_tags item is one English Danbooru action tag after # (spaces within a tag are allowed), never multiple tags or a sentence. Put these only in interaction_tags. Leave interaction_tags empty for individual actions, proximity, one-sided gaze or off-screen people. Write who acts on whom, direction and contact in the actual instance prompts too; distinguish recipients in separate groups, and never infer action direction from position or array order.
+Writing and review:
+NAI descriptions and analysis may retain the user's original Chinese; keep canonical tags accurate. Use references only for requested aspects; when borrowing clothing, pose or style alone, preserve the target identity. Default to simple background and white background unless the original request explicitly or implicitly needs an environment; explicit simple/white background wins. Do not invent unrelated locations, weather or lighting. Do not invent sex characteristics without positive user evidence. Quality and artist tags are supplied by the host; do not output them. Before output, review scene completeness, tag ownership, positions, visibility and action pairs. Correct omissions, inverted roles, missing counterparts or contradictory poses/contact within the request and local authority. Record the reviewed relations in composition_analysis.relations.
+
+
+Visible appearance: follow the user's specified composition, or your chosen
+composition where unspecified. For each instance, first determine which body parts
+appear within the frame. Then describe only their actually visible appearance,
+considering viewpoint, pose, clothing, occlusion and reflections. A body part being
+in frame does not make every feature of that part visible. Omit features that are
+outside the frame, hidden or not discernible; retain the visible shapes and details.
+Apply this throughout tags, prose and priority tags. Saved profiles supply facts,
+not a checklist to reproduce. Do not change the composition or pose to expose a
+saved feature, or reintroduce an invisible feature in another field. Evaluate each
+person and each panel independently, including repeated identities. Keep canonical
+identity, and obey user edits and profile facts for the features you describe.
+
+Actual canvas: 1024x1536 pixels, aspect ratio 2:3 (portrait); width/height=0.6667. Use at most 22 instances for this model.
+
+User request:
+一位成年女性站立，简单白底
+Local character evidence:
+
+
+Wardrobe authority: explicit user edits take priority. A selected named outfit or
+explicit profile defines the base; keep recognizable unmodified parts and apply
+all requested changes. For named outfits use verified components, or just the
+canonical outfit tag when components are unknown. Saved defaults are soft references
+only when clothing is unstated. Express visible parts, not a full component checklist.
+Never restore removed/replaced clothes, assign another wearer's clothes, or copy a
+donor's appearance. Unresolved explicit clothing does not permit default fallback.

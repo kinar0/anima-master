@@ -103,14 +103,16 @@ def test_restored_scene_responsibilities_stay_inside_the_direct_nai_writer():
     assert len(calls) == 2
     writer = calls[1]
     assert '"global_prompt"' in writer["prompt"]
-    assert "seven semantic responsibilities without outputting seven fields" in writer["prompt"]
-    assert "second internal composition and tag-allocation review" in writer["prompt"]
+    assert "Before output, review scene completeness" in writer["prompt"]
+    assert "tag ownership, positions" in writer["prompt"]
     assert "source#tag" in writer["prompt"] and "target#tag" in writer["prompt"]
     assert "mutual#tag" in writer["prompt"]
     assert "Actual canvas: 1024x1536" in writer["prompt"]
     assert "CUSTOM SEVEN FIELD WRITER" not in writer["prompt"]
     assert "Anima" not in writer["system_prompt"]
-    assert "same writing call" in writer["prompt"]
+    assert "seven-field" not in writer["prompt"]
+    assert writer["prompt"].count("角色甲用勺子喂角色乙") == 1
+    assert len(writer["prompt"]) < 10000
     assert result.summary["prompt_output_mode"] == "nai_instances"
     assert result.summary["prompt_llm_initial_content"] == output
     assert "nai_full_prompt_before_split" not in result.summary
@@ -209,6 +211,9 @@ def test_reference_futa_traits_do_not_authorize_target_traits_or_futa_policy():
     )
     assert result.final_prompt, result.summary
     assert NAI_FUTA_INSTANCE_POLICY not in calls[1]["prompt"]
+    assert "Original user request (background and trait authority):" in calls[1]["prompt"]
+    assert original.removeprefix("-r ") in calls[1]["prompt"]
+    assert "参考图视觉反推 tags：futanari" in calls[1]["prompt"]
     assert result.summary["sexual_trait_authority"]["futa_allowed"] is False
     assert "futanari" not in result.summary["nai_characters"][0]["prompt"]
 
@@ -221,7 +226,8 @@ def test_reference_futa_traits_do_not_authorize_target_traits_or_futa_policy():
     ({}, "角色甲是扶她，站立", False),
 ])
 def test_nai_and_seven_field_share_sensual_policy_and_config(config, user_text, enabled):
-    from prompt_templates import SENSUAL_EXPRESSION_POLICY, WARDROBE_AUTHORITY_POLICY, build_llm_prompt
+    from prompt_templates import SENSUAL_EXPRESSION_POLICY, build_llm_prompt
+    from nai_character_mode import NAI_WARDROBE_POLICY
     result, calls = run(
         "-r " + user_text, {"characters": [semantic_character("角色甲")]},
         plan([("character_a", "girl, standing", .5)], "1girl, white background"), config,
@@ -233,9 +239,13 @@ def test_nai_and_seven_field_share_sensual_policy_and_config(config, user_text, 
     assert (SENSUAL_EXPRESSION_POLICY in prompt) is enabled
     assert result.summary["sensual_mode"] is enabled
     assert prompt.count(SENSUAL_EXPRESSION_POLICY) == int(enabled)
-    assert prompt.count(WARDROBE_AUTHORITY_POLICY) == 1
+    assert prompt.count(NAI_WARDROBE_POLICY) == 1
+    assert prompt.endswith(NAI_WARDROBE_POLICY)
+    assert "Saved defaults are soft references" in prompt
+    assert "selected named outfit or" in prompt
+    assert "Unresolved explicit clothing does not permit default fallback" in prompt
     if enabled:
-        assert prompt.index(SENSUAL_EXPRESSION_POLICY) < prompt.index(WARDROBE_AUTHORITY_POLICY)
+        assert prompt.index(SENSUAL_EXPRESSION_POLICY) < prompt.index(NAI_WARDROBE_POLICY)
 
 
 @pytest.mark.parametrize("trait", ["futanari", "扶她", "阴茎", "penis"])

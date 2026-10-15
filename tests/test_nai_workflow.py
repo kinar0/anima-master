@@ -59,15 +59,15 @@ def test_direct_writer_reviews_composition_tag_ownership_and_directions_in_one_c
         "A feeds B", "local identity evidence",
         {"width": 1216, "height": 832, "aspect_ratio": "19:13", "orientation": "landscape"},
     )
-    assert "second internal composition and tag-allocation review" in instruction
-    assert "same writing call" in instruction
-    assert "seven semantic responsibilities without outputting seven fields" in instruction
+    assert "Before output, review scene completeness" in instruction
     assert "source#tag" in instruction and "target#tag" in instruction and "mutual#tag" in instruction
-    assert "SAME action tag" in instruction
-    assert "Removing a local tag from global_prompt must not lose its meaning" in instruction
+    assert "same action tag" in instruction
+    assert "Reassign misplaced global instance conditions" in instruction
     assert "actual canvas" in instruction and "panel boundaries" in instruction
-    assert "coherent description" in instruction
-    assert "no extra seven-field draft or review schema" in instruction
+    assert "coherent natural language" in instruction
+    assert "seven-field" not in instruction and "same writing call" not in instruction
+    assert "seven semantic responsibilities" not in instruction
+
 
 
 def test_nai_writer_contract_separates_counts_and_allows_original_chinese() -> None:
@@ -79,7 +79,9 @@ def test_nai_writer_contract_separates_counts_and_allows_original_chinese() -> N
     assert "Ngirls, Mboys for a mixed group" in instruction
     assert "do not infer a gender change from titles" in instruction
     assert "retain the user's original Chinese" in instruction
-    assert "source_text must quote the original request in its original language" in instruction
+    assert "source_text must quote the exact applicable request clause" in instruction
+    assert "Otherwise leave it empty" in instruction
+    assert "original language, without translation" in instruction
     assert "Write all prompt strings in English" not in instruction
     assert "artist tags, quality" not in instruction
 
@@ -424,14 +426,15 @@ def test_nai_position_prompt_requires_per_character_gaze_assignment():
         "两人的脸朝向viewer，但爱音看向祥子的胸口", "2girls, looking at viewer", canvas
     )
 
-    assert "local environment relationships in global_prompt" in instruction
-    assert "repeat it in every applicable character prompt" in instruction
+    assert "Put instance conditions only in its prompt" in instruction
+    assert "every applicable prompt" in instruction
     assert "Do not invent a gaze toward the viewer" in instruction
-    assert "Anon looks toward Sakiko" in instruction
-    assert "sex/gender, identity tag" in instruction
-    assert "sitting on a table" in instruction
-    assert "classroom belongs globally" in instruction
-    assert "sitting on classroom desk belongs to that character" in instruction
+    assert "Keep face direction separate from eye gaze" in instruction
+    assert "held/used props" in instruction and "local environment contact" in instruction
+    assert "A shared bed can stay global" in instruction
+    assert "lying on that bed belongs to its occupant" in instruction
+    assert "panel-specific camera/crop belongs to its instance" in instruction
+
 
 
 def test_nai_mutual_action_tags_and_legacy_plan_without_tags():
@@ -512,7 +515,7 @@ def test_nai_unlisted_interaction_is_not_blocked_by_a_trigger_word_list():
     request = "A踢了B，B摔倒在地"
     canvas = {"width": 832, "height": 1216, "aspect_ratio": "13:19", "orientation": "portrait"}
     instruction = build_nai_character_plan_prompt(request, "2girls", canvas)
-    assert "open-ended semantic decision" in instruction
+    assert "actions beyond common examples" in instruction
     assert request in instruction
     plan = parse_nai_character_plan(json.dumps({
         "composition_analysis": {"viewpoint": "front", "layout": "pair", "relations": "A kicks B"},
@@ -582,9 +585,9 @@ def test_nai_complex_side_view_preserves_model_layout(chair, floor):
         plugin_root=PLUGIN_DIR,
     )
     instruction = build_nai_character_plan_prompt(source, "2girls, side view", canvas)
-    assert "camera angle" in instruction
-    assert "relative positions" in instruction
-    assert "Do not use a fixed coordinate template" in instruction
+    assert "Interpret camera, relative height/depth" in instruction
+    assert "horizontal and vertical separation" in instruction
+    assert "do not use a fixed coordinate template" in instruction
     assert "Leave interaction_tags empty" in instruction
     directed = build_nai_character_plan_prompt("A 拥抱 B", "2girls", canvas)
     assert "source#tag" in directed and "target#tag" in directed

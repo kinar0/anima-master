@@ -2,18 +2,15 @@
 
 APPEARANCE_VISIBILITY_POLICY = """
 
-Visible appearance: saved character profiles describe identity facts, not a checklist
-that must appear in this image. For every visible instance, use the final framing,
-body and head/face orientation, occlusion and reflections to select only appearance
-features actually visible in the image. Apply this to all tags and natural-language
-fields, including identity, details, narrative and priority tags. Do not change the
-requested pose or camera to expose a saved feature. A rear view with no face or eyes
-visible needs no eye-colour tags; looking back, a visible side eye or a clear mirror
-reflection may still show them. Fully closed or covered irises need no iris colour,
-but retain visible closed-eye shapes, expressions and occlusion cues; lack of eye
-highlights alone does not hide iris colour. Keep visible hair or ears even when
-other facial features are hidden. Different people and different panels of the same
-identity have independent visibility. Keep canonical identity and obey user edits
-and profile facts for the features you do express. Omit invisible traits rather than
-repeating them in another field. Never invent visibility evidence or extra viewers.
+Visible appearance: follow the user's specified composition, or your chosen
+composition where unspecified. For each instance, first determine which body parts
+appear within the frame. Then describe only their actually visible appearance,
+considering viewpoint, pose, clothing, occlusion and reflections. A body part being
+in frame does not make every feature of that part visible. Omit features that are
+outside the frame, hidden or not discernible; retain the visible shapes and details.
+Apply this throughout tags, prose and priority tags. Saved profiles supply facts,
+not a checklist to reproduce. Do not change the composition or pose to expose a
+saved feature, or reintroduce an invisible feature in another field. Evaluate each
+person and each panel independently, including repeated identities. Keep canonical
+identity, and obey user edits and profile facts for the features you describe.
 """
