@@ -554,3 +554,80 @@ def test_live_nai_chinese_and_per_instance_ownership(live_pipeline, tmp_path, ca
         assert "haneoka school uniform" not in characters["chihaya_anon"].replace("_", " ")
         assert any(term in characters["chihaya_anon"].replace("_", " ")
                    for term in ("white dress", "白色连衣裙"))
+
+
+@pytest.mark.parametrize("case", ["named", "ordinary_implicit_donor", "recolor"])
+def test_live_nai_bilingual_details_with_repeated_identity(live_pipeline, tmp_path, case):
+    """English details must come from the writer, alongside Chinese prose."""
+    from nai_character_mode import parse_nai_character_plan
+    from tag_cleaner import normalize_tag_key, split_tags
+
+    prompt = (
+        "-r 三人上半身构图，同一画面里出现两个丰川祥子。千早爱音穿羽丘校服坐在中间；"
+        "左侧丰川祥子穿月之森校服，右侧丰川祥子穿着oblivionis的衣服，"
+        "两人分别用手扶住爱音的左肩和右肩，微笑看着爱音。"
+    )
+    if case != "named":
+        prompt = prompt.replace("千早爱音穿羽丘校服", "千早爱音穿白衬衫")
+    if case == "ordinary_implicit_donor":
+        prompt = prompt.replace("穿着oblivionis的衣服", "穿oblivionis衣服")
+    elif case == "recolor":
+        prompt = prompt.replace("穿月之森校服", "穿黑色外套").replace("穿着oblivionis的衣服", "穿白色外套")
+    live_pipeline[0].config["debug_prompt_enabled"] = True
+    result, calls = _build(live_pipeline, prompt)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"nai_bilingual_repeated_identity_{case}.json"
+    report_path.write_text(json.dumps({
+        "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Live NAI bilingual evidence: {report_path}")
+    assert result.final_prompt, result.summary
+    assert len(calls) in (2, 3)
+    assert not result.summary.get("nai_interaction_retry_validation_errors")
+    raw_plan = parse_nai_character_plan(result.summary["nai_character_plan_raw"])
+    if case != "recolor":
+        assert any("clothing=月之森校服;" in line and "wardrobe=named_outfit;" in line
+                   for line in calls[1]["prompt"].splitlines()), calls[1]["prompt"]
+
+    def english_tags(text):
+        return {normalize_tag_key(part) for part in split_tags(text)
+                if not _CJK_RE.search(part) and "#" not in part}
+
+    # Check raw writer output as well as final captions: profile restoration
+    # must not conceal a writer that supplied only Chinese keywords.
+    for global_text, rows in (
+        (raw_plan["global_prompt"], raw_plan["characters"]),
+        (result.final_prompt, result.summary["nai_characters"]),
+    ):
+        assert len(rows) == 3
+        assert [row["name"] for row in rows].count("chihaya_anon") == 1
+        assert [row["name"] for row in rows].count("togawa_sakiko") == 2
+        assert _CJK_RE.search(global_text), global_text
+        global_tags = english_tags(global_text)
+        assert "3girls" in global_tags, global_text
+        assert not {"1girls", "2girls"} & global_tags, global_text
+        assert "upper body" in global_tags or "upper body shot" in global_tags, global_text
+        assert "tsukinomori school uniform" not in global_tags
+        assert all(_CJK_RE.search(row["prompt"]) for row in rows), rows
+        anon = next(row for row in rows if row["name"] == "chihaya_anon")
+        anon_clothing = "haneoka school uniform" if case == "named" else "white shirt"
+        assert {anon_clothing, "sitting"} <= english_tags(anon["prompt"]), anon
+        if case != "named":
+            assert "haneoka school uniform" not in english_tags(anon["prompt"]), anon
+        sakikos = sorted((row for row in rows if row["name"] == "togawa_sakiko"),
+                         key=lambda row: row["x"])
+        left, right = sakikos
+        assert left["anchor_id"] != right["anchor_id"]
+        if case == "recolor":
+            assert {"black jacket", "black coat"} & english_tags(left["prompt"]), left
+            assert not {"white jacket", "white coat"} & english_tags(left["prompt"]), left
+            assert {"white jacket", "white coat"} & english_tags(right["prompt"]), right
+            assert not {"black jacket", "black coat"} & english_tags(right["prompt"]), right
+        else:
+            assert "tsukinomori school uniform" in english_tags(left["prompt"]), left
+            assert {"black corset", "red shirt"} & english_tags(right["prompt"]), right
+        assert "tsukinomori school uniform" not in english_tags(right["prompt"]), right
+        assert all({"smile", "smiling", "grin", "grinning"} & english_tags(row["prompt"])
+                   for row in sakikos), sakikos

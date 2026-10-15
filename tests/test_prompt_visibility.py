@@ -96,6 +96,56 @@ def test_nai_chinese_appearance_and_global_relations_reach_generation_inputs():
     assert graph[selector["character2"][0]]["inputs"]["comfyui_prompt"] == b["prompt"]
 
 
+@pytest.mark.parametrize("colored", [False, "jacket", "coat"])
+def test_nai_bilingual_repeated_identity_captions_reach_three_independent_nodes(colored):
+    from agent_tools.comfyui_workflows import custom_t2i_workflow
+    from tag_cleaner import normalize_tag_key, split_tags
+
+    clauses = ("角色甲穿白衬衫坐在中间", "左侧角色乙穿外套", "右侧角色乙穿连衣裙")
+    captions = (
+        "girl, pink_hair, white_shirt, sitting, 角色甲穿着白衬衫坐在中间。",
+        "girl, blue_hair, jacket, standing, 角色乙穿着外套站在左边。",
+        "girl, blue_hair, dress, standing, 角色乙穿着连衣裙站在右边。",
+    )
+    clothes = ("白衬衫", "外套", "连衣裙")
+    expected = ({"white shirt", "sitting"}, {"jacket", "standing"}, {"dress", "standing"})
+    if colored:
+        clothes = ("白衬衫", "黑色外套", "白色外套")
+        clauses = (clauses[0], "左侧角色乙穿黑色外套", "右侧角色乙穿白色外套")
+        captions = (captions[0], f"girl, blue_hair, black_{colored}, standing, 角色乙穿着黑色外套站在左边。",
+                    f"girl, blue_hair, white_{colored}, standing, 角色乙穿着白色外套站在右边。")
+        expected = (expected[0], {f"black {colored}", "standing"}, {f"white {colored}", "standing"})
+    output = json.loads(plan(list(zip(("character_a", "character_b", "character_b"),
+                                      captions, (.5, .25, .75))),
+                             "3girls, upper_body, white_background, 三人上半身入镜。"))
+    for index, row in enumerate(output["characters"]):
+        row.update(anchor_id=f"target_{index+1}", source_text=clauses[index])
+    result, calls = run(
+        "-r " + "；".join(clauses), {"characters": [
+            semantic_character("角色甲", clothes[0]),
+            semantic_character("角色乙", clothes[1]),
+            semantic_character("角色乙", clothes[2]),
+        ]}, json.dumps(output, ensure_ascii=False),
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    rows = result.summary["nai_characters"]
+    assert len(rows) == 3
+    for row, caption, tags in zip(rows, captions, expected):
+        assert tags <= {normalize_tag_key(part) for part in split_tags(row["prompt"])}
+        assert caption.split(", ")[-1] in row["prompt"]
+    if colored:
+        assert not {"white coat", "white jacket"} & {normalize_tag_key(part) for part in split_tags(rows[1]["prompt"])}
+        assert not {"black coat", "black jacket"} & {normalize_tag_key(part) for part in split_tags(rows[2]["prompt"])}
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, result.final_prompt, "blurry",
+        1024, 1536, 28, 6, 123, nai_characters=rows,
+    )
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    for index, row in enumerate(rows, 1):
+        assert graph[selector[f"character{index}"][0]]["inputs"]["comfyui_prompt"] == row["prompt"]
+
+
 @pytest.mark.parametrize("source_index", [0, 1])
 def test_nai_contact_state_belongs_to_mouth_owner_not_hand_owner(source_index):
     from tag_cleaner import split_tags

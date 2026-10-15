@@ -1964,6 +1964,30 @@ def test_named_outfit_uses_each_wearers_accepted_clothing_anchor(outfit_name, ou
     assert repaired[2] == plans[2]
 
 
+@pytest.mark.parametrize("other_clothing", ["星辉礼服", "未知斗篷"])
+def test_named_outfit_recovery_never_overrides_another_instances_clothing(other_clothing):
+    targets = (
+        SemanticAnchor("left", "target_character", "character", "角色甲", "", ("character_a",)),
+        SemanticAnchor("right", "target_character", "character", "角色甲", "", ("character_a",)),
+    )
+    clothing = (
+        SemanticAnchor("left_clothes", "clothing", "clothing", "苍穹制服", "", ()),
+        SemanticAnchor("right_clothes", "clothing", "clothing", other_clothing, "", ()),
+        SemanticAnchor("uniform", "outfit", "outfit", "苍穹制服", "", ("azure_uniform",)),
+    )
+    plans = tuple(SemanticCharacterPlan(
+        target.anchor_id, SemanticWardrobe("creative_fallback"),
+        clothing_anchor_id=f"{target.anchor_id}_clothes",
+    ) for target in targets)
+    repaired = repair_single_target_cached_named_outfit_plan(
+        plans, (*targets, *clothing),
+        SemanticLookupResult(named_outfit_tags=("azure_uniform",)),
+        f"左侧角色甲穿苍穹制服，右侧角色甲穿{other_clothing}",
+    )
+    assert repaired[0].wardrobe == SemanticWardrobe("named_outfit", "uniform")
+    assert repaired[1] == plans[1]
+
+
 def test_modified_named_uniform_repairs_planner_omission_without_losing_changes() -> None:
     targets = (
         SemanticAnchor("anon", "target_character", "character", "爱音", "", ("chihaya_anon",)),
@@ -2026,10 +2050,89 @@ def test_unrecognized_worn_clothing_never_restores_saved_default() -> None:
     assert explicit_worn_clothing_phrases(prompt, "乙") == ()
 
 
+@pytest.mark.parametrize("bound", [False, True])
+@pytest.mark.parametrize("garment", ["white_shirt", "purple_cloak"])
+def test_bound_ordinary_clothing_is_not_exclusive_to_a_cache_or_another_wearer(bound, garment):
+    anchors = (
+        SemanticAnchor("a", "target_character", "character", "甲", "", ("character_a",)),
+        SemanticAnchor("b", "target_character", "character", "乙", "", ("character_b",)),
+        SemanticAnchor("ordinary", "clothing", "clothing", "新选的衣服", "", ()),
+        SemanticAnchor("uniform", "outfit", "outfit", "指定校服", "", ("example_school_uniform",)),
+    )
+    semantic = SemanticLookupResult(
+        outfit_profile_tags=(garment, "stale_school_uniform", "ceremonial_dress"),
+        named_outfit_tags=("example_school_uniform", "stale_school_uniform", "ceremonial_dress"),
+        anchor_outfit_profiles=(("uniform", "example_school_uniform", (garment,), "default"),),
+    )
+    plans = (SemanticCharacterPlan("a", SemanticWardrobe("creative_fallback"),
+                                   clothing_anchor_id="ordinary" if bound else ""),
+             SemanticCharacterPlan("b", SemanticWardrobe("named_outfit", "uniform")))
+    effective = complete_character_wardrobe_states(
+        build_character_effective_outfits(anchors, plans, semantic, user_prompt=""),
+        anchors, semantic, explicit_wardrobe_evidence=True,
+    )
+    authority = build_wardrobe_authority(effective, semantic, anchors).for_character(effective[0])
+    text = f"character_a wears {garment.replace('_', ' ')} and example school uniform and stale school uniform and ceremonial dress"
+    filtered = controlled_character_outfit_detail(text, "character_a", effective[0], wardrobe_authority=authority)
+    assert (garment.replace('_', ' ') in filtered) == bound
+    assert (garment in authority.filter_character_tags(garment, effective[0])) == bound
+    assert "example school uniform" not in filtered and "stale school uniform" not in filtered
+    assert "ceremonial dress" not in filtered
+    assert authority.filter_tags(("ceremonial_dress",)) == ()
+    assert effective[0].resolution_state == ("resolved" if bound else "explicit_but_unresolved")
+    # Shared components never cancel an explicit removal or forbidden slot.
+    removed = replace(authority, removed_tags=(garment,))
+    assert removed.filter_tags((garment,)) == ()
+    assert garment.replace('_', ' ') not in removed.filter_character_prose(text, effective[0])
+
+
 def test_worn_clothing_scope_does_not_cross_to_another_wearer() -> None:
     prompt = "甲穿着长外套，乙穿着红色连衣裙"
     assert explicit_worn_clothing_phrases(prompt, "甲") == ("长外套",)
     assert explicit_worn_clothing_phrases(prompt, "乙") == ("红色连衣裙",)
+
+
+@pytest.mark.parametrize("semantic_changes", [False, True])
+def test_repeated_identity_without_clothing_binding_never_inherits_siblings_patch(semantic_changes):
+    anchors = tuple(SemanticAnchor(n, "target_character", "character", "角色乙", "", ("character_b",))
+                    for n in ("left", "right"))
+    prompt = "左侧角色乙的外套改成黑色；右侧角色乙的外套改成白色"
+    plans = tuple(SemanticCharacterPlan(n, SemanticWardrobe("creative_fallback"),
+                  directives=(SemanticOutfitDirective("replace_color", ("outerwear",), color, clause, n),)
+                  if semantic_changes else ())
+                  for n, color, clause in zip(("left", "right"), ("black", "white"), prompt.split("；")))
+    recovered = add_host_outfit_changes_to_plans(plans, anchors, prompt)
+    assert recovered == plans
+    effective = build_character_effective_outfits(anchors, recovered, SemanticLookupResult(), user_prompt=prompt)
+    for outfit, color in zip(effective, ("black", "white")):
+        assert {patch.value for patch in outfit.effective.patches} == ({color} if semantic_changes else set())
+
+
+def test_cosplay_recovery_cannot_overwrite_repeated_instances_accepted_clothing():
+    anchors = (
+        SemanticAnchor("left", "target_character", "character", "角色乙", "", ("character_b",)),
+        SemanticAnchor("right", "target_character", "character", "角色乙", "", ("character_b",)),
+        SemanticAnchor("uniform", "clothing", "clothing", "指定校服", "", ()),
+        SemanticAnchor("borrowed", "outfit_source", "character", "donor", "donor的衣服", ("donor",)),
+    )
+    plans = (SemanticCharacterPlan("left", SemanticWardrobe("creative_fallback"), clothing_anchor_id="uniform"),
+             SemanticCharacterPlan("right", SemanticWardrobe("outfit_source", "borrowed"), clothing_anchor_id="borrowed"))
+    assert repair_explicit_cosplay_plans(
+        plans, anchors, "左侧角色乙穿指定校服，右侧角色乙穿donor的衣服",
+    ) == plans
+
+
+def test_replacement_color_allows_writer_garment_wording_but_never_old_color_or_removal():
+    anchors = (SemanticAnchor("a", "target_character", "character", "甲", "", ()),)
+    directive = SemanticOutfitDirective("replace_color", ("outerwear",), "black", "外套改成黑色", "a")
+    plans = build_character_effective_outfits(
+        anchors, (SemanticCharacterPlan("a", SemanticWardrobe("creative_fallback"), (directive,)),),
+        SemanticLookupResult(), user_prompt="甲的外套改成黑色",
+    )
+    authority = build_wardrobe_authority(plans, SemanticLookupResult(), anchors)
+    assert authority.filter_tags(("black_coat", "black_jacket", "white_coat", "red_jacket")) == ("black_coat", "black_jacket")
+    removed = replace(authority, selected_tags=(), replacement_colors=())
+    assert removed.filter_tags(("black_coat", "black_jacket")) == ()
 
 
 def test_generic_named_outfit_components_reach_writer_for_arbitrary_wearer() -> None:

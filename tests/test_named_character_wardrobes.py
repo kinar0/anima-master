@@ -233,3 +233,36 @@ def test_empty_custom_components_remain_an_explicit_empty_record(resolver):
     result = resolver.cached_bound_wardrobes(anchors)
     assert result.anchor_outfit_profiles[0][2] == ()
     assert plans[0].wardrobe.kind == "outfit_source"
+
+
+@pytest.mark.parametrize("phrase", ["donor衣服", "donor的衣服", "捐赠者服装", "捐赠者的服装"])
+def test_bound_clothing_can_name_a_locally_confirmed_donor(resolver, phrase):
+    save_rows(resolver, [dict(key="donor", aliases=["donor", "捐赠者"], sourceTags=["donor"],
+                              tags=["red_shirt", "black_corset"], qualifier="default"),
+                         row("donor", "生日礼服", ["white_dress"])])
+    anchors = (SemanticAnchor("left", "target_character", "character", "wearer", "", ("wearer",)),
+               SemanticAnchor("right", "target_character", "character", "wearer", "", ("wearer",)),
+               SemanticAnchor("ordinary", "clothing", "clothing", "白衬衫", "", ()),
+               SemanticAnchor("borrowed", "clothing", "clothing", phrase, "", ()))
+    plans = (SemanticCharacterPlan("left", SemanticWardrobe("creative_fallback"), clothing_anchor_id="ordinary"),
+             SemanticCharacterPlan("right", SemanticWardrobe("creative_fallback"), clothing_anchor_id="borrowed"))
+    updated_anchors, updated = resolver.bind_character_wardrobes(anchors, plans)
+    assert updated[0] == plans[0]
+    assert updated[1].wardrobe.kind == "outfit_source"
+    assert resolver.cached_bound_wardrobes(updated_anchors).anchor_outfit_profiles[0][2] == ("red_shirt", "black_corset")
+
+
+@pytest.mark.parametrize("phrase,ambiguous", [
+    ("banana衣服", False), ("不认识的人衣服", False), ("白衬衫，旁边放着ana衣服", False),
+    ("ana衣服", True), ("ana衣服图案的衬衫", False),
+])
+def test_donor_recovery_abstains_for_unknown_ambiguous_or_incidental_names(resolver, phrase, ambiguous):
+    rows = [dict(key="ana", aliases=["ana"], sourceTags=["donor_a"], tags=["red_shirt"], qualifier="default")]
+    if ambiguous:
+        rows.append(dict(key="other", aliases=["ana"], sourceTags=["donor_b"], tags=["white_shirt"], qualifier="default"))
+    save_rows(resolver, rows)
+    anchors = (SemanticAnchor("t", "target_character", "character", "wearer", "", ("wearer",)),
+               SemanticAnchor("s", "clothing", "clothing", phrase, "", ()))
+    plans = (SemanticCharacterPlan("t", SemanticWardrobe("creative_fallback"), clothing_anchor_id="s"),)
+    _, updated = resolver.bind_character_wardrobes(anchors, plans)
+    assert updated == plans

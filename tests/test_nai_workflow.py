@@ -105,6 +105,11 @@ def test_nai_writer_contract_separates_counts_and_requires_chinese_prompt_prose(
     assert "Ngirls, Mboys for a mixed group" in instruction
     assert "do not infer a gender change from titles" in instruction
     assert "retain the user's original Chinese" in instruction
+    assert "Chinese prose supplements English tags; neither replaces the other" in instruction
+    assert "never translate the tag layer into Chinese keywords" in instruction
+    assert "Identity, gender and interaction_tags alone do not satisfy" in instruction
+    assert "Chinese prose must be complete sentences" in instruction
+    assert "three female instances use 3girls, not a list" in instruction
     assert "inside each actual instance prompt" in instruction
     assert "Do not translate all prose into English or output tags alone" in instruction
     assert "without a one-sentence limit" in instruction

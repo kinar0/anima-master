@@ -191,6 +191,26 @@ class DanbooruResolver:
                 updated.append(plan)
                 continue
             phrase = self._profile_alias_key(f"{wardrobe.source_text} {wardrobe.description}")
+            # Compact LLM1 can preserve "C衣服" verbatim while omitting C as
+            # clothing_source. The accepted wearer->clothing edge plus an exact
+            # local alias followed only by a clothing-source suffix is enough to
+            # recover that donor. Never scan scene text or guess an unknown name.
+            implicit_donors: set[str] = set()
+            if (plan.wardrobe.kind == "creative_fallback"
+                    and plan.clothing_anchor_id == wardrobe.anchor_id and wardrobe.role == "clothing"):
+                clothing_phrase = self._profile_alias_key(wardrobe.source_text)
+                for key, row in profiles.items():
+                    names = [str(key).split("::", 1)[0], *row.get("aliases", [])]
+                    if any(re.fullmatch(
+                        rf"{re.escape(self._profile_alias_key(name))}\s*(?:的\s*)?"
+                        r"(?:衣服|服装|衣装|穿搭|clothes|clothing|outfit)",
+                        clothing_phrase, re.I,
+                    ) for name in names if self._profile_alias_key(name)):
+                        implicit_donors.add(key)
+                owners = {tuple(sorted(profiles[key].get("owner_tags") or profiles[key].get("source_tags", [])))
+                          for key in implicit_donors}
+                if len(owners) != 1:
+                    implicit_donors.clear()
             owner = wardrobe if plan.wardrobe.kind == "outfit_source" else target
             owner_tags = set(owner.candidates)
             known_owner_tags = owner_tags.intersection(
@@ -217,7 +237,8 @@ class DanbooruResolver:
                 hits = [name for name in names if self._text_mentions_alias(phrase, name)]
                 if not hits:
                     continue
-                if plan.wardrobe.kind != "outfit_source" and not owner_tags.intersection(row_owners):
+                if (plan.wardrobe.kind != "outfit_source" and key not in implicit_donors
+                        and not owner_tags.intersection(row_owners)):
                     continue
                 if plan.wardrobe.kind == "outfit_source" and known_owner_tags and not known_owner_tags.intersection(
                     row_owners | set(row.get("source_tags", []))

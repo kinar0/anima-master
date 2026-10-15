@@ -644,7 +644,10 @@ def build_effective_outfit_plan(
         subject=plan.target_character,
         base_tags=normalized_base,
         effective_tags=tuple(effective),
-        removed_tags=tuple(removed),
+        # The same change can arrive via both LLM1 and conservative recovery,
+        # with different evidence spans. A final replacement must not also be
+        # classified as removed; patches retain the complete change history.
+        removed_tags=tuple(tag for tag in removed if tag not in effective),
         added_tags=tuple(dict.fromkeys(added)),
         forbidden_slots=tuple(forbidden_slots),
         patches=patches,

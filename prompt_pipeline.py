@@ -1235,6 +1235,7 @@ class CharacterEffectiveOutfit:
     composition_omitted_tags: tuple[str, ...] = ()
     resolution_state: str = "resolved"
     unresolved_evidence: tuple[str, ...] = ()
+    clothing_anchor_id: str = ""
 
 
 _STABLE_APPEARANCE_REQUEST_RE = re.compile(
@@ -1830,6 +1831,8 @@ class WardrobeAuthority:
     removed_slots: tuple[str, ...] = ()
     stale_cached_tags: tuple[str, ...] = ()
     character_selected_tags: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    named_outfit_tags: tuple[str, ...] = ()
+    replacement_colors: tuple[tuple[str, str], ...] = ()
 
     @staticmethod
     def _key(tag: str) -> str:
@@ -1908,15 +1911,29 @@ class WardrobeAuthority:
             self._key(tag)
             for tag in (*self.stale_cached_tags, *self.removed_tags)
         }
+        selected = {self._key(tag) for tag in self.selected_tags}
         return tuple(dict.fromkeys(
             tag
             for tag in tags
             if self._key(tag) not in stale
-            and not any(self._matches_slot(tag, slot) for slot in self.removed_slots)
+            and (self._key(tag) in selected
+                 or any(self._matches_slot(tag, slot) and color in normalize_tag_key(tag).split()
+                        for slot, color in self.replacement_colors)
+                 or not any(self._matches_slot(tag, slot) for slot in self.removed_slots))
         ))
 
     def filter_tag_text(self, text: str) -> str:
         return ", ".join(self.filter_tags(tuple(split_tags(text))))
+
+    def filter_character_tags(self, text: str, plan: CharacterEffectiveOutfit) -> str:
+        authority = self.for_character(plan)
+        own_keys = {self._key(tag) for owner, tags in authority.character_selected_tags
+                    if owner == plan.target_anchor_id for tag in tags}
+        other_keys = {self._key(tag) for owner, tags in authority.character_selected_tags
+                      if owner != plan.target_anchor_id for tag in tags} - own_keys
+        return ", ".join(authority.filter_tags(tuple(
+            part for part in split_tags(text) if self._key(part) not in other_keys
+        )))
 
     def filter_prose(self, text: str) -> str:
         result = str(text or "")
@@ -1934,16 +1951,17 @@ class WardrobeAuthority:
         self, text: str, plan: CharacterEffectiveOutfit
     ) -> str:
         """Remove only grounded outfit evidence owned by another wearer."""
-        result = self.filter_prose(text)
+        authority = self.for_character(plan)
+        result = authority.filter_prose(text)
         own_keys = {
             self._key(tag)
-            for target_id, tags in self.character_selected_tags
+            for target_id, tags in authority.character_selected_tags
             if target_id.lower() == plan.target_anchor_id.lower()
             for tag in tags
         }
         other_tags = tuple(
             tag
-            for target_id, tags in self.character_selected_tags
+            for target_id, tags in authority.character_selected_tags
             if target_id.lower() != plan.target_anchor_id.lower()
             for tag in tags
             if self._key(tag) not in own_keys
@@ -1952,6 +1970,30 @@ class WardrobeAuthority:
             result = self._remove_prose_tag(result, tag)
         result = re.sub(r"\s+and\s+(?=(?:is|are)\b)", " ", result, flags=re.I)
         return re.sub(r"\s{2,}", " ", result).strip(" ,;")
+
+    def for_character(self, plan: CharacterEffectiveOutfit) -> WardrobeAuthority:
+        """A common garment is not exclusive evidence of a saved outfit.
+
+        Only a resolved, explicitly bound ordinary outfit delegates components
+        to the writer. Named sets, unresolved ownership, explicit removals and
+        forbidden slots retain their existing authority; no tags are injected.
+        """
+        if not (plan.wardrobe_kind == "creative_fallback"
+                and plan.resolution_state == "resolved" and plan.clothing_anchor_id):
+            return self
+
+        def exclusive(tag: str) -> bool:
+            return (self._key(tag) in {self._key(value) for value in self.named_outfit_tags}
+                    or not outfit_tag_slot(tag) or bool(_CREATIVE_TAG_DENY_RE.search(tag)))
+
+        return replace(
+            self,
+            stale_cached_tags=tuple(tag for tag in self.stale_cached_tags if exclusive(tag)),
+            character_selected_tags=tuple(
+                (owner, tags if owner == plan.target_anchor_id else tuple(tag for tag in tags if exclusive(tag)))
+                for owner, tags in self.character_selected_tags
+            ),
+        )
 
 
 def build_wardrobe_authority(
@@ -2127,6 +2169,17 @@ def build_wardrobe_authority(
         removed_slots=removed_slots,
         stale_cached_tags=stale,
         character_selected_tags=character_selected_tags,
+        named_outfit_tags=tuple(dict.fromkeys((
+            *semantic_result.named_outfit_tags,
+            *(plan.wardrobe_tag for plan in plans if plan.wardrobe_kind == "named_outfit" and plan.wardrobe_tag),
+        ))),
+        replacement_colors=tuple(dict.fromkeys(
+            (patch.slot, patch.value)
+            for plan in plans for patch in plan.effective.patches
+            if patch.operation == "replace" and patch.value
+            and any(outfit_tag_slot(tag) == patch.slot and patch.value in normalize_tag_key(tag).split()
+                    for tag in plan.effective.effective_tags)
+        )),
     )
 
 
@@ -2600,7 +2653,9 @@ def repair_single_target_cached_named_outfit_plan(
         if (clothing is not None and clothing.role in {"clothing", "outfit"}
                 and clothing.source_text.strip()
                 and clothing.source_text in user_prompt):
-            phrases = (clothing.source_text, *phrases)
+            # An instance-bound clothing edge is more precise than rescanning
+            # every occurrence of the same identity in a multi-instance request.
+            phrases = (clothing.source_text,)
         for phrase in phrases:
             # A later scene mention is not the object of the wear verb.
             worn_object = re.split(
@@ -2729,13 +2784,15 @@ def explicit_cosplay_tags(
 ) -> tuple[str, ...]:
     """Add a source-character cosplay tag only for an explicit wearer relation."""
     by_id = {anchor.anchor_id: anchor for anchor in anchors}
-    assignments = dict(explicit_cosplay_assignments(
+    assignments = explicit_cosplay_assignments(
         anchors, user_prompt, cosplay_only=True
-    ))
+    )
     tags: list[str] = []
     for outfit in outfits:
-        source_text = assignments.get(outfit.target_anchor_id)
         source = by_id.get(outfit.wardrobe_anchor_id)
+        source_text = next((text for target_id, text in assignments
+                            if target_id == outfit.target_anchor_id and source is not None
+                            and _normalized_character_key(text) == _normalized_character_key(source.source_text)), "")
         canonical = outfit.wardrobe_tag.strip()
         if not (
             source_text
@@ -2796,6 +2853,10 @@ def repair_explicit_cosplay_plans(
     repaired: list[SemanticCharacterPlan] = []
     for plan in plans:
         source_text = assignments.get(plan.target_anchor_id, "")
+        scoped_text = _instance_outfit_patch_text(plan, anchors, user_prompt)
+        if scoped_text != user_prompt and not DanbooruResolver._text_mentions_alias(scoped_text, source_text):
+            repaired.append(plan)
+            continue
         source = sources.get(re.sub(r"\s+", " ", source_text.lower()))
         if source is not None:
             plan = replace(
@@ -2807,6 +2868,10 @@ def repair_explicit_cosplay_plans(
     for target_id, source_text in assignments.items():
         if target_id in existing:
             continue
+        if not _instance_outfit_patch_text(
+            SemanticCharacterPlan(target_id, SemanticWardrobe("none")), anchors, user_prompt,
+        ):
+            continue
         source = sources.get(re.sub(r"\s+", " ", source_text.lower()))
         if source is not None:
             repaired.append(SemanticCharacterPlan(
@@ -2814,6 +2879,31 @@ def repair_explicit_cosplay_plans(
                 wardrobe=SemanticWardrobe("outfit_source", source.anchor_id),
             ))
     return tuple(repaired)
+
+
+def _instance_outfit_patch_text(
+    plan: SemanticCharacterPlan, anchors: tuple[SemanticAnchor, ...], user_prompt: str,
+) -> str:
+    """Do not interpret all same-name clauses as changes to every instance.
+
+    LLM1 directives already carry instance ownership. For repeated identities,
+    deterministic recovery may read only that row's accepted clothing phrase.
+    Missing/ambiguous bindings remain for the writer to interpret from raw input.
+    """
+    by_id = {anchor.anchor_id: anchor for anchor in anchors}
+    target = by_id.get(plan.target_anchor_id)
+    if target is None:
+        return ""
+    identities = {target.source_text.casefold(), *(value.casefold() for value in target.candidates)} - {""}
+    repeated = any(
+        anchor.role == "target_character" and anchor.anchor_id != target.anchor_id
+        and identities.intersection({anchor.source_text.casefold(), *(value.casefold() for value in anchor.candidates)})
+        for anchor in anchors
+    )
+    if not repeated:
+        return user_prompt
+    clothing = by_id.get(plan.clothing_anchor_id)
+    return clothing.source_text if clothing and clothing.role in {"clothing", "outfit", "outfit_source"} else ""
 
 
 def add_host_outfit_changes_to_plans(
@@ -2837,8 +2927,12 @@ def add_host_outfit_changes_to_plans(
     by_target = {plan.target_anchor_id: plan for plan in plans}
     ordered_ids = [plan.target_anchor_id for plan in plans]
     for target_id, target in targets.items():
+        current = by_target.get(target_id)
         patches = parse_user_outfit_patches(
-            user_prompt,
+            _instance_outfit_patch_text(
+                current or SemanticCharacterPlan(target_id, SemanticWardrobe("default_profile")),
+                anchors, user_prompt,
+            ),
             target.source_text,
             known_character_names=known_names,
         )
@@ -2858,7 +2952,6 @@ def add_host_outfit_changes_to_plans(
         )
         if not directives:
             continue
-        current = by_target.get(target_id)
         if current is None:
             current = SemanticCharacterPlan(
                 target_anchor_id=target_id,
@@ -3355,7 +3448,7 @@ def build_character_effective_outfits(
         )
         effective = build_effective_outfit_plan(
             transfer,
-            user_prompt=user_prompt,
+            user_prompt=_instance_outfit_patch_text(plan, anchors, user_prompt),
             base_tags=base_tags,
             known_character_names=scoped_character_names,
             semantic_patches=patches,
@@ -3376,6 +3469,12 @@ def build_character_effective_outfits(
             effective=effective,
             complete_named_profile=complete_named_profile,
             composition_omitted_tags=composition_omitted_tags,
+            clothing_anchor_id=(
+                plan.clothing_anchor_id
+                if (clothing := by_id.get(plan.clothing_anchor_id)) is not None
+                and clothing.role in {"clothing", "outfit", "outfit_source"}
+                else ""
+            ),
         ))
     return tuple(built)
 
@@ -3418,6 +3517,8 @@ def complete_character_wardrobe_states(
         if kind == "default_reference":
             return True
         if kind == "creative_fallback":
+            if plan.clothing_anchor_id:
+                return True
             if scoped_mode == "creative_fallback":
                 return True
             return (
@@ -5320,10 +5421,12 @@ class PromptPipeline:
                     "\nOriginal user request (background and trait authority):\n" + original_prompt
                 )
             if target_outfits:
+                clothing_text = {anchor.anchor_id: anchor.source_text for anchor in anchors}
                 plan_prompt += "\nLocal target anchors (bind instances to these evidence rows):\n"
                 plan_prompt += "\n".join(
                     f"- {item.target_anchor_id}: {item.target_source_text}; "
                     f"identity={', '.join(item.target_candidates)}; wardrobe={item.wardrobe_kind}; "
+                    f"clothing={clothing_text.get(item.clothing_anchor_id, '')}; "
                     f"source={item.wardrobe_tag}; changes="
                     + "; ".join(patch.evidence for patch in item.effective.patches)
                     for item in target_outfits
@@ -5361,8 +5464,15 @@ class PromptPipeline:
                 self.logger.info("[comfyui_agent] NAI -r direct writer canvas:\n%s", canvas)
                 self.logger.info("[comfyui_agent] NAI -r direct writer prompt:\n%s", plan_prompt)
             writer_system_prompt = (
-                "Write only the requested NAI JSON. Put user-language prose in both "
-                "actual global and instance prompts; Chinese requests require Chinese. "
+                "Write only the requested NAI JSON. Both actual global and instance "
+                "prompts MUST combine English visual tags AND user-language descriptive sentences. "
+                "Chinese requests require Chinese prose AND English detail tags; neither "
+                "replaces the other. Never translate the tag layer into Chinese keywords. "
+                "English identity, gender and direction tags alone are insufficient: "
+                "include applicable English clothing, expression, pose and scene/camera tags. "
+                "global_prompt needs English framing/background tags, not only population "
+                "and copyright before Chinese. In each prompt serialize English tags first, "
+                "then the user-language sentences. "
                 "A bare body-state tag applies to the affected body part's owner, "
                 "not automatically to an action's source or both participants. "
                 "For example, A puts A's hand inside B's mouth: only B may have bare "
@@ -5483,17 +5593,11 @@ class PromptPipeline:
                         ))) for inherited in outfits
                         for item in (wearer if inherited.target_anchor_id == wearer.target_anchor_id else inherited,)
                     )
-                    scoped = replace(scoped, character_selected_tags=ownership)
+                    scoped = replace(scoped, character_selected_tags=ownership).for_character(wearer)
                     if wearer.resolution_state == "unspecified" and _UNTRUSTED_OUTFIT_DETAIL_RE.search(text):
                         scoped = replace(scoped, stale_cached_tags=())
-                    own_keys = {scoped._key(tag) for owner, tags in ownership
-                                if owner == wearer.target_anchor_id for tag in tags}
-                    other_keys = {scoped._key(tag) for owner, tags in ownership
-                                  if owner != wearer.target_anchor_id for tag in tags} - own_keys
                     # Pure tags require the same ownership boundary as wearing prose.
-                    text = ", ".join(part for part in split_tags(text)
-                                     if scoped._key(part) not in other_keys)
-                    text = scoped.filter_tag_text(text)
+                    text = scoped.filter_character_tags(text, wearer)
                     text = controlled_character_outfit_detail(
                         text, character["name"], wearer, user_prompt=prompt,
                         wardrobe_authority=scoped,

@@ -111,10 +111,13 @@ def test_restored_scene_responsibilities_stay_inside_the_direct_nai_writer():
     assert "CUSTOM SEVEN FIELD WRITER" not in writer["prompt"]
     assert "Anima" not in writer["system_prompt"]
     assert "Chinese requests require Chinese" in writer["system_prompt"]
+    assert "Chinese prose AND English detail tags" in writer["system_prompt"]
+    assert "Never translate the tag layer into Chinese keywords" in writer["system_prompt"]
     assert "Lighting is opt-in" in writer["system_prompt"]
     assert "seven-field" not in writer["prompt"]
     assert writer["prompt"].count("角色甲用勺子喂角色乙") == 1
-    assert len(writer["prompt"]) < 12000
+    # Character count is not a semantic contract or a reason to drop duties.
+    # The checks above guard responsibilities and the direct two-call route.
     assert result.summary["prompt_output_mode"] == "nai_instances"
     assert result.summary["prompt_llm_initial_content"] == output
     assert "nai_full_prompt_before_split" not in result.summary
@@ -138,6 +141,7 @@ def test_direct_direction_review_repairs_only_invalid_pairs_once(repair_ok):
     assert "source#hug" in calls[2]["prompt"] and "target#hug" in calls[2]["prompt"]
     assert "Lighting is opt-in" in calls[2]["system_prompt"]
     assert "affected body part's owner" in calls[2]["system_prompt"]
+    assert "Chinese prose AND English detail tags" in calls[2]["system_prompt"]
     assert result.summary["nai_character_plan_initial_raw"] == invalid
     if repair_ok:
         assert result.final_prompt
@@ -220,6 +224,39 @@ def test_nai_shared_named_outfit_anchor_is_not_filtered_from_second_wearer():
     assert result.final_prompt, result.summary
     assert len(calls) == 2
     assert all("aurora_academy_attire" in row["prompt"] for row in result.summary["nai_characters"])
+
+
+def test_nai_ordinary_shirt_survives_shared_uniform_components_and_old_cache():
+    from dataclasses import replace
+    from danbooru_semantic import SemanticAnchor
+
+    class MixedOutfits(Resolver):
+        def cached_outfit_profiles_for_prompt(self, prompt):
+            return replace(super().cached_outfit_profiles_for_prompt(prompt),
+                           source_outfit_profiles=(("角色甲", "character_a",
+                                                    ("old_school_uniform", "white_shirt"), "default"),))
+
+        def cached_named_outfits_for_prompt(self, prompt):
+            return SemanticLookupResult(
+                named_outfit_tags=("aurora_academy_attire",),
+                anchors=(SemanticAnchor("uniform", "outfit", "outfit", "命名校服", "",
+                                        ("aurora_academy_attire",)),),
+                anchor_outfit_profiles=(("uniform", "aurora_academy_attire", ("white_shirt",), "default"),),
+            )
+
+    result, calls = run(
+        "-r 角色甲穿白衬衫，角色乙穿命名校服", {"characters": [
+            semantic_character("角色甲", "白衬衫"), semantic_character("角色乙", "命名校服"),
+        ]}, plan([("character_a", "girl, white_shirt, standing, 角色甲穿着白衬衫站立。", .3),
+                  ("character_b", "girl, aurora_academy_attire, white_shirt, standing, 角色乙穿着命名校服站立。", .7)]),
+        resolver=MixedOutfits(),
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    a, b = result.summary["nai_characters"]
+    assert "white_shirt" in a["prompt"] and "白衬衫站立。" in a["prompt"]
+    assert "aurora_academy_attire" not in a["prompt"] and "old_school_uniform" not in a["prompt"]
+    assert "aurora_academy_attire" in b["prompt"] and "white_shirt" in b["prompt"]
 
 
 def test_nai_classified_clothes_are_not_assigned_to_a_wearer_by_host():

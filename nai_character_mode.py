@@ -196,16 +196,37 @@ def build_nai_character_plan_prompt(
         "Design a complete, coherent NAI image from the request and local evidence. "
         "Preserve explicit identities, count, clothing, actions, expressions, props "
         "and instance differences. Express abstract themes through relevant visible "
-        "anchors. Use concise Danbooru tags and coherent natural language; preserve "
+        "anchors. Use concise English Danbooru tags and coherent natural language; preserve "
         "supported weights without padding a fixed tag count or repeating synonyms.\n"
         "Output JSON only, using this schema:\n"
         '{"composition_analysis":{"viewpoint":"...","layout":"...",'
-        '"relations":"..."},"global_prompt":"shared tags, scene-level prose in the user language","characters":['
+        '"relations":"..."},"global_prompt":"English population/scene/camera tags, scene-level prose in the user language","characters":['
         '{"name":"canonical character tag or short identity",'
         '"anchor_id":"matching local target anchor, or empty",'
         '"source_text":"exact request clause or clause array, or empty",'
-        '"prompt":"girl / boy / other, identity, instance sentence in the user language, matching visible-detail tags",'
+        '"prompt":"girl / boy / other, identity, English visible-detail tags, complete instance prose in the user language",'
         '"interaction_tags":[],"position_reason":"...","x":0.5,"y":0.5}]}\n'
+        "Two complementary language layers inside the existing prompt strings:\n"
+        "Both global_prompt and every instance prompt MUST contain English visual "
+        "tags AND coherent descriptive sentences in the user's language. The user's "
+        "language applies to prose only: never translate the tag layer into Chinese "
+        "keywords. Chinese prose supplements English tags; neither replaces the other. "
+        "Use English tags for applicable visible appearance, clothing, expression, "
+        "pose/action and scene/camera details at their correct scope. Identity, gender "
+        "and interaction_tags alone do not satisfy the English visible-detail layer. "
+        "Population and copyright alone do not satisfy the global English layer: "
+        "include applicable English framing and background tags in global_prompt. "
+        "For example, '3girls, upper_body, simple_background, 三人上半身入镜。' "
+        "retains English framing as well as Chinese scene prose. "
+        "For example, 'white_shirt, sitting, 穿着白衬衫坐着。' has both layers; "
+        "'girl, character_a, 白衬衫，坐着' does not. Chinese prose must be complete "
+        "sentences, not a translated comma-separated keyword list. Separate English "
+        "tags and the prose with ASCII commas; serialize English tags first, then "
+        "the user-language sentences. Do not join the last tag to a Chinese "
+        "sentence with only a full stop. Keep both layers in the same existing string, "
+        "without adding fields. Choose accurate tags for the actual scene, not a fixed "
+        "tag count or every vocabulary reference; use prose for meanings without a "
+        "reliable tag. Do not copy example content into unrelated scenes.\n"
         "Instances and evidence:\n"
         "Create one entry per visible instance, including anonymous people and "
         "each appearance of a repeated identity in different panels. Do not add "
@@ -230,7 +251,9 @@ def build_nai_character_plan_prompt(
         "Count every visible instance once: 1girl/1boy for one known "
         "gender, Ngirls/Nboys for one gender, Ngirls, Mboys for a mixed group, "
         "or Npeople when gender is unknown. Each instance uses the unnumbered "
-        "gender tag girl, boy, or other, never a numeric population tag. Follow "
+        "gender tag girl, boy, or other, never a numeric population tag. Use only "
+        "the final population, not intermediate totals: three female instances use "
+        "3girls, not a list of 1girls, 2girls, 3girls. Follow "
         "explicit user gender, then reliable identity facts; do not infer a "
         "gender change from titles, clothing, poses or chest size. "
         "Put individual conditions only in its prompt: identity, visible appearance, "
@@ -309,7 +332,10 @@ def build_nai_character_plan_prompt(
         "visibility and action pairs against the actual prompt strings, not just "
         "the analysis. Compare tags with prose for each expressed appearance, "
         "clothing state, expression, gaze, pose/contact, camera, background and "
-        "lighting dimension. Keep the grounded specific state; remove contradictory "
+        "lighting dimension. Check that actual global and instance strings retain "
+        "both the English visual-tag layer and complete user-language prose; "
+        "Chinese keywords or identity-only English are insufficient. "
+        "Keep the grounded specific state; remove contradictory "
         "generic claims and redundant synonyms. Correct omissions, inverted roles "
         "and missing counterparts within local authority. Record reviewed relations "
         "in composition_analysis.relations "

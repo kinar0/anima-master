@@ -2,6 +2,14 @@
 
 > **严正警告：不要把随意精简 LLM 提示词当作排障办法，用户本人提出“简化”也不等于授权删功能。** 先定位原始回复、后处理和最终生成文本中的失效环节，再按 [提示词维护要求](prompting.md#严正警告不要随便精简或简化给-llm-的提示词) 修改；不能用一次成功或合法 JSON 代替语义验收。
 
+## 普通衣物被删、同名实例串色或省略“的”的借衣漏识别（2026-10-15）
+
+先比较 `semantic_plan_raw`、`nai_character_plan_prompt` 的逐 anchor 衣物证据、writer 原始 `nai_character_plan_raw` 和最终 `nai_characters`。英文衣物原本存在而最终消失，不能归因于模型只写中文。普通服装的已接受 clothing 关系须保留到实例权限；通用组件与旧档案/另一套衣服重名不代表穿错。指定套组身份、真正删除的衣物与禁止槽位仍应清除，未绑定实例不因此获得普通服装豁免。
+
+同一身份多次出场时，各实例的换色恢复只读取自己的已绑定衣物短语，不能再次扫描所有同名分句；借衣恢复也不能覆盖另一个实例的已接受服装。检查 `coat/jacket` 等同槽位写法：指定黑色外套时，同颜色的 writer 标签应保留，不能只接受宿主补出的某一个名词。改色的最终有效 tag 不能同时在 removed 集合中；重复来源的同一修改也要满足这一点。
+
+若 `clothing_source=null` 而衣物原文为 `C衣服`，仅在这条衣物关系已绑定穿着者、完整短语可对应唯一已确认本地来源及唯一档案时恢复。陌生或歧义别名、场景顺带提及继续不猜。真实测试记录同时检查原始和最终双语层，并保留失败记录；通过不代表已经验证图片或模型所有左右/肢体关系。
+
 ## 词汇候选与释义审核读取报 Internal server error（2026-10-14）
 
 本次复现定位到审核读取接口使用了 `request.args`，但当前 AstrBot 插件 Web API 的查询参数入口是 `request.query`。这会在读取候选文件前抛出 `AttributeError: 'PluginRequest' object has no attribute 'args'`，页面收到 500；与现有词库的翻译来源和词条质量无关。
@@ -31,6 +39,8 @@
 若显式标记存在却无可恢复台词，任务在提交 ComfyUI 前返回 `comic_dialogue_parse_failed`；若生成后缺中文字体、图片不合要求或排字失败，返回 `comic_dialogue_render_failed`，不发送无字原图。开关关闭时依旧按普通七字段提示词流程，模型可能把对白概括为表情或气泡。
 
 ## NAI 自定义工作流
+
+若 `-r` 突然主要输出中文关键词，先比较 `nai_character_plan_raw` 与 `nai_characters[].prompt`，不要把宿主补回的几个发色/瞳色 tags 当作 writer 已输出英文细节。2026-10-15 16:08 的三实例记录中，原始 JSON 已只有英文身份、性别和方向项，衣服、表情及姿态几乎全是中文；不是英文细节 tags 在后处理阶段被统一删除。当前专用 system、JSON 字段说明与同次复核明确要求“英文视觉 tags + 完整中文句子”并存，中文语言要求只作用于 prose。检查原始与最终两端的英文衣物、表情、动作/姿态、整图镜头，以及中文关系句；同名不同衣服的实例分别验收，不按名字合并。此修正不让宿主翻译中文或强补缺失名词 tags，不增加模型阶段。
 
 若本地已有多名角色档案，但 `confirmed_character_bindings` 只有一名，先对照 `semantic_plan_raw`，可能是第一阶段返回合法但不完整的名单。NAI `-r` 当前仍向写作者提供遗漏档案的条件参考；检查 `nai_character_plan_prompt` 的 `Additional locally confirmed identities`、`nai_local_profile_references` 和 `nai_bound_local_profile_references`。参考不是强制出场名单，服装来源仍独立处理；明确衣服尚未绑定时，不应看到该参考的 default reference。已清空的 `fixed_characters` 不再提供旧辅助拼写，但当前词库别名和档案仍可正常匹配。
 全局人数统计所有可见实例，角色框使用 `girl / boy / other`；独立的数字性别计数会归一化。画师/质量由主机补全，任务书不要求模型生成。中文请求的 NAI 写作指令要求实际角色 `prompt` 保留中文动作和关系句；只有 `source_text`、分析、位置理由有中文不算满足。canonical tags 仍使用英文。宿主不自行翻译或把整条中文原文复制给所有角色；这项语言与关系写作要求需要检查模型原始输出，不能仅凭任务书或离线替身测试断言真实模型一定遵守。
