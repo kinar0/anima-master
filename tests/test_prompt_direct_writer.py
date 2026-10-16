@@ -123,43 +123,80 @@ def test_restored_scene_responsibilities_stay_inside_the_direct_nai_writer():
     assert "nai_full_prompt_before_split" not in result.summary
 
 
-@pytest.mark.parametrize("repair_ok", [True, False])
-def test_direct_direction_review_repairs_only_invalid_pairs_once(repair_ok):
+@pytest.mark.parametrize("tags", [
+    [["source#hug"], []],
+    [["source#pointing at another"], ["target#pointing"]],
+    [["mutual#hug"], []],
+    [["source#hug", "target#hug"], []],
+])
+def test_direct_direction_review_downgrades_uncertain_hints_without_retry(tags):
     layout = json.loads(plan([("character_a", "girl, hugging character_b", .4),
                               ("character_b", "girl, receiving a hug", .6)]))
-    layout["characters"][0]["interaction_tags"] = ["source#hug"]
+    for character, actions in zip(layout["characters"], tags):
+        character["interaction_tags"] = actions
     invalid = json.dumps(layout)
-    layout["characters"][1]["interaction_tags"] = ["target#hug"]
-    fixed = json.dumps(layout)
     result, calls = run("-r 角色甲抱住角色乙", {"characters": [
         semantic_character("角色甲"), semantic_character("角色乙")
-    ]}, invalid, {"debug_prompt_enabled": True}, repair=fixed if repair_ok else invalid)
-    assert len(calls) == 3  # semantic planner, direct writer, one pair repair
-    assert result.summary["nai_character_plan_attempt_count"] == 2
-    assert result.summary["prompt_llm_attempt_count"] == 2
+    ]}, invalid, {"debug_prompt_enabled": True})
+    assert len(calls) == 2  # semantic planner and direct writer only
+    assert result.summary["nai_character_plan_attempt_count"] == 1
     assert result.summary["nai_interaction_initial_validation_errors"]
-    assert "source#hug" in calls[2]["prompt"] and "target#hug" in calls[2]["prompt"]
-    assert "Lighting is opt-in" in calls[2]["system_prompt"]
-    assert "affected body part's owner" in calls[2]["system_prompt"]
-    assert "Chinese prose AND English detail tags" in calls[2]["system_prompt"]
+    assert "nai_interaction_retry_validation_errors" not in result.summary
     assert result.summary["nai_character_plan_initial_raw"] == invalid
-    if repair_ok:
-        assert result.final_prompt
-        assert result.summary["nai_character_plan_accepted_attempt"] == "retry"
-        assert result.summary["prompt_llm_initial_content"] == invalid
-        assert result.summary["prompt_llm_retry_content"] == fixed
-        assert result.summary["nai_interaction_retry_validation_errors"] == []
-        assert "target#hug" in result.summary["nai_characters"][1]["prompt"]
-    else:
-        assert not result.final_prompt
-        assert result.summary["skipped_reason"] == "nai_character_plan_failed"
-        assert "nai_character_plan_invalid_interaction_pairs" in result.summary["llm_error"]
-        assert "nai_characters" not in result.summary
+    assert result.final_prompt, result.summary
+    assert result.summary["nai_character_plan_accepted_attempt"] == "initial"
+    assert result.summary["prompt_llm_initial_content"] == invalid
+    actor, recipient = result.summary["nai_characters"]
+    assert "hugging character_b" in actor["prompt"]
+    assert "receiving a hug" in recipient["prompt"]
+    assert actor["interaction_tags"] == recipient["interaction_tags"] == []
+    assert set(result.summary["nai_dropped_interaction_tags"]) == set(sum(tags, []))
 
 
-@pytest.mark.parametrize("repair_needed", [False, True])
+def test_single_person_prop_action_does_not_require_an_invented_recipient():
+    layout = json.loads(plan([("character_a", "girl, holding sign, 举着空白牌子站立。", .5)],
+                             "1girl, simple background, white background"))
+    layout["characters"][0]["interaction_tags"] = ["source#holding_sign"]
+    result, calls = run("-r 角色甲举着空白牌子站立", {"characters": [semantic_character("角色甲")]},
+                        json.dumps(layout, ensure_ascii=False))
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    assert len(result.summary["nai_characters"]) == 1
+    row = result.summary["nai_characters"][0]
+    assert "holding sign" in row["prompt"] and "举着空白牌子站立。" in row["prompt"]
+    assert row["interaction_tags"] == []
+
+
+@pytest.mark.parametrize("defect", ["position", "identity", "json"])
+def test_interaction_downgrade_does_not_bypass_required_structure_or_identity(defect):
+    from dataclasses import replace
+    from danbooru_semantic import SemanticAnchor
+
+    class ConfirmedIdentity(Resolver):
+        def cached_outfit_profiles_for_prompt(self, prompt):
+            return replace(super().cached_outfit_profiles_for_prompt(prompt),
+                           anchors=(SemanticAnchor("target_1", "target_character", "character", "角色甲", "",
+                                                   ("character_a",)),),
+                           anchor_tags=(("target_1", "character_a"),))
+
+    layout = json.loads(plan([("character_a", "girl, standing", .5)]))
+    layout["characters"][0]["interaction_tags"] = ["source#waving"]
+    if defect == "position":
+        layout["characters"][0]["x"] = 2
+    if defect == "identity":
+        layout["characters"][0]["name"] = "unconfirmed_other"
+    output = "{invalid" if defect == "json" else json.dumps(layout)
+    result, calls = run("-r 角色甲站立", {"characters": [semantic_character("角色甲")]}, output,
+                        resolver=ConfirmedIdentity())
+    assert not result.final_prompt
+    assert len(calls) == 2
+    assert result.summary["skipped_reason"] == "nai_character_plan_failed"
+    assert "invalid_interaction_pairs" not in result.summary["llm_error"]
+
+
+@pytest.mark.parametrize("incomplete_pair", [False, True])
 @pytest.mark.parametrize("outfit_tag", ["haneoka_school_uniform", "aurora_academy_attire"])
-def test_nai_named_clothes_stay_with_wearers_including_after_pair_repair(outfit_tag, repair_needed):
+def test_nai_named_clothes_stay_with_wearers_after_direction_downgrade(outfit_tag, incomplete_pair):
     class NamedClothing(Resolver):
         def cached_outfit_profiles_for_prompt(self, prompt):
             from dataclasses import replace
@@ -171,19 +208,16 @@ def test_nai_named_clothes_stay_with_wearers_including_after_pair_repair(outfit_
         ("character_b", f"girl, {outfit_tag}, 用自己手里的勺子喂角色甲", .7),
     ], f"2girls, {outfit_tag.replace('_', ' ')}, bed, table, unclassified_glow"))
     layout["characters"][1]["interaction_tags"] = ["source#feeding"]
-    if not repair_needed:
+    if not incomplete_pair:
         layout["characters"][0]["interaction_tags"] = ["target#feeding"]
     initial = json.dumps(layout, ensure_ascii=False)
-    layout["characters"][0]["interaction_tags"] = ["target#feeding"]
-    fixed = json.dumps(layout, ensure_ascii=False)
     result, calls = run(
         "-r 角色甲和角色乙都穿命名校服，角色乙用勺子喂角色甲", {"characters": [
             semantic_character("角色甲", "命名校服"), semantic_character("角色乙", "命名校服")
         ]}, initial, {"debug_prompt_enabled": True}, resolver=NamedClothing(),
-        repair=fixed if repair_needed else None,
     )
     assert result.final_prompt, result.summary
-    assert len(calls) == (3 if repair_needed else 2)
+    assert len(calls) == 2
     assert outfit_tag.replace('_', ' ') not in result.final_prompt
     assert result.summary["nai_dropped_global_character_tags"] == [outfit_tag.replace('_', ' ')]
     assert all(term in result.final_prompt for term in ("bed", "table", "unclassified glow"))
@@ -191,8 +225,11 @@ def test_nai_named_clothes_stay_with_wearers_including_after_pair_repair(outfit_
     assert outfit_tag in recipient["prompt"] and outfit_tag in actor["prompt"]
     assert "张嘴接受角色乙喂来的食物" in recipient["prompt"]
     assert "用自己手里的勺子喂角色甲" in actor["prompt"]
-    assert "target#feeding" in recipient["prompt"] and "source#feeding" in actor["prompt"]
-    if not repair_needed:
+    if incomplete_pair:
+        assert actor["interaction_tags"] == recipient["interaction_tags"] == []
+    else:
+        assert "target#feeding" in recipient["prompt"] and "source#feeding" in actor["prompt"]
+    if not incomplete_pair:
         from agent_tools.comfyui_workflows import custom_t2i_workflow
         graph = custom_t2i_workflow(
             {"custom_workflow_path": "nai_api.json"}, result.final_prompt, "blurry",

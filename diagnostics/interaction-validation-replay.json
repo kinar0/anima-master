@@ -1,0 +1,345 @@
+{
+  "kind": "offline replay of saved real model responses; no new LLM or image calls",
+  "records": [
+    {
+      "file": "diagnostics\\nai-text\\nai_text_dialogue.json",
+      "attempt": "nai_character_plan_initial_raw",
+      "warnings": [
+        "source#talking has no target#talking on another visible instance"
+      ],
+      "before": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿白衬衫站在左边说：“你好，祥子！”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, flat_chest, white_shirt, standing, facing_right, open_mouth, speech_bubble, looking_at_another, 千早爱音拥有粉色长发和灰色眼睛, 胸部平坦, 身穿白衬衫站在画面左侧, 侧身面向右边的丰川祥子, 张嘴说出问候语, 语气友善自然, 她的台词“你好, 祥子！”单独放在自己头顶上方的气泡中。, source#talking",
+          "interaction_tags": [
+            "source#talking"
+          ],
+          "position_reason": "Left-side speaker; bubble above her head on the left edge leaves the right half clear for sakiko's reply bubble.",
+          "x": 0.26,
+          "y": 0.5
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": [
+            "丰川祥子穿黑色连衣裙站在右边回答：“Hello, Anon! (OK)”",
+            "丰川祥子穿黑色连衣裙站在右边回答：“Hello"
+          ],
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, yellow_eyes_blue_hair, black_dress, standing, facing_left, open_mouth, speech_bubble, looking_at_another, 丰川祥子拥有蓝色长发和黄色眼睛, 发际两侧有鬓发并扎成双马尾式样, 胸部丰满, 身穿黑色连衣裙站在画面右侧, 侧身面向左边的千早爱音, 开口回应对方, 她的回答“Hello, Anon! (OK)”单独放在自己头顶上方的气泡中。, source#talking",
+          "interaction_tags": [
+            "source#talking"
+          ],
+          "position_reason": "Right-side responder; bubble above her head on the right edge keeps the two lines and bubbles separate.",
+          "x": 0.74,
+          "y": 0.5
+        }
+      ],
+      "after": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿白衬衫站在左边说：“你好，祥子！”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, flat_chest, white_shirt, standing, facing_right, open_mouth, speech_bubble, looking_at_another, 千早爱音拥有粉色长发和灰色眼睛, 胸部平坦, 身穿白衬衫站在画面左侧, 侧身面向右边的丰川祥子, 张嘴说出问候语, 语气友善自然, 她的台词“你好, 祥子！”单独放在自己头顶上方的气泡中。",
+          "interaction_tags": [],
+          "position_reason": "Left-side speaker; bubble above her head on the left edge leaves the right half clear for sakiko's reply bubble.",
+          "x": 0.26,
+          "y": 0.5
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": [
+            "丰川祥子穿黑色连衣裙站在右边回答：“Hello, Anon! (OK)”",
+            "丰川祥子穿黑色连衣裙站在右边回答：“Hello"
+          ],
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, yellow_eyes_blue_hair, black_dress, standing, facing_left, open_mouth, speech_bubble, looking_at_another, 丰川祥子拥有蓝色长发和黄色眼睛, 发际两侧有鬓发并扎成双马尾式样, 胸部丰满, 身穿黑色连衣裙站在画面右侧, 侧身面向左边的千早爱音, 开口回应对方, 她的回答“Hello, Anon! (OK)”单独放在自己头顶上方的气泡中。",
+          "interaction_tags": [],
+          "position_reason": "Right-side responder; bubble above her head on the right edge keeps the two lines and bubbles separate.",
+          "x": 0.74,
+          "y": 0.5
+        }
+      ],
+      "dropped": [
+        "source#talking",
+        "source#talking"
+      ]
+    },
+    {
+      "file": "diagnostics\\nai-text\\nai_text_negative_pairing_failure.json",
+      "attempt": "nai_character_plan_initial_raw",
+      "warnings": [
+        "source#holding sign has no target#holding sign on another visible instance"
+      ],
+      "before": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿“白色连衣裙”，举着空白木牌，不要写“欢迎”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_dress, holding_sign, blank_sign, wooden_sign, standing, holding_sign_with_both_hands, flat_chest, 千早爱音留着粉色长发, 灰色眼睛, 身穿白色连衣裙, 双手举起一块空白木牌, 木牌上没有任何文字, 表情自然, 站在画面偏左的位置。, source#holding_sign",
+          "interaction_tags": [
+            "source#holding_sign"
+          ],
+          "position_reason": "left of centre, holding sign forward, clear space to right for Sakiko",
+          "x": 0.36,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": "丰川祥子穿黑色连衣裙站在她旁边，无对白",
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, black_dress, standing, closed_mouth, 丰川祥子留着蓝色长发和双侧发束, 黄色眼睛, 身穿黑色连衣裙, 安静地站在千早爱音旁边, 嘴巴闭合, 没有对白。",
+          "interaction_tags": [],
+          "position_reason": "right side, standing close beside Anon, no contact needed",
+          "x": 0.64,
+          "y": 0.55
+        }
+      ],
+      "after": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿“白色连衣裙”，举着空白木牌，不要写“欢迎”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_dress, holding_sign, blank_sign, wooden_sign, standing, holding_sign_with_both_hands, flat_chest, 千早爱音留着粉色长发, 灰色眼睛, 身穿白色连衣裙, 双手举起一块空白木牌, 木牌上没有任何文字, 表情自然, 站在画面偏左的位置。",
+          "interaction_tags": [],
+          "position_reason": "left of centre, holding sign forward, clear space to right for Sakiko",
+          "x": 0.36,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": "丰川祥子穿黑色连衣裙站在她旁边，无对白",
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, black_dress, standing, closed_mouth, 丰川祥子留着蓝色长发和双侧发束, 黄色眼睛, 身穿黑色连衣裙, 安静地站在千早爱音旁边, 嘴巴闭合, 没有对白。",
+          "interaction_tags": [],
+          "position_reason": "right side, standing close beside Anon, no contact needed",
+          "x": 0.64,
+          "y": 0.55
+        }
+      ],
+      "dropped": [
+        "source#holding_sign"
+      ]
+    },
+    {
+      "file": "diagnostics\\nai-text\\nai_text_negative_pairing_failure.json",
+      "attempt": "nai_character_plan_retry_raw",
+      "warnings": [
+        "source#holding sign has no target#holding sign on another visible instance"
+      ],
+      "before": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿“白色连衣裙”，举着空白木牌，不要写“欢迎”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_dress, holding_sign, blank_sign, wooden_sign, standing, holding_sign_with_both_hands, flat_chest, 千早爱音留着粉色长发, 灰色眼睛, 身穿白色连衣裙, 双手举起一块空白木牌, 木牌上没有任何文字, 表情自然, 站在画面偏左的位置。, source#holding_sign",
+          "interaction_tags": [
+            "source#holding_sign"
+          ],
+          "position_reason": "Left of centre, holding sign forward with both hands, clear space to right for Sakiko to stand beside her.",
+          "x": 0.36,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": "丰川祥子穿黑色连衣裙站在她旁边，无对白",
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, black_dress, standing, closed_mouth, 丰川祥子留着蓝色长发和双侧发束, 黄色眼睛, 身穿黑色连衣裙, 安静地站在千早爱音旁边, 嘴巴闭合, 没有对白。",
+          "interaction_tags": [],
+          "position_reason": "Right side, standing close beside Anon, no contact needed.",
+          "x": 0.64,
+          "y": 0.55
+        }
+      ],
+      "after": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿“白色连衣裙”，举着空白木牌，不要写“欢迎”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_dress, holding_sign, blank_sign, wooden_sign, standing, holding_sign_with_both_hands, flat_chest, 千早爱音留着粉色长发, 灰色眼睛, 身穿白色连衣裙, 双手举起一块空白木牌, 木牌上没有任何文字, 表情自然, 站在画面偏左的位置。",
+          "interaction_tags": [],
+          "position_reason": "Left of centre, holding sign forward with both hands, clear space to right for Sakiko to stand beside her.",
+          "x": 0.36,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": "丰川祥子穿黑色连衣裙站在她旁边，无对白",
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, black_dress, standing, closed_mouth, 丰川祥子留着蓝色长发和双侧发束, 黄色眼睛, 身穿黑色连衣裙, 安静地站在千早爱音旁边, 嘴巴闭合, 没有对白。",
+          "interaction_tags": [],
+          "position_reason": "Right side, standing close beside Anon, no contact needed.",
+          "x": 0.64,
+          "y": 0.55
+        }
+      ],
+      "dropped": [
+        "source#holding_sign"
+      ]
+    },
+    {
+      "file": "diagnostics\\nai-text\\nai_text_negative_pairing_failure.json",
+      "attempt": "nai_character_plan_raw",
+      "warnings": [
+        "source#holding sign has no target#holding sign on another visible instance"
+      ],
+      "before": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿“白色连衣裙”，举着空白木牌，不要写“欢迎”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_dress, holding_sign, blank_sign, wooden_sign, standing, holding_sign_with_both_hands, flat_chest, 千早爱音留着粉色长发, 灰色眼睛, 身穿白色连衣裙, 双手举起一块空白木牌, 木牌上没有任何文字, 表情自然, 站在画面偏左的位置。, source#holding_sign",
+          "interaction_tags": [
+            "source#holding_sign"
+          ],
+          "position_reason": "Left of centre, holding sign forward with both hands, clear space to right for Sakiko to stand beside her.",
+          "x": 0.36,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": "丰川祥子穿黑色连衣裙站在她旁边，无对白",
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, black_dress, standing, closed_mouth, 丰川祥子留着蓝色长发和双侧发束, 黄色眼睛, 身穿黑色连衣裙, 安静地站在千早爱音旁边, 嘴巴闭合, 没有对白。",
+          "interaction_tags": [],
+          "position_reason": "Right side, standing close beside Anon, no contact needed.",
+          "x": 0.64,
+          "y": 0.55
+        }
+      ],
+      "after": [
+        {
+          "anchor_id": "target_1",
+          "source_text": "千早爱音穿“白色连衣裙”，举着空白木牌，不要写“欢迎”",
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_dress, holding_sign, blank_sign, wooden_sign, standing, holding_sign_with_both_hands, flat_chest, 千早爱音留着粉色长发, 灰色眼睛, 身穿白色连衣裙, 双手举起一块空白木牌, 木牌上没有任何文字, 表情自然, 站在画面偏左的位置。",
+          "interaction_tags": [],
+          "position_reason": "Left of centre, holding sign forward with both hands, clear space to right for Sakiko to stand beside her.",
+          "x": 0.36,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": "丰川祥子穿黑色连衣裙站在她旁边，无对白",
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, black_dress, standing, closed_mouth, 丰川祥子留着蓝色长发和双侧发束, 黄色眼睛, 身穿黑色连衣裙, 安静地站在千早爱音旁边, 嘴巴闭合, 没有对白。",
+          "interaction_tags": [],
+          "position_reason": "Right side, standing close beside Anon, no contact needed.",
+          "x": 0.64,
+          "y": 0.55
+        }
+      ],
+      "dropped": [
+        "source#holding_sign"
+      ]
+    },
+    {
+      "file": "diagnostics\\nai-text-scoped\\nai_text_dialogue.json",
+      "attempt": "nai_character_plan_initial_raw",
+      "warnings": [
+        "source#talking has no target#talking on another visible instance"
+      ],
+      "before": [
+        {
+          "anchor_id": "target_1",
+          "source_text": [
+            "千早爱音穿白衬衫站在左边说：“你好，祥子！”"
+          ],
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_shirt, standing, facing_right, looking_at_another, open_mouth, speaking, speech_bubble, 千早爱音站在画面左侧, 穿着白衬衫, 粉色长发披落, 灰色眼睛望向右侧的丰川祥子, 微微张口正在说话, 头顶上方的气泡中写有 NAILITERAL0000TOKEN。, source#talking",
+          "interaction_tags": [
+            "source#talking"
+          ],
+          "position_reason": "placed left of centre so she can face right toward the other speaker; high y keeps standing torsos and her bubble inside frame",
+          "x": 0.27,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": [
+            "丰川祥子穿黑色连衣裙站在右边回答：“Hello, Anon! (OK)”"
+          ],
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, black_dress, standing, facing_left, looking_at_another, open_mouth, speaking, speech_bubble, 丰川祥子站在画面右侧, 穿着黑色连衣裙, 蓝色长发配两侧发束, 黄色眼睛看着左侧的千早爱音, 开口作答, 头顶上方的气泡中写着 NAILITERAL0001TOKEN。, source#talking",
+          "interaction_tags": [
+            "source#talking"
+          ],
+          "position_reason": "placed right of centre so she faces left at her interlocutor; matching height and symmetric bubble space keep the exchange readable",
+          "x": 0.73,
+          "y": 0.55
+        }
+      ],
+      "after": [
+        {
+          "anchor_id": "target_1",
+          "source_text": [
+            "千早爱音穿白衬衫站在左边说：“你好，祥子！”"
+          ],
+          "name": "chihaya_anon",
+          "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, white_shirt, standing, facing_right, looking_at_another, open_mouth, speaking, speech_bubble, 千早爱音站在画面左侧, 穿着白衬衫, 粉色长发披落, 灰色眼睛望向右侧的丰川祥子, 微微张口正在说话, 头顶上方的气泡中写有 NAILITERAL0000TOKEN。",
+          "interaction_tags": [],
+          "position_reason": "placed left of centre so she can face right toward the other speaker; high y keeps standing torsos and her bubble inside frame",
+          "x": 0.27,
+          "y": 0.55
+        },
+        {
+          "anchor_id": "target_2",
+          "source_text": [
+            "丰川祥子穿黑色连衣裙站在右边回答：“Hello, Anon! (OK)”"
+          ],
+          "name": "togawa_sakiko",
+          "prompt": "girl, togawa_sakiko, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, black_dress, standing, facing_left, looking_at_another, open_mouth, speaking, speech_bubble, 丰川祥子站在画面右侧, 穿着黑色连衣裙, 蓝色长发配两侧发束, 黄色眼睛看着左侧的千早爱音, 开口作答, 头顶上方的气泡中写着 NAILITERAL0001TOKEN。",
+          "interaction_tags": [],
+          "position_reason": "placed right of centre so she faces left at her interlocutor; matching height and symmetric bubble space keep the exchange readable",
+          "x": 0.73,
+          "y": 0.55
+        }
+      ],
+      "dropped": [
+        "source#talking",
+        "source#talking"
+      ]
+    },
+    {
+      "file": "diagnostics\\nai-text-scoped\\nai_text_sign.json",
+      "attempt": "nai_character_plan_initial_raw",
+      "warnings": [
+        "source#holding sign has no target#holding sign on another visible instance"
+      ],
+      "before": [
+        {
+          "anchor_id": "target_1",
+          "source_text": [
+            "一个粉发女孩穿白色连衣裙，举着一块木牌，木牌上写着“欢迎光临，C#社！”；文字只在木牌上。"
+          ],
+          "name": "girl",
+          "prompt": "girl, pink_hair, white_dress, long_hair, holding_sign, wooden_sign, blank_sign, standing, looking_at_viewer, front_view, upper_body, 一位粉发女孩穿着白色连衣裙, 正面站立面对镜头, 双手将一块木牌举在胸前。木牌表面朝向镜头, 上面写着 NAILITERAL0000TOKEN, 画面中没有其他文字。, source#holding sign",
+          "interaction_tags": [
+            "source#holding sign"
+          ],
+          "position_reason": "单人构图，女孩居中偏下，木牌举在身前且正面朝向镜头，保证牌面文字完整可见。",
+          "x": 0.5,
+          "y": 0.56
+        }
+      ],
+      "after": [
+        {
+          "anchor_id": "target_1",
+          "source_text": [
+            "一个粉发女孩穿白色连衣裙，举着一块木牌，木牌上写着“欢迎光临，C#社！”；文字只在木牌上。"
+          ],
+          "name": "girl",
+          "prompt": "girl, pink_hair, white_dress, long_hair, holding_sign, wooden_sign, blank_sign, standing, looking_at_viewer, front_view, upper_body, 一位粉发女孩穿着白色连衣裙, 正面站立面对镜头, 双手将一块木牌举在胸前。木牌表面朝向镜头, 上面写着 NAILITERAL0000TOKEN, 画面中没有其他文字。",
+          "interaction_tags": [],
+          "position_reason": "单人构图，女孩居中偏下，木牌举在身前且正面朝向镜头，保证牌面文字完整可见。",
+          "x": 0.5,
+          "y": 0.56
+        }
+      ],
+      "dropped": [
+        "source#holding sign"
+      ]
+    }
+  ]
+}

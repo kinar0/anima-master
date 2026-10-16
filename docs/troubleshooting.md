@@ -40,6 +40,8 @@
 
 ## NAI 自定义工作流
 
+互动方向诊断的 `nai_interaction_initial_validation_errors` / `nai_interaction_retry_validation_errors` 保留历史键名，现只表示对应模型回复中发现并降级的方向标签问题；非空不等于本次失败。`nai_dropped_interaction_tags` 保存最终采用回复中移除的方向项。文字绑定分别记录在 `nai_text_initial_validation_errors` / `nai_text_retry_validation_errors`，仍可触发一次修复和失败停止。只按精确动作名确认配对，因此官方 `source#pointing at another` / `target#pointing` 这类不同名写法会降级为已有自然语言关系，不猜测或强改动作。更新后须重载插件。
+
 若 `-r` 突然主要输出中文关键词，先比较 `nai_character_plan_raw` 与 `nai_characters[].prompt`，不要把宿主补回的几个发色/瞳色 tags 当作 writer 已输出英文细节。2026-10-15 16:08 的三实例记录中，原始 JSON 已只有英文身份、性别和方向项，衣服、表情及姿态几乎全是中文；不是英文细节 tags 在后处理阶段被统一删除。当前专用 system、JSON 字段说明与同次复核明确要求“英文视觉 tags + 完整中文句子”并存，中文语言要求只作用于 prose。检查原始与最终两端的英文衣物、表情、动作/姿态、整图镜头，以及中文关系句；同名不同衣服的实例分别验收，不按名字合并。此修正不让宿主翻译中文或强补缺失名词 tags，不增加模型阶段。
 
 若本地已有多名角色档案，但 `confirmed_character_bindings` 只有一名，先对照 `semantic_plan_raw`，可能是第一阶段返回合法但不完整的名单。NAI `-r` 当前仍向写作者提供遗漏档案的条件参考；检查 `nai_character_plan_prompt` 的 `Additional locally confirmed identities`、`nai_local_profile_references` 和 `nai_bound_local_profile_references`。参考不是强制出场名单，服装来源仍独立处理；明确衣服尚未绑定时，不应看到该参考的 default reference。已清空的 `fixed_characters` 不再提供旧辅助拼写，但当前词库别名和档案仍可正常匹配。
@@ -59,10 +61,10 @@
 再检查模型的可见输出。失败时停止提交，不回退到普通七字段写作或未规划的整体提示词。
 旧版本可能报 `nai_character_plan_missing_noun_tags: <tag>`：例如 2026-10-13 09:58 的回复已有完整构图分析、三个角色框和有效坐标，却仅因缺少 `heart` 拒绝提交。这条硬规则及其整份布局重试已移除。更新并重载插件后，词库仅辅助布局模型表达；缺少独立 tag 只记入 `nai_missing_noun_tags`，不会阻断生图或强行猜测归属。该诊断统计精确独立 tag，不代表自然语言没有表达同一含义。角色框中实际写入的合法 `source#tag / target#tag / mutual#tag` 也计入精确覆盖；非法 JSON、角色框或坐标仍属于规划失败。
 `nai_dropped_interaction_tags` 非空表示布局模型给某个角色的
-`interaction_tags` 写了空动作、多个 `#`、逗号串、非英文 tag，或把方向标签写进了普通角色描述而未放进 `interaction_tags` 数组。
+`interaction_tags` 写了空动作、多个 `#`、逗号串、非英文 tag，或把方向标签写进了普通角色描述而未放进 `interaction_tags` 数组；2026-10-16 起也包含因配对不确定而降级移除的动作组。
 应让模型只为明确互动的角色各写一项 `source#tag`、`target#tag` 或
 `mutual#tag`；无明确方向时使用空列表。布局模型根据完整原文判断互动，
-不再由固定动作词组门控。主机还核对同动作 source/target 是否在不同实例配对、mutual 是否至少两人；配对不完整时修复一次，仍错误报 `nai_character_plan_invalid_interaction_pairs` 并停止。若结构配对正确但互动对象或方向不对，
+不再由固定动作词组门控。主机还核对同动作 source/target 是否在不同实例配对、mutual 是否至少两人；2026-10-16 起，配对不完整只移除有争议动作组的方向标签，保留普通动作、中文关系与其他有效配对，不再触发整份重写或 `nai_character_plan_invalid_interaction_pairs` 停止。旧记录中的该错误仍可用于排查旧版本。若结构配对正确但互动对象或方向不对，
 需检查 `nai_character_plan_raw` 与原文；`nai_dropped_interaction_tags` 不会记录这种语义错误。普通动作 tag 的身体状态仍须属于当前角色；不能用统一删除普通动作的方式代替归属判断，正确归属的普通动作和方向 tag 均保留。任务书要求先写清中文关系、再按主体分配 tag，并用名字/位置指代其他人物，避免在本角色框重复别人的外貌、体型或衣服。
 
 若一名角色的性别、衣服、动作、表情、外貌或视线影响了其他角色，检查任务摘要中的

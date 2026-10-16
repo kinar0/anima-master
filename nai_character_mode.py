@@ -352,16 +352,17 @@ def build_nai_character_plan_prompt(
     )
 
 
-def nai_interaction_validation_issues(plan: dict[str, Any]) -> tuple[str, ...]:
-    """Check direction-pair structure without guessing actions from request words."""
+def _nai_interaction_issues_by_action(plan: dict[str, Any]) -> dict[str, tuple[str, ...]]:
+    """Report uncertain action groups, without inferring semantic counterparts."""
     actions: dict[str, dict[str, set[int]]] = {}
     for index, character in enumerate(plan["characters"]):
         for tag in character.get("interaction_tags", ()):
             direction, _, action = tag.casefold().partition("#")
             roles = actions.setdefault(_normalized_nai_tag(action), {})
             roles.setdefault(direction, set()).add(index)
-    issues = []
+    result = {}
     for action, roles in actions.items():
+        issues = []
         sources, targets = roles.get("source", set()), roles.get("target", set())
         mutual = roles.get("mutual", set())
         if any(not (targets - {index}) for index in sources):
@@ -372,7 +373,41 @@ def nai_interaction_validation_issues(plan: dict[str, Any]) -> tuple[str, ...]:
             issues.append(f"mutual#{action} needs at least two visible participants")
         if mutual & (sources | targets):
             issues.append(f"{action} assigns mutual and directed roles to the same instance")
-    return tuple(issues)
+        if issues:
+            result[action] = tuple(issues)
+    return result
+
+
+def nai_interaction_validation_issues(plan: dict[str, Any]) -> tuple[str, ...]:
+    """Diagnose direction pairs; these hints do not determine plan validity."""
+    return tuple(issue for issues in _nai_interaction_issues_by_action(plan).values()
+                 for issue in issues)
+
+
+def downgrade_nai_interaction_tags(plan: dict[str, Any]) -> tuple[str, ...]:
+    """Drop uncertain direction hints, preserving prose and other action groups.
+
+    Different source/target tag names can describe a valid interaction. Without
+    semantic evidence we neither equate those names nor invent a counterpart.
+    Remove the disputed action's hints as a group so no half-pair survives.
+    Call only on parsed plans, whose direction tags were appended as bare items.
+    """
+    uncertain = _nai_interaction_issues_by_action(plan)
+    for character in plan["characters"]:
+        dropped = [tag for tag in character.get("interaction_tags", ())
+                   if _normalized_nai_tag(tag.partition("#")[2]) in uncertain]
+        if not dropped:
+            continue
+        character["interaction_tags"] = [
+            tag for tag in character["interaction_tags"] if tag not in dropped
+        ]
+        # Exact emitted items only: ordinary action tags, Chinese relationships,
+        # immutable lettering tokens and weighted syntax stay untouched.
+        character["prompt"] = ", ".join(
+            part for part in split_tags(character["prompt"]) if part not in dropped
+        )
+        plan["dropped_interaction_tags"].extend(dropped)
+    return tuple(issue for issues in uncertain.values() for issue in issues)
 
 
 def missing_nai_noun_tags(

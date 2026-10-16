@@ -18,6 +18,7 @@ from agent_tools.comfyui_workflows import custom_t2i_workflow, workflow  # noqa:
 from generation_task import GenerationTaskRunner  # noqa: E402
 from nai_character_mode import (  # noqa: E402
     build_nai_character_plan_prompt,
+    downgrade_nai_interaction_tags,
     missing_nai_noun_tags,
     nai_interaction_validation_issues,
     parse_nai_character_plan,
@@ -52,6 +53,35 @@ def test_interaction_review_checks_pairs_without_a_fixed_action_dictionary(tags,
                        for index, actions in enumerate(tags)],
     }))
     assert bool(nai_interaction_validation_issues(parsed)) is not valid
+    original_prompts = [row["prompt"] for row in parsed["characters"]]
+    warnings = downgrade_nai_interaction_tags(parsed)
+    assert bool(warnings) is not valid
+    assert nai_interaction_validation_issues(parsed) == ()
+    if valid:
+        assert [row["prompt"] for row in parsed["characters"]] == original_prompts
+    assert downgrade_nai_interaction_tags(parsed) == ()  # idempotent
+
+
+def test_uncertain_direction_group_preserves_valid_other_actions_and_opaque_prose():
+    parsed = parse_nai_character_plan(json.dumps({
+        "composition_analysis": dict(viewpoint="front", layout="pair", relations="help and wave"),
+        "global_prompt": "2girls, indoors",
+        "characters": [
+            dict(name="A", prompt="girl, helping up, (white shirt:1.2), 扶起B并挥手。NAILITERAL0000TOKEN",
+                 interaction_tags=["source#helping_up", "source#waving"],
+                 position_reason="beside B", x=.4, y=.5),
+            dict(name="B", prompt="girl, standing, 被A扶起。",
+                 interaction_tags=["target#helping up"],
+                 position_reason="beside A", x=.6, y=.5),
+        ],
+    }, ensure_ascii=False))
+    assert downgrade_nai_interaction_tags(parsed)
+    assert parsed["characters"][0]["interaction_tags"] == ["source#helping_up"]
+    assert parsed["characters"][1]["interaction_tags"] == ["target#helping up"]
+    assert "source#waving" not in parsed["characters"][0]["prompt"]
+    for text in ("helping up", "(white shirt:1.2)", "扶起B并挥手。NAILITERAL0000TOKEN"):
+        assert text in parsed["characters"][0]["prompt"]
+    assert parsed["dropped_interaction_tags"] == ["source#waving"]
 
 
 @pytest.mark.parametrize("action", ["holding_hands", "hug", "helping_up"])

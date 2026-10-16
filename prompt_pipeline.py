@@ -38,7 +38,7 @@ try:
     from .nai_character_mode import (
         build_nai_character_plan_prompt,
         NAI_WARDROBE_POLICY,
-        nai_interaction_validation_issues,
+        downgrade_nai_interaction_tags,
         missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
@@ -134,7 +134,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from nai_character_mode import (
         build_nai_character_plan_prompt,
         NAI_WARDROBE_POLICY,
-        nai_interaction_validation_issues,
+        downgrade_nai_interaction_tags,
         missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
@@ -5503,9 +5503,11 @@ class PromptPipeline:
                 plan_raw, character_limit=canvas["character_limit"],
                 character_scoped_tags=character_scoped_tags,
             )
-            issues = nai_interaction_validation_issues(nai_plan)
+            interaction_issues = downgrade_nai_interaction_tags(nai_plan)
+            issues = tuple(nai_plan.get("text_validation_errors", ()))
             summary.update(nai_character_plan_attempt_count=1,
-                           nai_interaction_initial_validation_errors=list(issues))
+                           nai_interaction_initial_validation_errors=list(interaction_issues),
+                           nai_text_initial_validation_errors=list(issues))
             if issues:
                 repair_prompt = (plan_prompt + "\nThe previous allocation failed interaction review:\n"
                                  + "\n".join(issues) + "\nPrevious JSON:\n" + plan_raw
@@ -5536,10 +5538,12 @@ class PromptPipeline:
                     plan_raw, character_limit=canvas["character_limit"],
                     character_scoped_tags=character_scoped_tags,
                 )
-                issues = nai_interaction_validation_issues(nai_plan)
-                summary["nai_interaction_retry_validation_errors"] = list(issues)
+                interaction_issues = downgrade_nai_interaction_tags(nai_plan)
+                issues = tuple(nai_plan.get("text_validation_errors", ()))
+                summary["nai_interaction_retry_validation_errors"] = list(interaction_issues)
+                summary["nai_text_retry_validation_errors"] = list(issues)
                 if issues:
-                    raise ValueError("nai_character_plan_invalid_interaction_pairs: " + "; ".join(issues))
+                    raise ValueError("nai_text_plan_invalid: " + "; ".join(issues))
             bound_references = tuple(
                 item for item in local_references
                 if any(_character_outfit_matches(character["name"], item)

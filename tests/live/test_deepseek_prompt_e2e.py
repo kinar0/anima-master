@@ -506,7 +506,7 @@ def test_live_nai_chinese_and_per_instance_ownership(live_pipeline, tmp_path, ca
     print(f"Live NAI ownership evidence: {report_path}")
     assert result.final_prompt, result.summary.get("llm_error")
     assert len(calls) in (2, 3)
-    assert not result.summary.get("nai_interaction_retry_validation_errors")
+    assert not result.summary.get("nai_text_retry_validation_errors")
     characters = {row["name"]: row["prompt"] for row in result.summary["nai_characters"]}
     assert set(characters) == {"chihaya_anon", "togawa_sakiko"}
     assert all(_CJK_RE.search(text) for text in characters.values()), characters
@@ -585,7 +585,7 @@ def test_live_nai_bilingual_details_with_repeated_identity(live_pipeline, tmp_pa
     print(f"Live NAI bilingual evidence: {report_path}")
     assert result.final_prompt, result.summary
     assert len(calls) in (2, 3)
-    assert not result.summary.get("nai_interaction_retry_validation_errors")
+    assert not result.summary.get("nai_text_retry_validation_errors")
     raw_plan = parse_nai_character_plan(result.summary["nai_character_plan_raw"])
     if case != "recolor":
         assert any("clothing=月之森校服;" in line and "wardrobe=named_outfit;" in line
