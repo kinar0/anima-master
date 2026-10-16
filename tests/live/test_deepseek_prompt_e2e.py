@@ -201,12 +201,15 @@ def live_pipeline(tmp_path_factory):
     return pipeline, context
 
 
-def _build(live_pipeline, prompt: str, *, multi_person: bool = False):
+def _build(live_pipeline, prompt: str, *, multi_person: bool = False, canvas_size=None):
     pipeline, context = live_pipeline
 
     async def run():
         try:
-            result = await pipeline.build(_Event(), prompt, multi_person=multi_person)
+            result = await pipeline.build(
+                _Event(), prompt, multi_person=multi_person,
+                canvas_size=canvas_size, canvas_size_explicit=canvas_size is not None,
+            )
             return result, list(context.calls)
         finally:
             await context.provider.terminate()
@@ -554,6 +557,60 @@ def test_live_nai_chinese_and_per_instance_ownership(live_pipeline, tmp_path, ca
         assert "haneoka school uniform" not in characters["chihaya_anon"].replace("_", " ")
         assert any(term in characters["chihaya_anon"].replace("_", " ")
                    for term in ("white dress", "白色连衣裙"))
+
+
+@pytest.mark.parametrize("case,prompt", [
+    ("joint_reach", "-r 单幅横向构图，三分之四侧视图。千早爱音穿白衬衫站在左边，丰川祥子穿黑色外套站在右边，两人靠近面对面。爱音同时用左手扶住祥子的右肩、右手握住祥子的左手，两项接触都要入镜。"),
+    ("seated_support", "-r 单幅侧视全身构图。千早爱音穿白色连衣裙坐在左侧椅子上，丰川祥子穿黑色外套在右侧地上单膝跪地，面朝爱音。祥子一只手握着爱音的手，另一只手托住爱音的肘部，同时完成两项动作。"),
+    ("separate_panels", "-r 左右两格，左格千早爱音穿白衬衫站在桌旁，右格千早爱音穿黑色外套独自坐在椅子上，两格之间留白，两个人物没有互动，不要跨格接触。"),
+])
+def test_live_nai_spatial_action_constraints(live_pipeline, tmp_path, case, prompt):
+    """Retain evidence for semantic spatial review; coordinates alone prove no anatomy."""
+    from nai_character_mode import parse_nai_character_plan
+    from agent_tools.comfyui_workflows import custom_t2i_workflow
+
+    live_pipeline[0].config["debug_prompt_enabled"] = True
+    canvas_size = (1216, 832) if case == "joint_reach" else (832, 1216)
+    result, calls = _build(live_pipeline, prompt, canvas_size=canvas_size)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"nai_spatial_{case}.json"
+    report_path.write_text(json.dumps({
+        "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Live NAI spatial evidence: {report_path}")
+    assert result.final_prompt, result.summary.get("llm_error")
+    assert len(calls) in (2, 3), calls
+    assert (result.summary["nai_canvas"]["width"], result.summary["nai_canvas"]["height"]) == canvas_size
+    raw_plan = parse_nai_character_plan(result.summary["nai_character_plan_raw"])
+    if case != "separate_panels":
+        for global_text in (raw_plan["global_prompt"], result.final_prompt):
+            assert "手" in global_text and ("肩" if case == "joint_reach" else "肘") in global_text, global_text
+    for rows in (raw_plan["characters"], result.summary["nai_characters"]):
+        assert len(rows) == 2
+        assert all(_CJK_RE.search(row["prompt"]) for row in rows)
+        if case == "separate_panels":
+            assert all(row["name"] == "chihaya_anon" for row in rows)
+            assert all(not row.get("interaction_tags") for row in rows)
+            left, right = sorted(rows, key=lambda row: row["x"])
+            assert left["x"] < .5 < right["x"], rows
+            assert "站" in left["prompt"] and "坐" in right["prompt"], rows
+        else:
+            by_name = {row["name"]: row for row in rows}
+            assert set(by_name) == {"chihaya_anon", "togawa_sakiko"}
+            assert by_name["chihaya_anon"]["x"] < by_name["togawa_sakiko"]["x"], rows
+            text = " ".join(row["prompt"] for row in rows)
+            assert "手" in text and ("肩" if case == "joint_reach" else "肘") in text, rows
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, result.final_prompt, "blurry",
+        *canvas_size, 28, 6, 123, override_size=True,
+        nai_characters=result.summary["nai_characters"],
+    )
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    for index, row in enumerate(result.summary["nai_characters"], 1):
+        assert selector[f"character{index}_x"] == row["x"]
+        assert selector[f"character{index}_y"] == row["y"]
 
 
 @pytest.mark.parametrize("case", ["named", "ordinary_implicit_donor", "recolor"])

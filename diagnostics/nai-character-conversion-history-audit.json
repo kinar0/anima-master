@@ -1,0 +1,574 @@
+[
+  {
+    "prompt_id": "f9d50cfc-f9aa-46e7-8fa6-8d82c0f9d3ae",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "f9d50cfc-f9aa-46e7-8fa6-8d82c0f9d3ae",
+          "timestamp": 1792066989507
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "f9d50cfc-f9aa-46e7-8fa6-8d82c0f9d3ae",
+          "timestamp": 1792066989508
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "f9d50cfc-f9aa-46e7-8fa6-8d82c0f9d3ae",
+          "timestamp": 1792066997421
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, ponytail, single_ponytail, large_breasts, white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, kneeling, on_carpet, from_above, looking_up, open_mouth, speaking, resigned_expression, hands_on_lap, 丰川祥子把长发绑成单马尾, 跪在地毯上。她穿着白色衬衫, 灰色外套与格子百褶裙, 系着绿色斜条纹领带和黑色缎带。她微微抬头看向镜头, 开口说道“真拿你没办法”, 神情带着几分无奈。, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, ponytail, single_ponytail, large_breasts, white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, kneeling, on_carpet, from_above, looking_up, open_mouth, speaking, resigned_expression, hands_on_lap, 丰川祥子把长发绑成单马尾, 跪在地毯上。她穿着白色衬衫, 灰色外套与格子百褶裙, 系着绿色斜条纹领带和黑色缎带。她微微抬头看向镜头, 开口说道“真拿你没办法”, 神情带着几分无奈。, yellow_eyes_blue_hair",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202309_00001_.png",
+            "subfolder": "astrbot\\2026-10-15\\1647320236",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "a5a60d7e-9187-4a29-99c9-714d50e01372",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "a5a60d7e-9187-4a29-99c9-714d50e01372",
+          "timestamp": 1792067067951
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "a5a60d7e-9187-4a29-99c9-714d50e01372",
+          "timestamp": 1792067067951
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "a5a60d7e-9187-4a29-99c9-714d50e01372",
+          "timestamp": 1792067077595
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, ponytail, yellow_eyes, sidelocks, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, green_necktie, diagonal-striped_necktie, black_ribbon, neck_ribbon, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, white_socks, black_shoes, scrunchie, mouth_hold, kneeling, on_knees, arms_up, hands_in_hair, tying_hair, from_above, 丰川祥子把蓝色长发拢到脑后扎成单马尾, 嘴里叼着一根发圈, 双手抬起整理头发, 跪在地毯上, 微微抬头说\"真拿你没办法\"。, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, ponytail, yellow_eyes, sidelocks, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, green_necktie, diagonal-striped_necktie, black_ribbon, neck_ribbon, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, white_socks, black_shoes, scrunchie, mouth_hold, kneeling, on_knees, arms_up, hands_in_hair, tying_hair, from_above, 丰川祥子把蓝色长发拢到脑后扎成单马尾, 嘴里叼着一根发圈, 双手抬起整理头发, 跪在地毯上, 微微抬头说\"真拿你没办法\"。, yellow_eyes_blue_hair",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202427_00001_.png",
+            "subfolder": "astrbot\\2026-10-15\\1962727422",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "46b9be0a-8a00-4e94-9a0a-7f38a8380d60",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "46b9be0a-8a00-4e94-9a0a-7f38a8380d60",
+          "timestamp": 1792067138732
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "46b9be0a-8a00-4e94-9a0a-7f38a8380d60",
+          "timestamp": 1792067138733
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "46b9be0a-8a00-4e94-9a0a-7f38a8380d60",
+          "timestamp": 1792067180708
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, one_side_up, ponytail, single_side_ponytail, hair_up, hands_on_hair, hand_in_hair, mouth_hold, scrunchie, object_in_mouth, kneeling, on_knees, annoyed, displeased, pout, looking_at_viewer, from_below, full_body, white_shirt, collared_shirt, grey_jacket, haneoka_school_uniform, green_necktie, striped_necktie, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, neck_ribbon, hair_ribbon, white_socks, black_shoes, kneeling_on_carpet, carpet, indoors, upper_body, 丰川祥子跪在地毯上, 双手正在把马尾绑起, 嘴里叼着发圈, 脸上带着嫌弃的表情, 低声说\"真拿你没办法\"。她穿着白衬衫与灰色外套, 系着绿色条纹领带, 黑色蝴蝶结和格纹百褶裙, 穿着白袜和黑鞋。, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, one_side_up, ponytail, single_side_ponytail, hair_up, hands_on_hair, hand_in_hair, mouth_hold, scrunchie, object_in_mouth, kneeling, on_knees, annoyed, displeased, pout, looking_at_viewer, from_below, full_body, white_shirt, collared_shirt, grey_jacket, haneoka_school_uniform, green_necktie, striped_necktie, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, neck_ribbon, hair_ribbon, white_socks, black_shoes, kneeling_on_carpet, carpet, indoors, upper_body, 丰川祥子跪在地毯上, 双手正在把马尾绑起, 嘴里叼着发圈, 脸上带着嫌弃的表情, 低声说\"真拿你没办法\"。她穿着白衬衫与灰色外套, 系着绿色条纹领带, 黑色蝴蝶结和格纹百褶裙, 穿着白袜和黑鞋。, yellow_eyes_blue_hair",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202538_00001_.png",
+            "subfolder": "astrbot\\2026-10-15\\1962727422",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "419db146-dd52-40ef-9517-68d6ca2b1610",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "419db146-dd52-40ef-9517-68d6ca2b1610",
+          "timestamp": 1792067197955
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "419db146-dd52-40ef-9517-68d6ca2b1610",
+          "timestamp": 1792067197956
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "419db146-dd52-40ef-9517-68d6ca2b1610",
+          "timestamp": 1792067206568
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, holding_hair, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, holding_hair, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "changed": false
+      },
+      {
+        "slot": "character2",
+        "link": [
+          "15",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "converted_using_installed_module": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202637_00001_.png",
+            "subfolder": "astrbot\\2026-10-15\\2230133720",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "d6e1a8e0-9c46-438a-a773-07b126c97b7a",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "d6e1a8e0-9c46-438a-a773-07b126c97b7a",
+          "timestamp": 1792067249509
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "d6e1a8e0-9c46-438a-a773-07b126c97b7a",
+          "timestamp": 1792067249510
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "d6e1a8e0-9c46-438a-a773-07b126c97b7a",
+          "timestamp": 1792067259973
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, large_breasts, ponytail, single_ponytail, hair_tying, arms_up, mouth_hold, scrunchie, kneeling, on_carpet, looking_up, from_above, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, green_necktie, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, neck_ribbon, white_socks, black_shoes, 丰川祥子留着蓝色长发与鬓发, 黄色眼睛, 穿着白衬衫和灰色外套, 系着绿色领带与黑色领结, 下身穿格子百褶裙和白袜黑鞋。她跪在地毯上, 一手抬起拢住脑后头发正在扎起单马尾, 嘴里叼着发圈, 微微仰头看向上方镜头, 神情带着无奈, 身旁浮现文字“真拿你没办法”。, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, large_breasts, ponytail, single_ponytail, hair_tying, arms_up, mouth_hold, scrunchie, kneeling, on_carpet, looking_up, from_above, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, green_necktie, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, neck_ribbon, white_socks, black_shoes, 丰川祥子留着蓝色长发与鬓发, 黄色眼睛, 穿着白衬衫和灰色外套, 系着绿色领带与黑色领结, 下身穿格子百褶裙和白袜黑鞋。她跪在地毯上, 一手抬起拢住脑后头发正在扎起单马尾, 嘴里叼着发圈, 微微仰头看向上方镜头, 神情带着无奈, 身旁浮现文字“真拿你没办法”。, yellow_eyes_blue_hair",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202729_00001_.png",
+            "subfolder": "astrbot\\2026-10-15\\1120741042",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "ed66ba78-4d2b-460e-84b5-f7fe861993f7",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "ed66ba78-4d2b-460e-84b5-f7fe861993f7",
+          "timestamp": 1792067261789
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [
+            "11",
+            "12"
+          ],
+          "prompt_id": "ed66ba78-4d2b-460e-84b5-f7fe861993f7",
+          "timestamp": 1792067261790
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "ed66ba78-4d2b-460e-84b5-f7fe861993f7",
+          "timestamp": 1792067269327
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "changed": false
+      },
+      {
+        "slot": "character2",
+        "link": [
+          "15",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "converted_using_installed_module": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202637_00002_.png",
+            "subfolder": "astrbot\\2026-10-15\\2230133720",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "23393569-7161-4b50-a636-1bb73e1fc50d",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "23393569-7161-4b50-a636-1bb73e1fc50d",
+          "timestamp": 1792067370912
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "23393569-7161-4b50-a636-1bb73e1fc50d",
+          "timestamp": 1792067370914
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "23393569-7161-4b50-a636-1bb73e1fc50d",
+          "timestamp": 1792067381400
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "changed": false
+      },
+      {
+        "slot": "character2",
+        "link": [
+          "15",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "converted_using_installed_module": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202637_00003_.png",
+            "subfolder": "astrbot\\2026-10-15\\2230133720",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "333dab9a-653f-467e-aef4-6e11b2d3b1fb",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "333dab9a-653f-467e-aef4-6e11b2d3b1fb",
+          "timestamp": 1792067390667
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [
+            "3",
+            "9",
+            "11",
+            "12",
+            "14",
+            "15"
+          ],
+          "prompt_id": "333dab9a-653f-467e-aef4-6e11b2d3b1fb",
+          "timestamp": 1792067390668
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "333dab9a-653f-467e-aef4-6e11b2d3b1fb",
+          "timestamp": 1792067397910
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, plaid_skirt, green_necktie, long_sleeves, black_ribbon, sitting, on_couch, outstretched_leg, hand_on_another's_hair, 丰川祥子留着蓝色长发, 两侧头发束起, 黄色眼睛, 穿着羽丘女子学园的校服, 灰色外套内搭白衬衫, 系着绿色领带。她坐在沙发上, 朝前方伸出一只右脚, 同时用左手托着千早爱音的几缕头发。, source#holding_hair, target#holding_foot, target#licking_foot, yellow_eyes_blue_hair",
+        "changed": false
+      },
+      {
+        "slot": "character2",
+        "link": [
+          "15",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "converted_using_installed_module": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, green_necktie, long_sleeves, kneeling, wariza, on_floor, facing_viewer, holding_foot, both_hands_on_another's_foot, licking, tongue, licking_foot, 千早爱音留着粉色长发, 灰色眼睛, 穿着羽丘女子学园的校服, 灰色外套, 白衬衫与绿色格子裙。她跪坐在地板上正对着沙发上的丰川祥子, 两只手小心翼翼地捧着丰川祥子的右脚, 伸出舌头舔舐。, target#holding_hair, source#holding_foot, source#licking_foot",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015202637_00004_.png",
+            "subfolder": "astrbot\\2026-10-15\\2230133720",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "prompt_id": "8b5fe6c5-cbe1-43e9-a794-2ebd061d73f2",
+    "status": "success",
+    "timings": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "8b5fe6c5-cbe1-43e9-a794-2ebd061d73f2",
+          "timestamp": 1792067597641
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [
+            "11",
+            "12"
+          ],
+          "prompt_id": "8b5fe6c5-cbe1-43e9-a794-2ebd061d73f2",
+          "timestamp": 1792067597642
+        }
+      ],
+      [
+        "execution_success",
+        {
+          "prompt_id": "8b5fe6c5-cbe1-43e9-a794-2ebd061d73f2",
+          "timestamp": 1792067614252
+        }
+      ]
+    ],
+    "selector": [
+      "13",
+      0
+    ],
+    "characters": [
+      {
+        "slot": "character1",
+        "link": [
+          "14",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, grey_skirt, plaid_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, sitting, on_couch, outstretched_leg, foot, barefoot, toes, one_eye_closed, soft_smile, looking_at_another, hand_on_another's_head, 丰川祥子穿着灰外套, 白衬衫与格纹裙坐在沙发上, 右腿向前伸出一只赤脚停在千早爱音面前, 左手轻轻揉着千早爱音的头。她低头看向千早爱音, 神情柔和。, source#head_pat, source#licking, yellow_eyes_blue_hair",
+        "converted_using_installed_module": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, haneoka_school_uniform, white_shirt, collared_shirt, grey_jacket, grey_skirt, plaid_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, sitting, on_couch, outstretched_leg, foot, barefoot, toes, one_eye_closed, soft_smile, looking_at_another, hand_on_another's_head, 丰川祥子穿着灰外套, 白衬衫与格纹裙坐在沙发上, 右腿向前伸出一只赤脚停在千早爱音面前, 左手轻轻揉着千早爱音的头。她低头看向千早爱音, 神情柔和。, source#head_pat, source#licking, yellow_eyes_blue_hair",
+        "changed": false
+      },
+      {
+        "slot": "character2",
+        "link": [
+          "15",
+          0
+        ],
+        "class_type": "ComfyUIToNovelAIV4",
+        "input": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, diagonal-striped_necktie, black_socks, kneeling, wariza, seiza, on_floor, hands_on_another's_foot, holding_foot, tongue, licking, tongue_out, looking_up, blush, 千早爱音穿着冬装校服跪坐在地板上正对着丰川祥子, 双手小心翼翼地捧着丰川祥子的右脚, 微微低头伸出舌头舔舐她的脚。她抬眼看向丰川祥子, 脸颊泛红。, target#head_pat, target#licking",
+        "converted_using_installed_module": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, diagonal-striped_necktie, black_socks, kneeling, wariza, seiza, on_floor, hands_on_another's_foot, holding_foot, tongue, licking, tongue_out, looking_up, blush, 千早爱音穿着冬装校服跪坐在地板上正对着丰川祥子, 双手小心翼翼地捧着丰川祥子的右脚, 微微低头伸出舌头舔舐她的脚。她抬眼看向丰川祥子, 脸颊泛红。, target#head_pat, target#licking",
+        "changed": false
+      }
+    ],
+    "outputs": {
+      "10": {
+        "images": [
+          {
+            "filename": "1015203317_00001_.png",
+            "subfolder": "astrbot\\2026-10-15\\2230133720",
+            "type": "output"
+          }
+        ]
+      }
+    }
+  }
+]

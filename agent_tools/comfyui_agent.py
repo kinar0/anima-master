@@ -5,6 +5,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+# Workflow helpers also import modules from the plugin root. Bootstrap that
+# path before importing them when this file runs as a standalone subprocess.
+PLUGIN_ROOT = Path(__file__).resolve().parents[1]
+if str(PLUGIN_ROOT) not in sys.path:
+    sys.path.insert(0, str(PLUGIN_ROOT))
+
 from comfyui_command_runner import run_cli_action
 from comfyui_inputs import ComfyUIImageResolver
 from comfyui_operations import (
@@ -16,10 +22,6 @@ from comfyui_operations import (
 from comfyui_sizes import allowed_sizes
 from comfyui_status import build_status_payload
 from PIL import Image
-
-PLUGIN_ROOT = Path(__file__).resolve().parents[1]
-if str(PLUGIN_ROOT) not in sys.path:
-    sys.path.insert(0, str(PLUGIN_ROOT))
 
 from prompt_presets import apply_config_preset  # noqa: E402
 

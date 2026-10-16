@@ -7,6 +7,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from nai_text import NaiTextRequest, remove_text_suppression, split_nai_text_tail
+
 
 def _nai_character_limit(model: Any) -> int:
     name = str(model or "").casefold()
@@ -361,6 +363,16 @@ def _apply_custom_workflow_inputs(
     positive_slots = [(node_id, "text") for node_id in positive_ids]
     negative_slots = [(node_id, "text") for node_id in negative_ids]
     for node_id in nai_ids:
+        lettering = [payload for value in [prompt, *(str(row.get("prompt", "")) for row in (nai_characters or []))]
+                     if (payload := split_nai_text_tail(value)[1]) is not None]
+        if lettering:
+            try:
+                NaiTextRequest(explicit_payload="\n\n".join(lettering)).validate(
+                    str(workflow_body[node_id].get("inputs", {}).get("model", ""))
+                )
+            except ValueError as exc:
+                raise SystemExit(str(exc)) from exc
+            negative_prompt = remove_text_suppression(negative_prompt, negative=True)
         positive_slots.append(_nai_prompt_slot(workflow_body, node_id, "prompt"))
         negative_slots.append(
             _nai_prompt_slot(workflow_body, node_id, "negative_prompt")
@@ -442,9 +454,12 @@ def _apply_nai_character_prompts(
     if (
         not isinstance(generator_inputs, dict)
         or not isinstance(characters, list)
-        or not 1 <= len(characters) <= _nai_character_limit(generator_inputs.get("model"))
+        or not 0 <= len(characters) <= _nai_character_limit(generator_inputs.get("model"))
     ):
         raise SystemExit("nai_character_plan_character_count")
+    if not characters:
+        generator_inputs.pop("characterPrompts", None)
+        return
     used = {str(key) for key in workflow_body}
     next_id = max((int(key) for key in used if key.isdigit()), default=0) + 1
 

@@ -8,17 +8,34 @@ from typing import Any
 
 try:
     from .comic_dialogue import ComicDialogueError, extract_comic_dialogue
-    from .nai_character_mode import strip_nai_character_switch
+    from .nai_text import split_nai_text_tail, join_nai_text_tail
 except ImportError:  # pragma: no cover - direct module tests.
     from comic_dialogue import ComicDialogueError, extract_comic_dialogue
-    from nai_character_mode import strip_nai_character_switch
+    from nai_text import split_nai_text_tail, join_nai_text_tail
 
 
 def split_manual_prompt_suffix(user_prompt: str) -> tuple[str, str]:
     """Split the first ``#`` suffix from text that prompt processing may inspect."""
-    prompt, separator, manual_suffix = str(user_prompt or "").partition("#")
-    if not separator:
-        return prompt.strip(), ""
+    value = str(user_prompt or "")
+    visual, text = split_nai_text_tail(value)
+    quote = None
+    pairs = {'"': '"', '“': '”', '「': '」', '『': '』'}
+    split_at = None
+    for index, char in enumerate(visual):
+        if index and visual[index - 1] == "\\":
+            continue
+        if quote:
+            if char == quote:
+                quote = None
+        elif char in pairs:
+            quote = pairs[char]
+        elif char == "#":
+            split_at = index
+            break
+    if split_at is None:
+        return value.strip(), ""
+    prompt, manual_suffix = visual[:split_at], visual[split_at + 1:]
+    prompt = join_nai_text_tail(prompt, text)
     return prompt.strip(), manual_suffix.strip()
 
 
@@ -28,6 +45,9 @@ def insert_manual_prompt_suffix(final_prompt: str, manual_suffix: str) -> str:
     suffix = str(manual_suffix or "").strip().strip(",")
     if not prompt or not suffix:
         return prompt
+    visual, text = split_nai_text_tail(prompt)
+    if text is not None:
+        return join_nai_text_tail(insert_manual_prompt_suffix(visual, suffix), text)
     nltags_match = re.search(r",\s*Nltags\s*:", prompt, flags=re.IGNORECASE)
     if nltags_match is None:
         return f"{prompt.rstrip(' ,')}, {suffix}"
@@ -238,12 +258,9 @@ class GenerationTaskRunner:
             build_kwargs: dict[str, Any] = {
                 "multi_person": multi_person,
                 "original_user_prompt": prompt_before_suffix,
+                "canvas_size": (int(requested_width), int(requested_height)),
+                "canvas_size_explicit": explicit_size,
             }
-            if strip_nai_character_switch(prompt_before_suffix)[0]:
-                build_kwargs.update(
-                    canvas_size=(int(requested_width), int(requested_height)),
-                    canvas_size_explicit=explicit_size,
-                )
             prompt = await self._build_prompt(event, prompt, **build_kwargs)
             prompt_summary = dict(self._prompt_summary())
             prompt = insert_manual_prompt_suffix(prompt, manual_suffix)
@@ -288,7 +305,8 @@ class GenerationTaskRunner:
             self._task_recorder.mark_failure(task, payload["error"])
             self._persist_task(task)
             return payload
-        if prompt_summary.get("nai_r_mode") and not prompt_summary.get("nai_characters"):
+        if (prompt_summary.get("nai_r_mode") and not prompt_summary.get("nai_characters")
+            and not prompt_summary.get("nai_text_layout_mode")):
             payload = {
                 "ok": False,
                 "error": str(
@@ -302,7 +320,7 @@ class GenerationTaskRunner:
         args = ["generate", "--prompt", prompt]
         sender_id = getattr(event, "get_sender_id", lambda: "")()
         args.extend(["--user-id", str(sender_id or "")])
-        if prompt_summary.get("nai_r_mode"):
+        if prompt_summary.get("nai_r_mode") and (prompt_summary.get("nai_characters") or prompt_summary.get("nai_text_layout_mode")):
             args.extend(
                 [
                     "--nai-characters",

@@ -1,0 +1,9 @@
+{
+  "config_sha256": "4d9692bc3538f06a447c120f2a81aee4ea94a4056e8c8f64106fd2b01a2de37d",
+  "previous_template_sha256": "ea6d6703ad26ea38859a6d59c8e343514a818f259c3f7cda6947c6fbddeaaf4f",
+  "new_template_sha256": "e0f248b0f2686e6c0ba53ac2f06250b59133b727f576a61bb9b2fd1fef649dfe",
+  "changed_setting": "anima_master_prompting.prompt_builder_template",
+  "changed_lines": [
+    17
+  ]
+}

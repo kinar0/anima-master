@@ -7,6 +7,11 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 try:
+    from .nai_text import NaiTextRequest, extract_nai_text_request
+except ImportError:
+    from nai_text import NaiTextRequest, extract_nai_text_request
+
+try:
     from .danbooru_resolver import DanbooruResolveOutcome, DanbooruResolver
     from .danbooru_semantic import (
         DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT,
@@ -5372,10 +5377,14 @@ class PromptPipeline:
         noun_mappings: tuple[tuple[str, str], ...], noun_tags: tuple[str, ...],
         keyword_rules: tuple[Any, ...], mode: str, sensual_mode: bool,
         local_references: tuple[CharacterEffectiveOutfit, ...] = (),
+        text_request: NaiTextRequest = NaiTextRequest(),
     ) -> PromptPipelineResult:
         """Second-stage NAI writer: local evidence directly to instance JSON."""
         debug = self._bool("debug_prompt_enabled", False)
         plan_prompt = plan_raw = plan_initial_raw = ""
+        text_request = text_request.require_known_speakers(tuple(
+            anchor.source_text for anchor in anchors if anchor.role == "target_character"
+        ))
         trait_request = original_prompt or prompt
         allow_futa = has_positive_futa_request(trait_request)
         allow_male_genitals = has_positive_male_genital_request(trait_request)
@@ -5451,6 +5460,7 @@ class PromptPipeline:
                  "canonical_tags": list(item.target_candidates)} for item in local_references
             ]
             plan_prompt += build_keyword_rule_block(tuple(keyword_rules))
+            plan_prompt += text_request.writer_rule()
             if mode == "img2img":
                 plan_prompt += ("\nThis is image editing: retain the original composition, pose and "
                                 "background unless the user changes them. A replacement identity "
@@ -5482,8 +5492,24 @@ class PromptPipeline:
                 "in each wearer's actual prompt; Chinese names alone are not tag anchors. "
                 "Lighting is opt-in: never add default soft/cinematic/fill lighting. "
                 "Explicit darkness and other stated absences override embellishment. "
+                "Use spatial reasoning to choose positions, scale and orientation "
+                "that make every requested action simultaneously feasible in its "
+                "intended panel. Preserve explicit layout/camera constraints; "
+                "continuous centres must agree with actual scene and instance prose. "
+                "State every requested action/contact in actual global and relevant "
+                "instance prose; correct analysis alone does not reach the image model. "
                 "Follow the supplied schema, user edits and local authority."
             )
+            if text_request.texts:
+                writer_system_prompt += (
+                    " Lettering requires text_regions with one record per immutable literal id. "
+                    "The locally confirmed roster lists UNIQUE IDENTITIES, not the number of "
+                    "visible panel instances. Repeat the same canonical name in separate "
+                    "characters objects whenever it appears in different panels, even with "
+                    "identical clothing. Assign speech to the final array's zero-based "
+                    "instance index; narration has null owner. Never merge a character's "
+                    "different panels into one prompt, centre or lettering scope."
+                )
             response = await self.context.llm_generate(
                 chat_provider_id=provider_id, prompt=plan_prompt,
                 system_prompt=writer_system_prompt,
@@ -5502,6 +5528,7 @@ class PromptPipeline:
             nai_plan = parse_nai_character_plan(
                 plan_raw, character_limit=canvas["character_limit"],
                 character_scoped_tags=character_scoped_tags,
+                text_request=text_request,
             )
             interaction_issues = downgrade_nai_interaction_tags(nai_plan)
             issues = tuple(nai_plan.get("text_validation_errors", ()))
@@ -5509,12 +5536,19 @@ class PromptPipeline:
                            nai_interaction_initial_validation_errors=list(interaction_issues),
                            nai_text_initial_validation_errors=list(issues))
             if issues:
-                repair_prompt = (plan_prompt + "\nThe previous allocation failed interaction review:\n"
+                repair_prompt = (plan_prompt + "\nThe previous allocation failed interaction/text ownership review:\n"
                                  + "\n".join(issues) + "\nPrevious JSON:\n" + plan_raw
                                  + "\nRecheck the original request and both participants. Repair the "
                                  "complete JSON once, preserving valid identities, wardrobe and layout. "
                                  "Use matching action tags for directed pairs; remove invented roles "
-                                 "instead of inventing an extra participant.")
+                                 "instead of inventing an extra participant. Repair missing/duplicate lettering "
+                                 "ids, panel/instance ownership and placement tokens. Literal source spans "
+                                 "already belong to immutable registry ids; do not reconstruct source_text. "
+                                 "For cross-panel-instance errors, SPLIT that character object into "
+                                 "separate panel instances with their own prompts/centres, then update "
+                                 "all affected zero-based character_index values. The unique-identity "
+                                 "roster does not forbid repeated names in the characters array. "
+                                 "never flatten an unresolved line into base or ignore a requested line.")
                 summary["nai_character_plan_attempt_count"] = 2
                 summary["prompt_llm_attempt_count"] = 2
                 response = await self.context.llm_generate(
@@ -5537,6 +5571,7 @@ class PromptPipeline:
                 nai_plan = parse_nai_character_plan(
                     plan_raw, character_limit=canvas["character_limit"],
                     character_scoped_tags=character_scoped_tags,
+                    text_request=text_request,
                 )
                 interaction_issues = downgrade_nai_interaction_tags(nai_plan)
                 issues = tuple(nai_plan.get("text_validation_errors", ()))
@@ -5668,6 +5703,9 @@ class PromptPipeline:
                 final_prompt_head=self._shorten(nai_plan["global_prompt"], 600),
                 final_prompt_chars=len(nai_plan["global_prompt"]),
             )
+            if text_request.texts:
+                summary["nai_text_regions"] = nai_plan["text_regions"]
+                summary["nai_dropped_text_references"] = nai_plan.get("dropped_text_references", [])
             if debug:
                 summary.update(nai_character_plan_prompt=plan_prompt, nai_character_plan_raw=plan_raw,
                                llm_prompt=plan_prompt, prompt_llm_initial_content=plan_initial_raw,
@@ -5675,7 +5713,7 @@ class PromptPipeline:
                 self.logger.info("[comfyui_agent] NAI -r direct writer final plan:\n%s", json.dumps(nai_plan, ensure_ascii=False))
             return PromptPipelineResult(nai_plan["global_prompt"], summary)
         except Exception as exc:
-            summary.update(skipped_reason="nai_character_plan_failed", llm_error=str(exc),
+            summary.update(skipped_reason="nai_text_plan_failed" if str(exc).startswith("nai_text_") else "nai_character_plan_failed", llm_error=str(exc),
                            final_prompt_head="", final_prompt_chars=0)
             if debug:
                 summary.update(nai_character_plan_prompt=plan_prompt, nai_character_plan_raw=plan_raw)
@@ -5683,6 +5721,76 @@ class PromptPipeline:
             return PromptPipelineResult("", summary)
 
     async def build(
+        self, event: Any, user_prompt: str, mode: str = "txt2img", *,
+        multi_person: bool = False, original_user_prompt: str = "",
+        canvas_size: tuple[int, int] | None = None,
+        canvas_size_explicit: bool = False,
+    ) -> PromptPipelineResult:
+        """Keep native NAI lettering outside the visual prompt pipeline."""
+        config = apply_config_preset(dict(self.config))
+        canvas = resolve_nai_canvas(
+            config, canvas_size or (self._int("width", 1024), self._int("height", 1536)),
+            explicit_size=canvas_size_explicit,
+        )
+        text_request = NaiTextRequest()
+        source_request = original_user_prompt or user_prompt
+        original = source_request
+        visual = user_prompt
+        if canvas["model"] and mode == "txt2img":
+            try:
+                original, text_request = extract_nai_text_request(
+                    original, include_dialogue=not self._bool("comic_dialogue_enabled", False),
+                )
+            except ValueError as exc:
+                return PromptPipelineResult("", {"skipped_reason": "nai_text_parse_failed", "llm_error": str(exc)})
+            bypass = not self._bool("prompt_optimize_enabled", True) or strip_raw_prefix(user_prompt)[0]
+            if bypass and text_request.explicit_payload is None:
+                text_request = NaiTextRequest()
+            # Only the authoritative user request supplies lettering; references cannot.
+            if text_request.explicit_payload is not None:
+                if user_prompt.startswith(source_request):
+                    visual = original + user_prompt[len(source_request):]
+                else:
+                    visual, _ = extract_nai_text_request(user_prompt)
+            if (text_request.texts or text_request.explicit_payload is not None) and (bypass or not text_request.optional_ids):
+                try:
+                    text_request.validate(canvas["model"])
+                except ValueError as exc:
+                    return PromptPipelineResult("", {"skipped_reason": str(exc).split(":")[0], "llm_error": str(exc)})
+        result = await self._build_visual_prompt(
+            event, visual, mode, multi_person=multi_person,
+            original_user_prompt=original, canvas_size=canvas_size,
+            canvas_size_explicit=canvas_size_explicit, text_request=text_request,
+        )
+        if result.final_prompt and text_request.texts:
+            raw = result.summary.get("raw_mode", False) or not self._bool("prompt_optimize_enabled", True)
+            summary = result.summary
+            if raw:
+                final = text_request.finish(result.final_prompt, raw=True)
+            else:
+                if "nai_text_regions" not in summary:
+                    return PromptPipelineResult("", {**summary, "skipped_reason": "nai_text_plan_failed", "llm_error": "nai_text_missing_regions"})
+                selected_texts = tuple(text_request.texts[row["id"]] for row in summary["nai_text_regions"] if row["kind"] != "ignore")
+                if selected_texts:
+                    try:
+                        NaiTextRequest(selected_texts).validate(canvas["model"])
+                    except ValueError as exc:
+                        return PromptPipelineResult("", {**summary, "skipped_reason": str(exc).split(":")[0], "llm_error": str(exc)})
+                final = text_request.finish_regions(result.final_prompt, summary.get("nai_characters", []), summary["nai_text_regions"])
+            summary.update(
+                nai_text_rendering={"model": canvas["model"], "texts": list(text_request.texts),
+                                    "characters": len(text_request.payload), "native": True},
+                final_prompt_head=self._shorten(final, 600), final_prompt_chars=len(final),
+            )
+            if "nai_global_prompt" in summary:
+                summary["nai_global_prompt"] = final
+            if self._bool("debug_prompt_enabled", False):
+                summary["final_prompt"] = final
+                self.logger.info("[comfyui_agent] NAI final prompt with native lettering:\n%s", final)
+            return PromptPipelineResult(final, summary)
+        return result
+
+    async def _build_visual_prompt(
         self,
         event: Any,
         user_prompt: str,
@@ -5692,6 +5800,7 @@ class PromptPipeline:
         original_user_prompt: str = "",
         canvas_size: tuple[int, int] | None = None,
         canvas_size_explicit: bool = False,
+        text_request: NaiTextRequest = NaiTextRequest(),
     ) -> PromptPipelineResult:
         """Build the final prompt and summary for one generation request.
 
@@ -5772,6 +5881,14 @@ class PromptPipeline:
                 }
             )
             return PromptPipelineResult(raw_prompt, summary)
+
+        # Lettering needs instance ownership even without an explicit -r switch.
+        # Reuse the existing second-stage writer; no third semantic call.
+        if text_request.texts:
+            summary["nai_text_layout_mode"] = True
+            summary["nai_text_auto_mode"] = not nai_r_mode
+            nai_r_mode = True
+            summary["nai_r_mode"] = True
 
         prompt_config = preset_config
         if preset_index is not None:
@@ -6795,6 +6912,7 @@ class PromptPipeline:
                     prompt, semantic_anchors, character_effective_outfits,
                     semantic_result, implicit_mode=implicit_wardrobe_mode,
                 ),
+                text_request=text_request,
             )
         llm_prompt = build_llm_prompt(
             prompt,
@@ -6848,6 +6966,7 @@ class PromptPipeline:
                 "归属和可见性决定是否采用；可以不采用或用自然语言表达，"
                 "没有必须输出的 tag 清单。不要把一人的条件分给另一人。"
             )
+        llm_prompt += text_request.writer_rule()
         allow_futa = has_positive_futa_request(prompt)
         if self._bool("debug_prompt_enabled", False):
             self.logger.info(
@@ -6951,6 +7070,7 @@ class PromptPipeline:
         # LLM response, so it commonly sits outside the seven brace blocks.
         # Extract it before structured parsing, which intentionally retains
         # only the declared field values and would otherwise discard it.
+        llm_content = text_request.protect(llm_content)
         llm_content, llm_background_mode = extract_background_mode(llm_content)
         structured_parse = validate_confirmed_character_roster(
             _parse_structured_prompt(llm_content), semantic_character_tags
@@ -7032,7 +7152,7 @@ class PromptPipeline:
                     )
                 if is_chinese_model_refusal(retry_llm_content):
                     return self._model_refusal_result(summary, retry_llm_content)
-                retry_content = retry_llm_content
+                retry_content = text_request.protect(retry_llm_content)
                 retry_content, retry_background_mode = extract_background_mode(
                     retry_content
                 )

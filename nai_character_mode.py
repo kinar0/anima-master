@@ -9,6 +9,11 @@ from pathlib import Path
 from typing import Any
 
 try:
+    from .nai_text import NaiTextRequest
+except ImportError:
+    from nai_text import NaiTextRequest
+
+try:
     from .tag_cleaner import split_tags, display_tag_text
     from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 except ImportError:  # pragma: no cover - direct script-style imports.
@@ -275,9 +280,36 @@ def build_nai_character_plan_prompt(
         "do not use a fixed coordinate template for pose words. Distinguish "
         "horizontal and vertical separation when the view requires it. For contact, "
         "check that projected bodies and limbs can meet at this framing and scale; "
-        "do not place them as disconnected figures. Coordinates guide composition, "
+        "do not place them as disconnected figures. "
+        "Use spatial reasoning: mentally stage the scene in three dimensions, then "
+        "project it through the requested camera onto the actual canvas. Position "
+        "choices must make ALL requested actions in the intended moment and panel "
+        "simultaneously feasible, not merely distribute characters across the image. "
+        "For each action, locate the actor, recipient, relevant body parts, contact "
+        "point and any supporting surface or prop. Work out body scale, orientation, "
+        "limb reach, relative height, depth and occlusion together; a centre alone "
+        "does not describe a pose. Check a participant's multiple actions together "
+        "so satisfying one contact does not make another unreachable. "
+        "Choose centres from that joint arrangement, rather than choosing isolated "
+        "positions first and merely claiming contact in prose. Overlapping bodies "
+        "may need close or overlapping centres; do not force equal spacing, distinct "
+        "centres or symmetric left/right slots. Separation must likewise support "
+        "requests for distance, separate groups or separate panels; do not pull "
+        "unrelated people together. Screen y is projected vertical position, not "
+        "a depth coordinate; infer depth from camera, scale and occlusion too. "
+        "Use continuous normalized coordinates with enough decimal precision for "
+        "the arrangement (typically 2-3 decimals); do not snap to tenths or a grid. "
+        "Coordinates refer to each instance's visible region centre, not its head, "
+        "hand or contact point, and panel coordinates still refer to the whole canvas. "
+        "When a draft cannot support every requested action, revise unconstrained "
+        "spacing, scale, pose and framing together while preserving explicit camera, "
+        "left/right, panel and cropping requirements. Do not silently drop an action "
+        "or override an explicit constraint; briefly mark genuinely incompatible "
+        "requirements in relations instead of asserting impossible contact. "
+        "Coordinates guide composition, "
         "not exact anatomy; preserve intentional cropping. Keep "
-        "composition_analysis and position_reason brief.\n"
+        "composition_analysis and position_reason brief, but explain which action "
+        "or separation constraints the chosen placement supports.\n"
         "Interactions:\n"
         "Identify explicit actions between visible people from meaning, including "
         "actions beyond common examples. Allowed prefixes are exactly source#, "
@@ -335,6 +367,15 @@ def build_nai_character_plan_prompt(
         "lighting dimension. Check that actual global and instance strings retain "
         "both the English visual-tag layer and complete user-language prose; "
         "Chinese keywords or identity-only English are insufficient. "
+        "Mentally project the final arrangement again: verify that all requested "
+        "actions can coexist at these positions, scales and orientations, including "
+        "each shared participant's reach and every required contact or separation. "
+        "Check coordinates, global scene prose and instance prompts against the "
+        "same arrangement; fix discrepancies before output. Every requested "
+        "action and required contact must be stated in the actual global scene "
+        "prose and the relevant instance prose as well as supported by placement. "
+        "A correct analysis or position_reason does not compensate for an action "
+        "missing from those generated strings. "
         "Keep the grounded specific state; remove contradictory "
         "generic claims and redundant synonyms. Correct omissions, inverted roles "
         "and missing counterparts within local authority. Record reviewed relations "
@@ -447,6 +488,7 @@ def missing_nai_noun_tags(
 def parse_nai_character_plan(
     raw: str, *, character_limit: int = MAX_NAI_CHARACTERS,
     character_scoped_tags: tuple[str, ...] = (),
+    text_request: NaiTextRequest = NaiTextRequest(),
 ) -> dict[str, Any]:
     """Validate model output before any NAI workflow is submitted."""
     value = str(raw or "").strip()
@@ -468,7 +510,8 @@ def parse_nai_character_plan(
         raise ValueError("nai_character_plan_missing_composition_analysis")
     if not isinstance(global_prompt, str) or not global_prompt.strip():
         raise ValueError("nai_character_plan_missing_global_prompt")
-    if not isinstance(characters, list) or not 1 <= len(characters) <= character_limit:
+    global_prompt = text_request.protect(global_prompt)
+    if not isinstance(characters, list) or not (0 if text_request.texts else 1) <= len(characters) <= character_limit:
         raise ValueError("nai_character_plan_character_count")
     cleaned: list[dict[str, Any]] = []
     dropped_interaction_tags: list[str] = []
@@ -504,7 +547,7 @@ def parse_nai_character_plan(
                 collect_interaction_tag(tag)
         elif raw_interaction_tags:
             dropped_interaction_tags.append(str(raw_interaction_tags)[:80])
-        character_prompt = prompt.strip()
+        character_prompt = text_request.protect(prompt.strip())
         # Only the explicit array can supply direction tags. Strip copies from
         # the prose field so an empty array really means no interaction tag.
         prompt_parts = []
@@ -563,7 +606,7 @@ def parse_nai_character_plan(
     global_clean = ", ".join(part for part in global_parts if part)
     if not global_clean:
         raise ValueError("nai_character_plan_missing_global_prompt")
-    return {
+    result = {
         "composition_analysis": {
             key: analysis[key].strip() for key in ("viewpoint", "layout", "relations")
         },
@@ -572,6 +615,20 @@ def parse_nai_character_plan(
         "dropped_interaction_tags": dropped_interaction_tags,
         "dropped_global_character_tags": dropped_global_character_tags,
     }
+    if text_request.texts:
+        regions, issues = text_request.validate_regions(data.get("text_regions"), cleaned, global_clean)
+        result.update(text_regions=regions, text_validation_errors=issues)
+        if not issues:
+            dropped = []
+            result["global_prompt"], removed = text_request.remove_misplaced_references(result["global_prompt"], None, regions)
+            if removed:
+                dropped.append({"character_index": None, "ids": removed})
+            for index, row in enumerate(cleaned):
+                row["prompt"], removed = text_request.remove_misplaced_references(row["prompt"], index, regions)
+                if removed:
+                    dropped.append({"character_index": index, "ids": removed})
+            result["dropped_text_references"] = dropped
+    return result
 
 
 def preserve_nai_global_artist_tags(global_prompt: str, artist_tags: str) -> str:

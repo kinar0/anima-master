@@ -652,7 +652,11 @@ def test_nai_r_uses_v4_model_limit_even_with_explicit_canvas(tmp_path):
         )
 
 
-@pytest.mark.parametrize("chair,floor", [((.27, .29), (.76, .75)), ((.74, .25), (.23, .77))])
+@pytest.mark.parametrize("chair,floor", [
+    ((.27, .29), (.76, .75)), ((.74, .25), (.23, .77)),
+    ((.3427, .5173), (.3491, .5279)), ((.5, .5), (.5, .5)),
+    ((0., 0.), (1., 1.)),
+])
 def test_nai_complex_side_view_preserves_model_layout(chair, floor):
     source = "丰川祥子坐在椅子上，千早爱音跪坐在丰川祥子面前的地上。侧视图。"
     canvas = resolve_nai_canvas(
@@ -664,6 +668,13 @@ def test_nai_complex_side_view_preserves_model_layout(chair, floor):
     assert "Interpret camera, relative height/depth" in instruction
     assert "horizontal and vertical separation" in instruction
     assert "do not use a fixed coordinate template" in instruction
+    assert "Use spatial reasoning" in instruction
+    assert "ALL requested actions" in instruction
+    assert "simultaneously feasible" in instruction
+    assert "a participant's multiple actions together" in instruction
+    assert "do not snap to tenths or a grid" in instruction
+    assert "panel coordinates still refer to the whole canvas" in instruction
+    assert "do not pull unrelated people together" in instruction
     assert "Leave interaction_tags empty" in instruction
     directed = build_nai_character_plan_prompt("A 拥抱 B", "2girls", canvas)
     assert "source#tag" in directed and "target#tag" in directed
@@ -684,6 +695,13 @@ def test_nai_complex_side_view_preserves_model_layout(chair, floor):
     assert (plan["characters"][0]["x"], plan["characters"][0]["y"]) == chair
     assert (plan["characters"][1]["x"], plan["characters"][1]["y"]) == floor
     assert plan["composition_analysis"]["viewpoint"] == "side view"
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, plan["global_prompt"], "blurry",
+        1024, 1536, 28, 6, 123, nai_characters=plan["characters"],
+    )
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    assert (selector["character1_x"], selector["character1_y"]) == chair
+    assert (selector["character2_x"], selector["character2_y"]) == floor
 
 
 def test_nai_canvas_uses_explicit_size_or_override():

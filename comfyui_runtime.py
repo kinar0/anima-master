@@ -166,6 +166,18 @@ class ComfyUIRuntime:
             return "NAI 工作流的宽和高必须是 64 的倍数，请使用 832x1216 或 1024x1536 等尺寸"
         if detail == "nai_sampling_parameters_out_of_range":
             return "NAI 节点要求步数为 1–50，CFG 为 0–30"
+        if detail == "nai_text_requires_v5_for_non_english":
+            return "NAI 中文、日文或其他非 ASCII 文字请使用 V5；V4/V4.5 仅支持英文文字"
+        if detail == "nai_text_requires_v4_or_newer":
+            return "NAI 原生文字生成需要 V4 或更新模型；中文请使用 V5"
+        if detail.startswith("nai_text_too_long"):
+            return "要画的文字超过模型上限：V4/V4.5 118、V5 Curated 374、V5 Full 750 字符（含空白和换行），请缩短原文"
+        if detail == "nai_text_empty":
+            return "Text: 后需要填写实际要画出的文字"
+        if detail == "nai_text_parse_failed":
+            return "无法可靠提取要画的文字；请用双引号明确原文，或在末尾使用 Text: 原文"
+        if detail == "nai_text_plan_failed":
+            return "文字的画格、角色实例或旁白位置未能可靠绑定，已停止生成；请明确每格角色和文字位置后重试"
         if detail == "nai_character_mode_requires_nai_workflow":
             return "-r 需要使用包含 NovelAIGenerator 的 NAI API 工作流"
         if detail == "nai_character_mode_requires_optimization":
@@ -173,7 +185,33 @@ class ComfyUIRuntime:
         if detail == "nai_character_mode_incompatible_multi_person":
             return "-r 请使用普通 /anm 生图命令，不要与 /anm 多人兼容模式同用"
         if detail.startswith("nai_character_plan_"):
-            return "-r 的逐角色位置规划失败，请重试或缩短为最多五个角色实例"
+            cause = detail
+            if detail == "nai_character_plan_failed":
+                cause = str(payload.get("llm_error") or "")
+            cause = cause.partition(":")[0].strip()
+            reasons = {
+                "nai_character_plan_invalid_interaction_pairs":
+                    "-r 的角色互动方向标签未能正确配对，已停止生成",
+                "nai_character_plan_invalid_json":
+                    "-r 的模型输出不是完整、有效的 JSON，已停止生成",
+                "nai_character_plan_invalid_structure":
+                    "-r 的模型输出结构无效，已停止生成",
+                "nai_character_plan_character_count":
+                    "-r 返回的角色实例列表无效或数量不符合当前模型限制，已停止生成",
+                "nai_character_plan_invalid_character":
+                    "-r 返回的角色实例缺少有效名称或提示词，已停止生成",
+                "nai_character_plan_invalid_position":
+                    "-r 返回的角色坐标缺失或不在 0–1 范围内，已停止生成",
+                "nai_character_plan_missing_composition_analysis":
+                    "-r 的模型输出缺少完整构图分析，已停止生成",
+                "nai_character_plan_missing_global_prompt":
+                    "-r 的模型输出缺少全局提示词，已停止生成",
+                "nai_character_plan_missing_position_reason":
+                    "-r 的模型输出缺少角色位置说明，已停止生成",
+            }
+            return reasons.get(
+                cause, "-r 的逐角色提示词规划失败，已停止生成；具体原因请查看任务记录"
+            )
         if detail == "no image found in history":
             return "ComfyUI 完成了任务但没有产出图片"
         if detail == "multi_person_plan_failed":
@@ -238,11 +276,12 @@ class ComfyUIRuntime:
             )
         if not payload.get("ok"):
             reason = self.failure_reason(payload)
-            message = (
-                "模型拒绝了生成"
-                if payload.get("error") == "model_refused_generation"
-                else f"ComfyUI 操作失败：{reason}。"
-            )
+            if payload.get("error") == "model_refused_generation":
+                message = "模型拒绝了生成"
+            elif str(payload.get("error") or "").startswith("nai_character_plan_"):
+                message = f"提示词构建失败：{reason}。"
+            else:
+                message = f"ComfyUI 操作失败：{reason}。"
             payload["delivery"] = operation_failed_delivery(payload, message)
             await event.send(event.plain_result(message))
             return message

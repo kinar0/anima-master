@@ -38,9 +38,28 @@
 
 若显式标记存在却无可恢复台词，任务在提交 ComfyUI 前返回 `comic_dialogue_parse_failed`；若生成后缺中文字体、图片不合要求或排字失败，返回 `comic_dialogue_render_failed`，不发送无字原图。开关关闭时依旧按普通七字段提示词流程，模型可能把对白概括为表情或气泡。
 
+## NAI 文字丢失、被翻译或尾部混入 tags
+
+使用明确的 `写着“原文”` / `角色：“台词”`，漫画写清每格和文字位置；也可在最后给出原生 `Text:`。检查 `nai_text_rendering.texts` 原文清单及 `nai_text_regions` 的 occurrence id、panel、character_index、placement，再看每个实际 `nai_characters[].prompt` 与 `nai_global_prompt`：对白只能进入所属格的实例尾段，旁白等无主文字进入带画格/位置说明的 base 尾段，不能只检查 base 是否有全部台词。各尾段后不能再加 tags，转换前后应逐字一致。同名多格和相同台词按出现编号分别核对；`nai_text_plan_failed` 表示绑定结构修复一次后仍错误，不回退全局混排。模型返回的 source_text 不重写文字来源，宿主始终保存编号对应的原始上下文与位置。扩展更新后重启 ComfyUI，插件更新后重载插件。普通衣服引号、否定及参考图文字不会直接取得原生输出权限；冒号标签的引号由 writer 分辨文字或画面条件。raw 只处理显式尾段。
+
+`nai_text_requires_v5_for_non_english` 表示 V4/V4.5 收到了非 ASCII 原文；`nai_text_too_long` 表示超过 V4/V4.5 118、V5 Curated 374 或 V5 Full 750 字符（含空白/换行）；`nai_text_empty` 表示空尾段。均不靠删字继续。若开启 `comic_dialogue_enabled`，自动漫画对白仍走原有发送前排字，不自动再画一份。负向独立的 text/语言文字 tags 会在带文字尾段的 NAI 提交中移除，其他负向保留。
+
+最终原文正确但图片错字属于生成结果问题；当前没有 OCR 验字或自动生图重试。真实模型提示词测试也不能证明字形和气泡位置正确。详见 [NAI 原生文字生成](NAI原生文字生成.md)。
+
 ## NAI 自定义工作流
 
 互动方向诊断的 `nai_interaction_initial_validation_errors` / `nai_interaction_retry_validation_errors` 保留历史键名，现只表示对应模型回复中发现并降级的方向标签问题；非空不等于本次失败。`nai_dropped_interaction_tags` 保存最终采用回复中移除的方向项。文字绑定分别记录在 `nai_text_initial_validation_errors` / `nai_text_retry_validation_errors`，仍可触发一次修复和失败停止。只按精确动作名确认配对，因此官方 `source#pointing at another` / `target#pointing` 这类不同名写法会降级为已有自然语言关系，不猜测或强改动作。更新后须重载插件。
+
+`-r` 的提交前规划失败现在显示“提示词构建失败”，按任务 payload 中的
+`llm_error` 区分 JSON/结构、实例列表、坐标及必要字段错误；历史版本还可能因互动方向配对失败而停止。
+未知原因提示查看任务记录，不再统一建议“重试或缩短为最多五个角色实例”。
+只有明确识别为 `model_refused_generation` 的回复才显示“模型拒绝了生成”；
+配对校验失败本身不能证明模型拒绝。此次只修改错误展示，不改变提示词、
+校验、修复次数或停止提交的行为。更新后需重载 AstrBot 插件。
+
+若 `-r` 的小数位置到 NAI 后被改成十分位，比较任务摘要 `nai_characters[].x/y`、提交图的 `CharacterPromptSelect.inputs.characterN_x/y` 和 NAI payload 的 `char_captions[].centers`。AstrBot 原本就透传浮点数；旧 NAI 节点的 `round(..., 1)` 才会把 `0.3427` 改成 `0.3`。配套节点已取消后端取整，UI 步长为 `0.001`，更新后需重启 ComfyUI 并刷新节点界面；提示词任务书则需重载 AstrBot 插件。归一化范围仍为 0–1。V4/V4.5 本身的 5×5 位置限制不会由此消失。
+
+坐标没变但接触仍不对时，检查 writer 原始 `composition_analysis`、`position_reason` 和实际全局/实例文本：同一人物的每项动作是否在同一镜头、尺度、朝向和间距下同时可行，接触点是否属于正确身体部位，分格坐标是否使用整幅画布。不能仅凭方向配对或“臂展可达”的理由宣称图像已验证。真实提示词回归记录见 `diagnostics/nai-spatial-review/`，目前不含 NAI 出图验收。
 
 若 `-r` 突然主要输出中文关键词，先比较 `nai_character_plan_raw` 与 `nai_characters[].prompt`，不要把宿主补回的几个发色/瞳色 tags 当作 writer 已输出英文细节。2026-10-15 16:08 的三实例记录中，原始 JSON 已只有英文身份、性别和方向项，衣服、表情及姿态几乎全是中文；不是英文细节 tags 在后处理阶段被统一删除。当前专用 system、JSON 字段说明与同次复核明确要求“英文视觉 tags + 完整中文句子”并存，中文语言要求只作用于 prose。检查原始与最终两端的英文衣物、表情、动作/姿态、整图镜头，以及中文关系句；同名不同衣服的实例分别验收，不按名字合并。此修正不让宿主翻译中文或强补缺失名词 tags，不增加模型阶段。
 
@@ -122,6 +141,15 @@ AstrBot 的 ComfyUI 地址仍填写 ComfyUI 服务，不填写 NovelAI 网站地
 - 指令是否写成 `/anm`、`/anima` 或 `/comfyui`。
 
 ## ComfyUI 离线
+
+若本机 `http://127.0.0.1:8188/system_stats` 正常，但最近任务的
+`comfyui_status.error` 为 `empty_tool_output`，需要检查辅助子进程的 stderr。
+2026-10-15 的实例是在请求 API 前导入工作流时报
+`ModuleNotFoundError: No module named 'nai_text'`，被就绪检查归为离线。
+原因是 CLI 入口在导入工作流依赖后才加入插件根目录；现已将路径初始化移至所有
+本地 helper 导入之前。该修复随下一次辅助子进程启动生效，无需修改连接地址或
+重启 ComfyUI。回归从插件目录外启动真实 CLI，清除继承的 `PYTHONPATH`，覆盖
+帮助入口、快速存活检查及完整模型检查；真实本机状态检查不提交生图。
 
 确认：
 

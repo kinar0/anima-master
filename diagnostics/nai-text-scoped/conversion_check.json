@@ -1,0 +1,42 @@
+[
+  {
+    "explicit_r": "False",
+    "scope": "base",
+    "text_tail": "放学后。\n\n第二天。"
+  },
+  {
+    "explicit_r": "False",
+    "scope": "1:chihaya_anon",
+    "text_tail": "你好，祥子！"
+  },
+  {
+    "explicit_r": "False",
+    "scope": "2:togawa_sakiko",
+    "text_tail": "等等！"
+  },
+  {
+    "explicit_r": "False",
+    "scope": "3:chihaya_anon",
+    "text_tail": "再见！"
+  },
+  {
+    "explicit_r": "True",
+    "scope": "base",
+    "text_tail": "放学后。\n\n第二天。"
+  },
+  {
+    "explicit_r": "True",
+    "scope": "1:chihaya_anon",
+    "text_tail": "你好，祥子！"
+  },
+  {
+    "explicit_r": "True",
+    "scope": "2:togawa_sakiko",
+    "text_tail": "等等！"
+  },
+  {
+    "explicit_r": "True",
+    "scope": "3:chihaya_anon",
+    "text_tail": "再见！"
+  }
+]

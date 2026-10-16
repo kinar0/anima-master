@@ -61,6 +61,8 @@ vae_name = ComfyUI 中的 VAE 文件名
 
 ### NovelAI（NAI）工作流
 
+2026-10-15 原生文字补充：带明确文字的优化请求自动复用逐实例 writer，即使未写 `-r` 也按画格/角色实例分配台词。对白各进所属实例 `Text:` 尾段，旁白等无主文字保留画格与位置说明后进入 base；不是将全篇台词集中到 base。没有文字需求时仍按下文普通/`-r` 边界处理。raw/关闭优化只保留显式原生尾段，不自动绑定；已有发送前排字开关保持独立。详见 [NAI 原生文字生成](NAI原生文字生成.md)。
+
 支持通过 ComfyUI 的 `ComfyUI_RS_NAI_API_Request` 中的 `NovelAIGenerator`
 调用 NAI。账户认证仍由该 ComfyUI 扩展管理；AstrBot 继续连接 ComfyUI 地址。
 无需在 AstrBot 中另外填写 NAI 密钥，也不使用本地 Anima 模型加载器。
