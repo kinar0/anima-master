@@ -1,0 +1,98 @@
+{
+  "path": "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\data\\plugin_data\\astrbot_plugin_anima_master\\danbooru_outfit_profiles.json",
+  "profile": "羽丘高一校服::winter",
+  "before": {
+    "kind": "named_outfit",
+    "variant": "winter",
+    "aliases": [
+      "羽丘冬季校服",
+      "羽丘校服冬季",
+      "羽丘校服（冬季）",
+      "haneoka school winter uniform",
+      "羽丘校服"
+    ],
+    "manual_aliases": [
+      "羽丘冬季校服",
+      "羽丘校服冬季",
+      "羽丘校服（冬季）",
+      "haneoka school winter uniform",
+      "羽丘校服"
+    ],
+    "canonical_tag": "haneoka_school_uniform",
+    "source_tags": [],
+    "copyright_tags": [],
+    "outfit_tags": [
+      "haneoka_school_uniform"
+    ],
+    "component_tags": [
+      "grey_jacket",
+      "white_shirt",
+      "collared_shirt",
+      "winter_uniform",
+      "green_skirt",
+      "plaid_skirt",
+      "pleated_skirt",
+      "long_sleeves",
+      "green_necktie",
+      "striped_necktie",
+      "diagonal-striped_necktie",
+      "dress_shirt",
+      "black_ribbon",
+      "hair_ribbon",
+      "blue_necktie",
+      "hair_bow",
+      "yellow_bow",
+      "black_socks",
+      "black_shoes",
+      "wing_collar"
+    ]
+  },
+  "after": {
+    "kind": "named_outfit",
+    "variant": "winter",
+    "aliases": [
+      "羽丘冬季校服",
+      "羽丘校服冬季",
+      "羽丘校服（冬季）",
+      "haneoka school winter uniform",
+      "羽丘校服"
+    ],
+    "manual_aliases": [
+      "羽丘冬季校服",
+      "羽丘校服冬季",
+      "羽丘校服（冬季）",
+      "haneoka school winter uniform",
+      "羽丘校服"
+    ],
+    "canonical_tag": "haneoka_school_uniform",
+    "source_tags": [],
+    "copyright_tags": [],
+    "outfit_tags": [
+      "haneoka_school_uniform"
+    ],
+    "component_tags": [
+      "grey_jacket",
+      "white_shirt",
+      "collared_shirt",
+      "winter_uniform",
+      "green_skirt",
+      "plaid_skirt",
+      "pleated_skirt",
+      "long_sleeves",
+      "green_necktie",
+      "striped_necktie",
+      "diagonal-striped_necktie",
+      "dress_shirt",
+      "blue_necktie",
+      "black_socks",
+      "black_shoes",
+      "wing_collar"
+    ]
+  },
+  "removed": [
+    "black_ribbon",
+    "hair_ribbon",
+    "hair_bow",
+    "yellow_bow"
+  ]
+}

@@ -14,10 +14,10 @@ except ImportError:
     from nai_text import NaiTextRequest
 
 try:
-    from .tag_cleaner import split_tags, display_tag_text
+    from .tag_cleaner import split_tags, display_tag_text, normalize_tag_key
     from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 except ImportError:  # pragma: no cover - direct script-style imports.
-    from tag_cleaner import split_tags, display_tag_text
+    from tag_cleaner import split_tags, display_tag_text, normalize_tag_key
     from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
 
 
@@ -195,6 +195,10 @@ def build_nai_character_plan_prompt(
             + "\n".join(f"- {alias} => {tag}" for alias, tag in noun_mappings)
             + "\nUse only mappings that fit the request and the correct owner; natural "
             "language or a directional action tag may express the meaning instead. "
+            "When expressing the same mapped concept as a tag, prefer the supplied "
+            "canonical spelling; do not invent a plural, synonym or near-match. "
+            "Choose a different tag only for a genuinely different intended visual "
+            "meaning, not to decorate or intensify the mapped concept. "
             "This is not a required tag checklist.\n"
         )
     return (
@@ -270,12 +274,26 @@ def build_nai_character_plan_prompt(
         "lying on that bed belongs to its occupant. A panel-specific camera/crop "
         "belongs to its instance; only whole-page framing belongs globally. "
         "Keep face direction separate from eye gaze. "
+        "A shared outfit does not imply shared personal accessories. Distinguish "
+        "the outfit's garments from a wearer's hair ornaments and other personal "
+        "items; never transfer those merely because both wear the same uniform. "
         "Reassign misplaced global instance conditions without losing "
         "their supported meaning or copying all evidence into every box.\n"
         "Composition:\n"
         "Interpret camera, relative height/depth, facing and contact together "
         "before placing instances. Use the actual canvas aspect ratio and "
-        "respect explicit left/right and panel boundaries. Set x/y to the centre "
+        "respect explicit left/right and panel boundaries. "
+        "First identify the visual focus of the request: which feature, expression "
+        "or contact must the image actually reveal? Where the user leaves the "
+        "camera free, compare close cropping, an oblique view and an over-shoulder "
+        "view; choose a view that makes that focus legible and the contact simple "
+        "to depict. A small facial detail usually needs the affected face visible "
+        "to the camera and enough image area, not hidden behind the actor. The "
+        "actor may face away or appear partly cropped. Do not favour the actor's "
+        "face, a full-body view or a symmetrical portrait merely to display more "
+        "profile tags. Mutual eye contact does not require both faces to be fully "
+        "shown to the camera; distinguish their gaze from the camera direction. "
+        "Set x/y to the centre "
         "of each visible region, in [0,1], x left-to-right and y top-to-bottom; "
         "do not use a fixed coordinate template for pose words. Distinguish "
         "horizontal and vertical separation when the view requires it. For contact, "
@@ -325,8 +343,17 @@ def build_nai_character_plan_prompt(
         "body location. Bare body-location/state tags belong only to the owner of "
         "the affected body part, never automatically to both participants or to "
         "the owner of a contacting limb. Remove an unsafe bare tag while retaining "
-        "the act in named prose and paired direction tags. Both may keep an ordinary "
-        "action only when its standalone meaning truly applies to both. "
+        "the act in named prose and paired direction tags. "
+        "For a valid paired interaction, express that canonical action only via "
+        "interaction_tags, without repeating the same action as a bare or weighted "
+        "ordinary tag in either participant or globally. This avoids a second, "
+        "undirected self-action assertion. "
+        "Do not replace that omitted ordinary tag with an alternate synonymous "
+        "body-state tag or an invented compound; that recreates the same unsafe "
+        "self-action. "
+        "Keep the complete named prose and other distinct, correctly owned "
+        "body-state tags. Individual actions and "
+        "actions whose direction hints cannot be paired keep their ordinary tags. "
         "Leave interaction_tags empty for individual actions, proximity, one-sided "
         "gaze or off-screen people. Write who acts on whom, direction and contact "
         "in the actual instance prompts too, naming whose limb contacts whose "
@@ -364,7 +391,13 @@ def build_nai_character_plan_prompt(
         "visibility and action pairs against the actual prompt strings, not just "
         "the analysis. Compare tags with prose for each expressed appearance, "
         "clothing state, expression, gaze, pose/contact, camera, background and "
-        "lighting dimension. Check that actual global and instance strings retain "
+        "lighting dimension. "
+        "Check physical preconditions as well as sentiment: an expression chosen "
+        "to convey resistance, teasing or excitement must still allow the stated "
+        "contact and reveal its focal detail. Do not add a closed or clenched "
+        "mouth to a contact that requires an accessible open mouth. Express the "
+        "emotion through compatible eyes, brows, tension or posture instead. "
+        "Check that actual global and instance strings retain "
         "both the English visual-tag layer and complete user-language prose; "
         "Chinese keywords or identity-only English are insufficient. "
         "Mentally project the final arrangement again: verify that all requested "
@@ -376,6 +409,9 @@ def build_nai_character_plan_prompt(
         "prose and the relevant instance prose as well as supported by placement. "
         "A correct analysis or position_reason does not compensate for an action "
         "missing from those generated strings. "
+        "Lead the global scene prose with the focal interaction and its contact "
+        "point, then add context, so the main visual purpose is never reduced "
+        "to a generic pose or left only in analysis. "
         "Keep the grounded specific state; remove contradictory "
         "generic claims and redundant synonyms. Correct omissions, inverted roles "
         "and missing counterparts within local authority. Record reviewed relations "
@@ -448,7 +484,41 @@ def downgrade_nai_interaction_tags(plan: dict[str, Any]) -> tuple[str, ...]:
             part for part in split_tags(character["prompt"]) if part not in dropped
         )
         plan["dropped_interaction_tags"].extend(dropped)
+    _remove_redundant_nai_action_tags(plan)
     return tuple(issue for issues in uncertain.values() for issue in issues)
+
+
+def _remove_redundant_nai_action_tags(plan: dict[str, Any]) -> None:
+    """Project accepted directions once, without guessing action/body ownership.
+
+    Run after uncertain groups are dropped. Only exact actions represented by
+    this instance's remaining direction hints suppress ordinary duplicates;
+    prose, unrelated states and uninvolved instances remain untouched.
+    """
+    def key(tag: str) -> str:
+        return _normalized_nai_tag(normalize_tag_key(tag))
+
+    all_actions: set[str] = set()
+    dropped = plan.setdefault("dropped_redundant_action_tags", [])
+    for index, character in enumerate(plan["characters"]):
+        actions = {key(tag.partition("#")[2])
+                   for tag in character.get("interaction_tags", ())}
+        all_actions.update(actions)
+        retained = []
+        for part in split_tags(character["prompt"]):
+            if key(part) in actions:
+                dropped.append({"character_index": index, "tag": part})
+            else:
+                retained.append(part)
+        character["prompt"] = ", ".join(retained)
+    retained_global = []
+    for part in split_tags(plan["global_prompt"]):
+        if key(part) in all_actions:
+            dropped.append({"character_index": None, "tag": part})
+            plan["dropped_global_character_tags"].append(part)
+        else:
+            retained_global.append(part)
+    plan["global_prompt"] = ", ".join(retained_global)
 
 
 def missing_nai_noun_tags(

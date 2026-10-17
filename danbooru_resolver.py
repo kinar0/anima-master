@@ -1157,6 +1157,8 @@ class DanbooruResolver:
         matched: list[str] = []
         matched_anchors: list[SemanticAnchor] = []
         anchor_identities: set[tuple[str, str]] = set()
+        anchor_variants: dict[str, str] = {}
+        components_by_outfit: dict[tuple[str, str], list[str]] = {}
 
         def register_match(alias: str, tag: str, variant: str) -> None:
             if tag not in matched:
@@ -1175,6 +1177,7 @@ class DanbooruResolver:
                     candidates=(tag,),
                 )
             )
+            anchor_variants[matched_anchors[-1].anchor_id] = variant
 
         for tag, variant, aliases in self._configured_named_outfit_groups():
             matched_alias = next(
@@ -1236,9 +1239,12 @@ class DanbooruResolver:
                 str(alias).split("::", 1)[0],
             )
             register_match(matched_alias, canonical, variant)
+            components = components_by_outfit.setdefault((canonical, variant), [])
             for value in self._named_component_tags(profile, canonical):
                 if value not in profile_tags_for_request:
                     profile_tags_for_request.append(value)
+                if value not in components:
+                    components.append(value)
             for candidate in profiles.values():
                 if not isinstance(candidate, dict) or candidate.get("kind") == "named_outfit":
                     continue
@@ -1256,17 +1262,26 @@ class DanbooruResolver:
                     value = str(tag).strip()
                     if value and value not in profile_tags_for_request:
                         profile_tags_for_request.append(value)
+                    if value and value not in components:
+                        components.append(value)
         if not matched:
             return None
-        anchor_outfit_profiles = ()
-        if len(matched_anchors) == 1 and profile_tags_for_request:
-            anchor = matched_anchors[0]
-            anchor_outfit_profiles = ((
+        # Preserve each saved set's components even when several outfits (or
+        # variants of one canonical tag) occur in the same request. Flattening
+        # these rows made complete edited sets look missing, triggering fresh
+        # sampling that could reintroduce components the user had removed.
+        anchor_outfit_profiles = tuple(
+            (
                 anchor.anchor_id,
                 anchor.candidates[0] if anchor.candidates else "",
-                tuple(profile_tags_for_request),
-                requested_variant,
-            ),)
+                tuple(components_by_outfit[(anchor.candidates[0], anchor_variants[anchor.anchor_id])]),
+                anchor_variants[anchor.anchor_id],
+            )
+            for anchor in matched_anchors
+            if anchor.candidates and components_by_outfit.get(
+                (anchor.candidates[0], anchor_variants[anchor.anchor_id])
+            )
+        )
         return SemanticLookupResult(
             confirmed_tags=tuple(matched),
             named_outfit_tags=tuple(matched),

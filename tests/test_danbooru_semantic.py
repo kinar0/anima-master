@@ -3148,6 +3148,46 @@ def test_configured_term_mapping_is_returned_only_as_vocabulary_reference() -> N
     assert result.candidate_tags == ("masquerade_mask",)
 
 
+@pytest.mark.parametrize("same_canonical", [False, True])
+def test_cached_multiple_named_sets_keep_components_and_variant_per_anchor(tmp_path, same_canonical):
+    class Logger:
+        def warning(self, *_args): pass
+
+    profiles = {
+        "winter": dict(kind="named_outfit", canonical_tag="aurora_uniform", variant="winter",
+                       aliases=["冬季套组"], manual_aliases=["冬季套组"],
+                       outfit_tags=["aurora_uniform"], component_tags=["grey_jacket", "green_necktie"]),
+        "summer": dict(kind="named_outfit", canonical_tag="aurora_uniform" if same_canonical else "lunar_uniform",
+                       variant="summer", aliases=["夏季套组"], manual_aliases=["夏季套组"],
+                       outfit_tags=["aurora_uniform" if same_canonical else "lunar_uniform"],
+                       component_tags=["white_shirt", "red_necktie"]),
+        "unmentioned": dict(kind="named_outfit", canonical_tag="different_outfit", variant="winter",
+                            aliases=["舞台套组"], manual_aliases=["舞台套组"],
+                            outfit_tags=["different_outfit"], component_tags=["hair_ribbon"]),
+    }
+    path = tmp_path / "profiles.json"
+    path.write_text(json.dumps(dict(version=3, profiles=profiles)), encoding="utf-8")
+    resolver = DanbooruResolver(
+        logger=Logger(), cache={}, profile_cache_path=path, config={},
+        get_bool=lambda k,d:d, get_int=lambda k,d:d, get_float=lambda k,d:d, get_str=lambda k,d:d,
+    )
+    matched = resolver.cached_named_outfits_for_prompt("甲穿冬季套组，乙穿夏季套组")
+    assert matched is not None
+    assert len(matched.anchors) == len(matched.anchor_outfit_profiles) == 2
+    by_id = {row[0]: row[1:] for row in matched.anchor_outfit_profiles}
+    for anchor in matched.anchors:
+        tag, components, variant = by_id[anchor.anchor_id]
+        if anchor.source_text == "冬季套组":
+            assert tag == "aurora_uniform" and variant == "winter"
+            assert set(components) == {"grey_jacket", "green_necktie"}
+        else:
+            assert variant == "summer"
+            assert tag == ("aurora_uniform" if same_canonical else "lunar_uniform")
+            assert set(components) == {"white_shirt", "red_necktie"}
+    assert "hair_ribbon" not in matched.outfit_profile_tags
+    assert json.loads(path.read_text(encoding="utf-8"))["profiles"] == profiles
+
+
 def test_term_mapping_switch_disables_matching_without_deleting_entries() -> None:
     class _Logger:
         def warning(self, *_args, **_kwargs):

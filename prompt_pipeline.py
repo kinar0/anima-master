@@ -3226,6 +3226,11 @@ def apply_framing_to_character_outfits(
             removed_tags=tuple(
                 dict.fromkeys((*plan.effective.removed_tags, *omitted))
             ),
+            forbidden_slots=tuple(dict.fromkeys((
+                *plan.effective.forbidden_slots,
+                *(slot for slot in sorted(hidden_slots)
+                  if not any(outfit_tag_slot(tag) == slot for tag in plan.effective.added_tags)),
+            ))),
         )
         updated.append(
             replace(
@@ -5485,19 +5490,33 @@ class PromptPipeline:
                 "then the user-language sentences. "
                 "A bare body-state tag applies to the affected body part's owner, "
                 "not automatically to an action's source or both participants. "
-                "For example, A puts A's hand inside B's mouth: only B may have bare "
-                "hand_in_mouth; A uses source#hand_in_mouth and named prose, "
-                "B uses target#hand_in_mouth. Apply this body-owner test to every contact. "
+                "For example, A puts A's hand inside B's mouth: "
+                "A uses source#hand_in_mouth and named prose, "
+                "B uses target#hand_in_mouth and named prose; neither repeats bare "
+                "hand_in_mouth when the paired directions carry that action. "
+                "Do not substitute a synonymous bare body-state tag or an "
+                "invented compound that recreates the same self-action. "
+                "Distinct ordinary body states still follow their body owner. "
+                "Do not clone personal accessories across wearers of a shared outfit. "
+                "For the same mapped concept, use the supplied canonical tag spelling "
+                "rather than inventing plural or synonymous tags. "
                 "Require confirmed canonical identity and still-applicable named-outfit tags "
                 "in each wearer's actual prompt; Chinese names alone are not tag anchors. "
                 "Lighting is opt-in: never add default soft/cinematic/fill lighting. "
                 "Explicit darkness and other stated absences override embellishment. "
                 "Use spatial reasoning to choose positions, scale and orientation "
                 "that make every requested action simultaneously feasible in its "
-                "intended panel. Preserve explicit layout/camera constraints; "
+                "intended panel, "
+                "around the request's visible focal detail/contact, not around "
+                "displaying every character profile. With no fixed camera, consider "
+                "close crops and over-shoulder views that reveal the affected body "
+                "part; the actor may be rear-facing or partly cropped. "
+                "Choose compatible expressions that do not obstruct the contact. "
+                "Preserve explicit layout/camera constraints; "
                 "continuous centres must agree with actual scene and instance prose. "
                 "State every requested action/contact in actual global and relevant "
-                "instance prose; correct analysis alone does not reach the image model. "
+                "instance prose, starting global prose with the focal interaction; "
+                "correct analysis alone does not reach the image model. "
                 "Follow the supplied schema, user edits and local authority."
             )
             if text_request.texts:
@@ -5597,6 +5616,18 @@ class PromptPipeline:
                     dropped_sources=summary["nai_dropped_instance_sources"],
                 )
                 if wearer is not None:
+                    # The direct writer selects its final crop after local
+                    # profile evidence was assembled. Apply the existing crop
+                    # boundary per instance as well as on the seven-field path;
+                    # inherited skirts/shoes must not push a close view wider.
+                    framing_text = ", ".join((nai_plan["global_prompt"], character["prompt"]))
+                    wearer = apply_framing_to_character_outfits((wearer,), framing_text)[0]
+                    if wearer.composition_omitted_tags:
+                        summary.setdefault("nai_composition_omitted_tags", []).append({
+                            "name": character["name"],
+                            "anchor_id": wearer.target_anchor_id,
+                            "tags": list(wearer.composition_omitted_tags),
+                        })
                     omitted = _omitted_appearance_dimensions(changes)
                     replacement = _replacement_writer_dimensions(changes) | omitted
                     opened = _advisory_writer_dimensions(changes) | replacement
@@ -5692,6 +5723,7 @@ class PromptPipeline:
                 nai_global_prompt=nai_plan["global_prompt"],
                 nai_character_count=len(nai_plan["characters"]),
                 nai_dropped_interaction_tags=nai_plan["dropped_interaction_tags"],
+                nai_dropped_redundant_action_tags=nai_plan["dropped_redundant_action_tags"],
                 nai_dropped_global_character_tags=nai_plan["dropped_global_character_tags"],
                 nai_missing_noun_tags=list(missing_nai_noun_tags(nai_plan, noun_tags)),
                 nai_bound_local_profile_references=[

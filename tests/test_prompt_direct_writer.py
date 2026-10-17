@@ -167,6 +167,37 @@ def test_single_person_prop_action_does_not_require_an_invented_recipient():
     assert row["interaction_tags"] == []
 
 
+def test_direct_writer_removes_paired_action_duplicates_before_conversion():
+    from agent_tools.comfyui_workflows import custom_t2i_workflow
+    from tag_cleaner import split_tags
+
+    layout = json.loads(plan([
+        ("character_a", "girl, (hand in mouth:1.3), 角色甲把自己的手伸进角色乙嘴里。", .45),
+        ("character_b", "girl, hand_in_mouth, open_mouth, 角色乙张嘴接受角色甲的手。", .55),
+    ], "2girls, upper_body, bed, 两人上半身入镜，角色甲伸手触碰角色乙口内。"))
+    layout["characters"][0]["interaction_tags"] = ["source#hand_in_mouth"]
+    layout["characters"][1]["interaction_tags"] = ["target#hand_in_mouth"]
+    result, calls = run("-r 角色甲伸手进角色乙嘴里", {"characters": [
+        semantic_character("角色甲"), semantic_character("角色乙"),
+    ]}, json.dumps(layout, ensure_ascii=False), {"debug_prompt_enabled": True})
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    rows = result.summary["nai_characters"]
+    assert len(result.summary["nai_dropped_redundant_action_tags"]) == 2
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, result.final_prompt, "blurry",
+        1216, 832, 28, 6, 123, nai_characters=rows,
+    )
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    for i, role in enumerate(("source", "target"), 1):
+        text = graph[selector[f"character{i}"][0]]["inputs"]["comfyui_prompt"]
+        assert text == rows[i-1]["prompt"]
+        assert f"{role}#hand_in_mouth" in split_tags(text)
+        assert not {"hand_in_mouth", "hand in mouth", "(hand in mouth:1.3)"} & set(split_tags(text))
+        assert "角色" in text
+    assert "open_mouth" in rows[1]["prompt"]
+
+
 @pytest.mark.parametrize("defect", ["position", "identity", "json"])
 def test_interaction_downgrade_does_not_bypass_required_structure_or_identity(defect):
     from dataclasses import replace
@@ -261,6 +292,42 @@ def test_nai_shared_named_outfit_anchor_is_not_filtered_from_second_wearer():
     assert result.final_prompt, result.summary
     assert len(calls) == 2
     assert all("aurora_academy_attire" in row["prompt"] for row in result.summary["nai_characters"])
+
+
+@pytest.mark.parametrize("separate_panels", [False, True])
+def test_nai_final_crop_filters_inherited_outfit_per_instance(separate_panels):
+    from danbooru_semantic import SemanticAnchor
+    from tag_cleaner import split_tags
+
+    class SharedOutfit(Resolver):
+        def cached_named_outfits_for_prompt(self, prompt):
+            return SemanticLookupResult(
+                named_outfit_tags=("aurora_academy_attire",),
+                anchors=(SemanticAnchor("uniform", "outfit", "outfit", "命名校服", "",
+                                        ("aurora_academy_attire",)),),
+                anchor_outfit_profiles=(("uniform", "aurora_academy_attire",
+                                        ("white_shirt", "green_skirt", "black_shoes"), "default"),),
+            )
+
+    result, calls = run(
+        "-r 角色甲和角色乙穿命名校服", {"characters": [
+            semantic_character("角色甲", "命名校服"), semantic_character("角色乙", "命名校服"),
+        ]}, plan([
+            ("character_a", "girl, aurora_academy_attire, white_shirt, green_skirt, green_plaid_skirt, black_shoes, upper_body, close-up, 角色甲上半身入镜。", .3),
+            ("character_b", "girl, aurora_academy_attire, white_shirt, green_skirt, black_shoes, "
+             + ("full_body, 角色乙全身入镜。" if separate_panels else "upper_body, 角色乙上半身入镜。"), .7),
+        ], "2girls, two_panels" if separate_panels else "2girls, upper_body"), resolver=SharedOutfit(),
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    a, b = result.summary["nai_characters"]
+    assert "white_shirt" in split_tags(a["prompt"])
+    assert not {"green_skirt", "green_plaid_skirt", "black_shoes"} & set(split_tags(a["prompt"]))
+    if separate_panels:
+        assert {"green_skirt", "black_shoes"} <= set(split_tags(b["prompt"]))
+    else:
+        assert not {"green_skirt", "black_shoes"} & set(split_tags(b["prompt"]))
+    assert result.summary["nai_composition_omitted_tags"]
 
 
 def test_nai_ordinary_shirt_survives_shared_uniform_components_and_old_cache():

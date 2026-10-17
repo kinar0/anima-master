@@ -144,8 +144,10 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
         if segment.strip()
     }
 
-    def english_group(group: str) -> bool:
+    def english_group(group: str, *, skip_closeup: bool = False) -> bool:
         for tag in _FRAMING_TAG_GROUPS[group]:
+            if skip_closeup and tag == "close up":
+                continue
             if group in {"upper", "lower"}:
                 # Body-region words also occur in nudity/mutation prose. Treat
                 # them as framing only when they are standalone tags or carry a
@@ -174,7 +176,7 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
         r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)|"
         r"(?P<part2>上半身|下半身|头部|脸部|面部|眼部|嘴部|头发|手部|双手|"
         r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)"
-        r"(?:肖像|人像|构图|镜头|特写|入镜|可见|出镜|聚焦|视图|画面)",
+        r"(?:肖像|人像|构图|镜头|特写|入镜|可见|出镜|聚焦|视图|画面|为主体)",
         re.I,
     )
     chinese_parts = {
@@ -205,7 +207,14 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
     if boundary_frame:
         frame = boundary_frame
     elif (
-        english_group("head")
+        # A close view can still show the upper body or the whole figure.
+        # Explicit visible extent outranks the generic distance adjective;
+        # otherwise "upper_body, close-up" wrongly strips shirts and jackets.
+        english_group("head", skip_closeup=(
+            any(english_group(group) for group in _FRAMING_TAG_GROUPS if group != "head")
+            or bool(chinese_parts & {"上半身", "下半身", "腿部", "大腿", "臀部", "脚部", "足部", "双脚", "双足", "手部", "双手", "腹部", "肚脐"})
+            or bool(re.search(r"\bfull body\b|全身", normalized))
+        ))
         or "头像" in raw
         or bool(chinese_parts & {"头部", "脸部", "面部", "眼部", "嘴部", "头发"})
     ):

@@ -163,8 +163,10 @@ def test_nai_contact_state_belongs_to_mouth_owner_not_hand_owner(source_index):
     target = result.summary["nai_characters"][1-source_index]
     assert "hand_in_mouth" not in split_tags(source["prompt"])
     assert "source#hand_in_mouth" in split_tags(source["prompt"])
-    assert "hand_in_mouth" in split_tags(target["prompt"])
+    assert "hand_in_mouth" not in split_tags(target["prompt"])
     assert "target#hand_in_mouth" in split_tags(target["prompt"])
+    assert "mouth_open" in split_tags(target["prompt"])
+    assert "嘴里有同伴伸入的手" in target["prompt"]
 
 
 def test_nai_self_contact_and_anatomy_direction_tags_survive_profile_filtering():

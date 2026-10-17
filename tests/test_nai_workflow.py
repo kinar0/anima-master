@@ -79,13 +79,13 @@ def test_uncertain_direction_group_preserves_valid_other_actions_and_opaque_pros
     assert parsed["characters"][0]["interaction_tags"] == ["source#helping_up"]
     assert parsed["characters"][1]["interaction_tags"] == ["target#helping up"]
     assert "source#waving" not in parsed["characters"][0]["prompt"]
-    for text in ("helping up", "(white shirt:1.2)", "扶起B并挥手。NAILITERAL0000TOKEN"):
+    for text in ("source#helping_up", "(white shirt:1.2)", "扶起B并挥手。NAILITERAL0000TOKEN"):
         assert text in parsed["characters"][0]["prompt"]
     assert parsed["dropped_interaction_tags"] == ["source#waving"]
 
 
 @pytest.mark.parametrize("action", ["holding_hands", "hug", "helping_up"])
-def test_directional_action_keeps_ordinary_action_and_relation_prose(action):
+def test_directional_action_deduplicates_ordinary_action_and_keeps_relation_prose(action):
     from tag_cleaner import split_tags
     parsed = parse_nai_character_plan(json.dumps({
         "composition_analysis": {"viewpoint": "side", "layout": "pair", "relations": "contact"},
@@ -100,14 +100,61 @@ def test_directional_action_keeps_ordinary_action_and_relation_prose(action):
         ],
     }, ensure_ascii=False))
     source, target, individual = parsed["characters"]
+    assert downgrade_nai_interaction_tags(parsed) == ()
     for row, role in ((source, "source"), (target, "target")):
         tags = split_tags(row["prompt"])
-        assert action in tags or action.replace('_', ' ') in tags
+        assert action not in tags and action.replace('_', ' ') not in tags
         assert f"{role}#{action}" in tags
     assert "holding a spoon" in source["prompt"] and "用手帮助B" in source["prompt"]
     assert "mouth_open" in target["prompt"] and "接受A的帮助" in target["prompt"]
     assert action in split_tags(individual["prompt"])
     assert missing_nai_noun_tags(parsed, (action,)) == ()
+
+
+@pytest.mark.parametrize("action", ["hand_in_mouth", "examining_unseen_detail", "hug"])
+def test_paired_actions_remove_only_exact_duplicates_after_downgrade(action):
+    from tag_cleaner import split_tags
+    ordinary = action.replace("_", " ")
+    parsed = parse_nai_character_plan(json.dumps({
+        "composition_analysis": dict(viewpoint="close", layout="contact", relations="A acts on B"),
+        "global_prompt": f"3girls, bed, {action}",
+        "characters": [
+            dict(name="A", prompt=f"girl, ({ordinary}:1.2), {action}_focus, A帮助B。",
+                 interaction_tags=[f"source#{action}"], position_reason="near B", x=.4, y=.5),
+            dict(name="B", prompt=f"girl, {action}, open_mouth, B接受A的帮助。",
+                 interaction_tags=[f"target#{action}"], position_reason="near A", x=.6, y=.5),
+            dict(name="C", prompt=f"girl, {action}, C独自做动作。", interaction_tags=[],
+                 position_reason="separate", x=.8, y=.7),
+        ],
+    }, ensure_ascii=False))
+    assert downgrade_nai_interaction_tags(parsed) == ()
+    a, b, c = parsed["characters"]
+    assert f"({ordinary}:1.2)" not in split_tags(a["prompt"])
+    assert action not in split_tags(b["prompt"])
+    assert action in split_tags(c["prompt"])
+    assert f"{action}_focus" in a["prompt"]
+    assert "open_mouth" in b["prompt"] and "A帮助B。" in a["prompt"]
+    assert action not in split_tags(parsed["global_prompt"])
+    records = list(parsed["dropped_redundant_action_tags"])
+    assert downgrade_nai_interaction_tags(parsed) == ()
+    assert parsed["dropped_redundant_action_tags"] == records
+
+
+def test_uncertain_pair_retains_ordinary_body_state_and_does_not_guess_synonyms():
+    parsed = parse_nai_character_plan(json.dumps({
+        "composition_analysis": dict(viewpoint="close", layout="pair", relations="contact"),
+        "global_prompt": "2girls, bed",
+        "characters": [
+            dict(name="A", prompt="girl, finger_in_mouth, 自己的手指放在嘴里。",
+                 interaction_tags=["source#finger_in_mouth"], position_reason="left", x=.4, y=.5),
+            dict(name="B", prompt="girl, hand_in_mouth, 接触关系不明确。",
+                 interaction_tags=["target#hand_in_mouth"], position_reason="right", x=.6, y=.5),
+        ],
+    }, ensure_ascii=False))
+    assert downgrade_nai_interaction_tags(parsed)
+    assert "finger_in_mouth" in parsed["characters"][0]["prompt"]
+    assert "hand_in_mouth" in parsed["characters"][1]["prompt"]
+    assert parsed["dropped_redundant_action_tags"] == []
 
 
 def test_direct_writer_reviews_composition_tag_ownership_and_directions_in_one_call():
@@ -148,7 +195,11 @@ def test_nai_writer_contract_separates_counts_and_requires_chinese_prompt_prose(
     assert "whose limb contacts whose body part" in instruction
     assert "A source prefix grants agency, not ownership" in instruction
     assert "only to the owner of the affected body part" in instruction
-    assert "Both may keep an ordinary action only when" in instruction
+    assert "without repeating the same action as a bare or weighted" in instruction
+    assert "A shared outfit does not imply shared personal accessories" in instruction
+    assert "First identify the visual focus" in instruction
+    assert "compare close cropping, an oblique view and an over-shoulder" in instruction
+    assert "closed or clenched mouth" in instruction
     assert "Include scene-level prose stating who is where" in instruction
     assert "For a Chinese request this prose is Chinese" in instruction
     assert "Add lighting descriptions only when requested" in instruction

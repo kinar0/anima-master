@@ -559,6 +559,61 @@ def test_live_nai_chinese_and_per_instance_ownership(live_pipeline, tmp_path, ca
                    for term in ("white dress", "白色连衣裙"))
 
 
+@pytest.mark.parametrize("case,prompt,recipient", [
+    ("reported", "-r 千早爱音羽丘校服，被丰川祥子羽丘校服摁在床上，两人对视，千早爱音抗拒表情，丰川祥子一脸戏谑，丰川祥子手塞进千早爱音嘴里摸虎牙", "chihaya_anon"),
+    ("reversed", "-r 千早爱音和丰川祥子穿羽丘校服。千早爱音用手指轻触丰川祥子嘴里的虎牙，祥子张嘴让爱音检查。", "togawa_sakiko"),
+    ("different_people", "-r 高松灯穿羽丘校服，若叶睦穿月之森校服。灯用手指轻触睦嘴里的虎牙，睦张嘴让灯检查。", "wakaba_mutsumi"),
+    ("individual", "-r 千早爱音穿羽丘校服，自己把手指放在自己嘴里碰虎牙，正面上半身构图。", "chihaya_anon"),
+    ("explicit_camera", "-r 单幅侧面全身构图。千早爱音和丰川祥子穿羽丘校服，面对面站立，祥子用手指轻触爱音嘴里的虎牙，爱音张嘴。保持侧面全身构图。", "chihaya_anon"),
+])
+def test_live_nai_focal_contact_and_canonical_tags(live_pipeline, tmp_path, case, prompt, recipient):
+    """Preserve raw/final evidence for manual camera and contact review too."""
+    from tag_cleaner import normalize_tag_key, split_tags
+    from agent_tools.comfyui_workflows import custom_t2i_workflow
+
+    live_pipeline[0].config["debug_prompt_enabled"] = True
+    result, calls = _build(live_pipeline, prompt, canvas_size=(1216, 832))
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    graph = custom_t2i_workflow(
+        {"custom_workflow_path": "nai_api.json"}, result.final_prompt, "blurry",
+        1216, 832, 28, 6, 123, nai_characters=result.summary.get("nai_characters", []),
+    ) if result.final_prompt else {}
+    (report_dir / f"contact_{case}.json").write_text(json.dumps({
+        "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt, "workflow": graph,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    assert result.final_prompt, result.summary.get("llm_error")
+    assert len(calls) == 2
+    raw = json.loads(result.summary["nai_character_plan_raw"])
+    for rows in (raw["characters"], result.summary["nai_characters"]):
+        for row in rows:
+            atoms = {normalize_tag_key(p) for p in split_tags(row["prompt"])}
+            assert not atoms & {"fangs", "clenched teeth", "closed mouth"}, row
+            if row["name"] == recipient:
+                assert "fang" in atoms, row
+            elif case != "individual":
+                assert not atoms & {"hand in mouth", "finger in mouth", "fingers in mouth"}, row
+            if case in {"reported", "reversed", "explicit_camera", "individual"} and row["name"] == "chihaya_anon":
+                assert not atoms & {"hair ribbon", "hair bow", "yellow bow", "black ribbon"}, row
+            assert _CJK_RE.search(row["prompt"]), row
+    # Exact matching duplicate suppression is deterministic, regardless of the
+    # writer's compliance. The raw reply remains available for separate review.
+    for row in result.summary["nai_characters"]:
+        atoms = {normalize_tag_key(p) for p in split_tags(row["prompt"])}
+        for action in row["interaction_tags"]:
+            assert normalize_tag_key(action.partition("#")[2]) not in atoms, row
+    if case == "individual":
+        assert not result.summary["nai_characters"][0]["interaction_tags"]
+    if case == "explicit_camera":
+        assert "full body" in {normalize_tag_key(p) for p in split_tags(result.final_prompt)}
+    if case == "reported":
+        assert "嘴" in raw["global_prompt"]
+    selector = graph[graph["1"]["inputs"]["characterPrompts"][0]]["inputs"]
+    for i, row in enumerate(result.summary["nai_characters"], 1):
+        assert graph[selector[f"character{i}"][0]]["inputs"]["comfyui_prompt"] == row["prompt"]
+
+
 @pytest.mark.parametrize("case,prompt", [
     ("joint_reach", "-r 单幅横向构图，三分之四侧视图。千早爱音穿白衬衫站在左边，丰川祥子穿黑色外套站在右边，两人靠近面对面。爱音同时用左手扶住祥子的右肩、右手握住祥子的左手，两项接触都要入镜。"),
     ("seated_support", "-r 单幅侧视全身构图。千早爱音穿白色连衣裙坐在左侧椅子上，丰川祥子穿黑色外套在右侧地上单膝跪地，面朝爱音。祥子一只手握着爱音的手，另一只手托住爱音的肘部，同时完成两项动作。"),

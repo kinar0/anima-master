@@ -1,0 +1,43 @@
+{
+  "task_id": "749424e078d742adaf97a775e4bf4361",
+  "time": "2026-10-17T12:36:12.408833",
+  "original_prompt": "-r 千早爱音羽丘校服，被丰川祥子羽丘校服摁在床上，两人对视，千早爱音抗拒表情，丰川祥子一脸戏谑，丰川祥子手塞进千早爱音嘴里摸虎牙 #houkisei",
+  "noun_tags": [
+    "on_bed",
+    "eye_contact",
+    "school_uniform",
+    "fang"
+  ],
+  "global_prompt": "nsfw, masterpiece, best quality, questionable, 2girls, indoors, bedroom, mattress, bed sheet, from above, 床上场景, 千早爱音与丰川祥子都穿着羽丘校服, 丰川祥子把千早爱音按在床上, 两人对视, 丰川祥子一只手塞进千早爱音嘴里摸着她的虎牙。",
+  "characters": [
+    {
+      "anchor_id": "target_1",
+      "source_text": "千早爱音羽丘校服，被丰川祥子羽丘校服摁在床上，两人对视，千早爱音抗拒表情",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, black_socks, hair_ribbon, fang, on_bed, lying_on_back, facing_away, eye_contact, resisting, distressed, clenched_teeth, parted_lips, hand_in_mouth, 千早爱音穿着羽丘校服仰躺在床上, 被丰川祥子按在床面, 脸朝向对方与祥子对视, 露出抗拒和不适的表情, 嘴唇被撑开, 虎牙可见。, target#hand_in_mouth",
+      "interaction_tags": [
+        "target#hand_in_mouth"
+      ],
+      "position_reason": "Anon lies under Sakiko at lower left, face turned up-right to meet Sakiko's gaze; her mouth is at the height Sakiko's hand can reach while pinning her.",
+      "x": 0.36,
+      "y": 0.6
+    },
+    {
+      "anchor_id": "target_2",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, long_hair, blue_hair, yellow_eyes, sidelocks, two_side_up, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, black_socks, hair_ribbon, on_bed, straddling, leaning_forward, looking_down, eye_contact, smug, smirk, hand_in_mouth, 丰川祥子穿着羽丘校服俯身在床上, 把千早爱音按住, 脸带戏谑的笑意低头与她对视, 一只手伸进爱音嘴里摸她的虎牙。, source#hand_in_mouth, yellow_eyes_blue_hair",
+      "interaction_tags": [
+        "source#hand_in_mouth"
+      ],
+      "position_reason": "Sakiko is placed above and slightly right, leaning over Anon; this lets her arms pin Anon's shoulders while her right hand reaches Anon's mouth at lower left for the fang touch.",
+      "x": 0.6,
+      "y": 0.36
+    }
+  ],
+  "composition_analysis": {
+    "viewpoint": "Top-down/three-quarter view onto a bed, both girls visible and face to face on the mattress.",
+    "layout": "Landscape canvas; Sakiko above/over Anon, pinning her down on the bed. Anon's head to lower left, Sakiko's upper right; their faces close for eye contact. Sakiko's right hand reaches down into Anon's mouth.",
+    "relations": "togawa_sakiko presses chihaya_anon onto the bed (source#pinning, source#on_bed contact); togawa_sakiko inserts her own hand into chihaya_anon's mouth, touching Anon's fang (source#hand_in_mouth on Sakiko, target#hand_in_mouth on Anon; bare fang owned by Anon); mutual eye_contact between them."
+  },
+  "debug_raw_available": false
+}

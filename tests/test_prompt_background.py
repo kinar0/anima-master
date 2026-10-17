@@ -46,6 +46,18 @@ def test_background_marker_is_removed_before_tag_processing() -> None:
     assert "background_mode" not in tags
 
 
+def test_closeup_respects_explicit_visible_body_extent():
+    for text in ("upper_body, close-up", "close-up, 画面以两人上半身为主体"):
+        hidden = framing_hidden_outfit_slots(text)
+        assert "lower_body.skirt" in hidden
+        assert "upper_body.primary" not in hidden
+        assert "outerwear" not in hidden
+    assert not framing_hidden_outfit_slots("full_body, close-up")
+    assert framing_hidden_outfit_slots("hand_focus, close-up") == framing_hidden_outfit_slots("hand_focus")
+    assert framing_hidden_outfit_slots("navel_focus, close-up") == framing_hidden_outfit_slots("navel_focus")
+    assert "upper_body.primary" in framing_hidden_outfit_slots("face_focus, close-up")
+
+
 def test_user_explicit_indoor_background_overrides_default_portrait() -> None:
     assert user_requests_explicit_background("画一个女孩，日式室内背景") is True
     assert user_requests_explicit_background("两个女孩在泳池边站在一起") is True

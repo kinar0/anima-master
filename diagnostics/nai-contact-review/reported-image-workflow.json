@@ -1,0 +1,118 @@
+{
+  "1": {
+    "class_type": "NovelAIGenerator",
+    "inputs": {
+      "prompt": [
+        "9",
+        0
+      ],
+      "negative_prompt": [
+        "12",
+        0
+      ],
+      "model": "NAI Diffusion V5 Full",
+      "width": 1216,
+      "height": 832,
+      "sampler": "k_euler",
+      "steps": 28,
+      "cfg_scale": 5.0,
+      "seed": 3254311794,
+      "scheduler": "karras",
+      "cfg_rescale": 0.0,
+      "prefer_brownian": false,
+      "variety_boost": true,
+      "limit_opus_free": false,
+      "characterPrompts": [
+        "13",
+        0
+      ]
+    }
+  },
+  "3": {
+    "class_type": "Textbox",
+    "inputs": {
+      "text": "nsfw, masterpiece, best quality, questionable, 2girls, indoors, bedroom, mattress, bed sheet, from above, 床上场景, 千早爱音与丰川祥子都穿着羽丘校服, 丰川祥子把千早爱音按在床上, 两人对视, 丰川祥子一只手塞进千早爱音嘴里摸着她的虎牙。, houkisei"
+    }
+  },
+  "9": {
+    "class_type": "ComfyUIToNovelAIV4",
+    "inputs": {
+      "comfyui_prompt": [
+        "3",
+        0
+      ]
+    }
+  },
+  "11": {
+    "class_type": "Textbox",
+    "inputs": {
+      "text": "worst quality, low quality, score 1, score 2, score 3, artist name, watermark, signature, (bad hands:1.5), missing fingers, (extra fingers:1.5), (bad feet:1.5), extra limbs, (extra toes:1.5),  (missing limb:1.5), censor, censored, (male:1.5), (dark-skinned male:1.5), (1boy:1.5), lowres, bad anatomy, sepia, white haze, artistic error, worst quality, very displeasing, jpeg artifacts, (ai-generated:0), (aini:0.9), (furry:0.8), "
+    }
+  },
+  "12": {
+    "class_type": "ComfyUIToNovelAIV4",
+    "inputs": {
+      "comfyui_prompt": [
+        "11",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "SaveImage",
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ],
+      "filename_prefix": "astrbot/2026-10-17/549240449/1017123623"
+    }
+  },
+  "14": {
+    "class_type": "ComfyUIToNovelAIV4",
+    "inputs": {
+      "comfyui_prompt": "girl, chihaya_anon, long_hair, pink_hair, grey_eyes, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, black_socks, hair_ribbon, fang, on_bed, lying_on_back, facing_away, eye_contact, resisting, distressed, clenched_teeth, parted_lips, hand_in_mouth, 千早爱音穿着羽丘校服仰躺在床上, 被丰川祥子按在床面, 脸朝向对方与祥子对视, 露出抗拒和不适的表情, 嘴唇被撑开, 虎牙可见。, target#hand_in_mouth"
+    }
+  },
+  "15": {
+    "class_type": "ComfyUIToNovelAIV4",
+    "inputs": {
+      "comfyui_prompt": "girl, togawa_sakiko, long_hair, blue_hair, yellow_eyes, sidelocks, two_side_up, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, black_socks, hair_ribbon, on_bed, straddling, leaning_forward, looking_down, eye_contact, smug, smirk, hand_in_mouth, 丰川祥子穿着羽丘校服俯身在床上, 把千早爱音按住, 脸带戏谑的笑意低头与她对视, 一只手伸进爱音嘴里摸她的虎牙。, source#hand_in_mouth, yellow_eyes_blue_hair"
+    }
+  },
+  "13": {
+    "class_type": "CharacterPromptSelect",
+    "inputs": {
+      "character1_uc": "",
+      "character1_x": 0.36,
+      "character1_y": 0.6,
+      "character1": [
+        "14",
+        0
+      ],
+      "character2_enable": true,
+      "character2_uc": "",
+      "character2_x": 0.6,
+      "character2_y": 0.36,
+      "character2": [
+        "15",
+        0
+      ],
+      "character3_enable": false,
+      "character3_uc": "",
+      "character3_x": 0.5,
+      "character3_y": 0.5,
+      "character3": "",
+      "character4_enable": false,
+      "character4_uc": "",
+      "character4_x": 0.5,
+      "character4_y": 0.5,
+      "character4": "",
+      "character5_enable": false,
+      "character5_uc": "",
+      "character5_x": 0.5,
+      "character5_y": 0.5,
+      "character5": ""
+    }
+  }
+}
