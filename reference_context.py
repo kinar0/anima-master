@@ -4,6 +4,11 @@ from typing import Any
 
 from astrbot.api.event import AstrMessageEvent
 
+try:
+    from .llm_diagnostics import LLMDiagnostics
+except ImportError:
+    from llm_diagnostics import LLMDiagnostics
+
 
 class ReferenceContextBuilder:
     """Build prompt-ready context from a referenced image."""
@@ -17,6 +22,7 @@ class ReferenceContextBuilder:
         logger: Any,
         get_int: Callable[[str, int], int],
         shorten: Callable[[str, int], str],
+        get_bool: Callable[[str, bool], bool] | None = None,
     ):
         """Create a reference context builder.
 
@@ -27,6 +33,7 @@ class ReferenceContextBuilder:
             logger: Logger-like object used for diagnostics.
             get_int: Config integer getter.
             shorten: Function used to shorten long debug strings.
+            get_bool: Optional plugin debug-switch getter.
         """
         self._context = context
         self._run_prompt_tool = run_prompt_tool
@@ -34,6 +41,7 @@ class ReferenceContextBuilder:
         self._logger = logger
         self._get_int = get_int
         self._shorten = shorten
+        self._llm_diagnostics = LLMDiagnostics(logger, get_bool or (lambda _key, default: default))
         self._last_summary: ContextVar[dict[str, Any]] = ContextVar(
             f"anima_reference_summary_{id(self)}",
             default={},
@@ -110,7 +118,9 @@ class ReferenceContextBuilder:
             "不要臆造网页出处，不要输出中文。"
         )
         try:
-            response = await self._context.llm_generate(
+            self._llm_diagnostics.start_run()
+            response = await self._llm_diagnostics.generate(
+                self._context, stage="image_reverse",
                 chat_provider_id=provider_id,
                 prompt=prompt,
                 image_urls=[image_input],

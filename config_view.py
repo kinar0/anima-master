@@ -76,6 +76,8 @@ CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
         "verify_pass_score",
         "max_verify_retry",
         "debug_prompt_enabled",
+        "debug_llm_reasoning_enabled",
+        "debug_llm_usage_enabled",
         "debug_image_reference_enabled",
         "debug_send_payload_enabled",
     ),
@@ -156,7 +158,7 @@ def build_config_debug_lines(
         f"- 工作流：{_str(config, 'custom_workflow_path') if _bool(config, 'custom_workflow_enabled', False) else _str(config, 'workflow', 'anima_t2i')}",
         f"- 默认尺寸：{_int(config, 'width', 1024)}x{_int(config, 'height', 1536)}",
         f"- 模型：UNET={_str(config, 'unet_name', '') or '未配置'}，CLIP={_str(config, 'clip_name', '') or '未配置'}，VAE={_str(config, 'vae_name', '') or '未配置'}",
-        f"- 调试开关：prompt={_bool(config, 'debug_prompt_enabled', False)}，reference={_bool(config, 'debug_image_reference_enabled', False)}，send={_bool(config, 'debug_send_payload_enabled', False)}",
+        f"- 调试开关：prompt={_bool(config, 'debug_prompt_enabled', False)}，reasoning={_bool(config, 'debug_llm_reasoning_enabled', False)}，usage={_bool(config, 'debug_llm_usage_enabled', False)}，reference={_bool(config, 'debug_image_reference_enabled', False)}，send={_bool(config, 'debug_send_payload_enabled', False)}",
         f"- 上次任务：{task_path if task_exists else '暂无'}",
     ]
     lines.extend(

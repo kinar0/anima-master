@@ -216,6 +216,7 @@ class SemanticAppearanceChange:
     source_text: str
     dimensions: tuple[str, ...] = ()
     operation: str = "unspecified"
+    reference_character: str = ""
 
 
 @dataclass(frozen=True)
@@ -252,6 +253,7 @@ class SemanticLookupResult:
     candidate_tags: tuple[str, ...] = ()
     anchors: tuple[SemanticAnchor, ...] = ()
     status: str = "not_available"
+    profile_copyrights: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     def prompt_context(
         self,
@@ -408,7 +410,7 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
     )
     return (
         "List each visible character once. " + count_contract +
-        "A character used only as a cosplay or "
+        "A character used only as an appearance, cosplay or "
         "clothing reference is not visible. Copy all text values exactly from the "
         "request; never translate, guess tags, or fill missing clothes.\n\n"
         "Return only:\n"
@@ -428,7 +430,10 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "null. For A cosplay C or A wearing C's clothes (including A穿C衣服 "
         "without 的), A is the wearer and C is clothing_source; clothing still "
         "copies the full original garment/source phrase. A clothing donor is not "
-        "a visible instance unless independently present in the scene.\n"
+        "a visible instance unless independently present in the scene. A reference "
+        "to someone's hair, eyes, body feature or other appearance is NOT clothing: "
+        "keep clothing and clothing_source null unless clothes are independently "
+        "requested. Never put a hair/appearance phrase into clothing.\n"
         "clothing_changes = explicit changes only. Every item MUST be an object "
         "with operation, slots, color, source_text; source_text must be exact. "
         "operation MUST be one of remove, damage, replace_color, recolor_all, add, "
@@ -444,7 +449,13 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "dimension (eye_color, hair_color, hair_length, hair_style, skin_color, "
         "chest_size, animal_ears, tail, horns, age_presentation, or "
         "gender_presentation), operation (replace, additive, or omit), and exact "
-        "source_text; do not output tags. Use omit when the user says a visible "
+        "source_text, plus reference_character (the exact name of the person whose "
+        "feature is copied, otherwise null); do not output tags. Copying B's "
+        "hairstyle/eye color/horns onto A changes only the stated dimension of A. "
+        "B is an appearance reference, not an outfit donor or an additional visible "
+        "person unless independently present. Clothing and appearance references "
+        "may differ in the same request. Do not infer unstated source features or "
+        "accessories. Use omit when the user says a visible "
         "feature must not be drawn or must be completely hidden (for example, "
         "no visible eyes); this suppresses that dimension's saved profile. "
         "Do not use omit for missing highlights, a dull gaze, closed eyes, "
@@ -732,10 +743,12 @@ def parse_semantic_appearance_changes(
                 ).strip()
                 raw_dimensions = row.get("dimensions", row.get("dimension", ()))
                 raw_operation = str(row.get("operation") or "").strip().lower()
+                reference_character = str(row.get("reference_character") or "").strip()
             else:
                 source_text = str(row or "").strip()
                 raw_dimensions = ()
                 raw_operation = ""
+                reference_character = ""
             if not _appearance_source_is_grounded(source_text, user_prompt, name):
                 continue
             if isinstance(raw_dimensions, str):
@@ -773,7 +786,13 @@ def parse_semantic_appearance_changes(
             # absence; the dimension still comes from LLM1, not a host guess.
             if _explicit_eye_omission(source_text):
                 operation = "omit"
-            change = SemanticAppearanceChange(name, source_text, dimensions, operation)
+            # A source name elsewhere in the request cannot authorize copying its
+            # features. Keep unknown/ambiguous references as original prose only.
+            if reference_character and reference_character.casefold() not in source_text.casefold():
+                reference_character = ""
+            change = SemanticAppearanceChange(
+                name, source_text, dimensions, operation, reference_character
+            )
             if change not in changes:
                 changes.append(change)
     return tuple(changes)
@@ -786,6 +805,34 @@ def _candidate_values(item: dict[str, Any]) -> list[Any]:
         return values
     tag = item.get("tag")
     return [tag] if tag not in (None, "") else []
+
+
+def _appearance_reference_only_names(characters: list[Any], user_prompt: str) -> frozenset[str]:
+    """Names grounded exclusively inside another wearer's reference phrases.
+
+    This denies mandatory visibility, not a semantic decision about implied
+    participants. Any independently quoted occurrence keeps the visible row.
+    The original request still reaches the writer unchanged.
+    """
+    request = user_prompt.casefold()
+    spans: dict[str, list[tuple[int, int]]] = {}
+    for item in characters:
+        if not isinstance(item, dict) or not isinstance(item.get("appearance_changes"), list):
+            continue
+        for change in item["appearance_changes"]:
+            if not isinstance(change, dict):
+                continue
+            reference = str(change.get("reference_character") or "").strip().casefold()
+            phrase = str(change.get("source_text") or "").strip().casefold()
+            if not reference or reference not in phrase or reference == str(item.get("name") or "").casefold():
+                continue
+            spans.setdefault(reference, []).extend(
+                (match.start(), match.end()) for match in re.finditer(re.escape(phrase), request)
+            )
+    return frozenset(name for name, ranges in spans.items() if ranges and all(
+        any(start <= match.start() and match.end() <= end for start, end in ranges)
+        for match in re.finditer(re.escape(name), request)
+    ))
 
 
 def _simple_semantic_to_legacy(
@@ -809,6 +856,9 @@ def _simple_semantic_to_legacy(
         return data
     if intent_only:
         lookups = []
+        reference_only = _appearance_reference_only_names(characters, user_prompt)
+        characters = [item for item in characters if not isinstance(item, dict)
+                      or str(item.get("name") or "").strip().casefold() not in reference_only]
 
     def normalized_source(value: Any) -> str:
         return re.sub(r"\s+", " ", str(value or "").strip().lower())
@@ -820,6 +870,18 @@ def _simple_semantic_to_legacy(
             return legacy
         clothing = str(item.get("clothing") or "").strip()
         source = str(item.get("clothing_source") or "").strip()
+        # A copied identity alone is not garment evidence. A failed repair must
+        # not turn a hair/eye/etc. reference into an entire borrowed wardrobe.
+        appearance_evidence = tuple(
+            str(change.get("source_text") or "").casefold()
+            for change in item.get("appearance_changes", [])
+            if isinstance(change, dict)
+        ) if isinstance(item.get("appearance_changes"), list) else ()
+        if clothing and any(clothing.casefold() == evidence for evidence in appearance_evidence):
+            clothing = ""
+            source = ""
+        if source and not clothing:
+            source = ""
         changes = item.get("clothing_changes", item.get("changes", []))
         if source:
             kind = "outfit_source"
@@ -1203,6 +1265,7 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                 f"{expected_count} visible characters; got {len(characters)}"
             )
         request_has_parentheses = bool(re.search(r"[（(][^（）()]{1,120}[）)]", user_prompt))
+        reference_only = _appearance_reference_only_names(characters, user_prompt) if readable_intent else frozenset()
         for index, item in enumerate(
             characters[:MAX_SEMANTIC_CHARACTERS], start=1
         ):
@@ -1210,6 +1273,12 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                 issues.append(f"characters[{index}] must be an object")
                 continue
             name = str(item.get("name") or "").strip()
+            if name.casefold() in reference_only:
+                issues.append(
+                    f"characters[{index}]: {name} occurs only inside another person's "
+                    "appearance reference, without an independent visible occurrence. "
+                    "Keep it as reference_character, not a mandatory visible character."
+                )
             if not name or (
                 name not in user_prompt and name.lower() not in user_prompt.lower()
             ):
@@ -1245,6 +1314,12 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                             f"characters[{index}].{field} must be null or an exact "
                             "phrase from the request"
                         )
+                if item.get("clothing_source") and not item.get("clothing"):
+                    issues.append(
+                        f"characters[{index}].clothing_source requires an independent "
+                        "clothing phrase; appearance references belong in "
+                        "appearance_changes[].reference_character"
+                    )
                 for field in ("clothing_changes", "appearance_changes"):
                     value = item.get(field, [])
                     if not isinstance(value, list):
@@ -1303,6 +1378,19 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                                     "appearance dimension"
                                 )
                             source_text = str(change.get("source_text") or "").strip()
+                            reference = str(change.get("reference_character") or "").strip()
+                            if reference and reference.casefold() not in source_text.casefold():
+                                issues.append(
+                                    f"characters[{index}].appearance_changes"
+                                    f"[{change_index}].reference_character must occur "
+                                    "inside that change's source_text"
+                                )
+                            if source_text and str(item.get("clothing") or "").casefold() == source_text.casefold():
+                                issues.append(
+                                    f"characters[{index}].clothing must not reuse "
+                                    "an appearance-only change as garment evidence; "
+                                    "separate the independently requested clothes"
+                                )
                             if not _appearance_source_is_grounded(
                                 source_text, user_prompt, name
                             ):
@@ -2175,6 +2263,7 @@ def merge_semantic_results(
         status = statuses[-1] if statuses else "not_available"
     return SemanticLookupResult(
         confirmed_tags=merged("confirmed_tags"),
+        profile_copyrights=merged("profile_copyrights"),
         outfit_source_tags=merged("outfit_source_tags"),
         outfit_profile_tags=merged("outfit_profile_tags"),
         appearance_profile_tags=merged("appearance_profile_tags"),

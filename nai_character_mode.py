@@ -15,10 +15,10 @@ except ImportError:
 
 try:
     from .tag_cleaner import split_tags, display_tag_text, normalize_tag_key
-    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
+    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY, VISUAL_FOCUS_POLICY
 except ImportError:  # pragma: no cover - direct script-style imports.
     from tag_cleaner import split_tags, display_tag_text, normalize_tag_key
-    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
+    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY, VISUAL_FOCUS_POLICY
 
 
 _R_SWITCH = re.compile(r"(?<!\S)-r(?=$|[\s,，;；])", re.I)
@@ -34,7 +34,9 @@ name alone is not a tag anchor. Add verified visible components when known, with
 guessing unknown ones. Saved defaults are soft references
 only when clothing is unstated. Express visible parts, not a full component checklist.
 Never restore removed/replaced clothes, assign another wearer's clothes, or copy a
-donor's appearance. Unresolved explicit clothing does not permit default fallback.
+donor's appearance without a separately grounded, dimension-scoped appearance edit.
+An appearance reference alone never grants clothing-source authority.
+Unresolved explicit clothing does not permit default fallback.
 """
 
 
@@ -125,7 +127,8 @@ def strip_nai_character_switch(prompt: str) -> tuple[bool, str]:
     enabled = bool(_R_SWITCH.search(text))
     if enabled:
         text = _R_SWITCH.sub(" ", text)
-    return enabled, re.sub(r"\s+", " ", text).strip(" ,，;；")
+        return True, re.sub(r"\s+", " ", text).strip(" ,，;；")
+    return False, text.strip()
 
 
 def resolve_nai_canvas(
@@ -238,7 +241,15 @@ def build_nai_character_plan_prompt(
         "reliable tag. Do not copy example content into unrelated scenes.\n"
         "Instances and evidence:\n"
         "Create one entry per visible instance, including anonymous people and "
-        "each appearance of a repeated identity in different panels. Do not add "
+        "each appearance of a repeated identity in different panels. "
+        "Merge neither prompts nor positions across panels, including pages without "
+        "text. Identity-level evidence rows are reusable references, not a limit "
+        "on characters-array length: two identities appearing together in two panels "
+        "need four instance objects, each with its own prompt and centre. "
+        "For a multi-panel instance, source_text may identify its exact panel-local "
+        "request clause even without appearance/clothing edits; additional shared "
+        "requirements may be separate excerpts, but do not collect other panels' "
+        "local scenes into this instance. Do not add "
         "visible people from viewer, quoted names or off-screen clothing sources. "
         "Use the same confirmed canonical spelling in name and prompt; anonymous "
         "people use a short identity, not an invented canonical tag. "
@@ -246,7 +257,8 @@ def build_nai_character_plan_prompt(
         "anchor_id; never choose by array order. For repeated identities with "
         "locally recorded clothing edits or appearance changes, source_text must "
         "quote the exact applicable request clause, or an array of exact clauses "
-        "for shared and local requirements. Otherwise leave it empty. Quote in "
+        "for shared and local requirements. Otherwise it may be empty unless used "
+        "to identify the instance's panel as above. Quote in "
         "the original language, without translation, paraphrase or joining "
         "non-contiguous text. User-specified instance differences override "
         "identity-level baselines.\n"
@@ -418,7 +430,7 @@ def build_nai_character_plan_prompt(
         "in composition_analysis.relations "
         "as brief actor/action/recipient/body-owner statements, covering every "
         "requested interaction and marking any unresolved owner.\n"
-        + APPEARANCE_VISIBILITY_POLICY
+        + APPEARANCE_VISIBILITY_POLICY + VISUAL_FOCUS_POLICY
         + f"\nActual canvas: {width}x{height} pixels, aspect ratio "
         f"{canvas['aspect_ratio']} ({canvas['orientation']}); "
         f"width/height={width / height:.4f}. "
@@ -427,6 +439,36 @@ def build_nai_character_plan_prompt(
         + f"\nUser request:\n{user_prompt}\n"
         f"Local character evidence:\n{final_prompt}"
     )
+
+
+def reconcile_nai_instance_population(plan: dict[str, Any]) -> dict[str, Any] | None:
+    """Count accepted instances, never unique identities or comic panels.
+
+    Gender comes only from each instance's standalone gender tag; any unknown
+    or conflicting instance uses a neutral total instead of guessing identity.
+    """
+    genders = []
+    for character in plan["characters"]:
+        values = {normalize_tag_key(part) for part in split_tags(character["prompt"])} & {"girl", "boy", "other"}
+        genders.append(next(iter(values)) if len(values) == 1 else "other")
+    if not genders:
+        population = ["no humans"]
+    elif "other" in genders:
+        population = [f"{len(genders)}people"]
+    else:
+        population = [f"{count}{gender if count == 1 else gender + 's'}"
+                      for gender in ("girl", "boy") if (count := genders.count(gender))]
+    previous, retained = [], []
+    for part in split_tags(plan["global_prompt"]):
+        key = normalize_tag_key(part)
+        if key == "no humans" or re.fullmatch(r"\d+\s*(?:girls?|boys?|others?|people|persons?)", key):
+            previous.append(part)
+        else:
+            retained.append(part)
+    plan["global_prompt"] = ", ".join((*population, *retained))
+    if [normalize_tag_key(part) for part in previous] == population:
+        return None
+    return {"previous": previous, "current": population, "instance_count": len(genders)}
 
 
 def _nai_interaction_issues_by_action(plan: dict[str, Any]) -> dict[str, tuple[str, ...]]:
@@ -677,6 +719,7 @@ def parse_nai_character_plan(
     if not global_clean:
         raise ValueError("nai_character_plan_missing_global_prompt")
     result = {
+        "identity_review": data.get("identity_review", []),
         "composition_analysis": {
             key: analysis[key].strip() for key in ("viewpoint", "layout", "relations")
         },

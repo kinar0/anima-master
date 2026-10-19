@@ -704,6 +704,7 @@ class DanbooruResolver:
         scoped_appearances: dict[
             str, tuple[list[str], list[str]]
         ] = {}
+        profile_copyrights: list[tuple[str, tuple[str, ...]]] = []
         profile_items = [
             (str(profile_key), profile)
             for profile_key, profile in self._profile_data().get("profiles", {}).items()
@@ -835,6 +836,10 @@ class DanbooruResolver:
             identity_sources = tuple(profile.get("owner_tags") or sources)
             if evidence.get("source_category") == 0 and not profile.get("owner_tags"):
                 identity_sources = ()
+            profile_copyrights.extend(
+                (owner, tuple(str(tag).strip() for tag in profile.get("copyright_tags", [])
+                              if str(tag).strip())) for owner in identity_sources
+            )
             for tag in (*identity_sources, *profile.get("copyright_tags", [])):
                 value = str(tag).strip()
                 if value and value not in confirmed:
@@ -863,6 +868,7 @@ class DanbooruResolver:
             return None
         return SemanticLookupResult(
             confirmed_tags=tuple(confirmed),
+            profile_copyrights=tuple(dict.fromkeys(profile_copyrights)),
             outfit_profile_tags=tuple(outfit_tags),
             appearance_profile_tags=tuple(appearance_tags),
             source_outfit_profiles=tuple(scoped),

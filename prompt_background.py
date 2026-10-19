@@ -127,6 +127,14 @@ _OUTFIT_SLOT_VISIBILITY_BY_FRAME = {
     ),
 }
 
+# Torso garment attributes must follow the same crop as their garments, while
+# neck-only accessories such as a requested choker retain their own visibility.
+_OUTFIT_SLOT_VISIBILITY_BY_FRAME = {
+    frame: slots | ({"upper_body.neckwear", "upper_body.sleeves"}
+                    if "upper_body.primary" in slots else set())
+    for frame, slots in _OUTFIT_SLOT_VISIBILITY_BY_FRAME.items()
+}
+
 
 def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
     """Return garment slots that are deterministically outside the requested view.
@@ -215,7 +223,7 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
             or bool(chinese_parts & {"上半身", "下半身", "腿部", "大腿", "臀部", "脚部", "足部", "双脚", "双足", "手部", "双手", "腹部", "肚脐"})
             or bool(re.search(r"\bfull body\b|全身", normalized))
         ))
-        or "头像" in raw
+        or bool(re.search(r"头像|大头照|证件照|头部肖像|脸部肖像|面部肖像", raw))
         or bool(chinese_parts & {"头部", "脸部", "面部", "眼部", "嘴部", "头发"})
     ):
         frame = "head"

@@ -375,6 +375,10 @@ def outfit_tag_slot(tag: str) -> str:
         return "lower_body.underwear"
     if any(word in key for word in ("pantyhose", "stocking", "thighhigh", "sock")):
         return "legwear"
+    if re.search(r"\b(?:necktie|bowtie|neck ribbon|neck bow)\b", key):
+        return "upper_body.neckwear"
+    if re.search(r"\b(?:long|short|detached|puffy|wide|sleeveless) sleeves?\b|\bsleeveless\b", key):
+        return "upper_body.sleeves"
     if any(word in key for word in ("shirt", "blouse", "top", "bodice")):
         return "upper_body.primary"
     if "corset" in key:
@@ -389,8 +393,10 @@ def outfit_tag_slot(tag: str) -> str:
         return "footwear"
     if any(word in key for word in ("veil", "headdress", "hat", "headwear")):
         return "headwear"
-    if any(word in key for word in ("hair ribbon", "hair ornament", "hairpin")):
+    if any(word in key for word in ("hair ribbon", "hair ornament", "hairpin", "hair bow", "hairclip", "hair flower")):
         return "hair_accessory"
+    if re.search(r"\b(?:uniform|costume|outfit|suit)$", key):
+        return "outfit.identity"
     if "ribbon" in key or "bow" in key:
         return "accessory.ribbon"
     return ""

@@ -6,9 +6,11 @@ from typing import Any
 
 try:
     from . import anima_verify
+    from .llm_diagnostics import LLMDiagnostics
     from .task_summary import apply_verification_summary
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     import anima_verify
+    from llm_diagnostics import LLMDiagnostics
     from task_summary import apply_verification_summary
 
 
@@ -49,6 +51,7 @@ class GenerationVerifier:
         self._task_recorder = task_recorder
         self._generate_payload = generate_payload
         self.logger = logger
+        self._llm_diagnostics = LLMDiagnostics(logger, get_bool)
         self._bool = get_bool
         self._int = get_int
         self._str = get_str
@@ -390,10 +393,16 @@ class GenerationVerifier:
                 f"变化误判。预期角色及稳定外观锚点：{character_identity}。"
             )
 
+        self._llm_diagnostics.start_run()
+        attempts = 0
+
         async def llm_call(prompt: str, image_urls=None) -> str:
+            nonlocal attempts
             if not provider_id:
                 raise RuntimeError("no_verify_provider_available")
-            resp = await self.context.llm_generate(
+            attempts += 1
+            resp = await self._llm_diagnostics.generate(
+                self.context, stage="image_verifier", attempt="initial" if attempts == 1 else f"retry_{attempts - 1}",
                 chat_provider_id=provider_id,
                 prompt=prompt,
                 system_prompt=system_prompt,

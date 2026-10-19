@@ -1,6 +1,38 @@
 # 故障排查
 
+## 借外貌后条件膨胀或核心特征消失（2026-10-19）
+
+对照 `semantic_plan_raw`、`appearance_reference_evidence`、`prompt_llm_initial_content / prompt_llm_retry_content` 与 `final_prompt`，不要仅按 tag 数量判断。先区分来源错误（发型被误作借衣或来源本人出场）、证据缺失（只给姓名让模型猜）、后置误删（发型 tail 被当身体尾巴、发饰被旧衣柜过滤）、画外默认衣柜和自由装饰/跨字段复述。质量前缀、画师与 `#` 尾缀是独立宿主通道，不能都算作模型添加。
+
+外貌来源现在按接收者和维度提供唯一已核实事实；未知/歧义保留原句。已知可见事实漏写时复用一次写作修复，普通记录 `structured_initial_validation_errors / structured_retry_validation_errors`，NAI 另记 `nai_appearance_initial_validation_errors / nai_appearance_retry_validation_errors`，仍错则停止。仅引用来源不能选其衣柜或把名字强制升级为可见人物。发型词和真正尾巴分别处理，发饰权限与显式删除均按穿着者/实例绑定。大头照默认参考在写作前裁去领带、袖子和隐式整套制服身份，保留移除/禁止记录，最终继续同权过滤。
+
+普通及自定义模板的运行时边界明确限制无请求装饰，并要求 Nltags 只补充关系/空间含义；这属于模型写作要求，不是任意自然语言的语义去重器。模型仍可能复述已表达事实或产生未识别的装饰，不应靠整句粗删破坏多人关系。审计和回归范围见 [修复记录](../diagnostics/appearance-reference-fix/README.md)；没有重新生成对照图片，不能把文本回归视为像素质量保证。
+
 > **严正警告：不要把随意精简 LLM 提示词当作排障办法，用户本人提出“简化”也不等于授权删功能。** 先定位原始回复、后处理和最终生成文本中的失效环节，再按 [提示词维护要求](prompting.md#严正警告不要随便精简或简化给-llm-的提示词) 修改；不能用一次成功或合法 JSON 代替语义验收。
+
+## `-r` 提交前失败：结构修复、无档案身份与未命名画格（2026-10-19）
+
+当天截至 19:25 留存的 84 条显式 `-r` 请求中，10 条未进入 ComfyUI 提交：5 条 JSON/必填结构错误、4 条身份审核错误、2 条文字画格错误，其中一条身份与文字同时失败。逐条记录见 `diagnostics/2026-10-19-r-failures/README.md`。结构错误包括对象中途多右花括号、缺坐标、`layout` 被写成 `projection`、`relations` 被写成中文；不能只从错误名称推断为 token 截断或坐标越界。
+
+现在 JSON、必填字段和坐标错误与身份/文字共用原有一次 LLM2 修复预算，分别记录 `nai_structure_initial_validation_errors / nai_structure_retry_validation_errors`。修复稿仍错则停止，不由主机猜坐标、改字段或修补 JSON，不追加第二次修复。方向配对降级仍不占预算。初稿连结构都无法解析时，修复稿作为首次可用布局仍须检查 donor 语义，不能因处于修复阶段而跳过来源出场边界。失败摘要设置 `llm_failed=true`，避免任务被误记为 `llm_ok=true`。
+
+身份审核名单同时接纳可靠 character anchor 查询绑定，不再要求先有外貌/衣柜档案。绑定必须已确认，候选拼写、普通分类服装和歧义别名不能取得身份权限。额外未知身份审核只记入 `nai_dropped_identity_reviews`，原因 `unconfirmed_identity_review`，不提供缺人的解释、服装或外貌权限；缺失已确认人物、已知来源升级出场、矛盾 visibility 和必要引用仍严格校验。排查时同时比较 `confirmed_character_bindings` 与 `nai_identity_mentions`，不要把“未建档”误解为“引用造假”。
+
+文字的非空 `text_regions[].panel` 仍须存在于该文字的原文上下文。用户未命名画格而 writer 自行分镜时，使用 `panel=""`，用实际实例 prompt、placement 和独立的 `character_index` 表达设计的格子；不得把自起的“第一格/第二格”当成原文证据。用户已有明确画格时，原文、实例、跨格及文字归属检查保持。初稿违反规则仍在同一次修复中处理，失败停止。
+
+本地回归验证结构修复和不能放行的反例；真实模型测试位于 `tests/live/test_nai_submission_recovery_live.py`，默认跳过，需明确授权外部模型调用后启用。更新后需重载 AstrBot 插件才会用于新请求，历史失败任务不会自动重发。
+
+## 六格漫画在身份审核阶段停止（2026-10-18）
+
+02:29:57 的任务 `bb4dcb8ae658457097bc91b908b962be` 在 ComfyUI 提交前返回 `nai_identity_plan_invalid`。初稿把两个身份在不同格子的出场合成两个框；修复稿已拆为 7 个实例（祥子 4 次、爱音 3 次，最后一格两人），但 `identity_review` 仍按格重复，旧主机因身份重复和部分简称引用不匹配而拒绝。它不是 ComfyUI 连线、余额或日志开关问题。
+
+身份审核现按 canonical 身份合并同一 visibility 的有效证据；简称必须是本地无歧义别名。相互矛盾的分类、缺人解释和 source-only 身份出场的必要证据继续严格检查。真实模型复测另返回了正确的 7 个框，却将多余 visible 审核中的非连续原文缩写成新句；这种已独立确认并返回的目标身份不依赖多余审核取得权限，无效可选行写入 `nai_dropped_identity_reviews`，不再阻断有效布局。它不能放行新的身份或衣柜修改。
+
+反向检查也保留：一个实例的有效 `source_text` 同时引用多个原文明示的“第一格：”“左上小格子：”或 `Panel A:` 局部标题时，`nai_character_cross_panel_instance` 要求在原有一次修复内拆框，不由主机复制人物或分配坐标。全页共享服装要求仍可作为独立片段；无标签/模糊分格由 writer 解释。任务书明确无台词漫画也逐格建实例，不将 LLM1/本地资料的唯一身份数当作实例上限。无需恢复七段草稿或新增正常第三次调用。
+
+原失败、首次真实复测的失败、后续复测和职责对照保存在 `diagnostics/nai-comic-identity-review/`；回归见 `tests/test_nai_comic_identity_review.py`。只验证提示词和未提交工作流时，不能声称漫画成图的分格、发型和遮挡已验收。更新后需重载 AstrBot 插件。
+
+复测还发现模型会把“六格”误计为全局 `6girls`，即便已正确返回 7 个实例。通过其余权限后，主机只根据已接受的实例和各框明确的独立性别 tag 对齐全局人数，未知时写 `Npeople`；不碰 `6koma` 等格数，不凭中文角色名猜性别。检查 `nai_population_correction`，而不是用格子数或唯一身份数判断人数。
 
 ## 互动重复 tag、通用套组发饰与焦点取景（2026-10-17）
 
@@ -380,3 +412,9 @@ resolver 内部继续保存未转义 canonical tag `s:p_little_knight`，最终�
 
 
 NAI 同身份多格若报 `nai_character_plan_missing_instance_source` 或 `nai_character_plan_missing_instance_anchor`，表示无法把已知修改/不同衣柜安全绑定到某个格子；不会按名字或数组顺序猜归属。检查 `nai_character_plan_raw` 的 `source_text` 和 `anchor_id`：必要原文片段必须真实存在，共享与局部条件可用片段数组。必要片段虚构报 `nai_character_plan_ungrounded_instance_source`，错误本地 anchor 报 `nai_character_plan_invalid_instance_anchor`；当前此类具体结构错误停止提交，不退回旧 writer。身份唯一、重复实例没有待区分的修改，或没有匹配的本地计划时，无效可选引用只从角色数据移除并记入 `nai_dropped_instance_sources`，不触发重试或停止。2026-10-13 22:18 的三人请求中，模型将并列主语和共享动作拼成不连续的“蛇妖若叶睦的挑逗”，旧版因未区分必要与可选证据而误拒绝整个布局；当前此类辅助改写不会授予新权限或阻断请求。`nai_character_plan_visible_outfit_source` 表示模型把仅用于服装参考的已确认来源升级为可见人物；原文同时要求该来源人物出现时允许成为角色框。
+
+## 已知别名偶尔缺人或角色框直接使用中文名
+
+先对照 `danbooru_semantic_character_appearance_profiles` 与 `confirmed_character_bindings`；命中档案不等于已被第一阶段列为可见角色。NAI `-r` 继续检查 `nai_identity_mentions`、`nai_anchor_roles`、`nai_local_profile_references`、`nai_bound_local_profile_references` 与 `nai_identity_review`。来源身份也可以独立出场，但不能仅凭缓存命中加入画面。未出场的已知名字须有带上下文的原文引用和 donor/quoted/offscreen 分类；遗漏会触发一次身份修复，修复失败则停止。错误及次数保存在 `nai_identity_initial_validation_errors / nai_identity_retry_validation_errors / nai_character_plan_attempt_count`，文字修复与身份修复共用一次重试。
+
+已返回的唯一精确别名会先绑定 canonical 再过滤外貌。基础名与带后缀的变体同时出现时，外貌查询优先精确匹配；真正的别名冲突仍不会猜。若需要分析模型当时为何做了某个语义判断，仍应启用 debug 保存原始两阶段回复；新增摘要只记录身份分类与证据，不代替完整原始输出。中性复现与反例见 `tests/test_nai_identity_review.py`。

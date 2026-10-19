@@ -202,6 +202,7 @@ def build_services(
         run_prompt_tool=runtime.run_prompt_tool,
         event_image_input=image_inputs.event_image_input,
         logger=logger,
+        get_bool=get_bool,
         get_int=get_int,
         shorten=shorten,
     )

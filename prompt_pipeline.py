@@ -7,8 +7,10 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 try:
+    from .llm_diagnostics import LLMDiagnostics
     from .nai_text import NaiTextRequest, extract_nai_text_request
 except ImportError:
+    from llm_diagnostics import LLMDiagnostics
     from nai_text import NaiTextRequest, extract_nai_text_request
 
 try:
@@ -47,6 +49,7 @@ try:
         missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
+        reconcile_nai_instance_population,
         resolve_nai_canvas,
         strip_nai_character_switch,
     )
@@ -143,6 +146,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         missing_nai_noun_tags,
         parse_nai_character_plan,
         preserve_nai_global_artist_tags,
+        reconcile_nai_instance_population,
         resolve_nai_canvas,
         strip_nai_character_switch,
     )
@@ -1241,6 +1245,7 @@ class CharacterEffectiveOutfit:
     resolution_state: str = "resolved"
     unresolved_evidence: tuple[str, ...] = ()
     clothing_anchor_id: str = ""
+    appearance_accessory_slots: tuple[str, ...] = ()
 
 
 _STABLE_APPEARANCE_REQUEST_RE = re.compile(
@@ -1336,7 +1341,9 @@ _APPEARANCE_DIMENSION_PATTERNS: dict[str, re.Pattern[str]] = {
     "hair_style": re.compile(
         r"\b(?:twintails?|twin[ _-]+drills?|drill[ _-]+hair|ponytails?|"
         r"braids?|braided[ _-]+hair|straight[ _-]+hair|wavy[ _-]+hair|"
-        r"curly[ _-]+hair|bob[ _-]+cut|hair[ _-]+bun|double[ _-]+bun)\b|"
+        r"curly[ _-]+hair|bob[ _-]+cut|hair[ _-]+buns?|(?:twin|double)[ _-]+buns?|"
+        r"two[ _-]+side[ _-]+up|(?:half[ _-]+)?updo|sidelocks|"
+        r"(?:parted|side[ _-]+swept|blunt|swept)[ _-]+bangs)\b|"
         r"(?:双马尾|双钻头|钻头发|马尾|辫子|麻花辫|直发|卷发|波浪发|丸子头|发型)",
         re.I,
     ),
@@ -1356,14 +1363,49 @@ _APPEARANCE_DIMENSION_PATTERNS: dict[str, re.Pattern[str]] = {
 }
 
 
+def _hairstyle_tail_spans(value: str) -> tuple[tuple[int, int], ...]:
+    """Recognize hair compounds without treating unrelated body tails as hair."""
+    normalized = str(value or "").replace("_", " ")
+    # Lexical hair compounds must not grant or require a bodily-tail change.
+    # For separated "twin tails", require actual hair context; animal tails
+    # elsewhere in the same sentence are still classified independently.
+    hair_tail = re.compile(r"\b(?:pony[ -]?tails?|pig[ -]?tails?|twin[ -]?tails?)\b", re.I)
+    spans = []
+    for match in hair_tail.finditer(normalized):
+        prefix = re.split(r"[,;]|\band\b", normalized[:match.start()], flags=re.I)[-1][-70:]
+        suffix = normalized[match.end():match.end() + 35]
+        lexical = not re.search(r"[ -]", match.group())
+        hair_context = bool(re.search(r"\bhair\b.{0,55}$|\bhalf[ -]up\s*$", prefix, re.I)
+                            or re.match(r"(?:-like)?\s+(?:half[ -]updo|hairstyle|hairdo)\b", suffix, re.I))
+        if lexical or hair_context:
+            spans.append((match.start(), match.end()))
+    return tuple(spans)
+
+
+def _sub_appearance_dimension(dimension: str, replacement: Any, text: str) -> str:
+    """Apply a dimension's filter while preserving hair compounds inside tail rules."""
+    protected = _hairstyle_tail_spans(text) if dimension == "tail" else ()
+    def replace_match(match: re.Match[str]) -> str:
+        if any(start <= match.start() < end for start, end in protected):
+            return match.group()
+        return replacement(match) if callable(replacement) else replacement
+    return _APPEARANCE_DIMENSION_PATTERNS[dimension].sub(replace_match, text)
+
+
 def appearance_dimensions(value: str) -> frozenset[str]:
     """Classify every visual dimension expressed by one tag/prose fragment."""
     normalized = str(value or "").strip().lower().replace("_", " ")
+    hair_spans = _hairstyle_tail_spans(normalized)
+    tail_text = normalized
+    for start, end in reversed(hair_spans):
+        tail_text = tail_text[:start] + " " * (end - start) + tail_text[end:]
     dimensions = {
         dimension
         for dimension, pattern in _APPEARANCE_DIMENSION_PATTERNS.items()
-        if pattern.search(normalized)
+        if pattern.search(tail_text if dimension == "tail" else normalized)
     }
+    if hair_spans:
+        dimensions.add("hair_style")
     # Natural writer prose often inserts a colour between the length and noun:
     # ``long green hair``.  The atomic profile tag is still ``long_hair``.
     if re.search(r"\bhair\b", normalized) and re.search(
@@ -1400,7 +1442,8 @@ _STANDALONE_APPEARANCE_TAG_PATTERNS: dict[str, re.Pattern[str]] = {
     "hair_length": re.compile(r"(?:very long|long|medium|short) hair", re.I),
     "hair_style": re.compile(
         r"(?:twintails?|twin drills?|drill hair|ponytails?|braids?|braided hair|"
-        r"straight hair|wavy hair|curly hair|bob cut|hair bun|double bun)",
+        r"straight hair|wavy hair|curly hair|bob cut|hair buns?|(?:twin|double) buns?|"
+        r"two side up|(?:half[ -])?updo|sidelocks|(?:parted|side[ -]swept|blunt|swept) bangs)",
         re.I,
     ),
     "skin_color": re.compile(
@@ -1587,7 +1630,9 @@ def merge_authoritative_identity_block(
         )
     if predicates:
         return f"{character_name} {' and '.join(predicates)}"
-    return f"{character_name} has {', '.join(traits)}" if traits else writer_identity
+    # If all supplied attributes were rejected, returning the original sentence
+    # would silently restore every conflict. Identity may legitimately be empty.
+    return f"{character_name} has {', '.join(traits)}" if traits else ""
 
 
 def filter_character_appearance_prose(
@@ -1633,9 +1678,7 @@ def filter_character_appearance_prose(
     for dimension in _APPEARANCE_DIMENSION_PATTERNS:
         if dimension not in locked_dimensions:
             continue
-        result = _APPEARANCE_DIMENSION_PATTERNS[dimension].sub(
-            retain_matching_span, result,
-        )
+        result = _sub_appearance_dimension(dimension, retain_matching_span, result)
     result = re.sub(r"\s+,", ",", result)
     result = re.sub(r",\s*(?=,|;|$)", "", result)
     result = re.sub(r"\s+and\s+(?=,|;|$)", "", result, flags=re.I)
@@ -1690,6 +1733,7 @@ def filter_shared_appearance_tags(
     plans: tuple[CharacterEffectiveOutfit, ...],
     *,
     user_prompt: str,
+    appearance_changes: tuple[SemanticAppearanceChange, ...] = (),
 ) -> str:
     """Keep character appearance out of ambiguous shared Tags fields.
 
@@ -1701,26 +1745,17 @@ def filter_shared_appearance_tags(
     if not profiled:
         return text
     if len(plans) > 1:
-        per_wearer_overrides = tuple(
-            appearance_override_dimensions(
-                user_prompt,
-                (plan.target_source_text, *plan.target_candidates),
-                character_count=len(plans),
-            )
-            for plan in plans
-        )
-        shared_overrides = (
-            set.intersection(*(set(item) for item in per_wearer_overrides))
-            if per_wearer_overrides
-            else set()
-        )
-        blocked_dimensions = set(_APPEARANCE_DIMENSION_PATTERNS) - shared_overrides
+        # Permission to change the same dimension does not mean the new values
+        # are shared (A may copy B's curls while C copies D's braids).
+        blocked_dimensions = set(_APPEARANCE_DIMENSION_PATTERNS)
     else:
         plan = profiled[0]
         override_dimensions = appearance_override_dimensions(
             user_prompt,
             (plan.target_source_text, *plan.target_candidates),
             character_count=1,
+        ) | _advisory_writer_dimensions(
+            _semantic_appearance_changes_for_character(appearance_changes, plan)
         )
         blocked_dimensions = {
             dimension
@@ -1744,23 +1779,145 @@ def saved_appearance_for_names(
         for name in names
         if str(name).strip()
     }
-    matches: list[tuple[str, tuple[str, ...]]] = []
+    exact: list[tuple[str, tuple[str, ...]]] = []
+    fuzzy: list[tuple[str, tuple[str, ...]]] = []
     for aliases, source_tag, tags in semantic_result.character_appearance_profiles:
         profile_names = {
             re.sub(r"[^\w]+", " ", str(value).lower().replace("_", " ")).strip()
             for value in (*aliases, source_tag)
             if str(value).strip()
         }
-        if any(
-            left == right
-            or (len(left) >= 3 and left in right)
+        if normalized_names & profile_names:
+            exact.append((source_tag, tags))
+        elif any(
+            (len(left) >= 3 and left in right)
             or (len(right) >= 3 and right in left)
             for left in normalized_names
             for right in profile_names
         ):
-            matches.append((source_tag, tags))
-    unique = tuple(dict.fromkeys(matches))
+            fuzzy.append((source_tag, tags))
+    unique = tuple(dict.fromkeys(exact or fuzzy))
     return unique[0] if len(unique) == 1 else ("", ())
+
+
+def appearance_reference_evidence(
+    changes: tuple[SemanticAppearanceChange, ...], result: SemanticLookupResult,
+) -> tuple[dict[str, Any], ...]:
+    """Expose only the requested dimensions of an exactly bound local reference.
+
+    Unknown or ambiguous sources keep their original request text for the writer.
+    These rows neither create visible characters nor select a donor's wardrobe.
+    """
+    evidence = []
+    for change in changes:
+        if not change.reference_character or change.operation == "omit":
+            continue
+        reference_key = _normalized_character_key(change.reference_character)
+        profiles = tuple(dict.fromkeys(
+            (source, tags) for aliases, source, tags in result.character_appearance_profiles
+            if reference_key in {_normalized_character_key(name) for name in (*aliases, source)}
+        ))
+        if len({source for source, _tags in profiles}) != 1:
+            continue
+        source = profiles[0][0]
+        # Conflicting variants are not a licence to combine whole profiles.
+        common = set.intersection(*(set(tags) for _source, tags in profiles))
+        tags = tuple(tag for tag in profiles[0][1] if tag in common)
+        dimensions = frozenset(change.dimensions)
+        facts = tuple(tag for tag in tags
+                      if (classified := appearance_dimensions(tag))
+                      and classified <= dimensions)
+        accessories = tuple(dict.fromkeys(
+            tag for _alias, owner, outfit, _qualifier in result.source_outfit_profiles
+            if owner == source and "hair_style" in dimensions
+            for tag in outfit if outfit_tag_slot(tag) == "hair_accessory"
+        ))
+        evidence.append(dict(character=change.character_name, reference=change.reference_character,
+                             canonical_reference=source, dimensions=list(change.dimensions),
+                             guarded_dimensions=[dimension for dimension in change.dimensions
+                                 if not any(other.character_name == change.character_name
+                                            and dimension in other.dimensions
+                                            and (not other.reference_character or other.operation == "omit")
+                                            for other in changes if other != change)],
+                             source_text=change.source_text, tags=list(facts),
+                             optional_accessories=list(accessories)))
+    return tuple(evidence)
+
+
+def reference_appearance_issues(
+    text: str, evidence: tuple[dict[str, Any], ...],
+) -> tuple[str, ...]:
+    """Check requested, visible source facts in their recipient's actual text.
+
+    This is not noun-tag coverage: only exactly bound local appearance references
+    are checked. Unknown sources, omitted dimensions, conflicting instance/source
+    assignments and independently modified source dimensions remain semantic work.
+    No profile or missing tag is injected by this validation.
+    """
+    expressed = set(appearance_dimensions(text))
+    if expressed & {"hair_color", "hair_length"}:
+        expressed.add("hair_style")
+    owners_by_dimension: dict[str, set[str]] = {}
+    for row in evidence:
+        for dimension in row.get("guarded_dimensions", row["dimensions"]):
+            owners_by_dimension.setdefault(dimension, set()).add(row["canonical_reference"])
+    issues = []
+    for row in evidence:
+        active = expressed & set(row.get("guarded_dimensions", row["dimensions"]))
+        missing = []
+        for tag in row["tags"]:
+            dimensions = appearance_dimensions(tag)
+            if not dimensions or not dimensions <= active or any(
+                len(owners_by_dimension.get(dimension, ())) != 1 for dimension in dimensions
+            ):
+                continue
+            pattern = r"(?<![a-z0-9_])" + r"[\s_-]+".join(
+                re.escape(word) for word in tag.replace("_", " ").split()
+            ) + r"(?![a-z0-9_])"
+            if not re.search(pattern, text, re.I):
+                missing.append(tag)
+        if missing:
+            issues.append(
+                f"{row['character']}: the visible {', '.join(sorted(active))} copied from "
+                f"{row['reference']} is missing supplied canonical source facts in its OWN "
+                f"Identity/Details or instance prompt: {', '.join(missing)}. Use the supplied "
+                "spellings; remove speculative competing shapes instead of reinterpreting "
+                "known labels. Shared Tags/analysis are not recipient-scoped evidence. "
+                "Nltags must not restate or contradict the corrected feature."
+            )
+    return tuple(issues)
+
+
+def validate_structured_appearance_references(
+    parsed: Any, evidence: tuple[dict[str, Any], ...], plans: tuple[CharacterEffectiveOutfit, ...],
+) -> Any:
+    issues = []
+    for character in parsed.characters:
+        wearers = tuple(plan for plan in plans if _character_outfit_matches(character.name, plan))
+        rows = tuple(row for row in evidence if any(
+            _normalized_character_key(row["character"]) in {
+                _normalized_character_key(value) for value in (wearer.target_source_text, *wearer.target_candidates)
+            } for wearer in wearers))
+        issues.extend(reference_appearance_issues(
+            ", ".join((character.identity_tags, character.detail_tags)), rows,
+        ))
+    return replace(parsed, validation_errors=tuple(dict.fromkeys((*parsed.validation_errors, *issues))))
+
+
+def bind_appearance_accessory_permissions(
+    plans: tuple[CharacterEffectiveOutfit, ...], changes: tuple[SemanticAppearanceChange, ...],
+) -> tuple[CharacterEffectiveOutfit, ...]:
+    """Let a grounded hairstyle change choose hair accessories, never clothes.
+
+    This is an allowance for writer-selected items, not tag injection. Explicit
+    removals, forbidden slots and per-instance evidence continue to take priority.
+    """
+    return tuple(replace(plan, appearance_accessory_slots=("hair_accessory",)
+                         if any("hair_style" in change.dimensions and change.operation != "omit"
+                                for change in _semantic_appearance_changes_for_character(changes, plan))
+                         and not any("hair_style" in change.dimensions and change.operation == "omit"
+                                     for change in _semantic_appearance_changes_for_character(changes, plan))
+                         else ()) for plan in plans)
 
 
 def strip_structured_block_duplicates_from_nltags(
@@ -1938,6 +2095,7 @@ class WardrobeAuthority:
                       if owner != plan.target_anchor_id for tag in tags} - own_keys
         return ", ".join(authority.filter_tags(tuple(
             part for part in split_tags(text) if self._key(part) not in other_keys
+            or outfit_tag_slot(part) in plan.appearance_accessory_slots
         )))
 
     def filter_prose(self, text: str) -> str:
@@ -1970,6 +2128,7 @@ class WardrobeAuthority:
             if target_id.lower() != plan.target_anchor_id.lower()
             for tag in tags
             if self._key(tag) not in own_keys
+            and outfit_tag_slot(tag) not in plan.appearance_accessory_slots
         )
         for tag in sorted(other_tags, key=len, reverse=True):
             result = self._remove_prose_tag(result, tag)
@@ -1983,17 +2142,23 @@ class WardrobeAuthority:
         to the writer. Named sets, unresolved ownership, explicit removals and
         forbidden slots retain their existing authority; no tags are injected.
         """
+        authority = replace(
+            self, stale_cached_tags=tuple(
+                tag for tag in self.stale_cached_tags
+                if outfit_tag_slot(tag) not in plan.appearance_accessory_slots
+            )
+        )
         if not (plan.wardrobe_kind == "creative_fallback"
                 and plan.resolution_state == "resolved" and plan.clothing_anchor_id):
-            return self
+            return authority
 
         def exclusive(tag: str) -> bool:
             return (self._key(tag) in {self._key(value) for value in self.named_outfit_tags}
                     or not outfit_tag_slot(tag) or bool(_CREATIVE_TAG_DENY_RE.search(tag)))
 
         return replace(
-            self,
-            stale_cached_tags=tuple(tag for tag in self.stale_cached_tags if exclusive(tag)),
+            authority,
+            stale_cached_tags=tuple(tag for tag in authority.stale_cached_tags if exclusive(tag)),
             character_selected_tags=tuple(
                 (owner, tags if owner == plan.target_anchor_id else tuple(tag for tag in tags if exclusive(tag)))
                 for owner, tags in self.character_selected_tags
@@ -2161,6 +2326,11 @@ def build_wardrobe_authority(
         if plans
         else ()
     )
+    # Shared tags may use a modified appearance's accessories only when every
+    # wearer has that permission. Per-wearer filtering below keeps others scoped.
+    shared_accessory_slots = (set.intersection(*(set(plan.appearance_accessory_slots)
+                                                for plan in plans)) if plans else set())
+    stale = tuple(tag for tag in stale if outfit_tag_slot(tag) not in shared_accessory_slots)
     return WardrobeAuthority(
         has_character_plans=bool(plans),
         all_creative=bool(plans)
@@ -2215,10 +2385,19 @@ def non_wardrobe_confirmed_tags(
         for tag in tags
         if tag
     )
+    visible_identities = {tag for plan in plans for tag in plan.target_candidates}
+    explicitly_bound = {tag for anchor_id, tag in semantic_result.anchor_tags
+                        if any(anchor.anchor_id == anchor_id and anchor.role == "copyright"
+                               for anchor in semantic_result.anchors)}
+    profile_copyrights = {tag for _owner, tags in semantic_result.profile_copyrights for tag in tags}
+    visible_copyrights = {tag for owner, tags in semantic_result.profile_copyrights
+                         if owner in visible_identities for tag in tags}
     return tuple(
         tag
         for tag in semantic_result.confirmed_tags
         if (include_source_anchor or tag not in semantic_result.outfit_source_tags)
+        and (not plans or tag not in profile_copyrights
+             or tag in visible_copyrights or tag in explicitly_bound)
         and (not plans or tag not in selected_wardrobe_tags)
         and (not plans or tag not in cached_profile_outfit_tags)
     )
@@ -3163,7 +3342,7 @@ def apply_character_wardrobe_baselines(
 
 
 def filter_profile_tags_for_composition(
-    tags: tuple[str, ...], user_prompt: str
+    tags: tuple[str, ...], user_prompt: str, *, implicit_default: bool = False,
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """Omit saved wardrobe components that cannot be visible in the crop.
 
@@ -3171,6 +3350,8 @@ def filter_profile_tags_for_composition(
     requested additions are synthesized afterwards and therefore remain intact.
     """
     hidden_slots = framing_hidden_outfit_slots(user_prompt)
+    if implicit_default and "upper_body.primary" in hidden_slots:
+        hidden_slots = hidden_slots | {"outfit.identity"}
     if not hidden_slots:
         return tags, ()
     kept: list[str] = []
@@ -3198,13 +3379,16 @@ def apply_framing_to_character_outfits(
         return plans
     updated: list[CharacterEffectiveOutfit] = []
     for plan in plans:
+        plan_hidden_slots = (hidden_slots | {"outfit.identity"}
+                             if plan.wardrobe_kind == "default_reference"
+                             and "upper_body.primary" in hidden_slots else hidden_slots)
         added_keys = {
             WardrobeAuthority._key(tag) for tag in plan.effective.added_tags
         }
         omitted = tuple(
             tag
             for tag in plan.effective.base_tags
-            if outfit_tag_slot(tag) in hidden_slots
+            if outfit_tag_slot(tag) in plan_hidden_slots
             and WardrobeAuthority._key(tag) not in added_keys
         )
         if not omitted:
@@ -3228,7 +3412,7 @@ def apply_framing_to_character_outfits(
             ),
             forbidden_slots=tuple(dict.fromkeys((
                 *plan.effective.forbidden_slots,
-                *(slot for slot in sorted(hidden_slots)
+                *(slot for slot in sorted(plan_hidden_slots)
                   if not any(outfit_tag_slot(tag) == slot for tag in plan.effective.added_tags)),
             ))),
         )
@@ -3431,9 +3615,6 @@ def build_character_effective_outfits(
                 # components, so it must use named-set semantics rather than
                 # open-ended cosplay completion.
                 wardrobe_kind = "named_outfit"
-        base_tags, composition_omitted_tags = filter_profile_tags_for_composition(
-            base_tags, user_prompt
-        )
         patches = tuple(
             UserOutfitPatch(
                 subject=target.source_text,
@@ -3478,7 +3659,6 @@ def build_character_effective_outfits(
             appearance_tags=appearance_tags,
             effective=effective,
             complete_named_profile=complete_named_profile,
-            composition_omitted_tags=composition_omitted_tags,
             clothing_anchor_id=(
                 plan.clothing_anchor_id
                 if (clothing := by_id.get(plan.clothing_anchor_id)) is not None
@@ -3486,7 +3666,10 @@ def build_character_effective_outfits(
                 else ""
             ),
         ))
-    return tuple(built)
+    # Keep omission evidence and forbidden slots as well as cropped components.
+    # Otherwise pre-writer cropping loses the metadata needed to reject the same
+    # garments when the writer later reintroduces them in tags or narrative.
+    return apply_framing_to_character_outfits(tuple(built), user_prompt)
 
 
 def complete_character_wardrobe_states(
@@ -3646,6 +3829,7 @@ def fallback_missing_unspecified_profiles(
         if (
             plan.wardrobe_kind in {"default_profile", "default_reference"}
             and not plan.effective.effective_tags
+            and not plan.composition_omitted_tags
             and (
                 plan.resolution_state == "unspecified"
                 or (
@@ -3743,12 +3927,9 @@ def nai_local_profile_references(
         _normalized_character_key(value)
         for item in outfits for value in (item.target_source_text, *item.target_candidates)
     }
-    donors = {
-        _normalized_character_key(value)
-        for anchor in anchors if anchor.role == "outfit_source"
-        for value in (anchor.source_text, *anchor.candidates)
-    } | {_normalized_character_key(value) for value in result.outfit_source_tags}
-    recovered = fallback_target_anchors_from_semantic_evidence(user_prompt, (), result)
+    # Source classification may itself be incomplete: a donor can independently
+    # appear in the scene. Keep its identity conditional until visibility review.
+    recovered = nai_local_identity_mentions(user_prompt, result)
     named_outfits = set(result.named_outfit_tags)
     alias_owners: dict[str, set[str]] = {}
     for aliases, source_tag, _tags in result.character_appearance_profiles:
@@ -3760,7 +3941,7 @@ def nai_local_profile_references(
     seen_ids = {anchor.anchor_id for anchor in anchors}
     for anchor in recovered:
         keys = {_normalized_character_key(value) for value in (anchor.source_text, *anchor.candidates)}
-        if (keys & (represented | donors)
+        if (keys & represented
             or set(anchor.candidates) & named_outfits
             or not set(anchor.candidates) & set(result.confirmed_tags)):
             continue
@@ -3795,6 +3976,259 @@ def nai_local_profile_references(
     return fallback_missing_unspecified_profiles(
         effective, explicit_wardrobe_evidence=unresolved,
     )[0]
+
+
+def nai_confirmed_identity_anchors(result: SemanticLookupResult) -> tuple[SemanticAnchor, ...]:
+    """Identity lookup bindings need no saved appearance or wardrobe profile."""
+    tags = dict(result.anchor_tags)
+    return tuple(replace(anchor, candidates=(tags[anchor.anchor_id],))
+                 for anchor in result.anchors
+                 if anchor.role in {"target_character", "outfit_source"}
+                 and anchor.group == "character" and anchor.source_category in {None, 4}
+                 and tags.get(anchor.anchor_id) in result.confirmed_tags
+                 and tags.get(anchor.anchor_id) not in result.named_outfit_tags)
+
+
+def nai_local_identity_mentions(
+    user_prompt: str, result: SemanticLookupResult,
+) -> tuple[SemanticAnchor, ...]:
+    """Known request mentions, including sources, without declaring visibility."""
+    recovered = fallback_target_anchors_from_semantic_evidence(
+        user_prompt, (), replace(result, outfit_source_tags=()),
+    )
+    owners: dict[str, set[str]] = {}
+    for aliases, tag, _appearance in result.character_appearance_profiles:
+        for alias in (*aliases, tag):
+            owners.setdefault(_normalized_character_key(alias), set()).add(tag)
+    for alias, tag, _clothes, _qualifier in result.source_outfit_profiles:
+        owners.setdefault(_normalized_character_key(alias), set()).add(tag)
+    confirmed = nai_confirmed_identity_anchors(result)
+    for anchor in confirmed:
+        for alias in (anchor.source_text, *anchor.candidates):
+            owners.setdefault(_normalized_character_key(alias), set()).update(anchor.candidates)
+    recovered = (*recovered, *(anchor for anchor in confirmed
+                              if DanbooruResolver._alias_match_spans(user_prompt, anchor.source_text)
+                              and not any(item.source_text == anchor.source_text
+                                          and item.candidates == anchor.candidates for item in recovered)))
+    return tuple(anchor for anchor in recovered
+                 if len(owners.get(_normalized_character_key(anchor.source_text), ())) == 1
+                 and set(anchor.candidates) & set(result.confirmed_tags)
+                 and not set(anchor.candidates) & set(result.named_outfit_tags))
+
+
+_NAI_PANEL_HEADING = re.compile(
+    r"(?:^|[。.;；\n])\s*(?P<label>"
+    r"(?:第\s*)?(?:[0-9一二三四五六七八九十百零〇两]+|[a-z])\s*(?:个)?[大小]?格(?:子)?"
+    r"|[左右上下中底顶][左右上下中底顶侧方边间部排列]{0,10}(?:[a-z0-9])?[大小宽窄]?格(?:子)?"
+    r"|(?:panel|frame)\s+[a-z0-9][a-z0-9 -]{0,24})\s*[：:]",
+    re.I,
+)
+
+
+def nai_cross_panel_instance_issues(plan: dict[str, Any], user_prompt: str) -> tuple[str, ...]:
+    """Reject an explicitly cross-panel box; never infer people from prose.
+
+    Only exact source excerpts with request-authored panel headings are used.
+    Shared requirements without panel-local headings remain compatible evidence.
+    Unlabeled/ambiguous layouts are left to the writer, not assigned by keywords.
+    """
+    headings = {match["label"].strip().casefold()
+                for match in _NAI_PANEL_HEADING.finditer(user_prompt)}
+    if len(headings) < 2:
+        return ()
+    issues = []
+    for index, character in enumerate(plan["characters"]):
+        evidence = character.get("source_text", "")
+        parts = [evidence] if isinstance(evidence, str) else evidence
+        panels = set()
+        for part in parts:
+            if not part or part.casefold() not in user_prompt.casefold():
+                continue
+            panels.update(match["label"].strip().casefold()
+                          for match in _NAI_PANEL_HEADING.finditer(part)
+                          if match["label"].strip().casefold() in headings)
+        if len(panels) > 1:
+            issues.append(
+                f"nai_character_cross_panel_instance: characters[{index}] {character['name']} "
+                f"quotes multiple panel-local contexts: {', '.join(sorted(panels))}. "
+                "Split each visible appearance into its own characters object with its own "
+                "prompt and centre; reuse the same identity/anchor as appropriate. "
+                "Keep source_text local to that instance; shared requirements may be additional excerpts."
+            )
+    return tuple(issues)
+
+
+def review_nai_identities(
+    plan: dict[str, Any], mentions: tuple[SemanticAnchor, ...],
+    result: SemanticLookupResult, anchors: tuple[SemanticAnchor, ...],
+    user_prompt: str, *, scrutinize_donors: bool = True,
+    appearance_changes: tuple[SemanticAppearanceChange, ...] = (),
+) -> tuple[str, ...]:
+    """Bind exact aliases and demand grounded explanations for omitted mentions.
+
+    Visibility remains a semantic decision. Neither a cache hit nor a source
+    anchor alone establishes whether an independently present person is visible.
+    """
+    aliases: dict[str, set[str]] = {}
+    identity_spellings: dict[str, set[str]] = {}
+    for names, tag, _appearance in result.character_appearance_profiles:
+        for name in (*names, tag):
+            aliases.setdefault(_normalized_character_key(name), set()).add(tag)
+            identity_spellings.setdefault(tag, set()).add(name)
+    for name, tag, _clothes, _qualifier in result.source_outfit_profiles:
+        aliases.setdefault(_normalized_character_key(name), set()).add(tag)
+        aliases.setdefault(_normalized_character_key(tag), set()).add(tag)
+        identity_spellings.setdefault(tag, set()).update((name, tag))
+    for anchor in nai_confirmed_identity_anchors(result):
+        tag = anchor.candidates[0]
+        for name in (anchor.source_text, tag):
+            aliases.setdefault(_normalized_character_key(name), set()).add(tag)
+            identity_spellings.setdefault(tag, set()).add(name)
+
+    def canonical(name: str) -> str:
+        owners = aliases.get(_normalized_character_key(name), set())
+        return next(iter(owners)) if len(owners) == 1 else name
+
+    for character in plan["characters"]:
+        old = character["name"]
+        tag = canonical(old)
+        if tag != old:
+            # Only replace a complete tag token; retain names in narrative and
+            # source evidence. No positional assignment or prefix-name guessing.
+            parts = [tag if _normalized_character_key(part) == _normalized_character_key(old) else part
+                     for part in split_tags(character["prompt"])]
+            if not any(_normalized_character_key(part) == _normalized_character_key(tag) for part in parts):
+                parts.insert(0, tag)
+            character.update(name=tag, prompt=", ".join(parts))
+    actual = {_normalized_character_key(item["name"]) for item in plan["characters"]}
+    sources = {_normalized_character_key(canonical(value))
+               for anchor in anchors if anchor.role == "outfit_source"
+               for value in (anchor.source_text, *anchor.candidates)}
+    expected = {_normalized_character_key(tag) for tag in confirmed_semantic_character_tags(result)}
+    issues: list[str] = []
+    reviews: dict[str, dict[str, Any]] = {}
+    dropped_reviews: list[dict[str, Any]] = []
+    review_roles: dict[str, str] = {}
+    raw_reviews = plan.get("identity_review", [])
+    if not isinstance(raw_reviews, list):
+        issues.append("identity_review must be an array")
+        raw_reviews = []
+    for row in raw_reviews:
+        if not isinstance(row, dict):
+            issues.append("identity_review entries must be objects")
+            continue
+        name, role = (str(row.get(field) or "").strip() for field in ("name", "visibility"))
+        raw_evidence = row.get("source_text", "")
+        if isinstance(raw_evidence, str):
+            # Preserve a marked elision as separate, independently grounded
+            # excerpts. Never treat the joined fragments as a continuous quote.
+            evidence_parts = ([raw_evidence] if raw_evidence.casefold() in user_prompt.casefold()
+                              else re.split(r"…+|\.{3,}", raw_evidence))
+        elif isinstance(raw_evidence, list) and all(isinstance(part, str) for part in raw_evidence):
+            evidence_parts = raw_evidence
+        else:
+            evidence_parts = []
+        evidence_parts = [part.strip() for part in evidence_parts]
+        key = _normalized_character_key(canonical(name))
+        matching = [item for item in mentions if key in {
+            _normalized_character_key(value) for value in item.candidates}]
+        if not matching and role in {"visible", "donor", "quoted", "offscreen"}:
+            if key in review_roles and review_roles[key] != role:
+                issues.append(f"identity_review has conflicting visibility for identity: {name}")
+                continue
+            review_roles[key] = role
+        if (name and not matching and key not in expected and key not in sources
+            and not aliases.get(_normalized_character_key(name))
+            and role in {"visible", "donor", "quoted", "offscreen"}):
+            # This optional row is outside confirmed identity authority. It
+            # neither excuses a missing known person nor grants new authority.
+            # Still reject a direct contradiction with a returned unknown box.
+            if key in actual and role != "visible":
+                issues.append(f"identity_review visibility disagrees with characters: {name}")
+                continue
+            dropped_reviews.append({"name": name, "source_text": raw_evidence,
+                                    "reason": "unconfirmed_identity_review"})
+            continue
+        spellings = {item.source_text for item in matching}
+        spellings.update(spelling for spelling in identity_spellings.get(canonical(name), ())
+                         if aliases.get(_normalized_character_key(spelling)) == {canonical(name)})
+        invalid_evidence = (not matching or role not in {"visible", "donor", "quoted", "offscreen"}
+            or not 1 <= len(evidence_parts) <= 12
+            or any(not part or part.casefold() not in user_prompt.casefold() for part in evidence_parts)
+            or not any(DanbooruResolver._alias_match_spans(part, spelling)
+                       and len(part) > len(spelling) for part in evidence_parts for spelling in spellings))
+        if invalid_evidence:
+            if matching and role == "visible" and key in expected and key in actual:
+                # This identity already has independently accepted visible
+                # authority and a returned instance. An optional paraphrased
+                # review grants nothing; discard it rather than veto the layout.
+                # Omitted identities and source-only promotions remain strict.
+                dropped_reviews.append({"name": canonical(name), "source_text": raw_evidence,
+                                        "reason": "invalid_optional_visible_review"})
+                continue
+            issues.append(f"identity_review needs unambiguous known identity and exact contextual evidence: {name}")
+            continue
+        previous = reviews.get(key)
+        if previous:
+            if previous["visibility"] != role:
+                issues.append(f"identity_review has conflicting visibility for identity: {name}")
+                continue
+            previous_parts = previous["source_text"]
+            if isinstance(previous_parts, str):
+                previous_parts = [previous_parts]
+            evidence_parts = list(dict.fromkeys((*previous_parts, *evidence_parts)))
+        evidence = evidence_parts[0] if len(evidence_parts) == 1 else evidence_parts
+        reviews[key] = {"name": canonical(name), "visibility": role, "source_text": evidence}
+        if (role == "visible") != (key in actual):
+            issues.append(f"identity_review visibility disagrees with characters: {name}")
+        if role == "donor" and scrutinize_donors:
+            # A preliminary source row plus a copied scene clause is not proof
+            # of borrowing. Known direct relationships need no extra call; an
+            # unfamiliar relationship gets one semantic recheck, not a guessed
+            # visible person or a permanent rejection based on host grammar.
+            wearers = tuple(dict.fromkeys(
+                item.source_text for item in (*mentions, *anchors)
+                if item.role == "target_character"
+                and _normalized_character_key(canonical(item.source_text)) != key
+            ))
+            direct_phrases = tuple(phrase for part in evidence_parts for wearer in wearers
+                                   for phrase in explicit_worn_clothing_phrases(part, wearer))
+            direct_sources = tuple(source for part in evidence_parts
+                                   for _target, source in explicit_cosplay_assignments(
+                                       tuple(item for item in (*mentions, *anchors)
+                                             if item.role == "target_character"), part,
+                                   ))
+            appearance_reference = any(
+                _normalized_character_key(canonical(change.reference_character)) == key
+                and change.operation != "omit"
+                and any(change.source_text.casefold() in part.casefold() for part in evidence_parts)
+                for change in appearance_changes if change.reference_character
+            )
+            if not appearance_reference and not any(DanbooruResolver._alias_match_spans(phrase, spelling)
+                       for phrase in (*direct_phrases, *direct_sources) for spelling in spellings):
+                issues.append(
+                    f"Re-evaluate donor-only exclusion of {name} from the ORIGINAL request. "
+                    f"Quoted context: {evidence}. No direct wearer-to-source relationship "
+                    "was confirmed in this quote. Preliminary wardrobe/source rows may be "
+                    "wrong; do not use them to prove absence. Read the quoted subjects and "
+                    "shared actions independently: are they co-present people, or is one "
+                    "explicitly borrowing the other's outfit? Return every co-present person. "
+                    "If this is an unfamiliar but real borrowing expression, retain donor "
+                    "with its exact supporting context; do not invent a person to pass review."
+                )
+    for mention in mentions:
+        key = _normalized_character_key(mention.candidates[0])
+        if key not in reviews and (key not in actual or (key in sources and key not in expected)):
+            issues.append(f"Review omitted/source-classified identity {mention.source_text}: "
+                          "return its visible instance or identity_review with visibility "
+                          "visible/donor/quoted/offscreen and exact contextual source_text. "
+                          "Shared clothing descriptions do not turn a co-present person into a donor.")
+    for tag in confirmed_semantic_character_tags(result):
+        if _normalized_character_key(tag) not in actual:
+            issues.append(f"Missing confirmed visible identity: {tag}")
+    plan["validated_identity_review"] = list(reviews.values())
+    plan["dropped_identity_reviews"] = dropped_reviews
+    return (*issues, *nai_cross_panel_instance_issues(plan, user_prompt))
 
 
 def _nai_instance_evidence(
@@ -3847,6 +4281,8 @@ def _nai_instance_evidence(
             user_prompt="", base_tags=wearer.effective.base_tags, semantic_patches=patches,
         )
         wearer = replace(wearer, effective=effective)
+    if wearer is not None:
+        wearer = bind_appearance_accessory_permissions((wearer,), scoped_changes)[0]
     return wearer, scoped_changes
 
 
@@ -3917,7 +4353,7 @@ def _without_omitted_appearance(
     """Remove positive appearance assertions, retaining visibility instructions."""
     result = str(text or "")
     for dimension in dimensions:
-        result = _APPEARANCE_DIMENSION_PATTERNS[dimension].sub("", result)
+        result = _sub_appearance_dimension(dimension, "", result)
     result = re.sub(r"\b(?:and|with)\s*(?=[,;]|$)", "", result, flags=re.I)
     result = re.sub(r"\s+,", ",", result)
     result = re.sub(r",\s*(?=,|;|$)", "", result)
@@ -4091,7 +4527,10 @@ def character_wardrobe_authority_context(
                 f"from the user request, never restore defaults. Evidence: {evidence}"
             )
         elif plan.wardrobe_kind == "default_reference":
-            tags = ", ".join(plan.effective.effective_tags) or "creative fallback"
+            tags = ", ".join(plan.effective.effective_tags) or (
+                "no saved garments visible at this framing; do not invent out-of-frame clothing"
+                if plan.composition_omitted_tags else "creative fallback"
+            )
             lines.append(
                 f"- {plan.target_source_text}: default reference = {tags}. Use when "
                 f"context fits; otherwise adapt to the scene.{mutation_rule}{crop_rule}"
@@ -4178,6 +4617,7 @@ class PromptPipeline:
         self.context = context
         self.config = config
         self.logger = logger
+        self._llm_diagnostics = LLMDiagnostics(logger, get_bool)
         self._danbooru_resolver = danbooru_resolver
         self._researcher = researcher
         self._bool = get_bool
@@ -4247,6 +4687,7 @@ class PromptPipeline:
         character_name: str = "",
         allow_futa: bool = False,
         max_tokens: int | None = None,
+        diagnostic_attempt: str = "initial",
     ) -> str:
         """Ask the configured provider for the seven-block Anima prompt payload.
 
@@ -4287,6 +4728,20 @@ class PromptPipeline:
                 "contains names only. Every character appears exactly once in both "
                 "Identity and Details; keep its clothing in its own Details clause."
                 + sexual_trait_rule
+                + " 用户的具体修改优先于常见角色造型和装饰性扩写。已提供的适用 canonical "
+                "外貌特征必须带归属写入接收者自己的 Identity/Details，不能只写在共享 Tags。"
+                "只写当前镜头中可见的衣物；默认档案不能使大头照变成衣柜展示。"
+                "未要求时不增加柔光、日光、风、景深、虚化或镜头特效。"
+                "已核实的来源特征使用提供的 canonical 拼写（可把下划线写成空格），"
+                "不要把已知标签重新猜成另一种形状。未知或歧义来源只保留用户的参考关系，"
+                "不得凭空补出该来源的具体造型。"
+                "Nltags只补充前面字段未清楚表达的关系、方向、接触与空间含义，"
+                "不得复述完整人物和整幅画面；没有额外含义就留空。"
+                "单人静态肖像的外貌、衣物、镜头和背景若已表达，Nltags写空字段，"
+                "不要另写A portrait of开头的整图复述；明确的额外关系仍须保留。"
+                "Copyright只列画面中可见人物所属作品，外貌或服装参考不额外带入来源作品。"
+                "保留全部明确人物、画格、动作、服装修改及复杂关系。这些具体边界"
+                "优先于自定义模板中笼统的自由扩写和允许重复的说明。"
             ),
             "max_tokens": max_tokens or self._int("prompt_builder_max_tokens", 700),
             "thinking": {
@@ -4297,7 +4752,9 @@ class PromptPipeline:
             kwargs["reasoning_effort"] = (
                 self._str("prompt_builder_reasoning_effort", "high") or "high"
             )
-        response = await self.context.llm_generate(**kwargs)
+        response = await self._llm_diagnostics.generate(
+            self.context, stage="prompt_writer", attempt=diagnostic_attempt, **kwargs
+        )
         return _extract_completion_text(response)
 
     async def _generate_outfit_summary_with_llm(
@@ -4330,7 +4787,7 @@ class PromptPipeline:
             kwargs["reasoning_effort"] = (
                 self._str("prompt_builder_reasoning_effort", "high") or "high"
             )
-        response = await self.context.llm_generate(**kwargs)
+        response = await self._llm_diagnostics.generate(self.context, stage="outfit_summary", **kwargs)
         return _extract_completion_text(response)
 
     async def _generate_character_candidates_with_llm(
@@ -4354,7 +4811,8 @@ class PromptPipeline:
         Returns:
             Normalized candidate tags proposed for evidence-based lookup.
         """
-        response = await self.context.llm_generate(
+        response = await self._llm_diagnostics.generate(
+            self.context, stage="character_candidates",
             chat_provider_id=provider_id,
             prompt=(
                 "Extract the explicitly named existing anime/game character from "
@@ -4509,7 +4967,8 @@ class PromptPipeline:
                 "[comfyui_agent] semantic planner LLM system prompt:\n%s",
                 planner_system_prompt,
             )
-        response = await self.context.llm_generate(
+        response = await self._llm_diagnostics.generate(
+            self.context, stage="semantic_planner",
             chat_provider_id=provider_id,
             prompt=planner_prompt,
             system_prompt=planner_system_prompt,
@@ -4554,7 +5013,8 @@ class PromptPipeline:
             self.logger.info(
                 "[comfyui_agent] semantic planner repair prompt:\n%s", repair_prompt
             )
-        response = await self.context.llm_generate(
+        response = await self._llm_diagnostics.generate(
+            self.context, stage="semantic_planner", attempt="repair",
             chat_provider_id=provider_id,
             prompt=repair_prompt,
             system_prompt=planner_system_prompt,
@@ -4583,7 +5043,8 @@ class PromptPipeline:
         Returns:
             Raw JSON text returned by the provider.
         """
-        response = await self.context.llm_generate(
+        response = await self._llm_diagnostics.generate(
+            self.context, stage="constraint_planner",
             chat_provider_id=provider_id,
             prompt=plan_prompt,
             system_prompt=(
@@ -4601,6 +5062,7 @@ class PromptPipeline:
         provider_id: str,
         plan_prompt: str,
         use_deep_thinking: bool,
+        diagnostic_attempt: str = "initial",
     ) -> str:
         """Ask the active provider for a structured multi-person scene plan.
 
@@ -4629,7 +5091,9 @@ class PromptPipeline:
             kwargs["reasoning_effort"] = (
                 self._str("prompt_builder_reasoning_effort", "high") or "high"
             )
-        response = await self.context.llm_generate(**kwargs)
+        response = await self._llm_diagnostics.generate(
+            self.context, stage="multi_person_planner", attempt=diagnostic_attempt, **kwargs
+        )
         return _extract_completion_text(response)
 
     async def _build_multi_person_prompt(
@@ -4684,6 +5148,7 @@ class PromptPipeline:
                     provider_id=provider_id,
                     plan_prompt=plan_prompt,
                     use_deep_thinking=use_deep_thinking,
+                    diagnostic_attempt="initial" if attempt == 0 else "retry_1",
                 )
             except Exception as exc:
                 planner_error = self._shorten(str(exc), 300)
@@ -5405,6 +5870,15 @@ class PromptPipeline:
             # References do not change the authoritative LLM1 roster. A name in
             # the writer's visible-instance list binds its own local row below.
             target_outfits = outfits
+            identity_mentions = nai_local_identity_mentions(prompt, semantic_result)
+            summary["nai_identity_mentions"] = [
+                {"source": item.source_text, "canonical_tags": list(item.candidates)}
+                for item in identity_mentions
+            ]
+            summary["nai_anchor_roles"] = [
+                {"id": item.anchor_id, "source": item.source_text,
+                 "role": item.role, "candidates": list(item.candidates)} for item in anchors
+            ]
             # Evidence classifies these as clothing/appearance even when their
             # canonical names do not match the parser's generic tag patterns.
             # This removes global leakage only; it cannot choose a wearer.
@@ -5464,6 +5938,32 @@ class PromptPipeline:
                 {"anchor_id": item.target_anchor_id, "source": item.target_source_text,
                  "canonical_tags": list(item.target_candidates)} for item in local_references
             ]
+            if identity_mentions:
+                plan_prompt += (
+                    "\nIdentity completeness review: reconcile EVERY locally confirmed name below "
+                    "against the full request, independently of the preliminary target/source roles. "
+                    "A clothing donor can also be visibly present. In 'A and B have rumpled clothes "
+                    "and sit together', both are visible; in 'A wears B's clothes', B is only a donor "
+                    "unless separately present. Do not drop co-present people to prioritize tags. "
+                    "An identity used only as an appearance reference also uses visibility=donor, "
+                    "with the exact dimension-copying context as evidence; it grants no clothes. "
+                    "Use the exact canonical identity for every returned instance. "
+                    "For each absent identity, or any preliminary source returned as visible, add "
+                    "a top-level identity_review array entry: "
+                    '{"name":"canonical identity","visibility":"visible|donor|quoted|offscreen",'
+                    '"source_text":"exact contextual phrase from the request"}. '
+                    "source_text may instead be an array of exact excerpts for separate clauses; "
+                    "do not paraphrase or join excerpts with ellipses. "
+                    "identity_review summarizes UNIQUE IDENTITIES, not panel instances: "
+                    "combine one identity's contextual excerpts in one entry. It does not "
+                    "replace the separate characters entries for that person's panel appearances. "
+                    "The phrase must include the name and the surrounding visibility evidence; "
+                    "a bare name is insufficient. Donors, quoted names and off-screen people stay "
+                    "absent unless independently visible. Do not invent evidence or extra people.\n"
+                )
+                plan_prompt += "\n".join(
+                    f"- {item.source_text} => {', '.join(item.candidates)}" for item in identity_mentions
+                )
             plan_prompt += build_keyword_rule_block(tuple(keyword_rules))
             plan_prompt += text_request.writer_rule()
             if mode == "img2img":
@@ -5488,6 +5988,10 @@ class PromptPipeline:
                 "global_prompt needs English framing/background tags, not only population "
                 "and copyright before Chinese. In each prompt serialize English tags first, "
                 "then the user-language sentences. "
+                "Each characters object is ONE visible appearance in ONE panel, even with "
+                "no lettering. Repeat canonical names and applicable anchors in separate "
+                "objects across panels; never summarize several panels in one object with "
+                "one centre. Count visible appearances, not unique names or panel count. "
                 "A bare body-state tag applies to the affected body part's owner, "
                 "not automatically to an action's source or both participants. "
                 "For example, A puts A's hand inside B's mouth: "
@@ -5500,8 +6004,21 @@ class PromptPipeline:
                 "Do not clone personal accessories across wearers of a shared outfit. "
                 "For the same mapped concept, use the supplied canonical tag spelling "
                 "rather than inventing plural or synonymous tags. "
+                "For a known dimension-scoped appearance reference, put the supplied "
+                "canonical source facts in that recipient's actual prompt. Unknown or "
+                "ambiguous references preserve the user's relation without invented "
+                "source geometry; never complete a source profile from guesses. "
                 "Require confirmed canonical identity and still-applicable named-outfit tags "
                 "in each wearer's actual prompt; Chinese names alone are not tag anchors. "
+                "Decide who is visibly present from the original request BEFORE consulting "
+                "preliminary target/source classifications. Local canonical identities and "
+                "appearance facts are authoritative; an inferred clothing-source role is not "
+                "proof that its owner is absent. Independently present people must keep their "
+                "own boxes even if a preliminary wardrobe row calls them a source. "
+                "A和B衣服凌乱地坐在一起 describes A and B sitting together, not A wearing "
+                "B's clothes. Only a real borrowing/reference relationship permits donor-only "
+                "exclusion; shared clothes or actions alone do not. This visibility review "
+                "does not relax canonical tags, explicit user edits or per-instance authority. "
                 "Lighting is opt-in: never add default soft/cinematic/fill lighting. "
                 "Explicit darkness and other stated absences override embellishment. "
                 "Use spatial reasoning to choose positions, scale and orientation "
@@ -5529,7 +6046,8 @@ class PromptPipeline:
                     "instance index; narration has null owner. Never merge a character's "
                     "different panels into one prompt, centre or lettering scope."
                 )
-            response = await self.context.llm_generate(
+            response = await self._llm_diagnostics.generate(
+                self.context, stage="nai_direct_writer",
                 chat_provider_id=provider_id, prompt=plan_prompt,
                 system_prompt=writer_system_prompt,
                 max_tokens=max(1200, min(7200, max(
@@ -5544,21 +6062,66 @@ class PromptPipeline:
                 self.logger.info("[comfyui_agent] NAI -r direct writer raw output:\n%s", plan_raw)
             if is_chinese_model_refusal(plan_raw):
                 return self._model_refusal_result(summary, plan_raw)
-            nai_plan = parse_nai_character_plan(
-                plan_raw, character_limit=canvas["character_limit"],
-                character_scoped_tags=character_scoped_tags,
-                text_request=text_request,
-            )
-            interaction_issues = downgrade_nai_interaction_tags(nai_plan)
-            issues = tuple(nai_plan.get("text_validation_errors", ()))
-            summary.update(nai_character_plan_attempt_count=1,
-                           nai_interaction_initial_validation_errors=list(interaction_issues),
-                           nai_text_initial_validation_errors=list(issues))
+            def validate_plan(raw: str, attempt: str) -> tuple[dict[str, Any] | None, tuple[str, ...]]:
+                for kind in ("structure", "interaction", "text", "identity", "appearance"):
+                    summary[f"nai_{kind}_{attempt}_validation_errors"] = []
+                try:
+                    parsed = parse_nai_character_plan(
+                        raw, character_limit=canvas["character_limit"],
+                        character_scoped_tags=character_scoped_tags, text_request=text_request,
+                    )
+                except ValueError as exc:
+                    errors = (str(exc),)
+                    summary[f"nai_structure_{attempt}_validation_errors"] = list(errors)
+                    return None, errors
+                interaction_errors = downgrade_nai_interaction_tags(parsed)
+                # A syntax-only initial failure has not reviewed donor meaning.
+                # The first usable allocation must still receive that review.
+                identity_errors = review_nai_identities(
+                    parsed, identity_mentions, semantic_result, anchors, prompt,
+                    scrutinize_donors=attempt == "initial" or bool(
+                        summary.get("nai_structure_initial_validation_errors")),
+                    appearance_changes=appearance_changes,
+                )
+                text_errors = tuple(parsed.get("text_validation_errors", ()))
+                appearance_errors: list[str] = []
+                # Reuse instance binding only for this new check. Do not change
+                # existing optional-source diagnostics or non-reference paths.
+                reference_instances = parsed["characters"] if appearance_reference_evidence(
+                    appearance_changes, semantic_result,
+                ) else ()
+                for character in reference_instances:
+                    repeated = sum(_normalized_character_key(item["name"]) ==
+                                   _normalized_character_key(character["name"])
+                                   for item in parsed["characters"]) > 1
+                    try:
+                        _wearer, changes = _nai_instance_evidence(
+                            dict(character), (*target_outfits, *local_references), appearance_changes,
+                            original_prompt, repeated=repeated,
+                        )
+                    except ValueError as exc:
+                        appearance_errors.append(str(exc))
+                        continue
+                    appearance_errors.extend(reference_appearance_issues(
+                        character["prompt"], appearance_reference_evidence(changes, semantic_result),
+                    ))
+                summary[f"nai_interaction_{attempt}_validation_errors"] = list(interaction_errors)
+                summary[f"nai_text_{attempt}_validation_errors"] = list(text_errors)
+                summary[f"nai_identity_{attempt}_validation_errors"] = list(identity_errors)
+                summary[f"nai_appearance_{attempt}_validation_errors"] = appearance_errors
+                return parsed, (*text_errors, *identity_errors, *appearance_errors)
+
+            nai_plan, issues = validate_plan(plan_raw, "initial")
             if issues:
-                repair_prompt = (plan_prompt + "\nThe previous allocation failed interaction/text ownership review:\n"
+                repair_prompt = (plan_prompt + "\nThe previous allocation failed structure/identity/text/appearance ownership review:\n"
                                  + "\n".join(issues) + "\nPrevious JSON:\n" + plan_raw
                                  + "\nRecheck the original request and both participants. Repair the "
                                  "complete JSON once, preserving valid identities, wardrobe and layout. "
+                                 "Return valid JSON with the exact schema keys: composition_analysis "
+                                 "requires nonempty viewpoint, layout and relations strings; each "
+                                 "character requires name, prompt, position_reason and numeric x/y "
+                                 "in [0,1]. Do not translate or rename keys, close character objects "
+                                 "before their remaining fields, or guess coordinates on the host. "
                                  "Use matching action tags for directed pairs; remove invented roles "
                                  "instead of inventing an extra participant. Repair missing/duplicate lettering "
                                  "ids, panel/instance ownership and placement tokens. Literal source spans "
@@ -5567,10 +6130,15 @@ class PromptPipeline:
                                  "separate panel instances with their own prompts/centres, then update "
                                  "all affected zero-based character_index values. The unique-identity "
                                  "roster does not forbid repeated names in the characters array. "
+                                 "If the original occurrence context has no requested panel name, "
+                                 "use panel=\"\"; keep any writer-designed panel placement in the "
+                                 "actual prompt and placement, and bind text by character_index. "
+                                 "Do not present a writer-invented panel label as a source quote. "
                                  "never flatten an unresolved line into base or ignore a requested line.")
                 summary["nai_character_plan_attempt_count"] = 2
                 summary["prompt_llm_attempt_count"] = 2
-                response = await self.context.llm_generate(
+                response = await self._llm_diagnostics.generate(
+                    self.context, stage="nai_direct_writer", attempt="repair",
                     chat_provider_id=provider_id, prompt=repair_prompt,
                     system_prompt=writer_system_prompt + " Repair the reported errors while preserving valid content.",
                     max_tokens=max(1200, min(7200, max(
@@ -5587,17 +6155,16 @@ class PromptPipeline:
                 if is_chinese_model_refusal(retry_raw):
                     return self._model_refusal_result(summary, retry_raw)
                 plan_raw = retry_raw
-                nai_plan = parse_nai_character_plan(
-                    plan_raw, character_limit=canvas["character_limit"],
-                    character_scoped_tags=character_scoped_tags,
-                    text_request=text_request,
-                )
-                interaction_issues = downgrade_nai_interaction_tags(nai_plan)
-                issues = tuple(nai_plan.get("text_validation_errors", ()))
-                summary["nai_interaction_retry_validation_errors"] = list(interaction_issues)
-                summary["nai_text_retry_validation_errors"] = list(issues)
+                nai_plan, issues = validate_plan(plan_raw, "retry")
                 if issues:
-                    raise ValueError("nai_text_plan_invalid: " + "; ".join(issues))
+                    if summary["nai_structure_retry_validation_errors"]:
+                        raise ValueError(issues[0])
+                    raise ValueError(("nai_identity_plan_invalid: " if summary["nai_identity_retry_validation_errors"]
+                                      else "nai_appearance_plan_invalid: " if summary["nai_appearance_retry_validation_errors"]
+                                      else "nai_text_plan_invalid: ") + "; ".join(issues))
+            assert nai_plan is not None  # Invalid structure always has issues.
+            summary["nai_identity_review"] = nai_plan["validated_identity_review"]
+            summary["nai_dropped_identity_reviews"] = nai_plan["dropped_identity_reviews"]
             bound_references = tuple(
                 item for item in local_references
                 if any(_character_outfit_matches(character["name"], item)
@@ -5693,10 +6260,13 @@ class PromptPipeline:
                 for tag in (source_anchor_tags.get(anchor.anchor_id, ""), *anchor.candidates)
                 if tag and tag in semantic_result.confirmed_tags
             } - {_normalized_character_key(tag) for tag in expected}
-            if donor_only & actual:
+            reviewed_visible = {_normalized_character_key(item["name"])
+                                for item in nai_plan["validated_identity_review"] if item["visibility"] == "visible"}
+            if (donor_only & actual) - reviewed_visible:
                 raise ValueError("nai_character_plan_visible_outfit_source")
             if missing:
                 raise ValueError("nai_character_plan_missing_confirmed_identity: " + ", ".join(sorted(missing)))
+            summary["nai_population_correction"] = reconcile_nai_instance_population(nai_plan)
             global_prompt, removed = _strip_unrequested_sexual_trait_text(
                 nai_plan["global_prompt"], allow_futa=allow_futa,
                 allow_male_genitals=allow_male_genitals,
@@ -5746,7 +6316,7 @@ class PromptPipeline:
             return PromptPipelineResult(nai_plan["global_prompt"], summary)
         except Exception as exc:
             summary.update(skipped_reason="nai_text_plan_failed" if str(exc).startswith("nai_text_") else "nai_character_plan_failed", llm_error=str(exc),
-                           final_prompt_head="", final_prompt_chars=0)
+                           llm_failed=True, final_prompt_head="", final_prompt_chars=0)
             if debug:
                 summary.update(nai_character_plan_prompt=plan_prompt, nai_character_plan_raw=plan_raw)
                 self.logger.info("[comfyui_agent] NAI -r direct writer failed: %s", exc)
@@ -5759,6 +6329,7 @@ class PromptPipeline:
         canvas_size_explicit: bool = False,
     ) -> PromptPipelineResult:
         """Keep native NAI lettering outside the visual prompt pipeline."""
+        diagnostic_run_id = self._llm_diagnostics.start_run()
         config = apply_config_preset(dict(self.config))
         canvas = resolve_nai_canvas(
             config, canvas_size or (self._int("width", 1024), self._int("height", 1536)),
@@ -5794,6 +6365,8 @@ class PromptPipeline:
             original_user_prompt=original, canvas_size=canvas_size,
             canvas_size_explicit=canvas_size_explicit, text_request=text_request,
         )
+        if diagnostic_run_id:
+            result.summary["llm_diagnostics_run_id"] = diagnostic_run_id
         if result.final_prompt and text_request.texts:
             raw = result.summary.get("raw_mode", False) or not self._bool("prompt_optimize_enabled", True)
             summary = result.summary
@@ -5850,6 +6423,7 @@ class PromptPipeline:
         """
         original_prompt = str(user_prompt or "").strip()
         nai_r_mode, original_prompt = strip_nai_character_switch(original_prompt)
+        raw_mode, raw_prompt = strip_raw_prefix(original_prompt)
         _, background_intent_prompt = strip_nai_character_switch(
             str(original_user_prompt or original_prompt).strip()
         )
@@ -5898,7 +6472,6 @@ class PromptPipeline:
                 }
             )
             return PromptPipelineResult(prompt, summary)
-        raw_mode, raw_prompt = strip_raw_prefix(prompt)
         if raw_mode:
             if nai_r_mode:
                 summary["skipped_reason"] = "nai_character_mode_requires_optimization"
@@ -6739,6 +7312,11 @@ class PromptPipeline:
         )
         if missing_profile_fallback:
             wardrobe_source = "missing_profile_fallback"
+        character_effective_outfits = bind_appearance_accessory_permissions(
+            character_effective_outfits, semantic_appearance_changes,
+        )
+        reference_evidence = appearance_reference_evidence(semantic_appearance_changes, semantic_result)
+        summary["appearance_reference_evidence"] = list(reference_evidence)
         wardrobe_authority = build_wardrobe_authority(
             character_effective_outfits,
             semantic_result,
@@ -6778,6 +7356,16 @@ class PromptPipeline:
         semantic_confirmed_tags = wardrobe_authority.filter_tags(
             semantic_confirmed_tags
         )
+        # An appearance source conditions only its requested dimensions, never
+        # becomes an unconditional second character identity in the final prompt.
+        visible_identity_tags = {
+            tag for anchor_id, tag in semantic_result.anchor_tags
+            if any(anchor.anchor_id == anchor_id and anchor.role == "target_character"
+                   for anchor in semantic_anchors)
+        }
+        appearance_only_sources = {row["canonical_reference"] for row in reference_evidence} - visible_identity_tags
+        semantic_confirmed_tags = tuple(tag for tag in semantic_confirmed_tags
+                                        if tag not in appearance_only_sources)
         semantic_required_tags = tuple(
             dict.fromkeys(
                 (
@@ -6923,6 +7511,42 @@ class PromptPipeline:
                     + "; ".join(semantic_result.missing_descriptions)
                 )
             semantic_context = "\n".join(line for line in context_lines if line.rstrip(": "))
+        if reference_evidence:
+            semantic_context += (
+                "\nAppearance references by recipient (only the listed dimensions are copied; "
+                "these do not select clothes or add visible people):\n"
+                + "\n".join(
+                    f"- {row['character']} <= {row['reference']} ({row['canonical_reference']}): "
+                    f"dimensions={', '.join(row['dimensions'])}; "
+                    f"known facts={', '.join(row['tags']) or 'none supplied; preserve the original reference relation without inventing source features'}; "
+                    f"optional visible hair accessories={', '.join(row['optional_accessories']) or 'none supplied'}; "
+                    f"user evidence={row['source_text']}"
+                    for row in reference_evidence
+                )
+                + "\nUse an applicable supplied canonical fact instead of inventing a competing "
+                "hairstyle/feature. Write the applicable canonical facts in that recipient's "
+                "own Identity/Details (or actual NAI instance prompt), not only in shared Tags "
+                "or analysis. Keep other dimensions of the recipient. Source clothes and "
+                "unrequested source colors/body traits are not transferred. Accessories are optional "
+                "writer choices, never a checklist. Source-only copyright metadata is not the "
+                "recipient's copyright. Explicit edits/removals and visibility win."
+            )
+        unresolved_references = tuple(change for change in semantic_appearance_changes
+                                      if change.reference_character and change.operation != "omit"
+                                      and not any(row["character"] == change.character_name
+                                                  and row["reference"] == change.reference_character
+                                                  and row["source_text"] == change.source_text
+                                                  for row in reference_evidence))
+        if unresolved_references:
+            semantic_context += (
+                "\nUnresolved appearance references: no unique local source facts are available. "
+                "Keep these original relations in the recipient's text. Do not invent a "
+                "specific source shape, geometry, color, accessory or outfit from memory. "
+                "Retain independently stated user details and unmodified recipient facts:\n"
+                + "\n".join(f"- {change.character_name}: {change.source_text} "
+                            f"(source={change.reference_character}; dimensions={', '.join(change.dimensions)})"
+                            for change in unresolved_references)
+            )
         if nai_r_mode:
             if self._bool("debug_prompt_enabled", False):
                 summary.update(semantic_plan_raw=semantic_plan_raw,
@@ -7037,6 +7661,7 @@ class PromptPipeline:
                         character_name="",
                         allow_futa=allow_futa,
                         max_tokens=7200 if nai_r_mode else None,
+                        diagnostic_attempt="thinking_error_fallback",
                     )
                 except Exception as retry_exc:
                     self.logger.warning(
@@ -7067,6 +7692,7 @@ class PromptPipeline:
                     character_name="",
                     allow_futa=allow_futa,
                     max_tokens=7200 if nai_r_mode else None,
+                    diagnostic_attempt="empty_fallback",
                 )
             except Exception as retry_exc:
                 self.logger.warning(
@@ -7106,6 +7732,9 @@ class PromptPipeline:
         llm_content, llm_background_mode = extract_background_mode(llm_content)
         structured_parse = validate_confirmed_character_roster(
             _parse_structured_prompt(llm_content), semantic_character_tags
+        )
+        structured_parse = validate_structured_appearance_references(
+            structured_parse, reference_evidence, character_effective_outfits,
         )
         structured_roster_tags = structured_parse.roster_tags
         structured_copyright_tags = structured_parse.copyright_tags
@@ -7170,6 +7799,7 @@ class PromptPipeline:
                 retry_llm_content = await self._generate_prompt_tags_with_llm(
                     provider_id=provider_id,
                     llm_prompt=strict_format_prompt,
+                    diagnostic_attempt="format_retry",
                     use_deep_thinking=False,
                     fixed_character=False,
                     character_name="",
@@ -7190,6 +7820,9 @@ class PromptPipeline:
                 )
                 retry_parse = validate_confirmed_character_roster(
                     _parse_structured_prompt(retry_content), semantic_character_tags
+                )
+                retry_parse = validate_structured_appearance_references(
+                    retry_parse, reference_evidence, character_effective_outfits,
                 )
                 structured_roster_tags = retry_parse.roster_tags
                 structured_copyright_tags = retry_parse.copyright_tags
@@ -7352,6 +7985,7 @@ class PromptPipeline:
                 structured_scene,
                 character_effective_outfits,
                 user_prompt=prompt,
+                appearance_changes=semantic_appearance_changes,
             )
             if (
                 effective_outfit.modified

@@ -9,6 +9,8 @@
 
 真正生效的运行文件是 `data/config/astrbot_plugin_anima_master_config.json`。它是标准 JSON，不能直接写注释。
 
+2026-10-19 的自然语言优化模板默认值已同步聚焦和作用域规则：外貌参考只借对应维度，普通 `Nltags` 只补充关系/空间含义，未要求时不额外装饰光影。已知旧内置模板按指纹迁移；自定义模板保存内容不改，运行时附加明确的权限和可见性规则。这不新增开关、固定 tag 数量或模型阶段，也不自动修改用户的角色档案、画师或质量前缀。
+
 ## 最低启动清单
 
 能发起生图前，至少确认这些配置：
@@ -306,10 +308,18 @@ Canonical Tag: haneoka_school_uniform
 调试项默认关闭。只有排查问题时再打开：
 
 - `debug_prompt_enabled`
+- `debug_llm_reasoning_enabled`
+- `debug_llm_usage_enabled`
 - `debug_image_reference_enabled`
 - `debug_send_payload_enabled`
 
 开启后可能在日志和 `last_task.json` 中记录较长提示词，请注意隐私。
+
+`debug_llm_reasoning_enabled` 与 `debug_llm_usage_enabled` 可独立开启，不依赖 `debug_prompt_enabled`，位于配置页“排查问题”。前者以 `LLM reasoning` 记录接口实际返回的 `reasoning_content`；没有独立推理文本时写明 `reasoning_status=not_returned`（未返回推理内容），不从最终正文猜测思考过程。后者以 `LLM usage` 记录阶段、provider ID、调用 ID、初次/修复/降级重试标记、调用耗时、请求的 token 上限与思考参数、输入/缓存/输出/总 token，以及接口提供的推理 token 和结束原因。用量日志不包含任务书、模型正文或推理文本；缺失计数为 JSON `null`，不能当作零消耗。推理 token 是输出的一部分，不再加到总数上。调用失败或取消时只记录错误类型和耗时，不输出异常中的请求体。
+
+覆盖普通语义规划及修复、七字段写作及降级/格式重试、NAI `-r` 直接写作及修复、服装摘要、角色候选、低 CFG 约束、独立多人规划、引用图反推和生成后验图。批量名词翻译/审核和独立维护脚本不在这两个开关范围内，批量翻译沿用自己的用量统计。普通提示词构建的多次调用共享 `run_id`；最近任务摘要中的 `llm_diagnostics_run_id` 可用于检索该次构建的日志；并发请求分别保存，单次调用用 `call_id` 对应推理与用量。引用图反推和验图使用各自的调用组，不把它们的 `run_id` 当作生图任务 ID。
+
+这两个开关只读取已有模型响应，不改任务书、模型参数、最终提示词或调用次数，推理正文也不新增到任务摘要或聊天消息。开启日志本身不会减少 token；可据此定位多余思考、截断和重试，再单独调整配置。普通第一阶段和 NAI `-r` 写作者当前请求关闭思考，因而可能没有推理内容；provider 自定义参数也可能覆盖插件请求参数，日志里的 `requested_*` 只代表插件传入值，不代表服务端最终执行值。更新代码后重载插件，在配置页开启需要的开关、保存并按 AstrBot 配置流程重载后复现即可。
 
 `debug_prompt_enabled` 会同时记录第一次语义规划 LLM 的任务书、system prompt、完整原始回复、解析后的 anchors、恢复前后的 `character_plans`，以及第二次提示词 LLM 的任务书、回复和最终 prompt。`-r` 请求以 `NAI -r direct writer` 记录专用第二阶段实际画布、位置规划任务书、模型原始回复，以及解析和后处理后的完整位置规划（构图分析、每个角色的位置理由、XY 坐标、角色提示词、被丢弃的互动方向 tag，以及从全局提示词删除的明确角色实例 tag）。解析失败时也会记录原始回复和错误。任务摘要另保存 `nai_character_plan_prompt`、`nai_character_plan_raw` 与 `nai_dropped_global_character_tags`；方向配对错误、初稿/修复稿及尝试次数分别记录在 `nai_interaction_initial_validation_errors` / `nai_interaction_retry_validation_errors`、`nai_character_plan_initial_raw` / `nai_character_plan_retry_raw` 和 `nai_character_plan_attempt_count` 中，便于复核规划结果。关闭该开关时不输出这些位置规划调试日志。
 
