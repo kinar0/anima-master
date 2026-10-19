@@ -1,0 +1,2 @@
+# Keep upstream byte hashes reproducible on Windows as well as Unix.
+*.ts -text
