@@ -1,0 +1,9 @@
+{
+  "method": "danbooru-tags.exe --batch-file tag-queries.json --batch-workers 8 --for-prompt --json --compact",
+  "results_summary": {
+    "two_side_up": {"group_appearance_found": false, "general_exact_tag": true, "count": 183477},
+    "two_sides_up": {"group_appearance_found": false, "general_exact_tag": false},
+    "hair_ribbon": {"group_clothing_exact_tag": true, "count": 663813}
+  },
+  "limitation": "Local exact-tag evidence only; not image quality or hairstyle transfer validation."
+}

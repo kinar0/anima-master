@@ -1,0 +1,42 @@
+{
+  "tested_at": "2026-10-19T20:52:11",
+  "provider_id": "deepseek/deepseek-v4-flash",
+  "requested_model": "deepseek-v4-flash",
+  "response_model": "deepseek-flash",
+  "configured_modalities": [
+    "text"
+  ],
+  "expected_rows": [
+    [
+      "yellow",
+      "blue",
+      "red",
+      "green"
+    ],
+    [
+      "blue",
+      "orange",
+      "purple",
+      "purple"
+    ],
+    [
+      "green",
+      "purple",
+      "purple",
+      "green"
+    ]
+  ],
+  "reply": "{\"rows\":[[\"yellow\",\"blue\",\"red\",\"green\"],[\"blue\",\"orange\",\"purple\",\"purple\"],[\"green\",\"purple\",\"purple\",\"green\"]]}",
+  "exact_match": true,
+  "usage": {
+    "prompt_tokens": 250,
+    "completion_tokens": 36,
+    "total_tokens": 286,
+    "prompt_tokens_details": {
+      "cached_tokens": 0
+    },
+    "prompt_cache_hit_tokens": 0,
+    "prompt_cache_miss_tokens": 250
+  },
+  "finish_reason": "stop"
+}

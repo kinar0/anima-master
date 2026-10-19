@@ -1,0 +1,74 @@
+{
+  "queries": [
+    {
+      "group": "appearance",
+      "id": "two_side_up",
+      "match_mode": "exact",
+      "keyword": "two_side_up",
+      "limit": 5
+    },
+    {
+      "group": "appearance",
+      "id": "two_sides_up",
+      "match_mode": "exact",
+      "keyword": "two_sides_up",
+      "limit": 5
+    },
+    {
+      "group": "appearance",
+      "id": "yellow_eyes_blue_hair",
+      "match_mode": "exact",
+      "keyword": "yellow_eyes_blue_hair",
+      "limit": 5
+    },
+    {
+      "group": "expression",
+      "id": "partable_lips",
+      "match_mode": "exact",
+      "keyword": "partable_lips",
+      "limit": 5
+    },
+    {
+      "group": "expression",
+      "id": "parted_lips",
+      "match_mode": "exact",
+      "keyword": "parted_lips",
+      "limit": 5
+    },
+    {
+      "group": "pose",
+      "id": "hands_on_own_lap",
+      "match_mode": "exact",
+      "keyword": "hands_on_own_lap",
+      "limit": 5
+    },
+    {
+      "group": "pose",
+      "id": "sitting_on_bed",
+      "match_mode": "exact",
+      "keyword": "sitting_on_bed",
+      "limit": 5
+    },
+    {
+      "group": "action",
+      "id": "teasing",
+      "match_mode": "exact",
+      "keyword": "teasing",
+      "limit": 5
+    },
+    {
+      "group": "scene",
+      "id": "bed_sheet",
+      "match_mode": "exact",
+      "keyword": "bed_sheet",
+      "limit": 5
+    },
+    {
+      "group": "series",
+      "id": "master_of_melodia",
+      "match_mode": "exact",
+      "keyword": "master_of_melodia",
+      "limit": 5
+    }
+  ]
+}

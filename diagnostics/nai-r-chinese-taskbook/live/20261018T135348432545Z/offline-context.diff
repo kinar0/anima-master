@@ -1,0 +1,13 @@
+--- recorded-english
+
++++ offline-reconstructed-english
+
+@@ -57,7 +57,6 @@
+
+ Stable appearance baseline by wearer (visible dimensions only; apply user changes to the indicated instance, never copy omitted features):
+ - 祥子: blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts
+ - 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)
+-unresolved concepts; express only when assigned by the character plan: 羽丘冬季校服
+ Per-character clothing evidence:
+ - 祥子: default reference = haneoka_school_uniform, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, striped_necktie. Use when context fits; otherwise adapt to the scene. Saved profile components outside the requested framing were omitted; do not restore them.
+ - 千早爱音: named outfit base = haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, blue_necktie, wing_collar. Keep its recognizable unmodified components; apply every user-requested change to the base even when a saved component conflicts. Do not substitute another outfit. Saved profile components outside the requested framing were omitted; do not restore them.

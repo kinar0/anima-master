@@ -1,0 +1,333 @@
+{
+  "task_id": "ca259e35234145c6957f3b988dae2c72",
+  "time": "2026-10-17T17:19:27.381356",
+  "ok": true,
+  "clean_request": "丰川祥子和粥祥把千早爱音夹在中间，调戏着千早爱音。千早爱音脸色羞红。三人坐在床边",
+  "hand_suffix_excluded_from_models": true,
+  "semantic_plan": {
+    "characters": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "粥祥",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ]
+  },
+  "confirmed_bindings": [
+    {
+      "source": "丰川祥子",
+      "canonical_tag": "togawa_sakiko"
+    },
+    {
+      "source": "粥祥",
+      "canonical_tag": "togawa_sakiko_(master_of_melodia)"
+    },
+    {
+      "source": "千早爱音",
+      "canonical_tag": "chihaya_anon"
+    }
+  ],
+  "anchor_roles": [
+    {
+      "id": "target_1",
+      "source": "丰川祥子",
+      "role": "target_character",
+      "candidates": [
+        "togawa_sakiko"
+      ]
+    },
+    {
+      "id": "target_2",
+      "source": "粥祥",
+      "role": "target_character",
+      "candidates": [
+        "togawa_sakiko_(master_of_melodia)"
+      ]
+    },
+    {
+      "id": "target_3",
+      "source": "千早爱音",
+      "role": "target_character",
+      "candidates": [
+        "chihaya_anon"
+      ]
+    }
+  ],
+  "identity_review": [
+    {
+      "name": "togawa_sakiko",
+      "visibility": "visible",
+      "source_text": "丰川祥子和粥祥把千早爱音夹在中间，调戏着千早爱音。"
+    },
+    {
+      "name": "togawa_sakiko_(master_of_melodia)",
+      "visibility": "visible",
+      "source_text": "丰川祥子和粥祥把千早爱音夹在中间，调戏着千早爱音。"
+    },
+    {
+      "name": "chihaya_anon",
+      "visibility": "visible",
+      "source_text": "千早爱音脸色羞红。三人坐在床边"
+    }
+  ],
+  "attempts": {
+    "semantic": 1,
+    "writer": 1
+  },
+  "global_raw": "3girls, indoors, bedroom, bed, sitting, sitting_on_bed, bed_sheet, medium_shot, eye_level, 三人一起坐在床边，丰川祥子和粥祥一左一右把千早爱音夹在中间，两人凑近调戏她，千早爱音脸颊羞红，被两人夹住。",
+  "global_final": "2::blender ( medium ) ::, 3::3d::, 2::game screenshot::, -1:: realistic face::, 0.75::girls ' frontline 2: exilium style ::, 0.5::wuthering waves ( style ) ::, photorealistic, 0.3::detailed texture::, year 2025, year 2026, 10::very aesthetic::, 5:: masterpiece::, detailed light, ray tracing, cinematic lighting, depth of field, masterpiece, best quality, questionable, 3girls, indoors, bedroom, bed, bed sheet, medium shot, eye level, 三人一起坐在床边, 丰川祥子和粥祥一左一右把千早爱音夹在中间, 两人凑近调戏她, 千早爱音脸颊羞红, 被两人夹住。",
+  "global_submitted_before_conversion": "2::blender ( medium ) ::, 3::3d::, 2::game screenshot::, -1:: realistic face::, 0.75::girls ' frontline 2: exilium style ::, 0.5::wuthering waves ( style ) ::, photorealistic, 0.3::detailed texture::, year 2025, year 2026, 10::very aesthetic::, 5:: masterpiece::, detailed light, ray tracing, cinematic lighting, depth of field, masterpiece, best quality, questionable, 3girls, indoors, bedroom, bed, bed sheet, medium shot, eye level, 三人一起坐在床边, 丰川祥子和粥祥一左一右把千早爱音夹在中间, 两人凑近调戏她, 千早爱音脸颊羞红, 被两人夹住。, nsfw, explicit",
+  "global_converted_reconstructed": "2::blender ( medium ) ::, 3::3d::, 2::game screenshot::, -1:: realistic face::, 0.75::girls ' frontline 2: exilium style ::, 0.5::wuthering waves ( style ) ::, photorealistic, 0.3::detailed texture::, year 2025, year 2026, 10::very aesthetic::, 5:: masterpiece::, detailed light, ray tracing, cinematic lighting, depth of field, masterpiece, best quality, questionable, 3girls, indoors, bedroom, bed, bed sheet, medium shot, eye level, 三人一起坐在床边, 丰川祥子和粥祥一左一右把千早爱音夹在中间, 两人凑近调戏她, 千早爱音脸颊羞红, 被两人夹住。, nsfw, explicit",
+  "instances": [
+    {
+      "name": "togawa_sakiko",
+      "x": 0.2,
+      "y": 0.55,
+      "raw_prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, sitting, sitting_on_bed, leaning_forward, looking_at_another, smug, half-closed_eyes, head_tilt, 丰川祥子坐在床边左侧，身体向中间的千早爱音倾斜，肩臂贴着她，侧脸凑近用带着笑意的眼神调戏她。",
+      "final_prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, sitting, sitting_on_bed, leaning_forward, looking_at_another, smug, half-closed_eyes, head_tilt, 丰川祥子坐在床边左侧, 身体向中间的千早爱音倾斜, 肩臂贴着她, 侧脸凑近用带着笑意的眼神调戏她。, source#teasing, yellow_eyes_blue_hair",
+      "converted_reconstructed": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, large_breasts, white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, white_socks, black_shoes, sitting, sitting_on_bed, leaning_forward, looking_at_another, smug, half-closed_eyes, head_tilt, 丰川祥子坐在床边左侧, 身体向中间的千早爱音倾斜, 肩臂贴着她, 侧脸凑近用带着笑意的眼神调戏她。, source#teasing, yellow_eyes_blue_hair",
+      "added_tokens": [
+        "source#teasing",
+        "yellow_eyes_blue_hair"
+      ],
+      "removed_tokens": [],
+      "interaction_tags": [
+        "source#teasing"
+      ],
+      "exactly_matches_embedded_workflow": true
+    },
+    {
+      "name": "togawa_sakiko_(master_of_melodia)",
+      "x": 0.8,
+      "y": 0.55,
+      "raw_prompt": "girl, togawa_sakiko_(master_of_melodia), blue_hair, long_hair, yellow_eyes, two_sides_up, large_breasts, horns, black_dress, frilled_dress, dress_ribbon, puffy_short_sleeves, black_gloves, black_ribbon, hair_ribbon, black_pantyhose, black_thighhighs, black_shoes, boots, detached_collar, official_alternate_costume, sitting, sitting_on_bed, leaning_forward, looking_at_another, smug, smile, head_tilt, 粥祥坐在床边右侧，身体向中间的千早爱音靠拢，手臂贴在她另一侧，凑近带着调笑的神情逗弄她。",
+      "final_prompt": "girl, togawa_sakiko_(master_of_melodia), blue_hair, long_hair, yellow_eyes, two_sides_up, large_breasts, horns, black_dress, frilled_dress, dress_ribbon, puffy_short_sleeves, black_gloves, black_ribbon, hair_ribbon, black_pantyhose, black_thighhighs, black_shoes, boots, detached_collar, official_alternate_costume, sitting, sitting_on_bed, leaning_forward, looking_at_another, smug, smile, head_tilt, 粥祥坐在床边右侧, 身体向中间的千早爱音靠拢, 手臂贴在她另一侧, 凑近带着调笑的神情逗弄她。, source#teasing",
+      "converted_reconstructed": "girl, togawa_sakiko_(master_of_melodia), blue_hair, long_hair, yellow_eyes, two_sides_up, large_breasts, horns, black_dress, frilled_dress, dress_ribbon, puffy_short_sleeves, black_gloves, black_ribbon, hair_ribbon, black_pantyhose, black_thighhighs, black_shoes, boots, detached_collar, official_alternate_costume, sitting, sitting_on_bed, leaning_forward, looking_at_another, smug, smile, head_tilt, 粥祥坐在床边右侧, 身体向中间的千早爱音靠拢, 手臂贴在她另一侧, 凑近带着调笑的神情逗弄她。, source#teasing",
+      "added_tokens": [
+        "source#teasing"
+      ],
+      "removed_tokens": [],
+      "interaction_tags": [
+        "source#teasing"
+      ],
+      "exactly_matches_embedded_workflow": true
+    },
+    {
+      "name": "chihaya_anon",
+      "x": 0.5,
+      "y": 0.6,
+      "raw_prompt": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks, sitting, sitting_on_bed, blush, embarrassed, looking_down, averted_eyes, partable_lips, hands_on_own_lap, 千早爱音被丰川祥子和粥祥一左一右夹在中间坐在床边，脸色羞红，微微低头避开视线，双手放在膝上，显得害羞而窘迫。",
+      "final_prompt": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks, sitting, sitting_on_bed, blush, embarrassed, looking_down, averted_eyes, partable_lips, hands_on_own_lap, 千早爱音被丰川祥子和粥祥一左一右夹在中间坐在床边, 脸色羞红, 微微低头避开视线, 双手放在膝上, 显得害羞而窘迫。, target#teasing",
+      "converted_reconstructed": "girl, chihaya_anon, pink_hair, long_hair, grey_eyes, flat_chest, haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks, sitting, sitting_on_bed, blush, embarrassed, looking_down, averted_eyes, partable_lips, hands_on_own_lap, 千早爱音被丰川祥子和粥祥一左一右夹在中间坐在床边, 脸色羞红, 微微低头避开视线, 双手放在膝上, 显得害羞而窘迫。, target#teasing",
+      "added_tokens": [
+        "target#teasing"
+      ],
+      "removed_tokens": [],
+      "interaction_tags": [
+        "target#teasing"
+      ],
+      "exactly_matches_embedded_workflow": true
+    }
+  ],
+  "composition": {
+    "viewpoint": "平视中景，略偏正面，三人并排坐在床边，镜头略微向左前方倾斜，使爱音羞红的脸居中可见。",
+    "layout": "祥子在左侧，粥祥在右侧，爱音被两人夹在中间；两侧人物身体向内倾，肩臂贴近爱音，形成紧密的夹持感。",
+    "relations": "丰川祥子从左侧靠向千早爱音并以言语戏弄；粥祥从右侧靠向千早爱音并以言语戏弄；千早爱音被两人夹在中间，脸红低头，被调戏。"
+  },
+  "appearance_profiles": [
+    {
+      "aliases": [
+        "togawa sakiko (master of melodia)",
+        "togawa_sakiko_(master_of_melodia)",
+        "master of melodia",
+        "方舟祥子",
+        "粥祥",
+        "舟祥"
+      ],
+      "source_tag": "togawa_sakiko_(master_of_melodia)",
+      "appearance_tags": [
+        "yellow_eyes",
+        "blue_hair",
+        "long_hair",
+        "two_sides_up",
+        "large_breasts",
+        "horns"
+      ]
+    },
+    {
+      "aliases": [
+        "丰川祥子",
+        "togawa_sakiko",
+        "祥子",
+        "togawa sakiko",
+        "丰川祥子常服",
+        "祥子的演出服",
+        "祥子 stage outfit",
+        "丰川祥子的演出服",
+        "丰川祥子 stage outfit"
+      ],
+      "source_tag": "togawa_sakiko",
+      "appearance_tags": [
+        "blue_hair",
+        "long_hair",
+        "yellow_eyes",
+        "sidelocks",
+        "two_side_up",
+        "large_breasts",
+        "yellow_eyes_blue_hair",
+        "two_sides_up"
+      ]
+    },
+    {
+      "aliases": [
+        "千早爱音",
+        "chihaya_anon",
+        "爱音",
+        "千早爱音常服",
+        "千早爱音演出服",
+        "千早爱音的演出服",
+        "千早爱音演出服 stage outfit",
+        "千早爱音 stage outfit"
+      ],
+      "source_tag": "chihaya_anon",
+      "appearance_tags": [
+        "long_hair",
+        "pink_hair",
+        "grey_eyes",
+        "(flat_chest:1.4)"
+      ]
+    }
+  ],
+  "wardrobe_profiles": [
+    {
+      "alias": "粥祥",
+      "source_tag": "togawa_sakiko_(master_of_melodia)",
+      "qualifier": "default",
+      "outfit_tags": [
+        "black_dress",
+        "frilled_dress",
+        "dress_ribbon",
+        "puffy_short_sleeves",
+        "black_gloves",
+        "black_ribbon",
+        "hair_ribbon",
+        "black_pantyhose",
+        "black_thighhighs",
+        "black_shoes",
+        "boots",
+        "detached_collar",
+        "official_alternate_costume"
+      ]
+    },
+    {
+      "alias": "丰川祥子",
+      "source_tag": "togawa_sakiko",
+      "qualifier": "default",
+      "outfit_tags": [
+        "white_shirt",
+        "collared_shirt",
+        "haneoka_school_uniform",
+        "grey_jacket",
+        "plaid_skirt",
+        "grey_skirt",
+        "pleated_skirt",
+        "long_sleeves",
+        "black_ribbon",
+        "hair_ribbon",
+        "neck_ribbon",
+        "green_necktie",
+        "diagonal-striped_necktie",
+        "striped_necktie",
+        "white_socks",
+        "black_shoes"
+      ]
+    },
+    {
+      "alias": "千早爱音",
+      "source_tag": "chihaya_anon",
+      "qualifier": "default",
+      "outfit_tags": [
+        "haneoka_school_uniform",
+        "grey_jacket",
+        "white_shirt",
+        "collared_shirt",
+        "winter_uniform",
+        "green_skirt",
+        "plaid_skirt",
+        "pleated_skirt",
+        "long_sleeves",
+        "green_necktie",
+        "striped_necktie",
+        "diagonal-striped_necktie",
+        "black_socks"
+      ]
+    }
+  ],
+  "debug_field_duplicates": {
+    "writer_prompt_same": true,
+    "writer_raw_same": true
+  },
+  "character_counts": {
+    "writer_user": 19502,
+    "writer_system_reconstructed": 3088,
+    "planner_user_reconstructed": 3041,
+    "semantic_output": 356,
+    "writer_output": 2691,
+    "static_writer_user_prefix": 15355
+  },
+  "usage": {
+    "source": "user-provided DeepSeek dashboard figures; no per-call usage saved",
+    "total": 6593,
+    "input_cached": 3712,
+    "input_uncached": 1634,
+    "output": 1247,
+    "input_total": 5346,
+    "input_cache_hit_percent": 69.44
+  },
+  "current_config_style_8": {
+    "name": "nai3d",
+    "tags": "2::blender ( medium ) ::, 3::3d::, 2::game screenshot::, -1:: realistic face::, 0.75::girls ' frontline 2: exilium style ::, 0.5::wuthering waves ( style ) ::, photorealistic, 0.3::detailed texture::, year 2025, year 2026, 10::very aesthetic::, 5:: masterpiece::, detailed light, ray tracing, cinematic lighting, depth of field,"
+  },
+  "workflow": {
+    "generator_id": "1",
+    "selector_id": "13",
+    "model": "NAI Diffusion V5 Full",
+    "width": 1216,
+    "height": 832,
+    "steps": 28,
+    "sampler": "k_euler",
+    "seed": 1840790368
+  },
+  "delivery": {
+    "status": "sent",
+    "generated": true,
+    "sent": true
+  },
+  "limitations": [
+    "No live model or image request was made by this audit.",
+    "Embedded PNG proves submitted ComfyUI inputs, not a captured NAI HTTP request.",
+    "Conversions were reconstructed offline using the current installed converter.",
+    "System/planner prompts are reconstructed from current code, not stored historical messages.",
+    "Per-call usage and API request ids were not stored; dashboard grouping cannot be confirmed.",
+    "This is a prompt/data-flow review, not visual image or anatomy validation."
+  ]
+}

@@ -1,0 +1,239 @@
+[
+  {
+    "task_id": "db7305114a274d2484675727044a5f09",
+    "time": "2026-10-17T13:54:48.251871",
+    "ok": true,
+    "request_sha256": "9fd64d0dadd8709cfa3a359cd766569aa63c08740069b342df56ea6c8aef9391",
+    "cached_profile_found": true,
+    "alias_owners": [
+      "togawa_sakiko_(master_of_melodia)"
+    ],
+    "confirmed_character_bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "粥祥",
+        "canonical_tag": "togawa_sakiko_(master_of_melodia)"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "local_references": [],
+    "bound_references": [],
+    "final_names": [
+      "togawa_sakiko",
+      "togawa_sakiko_(master_of_melodia)",
+      "chihaya_anon"
+    ],
+    "raw_planner_saved": false,
+    "planner_validation_errors": [],
+    "identity_only_appearance_lookup": [
+      "togawa_sakiko_(master_of_melodia)",
+      [
+        "yellow_eyes",
+        "blue_hair",
+        "long_hair",
+        "two_sides_up",
+        "large_breasts",
+        "horns"
+      ]
+    ],
+    "alias_plus_canonical_appearance_lookup": [
+      "",
+      []
+    ]
+  },
+  {
+    "task_id": "a14b0db09eba48059a1116c9c1831c62",
+    "time": "2026-10-17T13:55:54.301378",
+    "ok": true,
+    "request_sha256": "1808a2df510d5edd42857e84a89880926abb2d9cfcf8c6c60e116f1712023ca9",
+    "cached_profile_found": true,
+    "alias_owners": [
+      "togawa_sakiko_(master_of_melodia)"
+    ],
+    "confirmed_character_bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "粥祥",
+        "canonical_tag": "togawa_sakiko_(master_of_melodia)"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "local_references": [],
+    "bound_references": [],
+    "final_names": [
+      "togawa_sakiko",
+      "togawa_sakiko_(master_of_melodia)",
+      "chihaya_anon"
+    ],
+    "raw_planner_saved": false,
+    "planner_validation_errors": [],
+    "identity_only_appearance_lookup": [
+      "togawa_sakiko_(master_of_melodia)",
+      [
+        "yellow_eyes",
+        "blue_hair",
+        "long_hair",
+        "two_sides_up",
+        "large_breasts",
+        "horns"
+      ]
+    ],
+    "alias_plus_canonical_appearance_lookup": [
+      "",
+      []
+    ]
+  },
+  {
+    "task_id": "1ebf558cc89b4410a4aed6fe58e55b58",
+    "time": "2026-10-17T13:57:14.548020",
+    "ok": true,
+    "request_sha256": "e045815909b5619fb19369fe7b3871a1d941edc2aa4a5c331825772ab4f034f2",
+    "cached_profile_found": true,
+    "alias_owners": [
+      "togawa_sakiko_(master_of_melodia)"
+    ],
+    "confirmed_character_bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "local_references": [
+      {
+        "anchor_id": "nai_local_reference_1",
+        "source": "粥祥",
+        "canonical_tags": [
+          "togawa_sakiko_(master_of_melodia)"
+        ]
+      }
+    ],
+    "bound_references": [
+      "nai_local_reference_1"
+    ],
+    "final_names": [
+      "togawa_sakiko",
+      "togawa_sakiko_(master_of_melodia)",
+      "chihaya_anon"
+    ],
+    "raw_planner_saved": false,
+    "planner_validation_errors": [],
+    "identity_only_appearance_lookup": [
+      "togawa_sakiko_(master_of_melodia)",
+      [
+        "yellow_eyes",
+        "blue_hair",
+        "long_hair",
+        "two_sides_up",
+        "large_breasts",
+        "horns"
+      ]
+    ],
+    "alias_plus_canonical_appearance_lookup": [
+      "",
+      []
+    ]
+  },
+  {
+    "task_id": "bc481e9f06614c1e904cd901af96146f",
+    "time": "2026-10-17T13:57:51.899803",
+    "ok": true,
+    "request_sha256": "e045815909b5619fb19369fe7b3871a1d941edc2aa4a5c331825772ab4f034f2",
+    "cached_profile_found": true,
+    "alias_owners": [
+      "togawa_sakiko_(master_of_melodia)"
+    ],
+    "confirmed_character_bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "local_references": [],
+    "bound_references": [],
+    "final_names": [
+      "togawa_sakiko",
+      "chihaya_anon"
+    ],
+    "raw_planner_saved": false,
+    "planner_validation_errors": [],
+    "identity_only_appearance_lookup": [
+      "togawa_sakiko_(master_of_melodia)",
+      [
+        "yellow_eyes",
+        "blue_hair",
+        "long_hair",
+        "two_sides_up",
+        "large_breasts",
+        "horns"
+      ]
+    ],
+    "alias_plus_canonical_appearance_lookup": [
+      "",
+      []
+    ]
+  },
+  {
+    "task_id": "3a61b2dc81ca41ec99506a3f59a9f7d4",
+    "time": "2026-10-17T13:58:50.695267",
+    "ok": true,
+    "request_sha256": "86889fb3647286fb2c6c1deba49a307dd0e6eee01a9e521d74c0d492faaa044e",
+    "cached_profile_found": true,
+    "alias_owners": [
+      "togawa_sakiko_(master_of_melodia)"
+    ],
+    "confirmed_character_bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "local_references": [],
+    "bound_references": [],
+    "final_names": [
+      "togawa_sakiko",
+      "粥祥",
+      "chihaya_anon"
+    ],
+    "raw_planner_saved": false,
+    "planner_validation_errors": [],
+    "identity_only_appearance_lookup": [
+      "togawa_sakiko_(master_of_melodia)",
+      [
+        "yellow_eyes",
+        "blue_hair",
+        "long_hair",
+        "two_sides_up",
+        "large_breasts",
+        "horns"
+      ]
+    ],
+    "alias_plus_canonical_appearance_lookup": [
+      "",
+      []
+    ]
+  }
+]

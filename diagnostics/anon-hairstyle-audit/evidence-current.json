@@ -1,0 +1,2370 @@
+{
+  "date": "2026-10-19",
+  "records": [
+    {
+      "task_id": "c75441a3038342b0952c667c02616369",
+      "time": "2026-10-19T17:33:05.428532",
+      "original_prompt": "千早爱音大头照，头发梳成丰川祥子的发型，脖子有项圈#rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成丰川祥子的发型\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled with twin side ponytails tied with small ribbons and grey eyes, with a gentle confident expression}\n{Details: chihaya_anon wears a black choker around her neck, a white collared shirt with a grey jacket over it and a green striped necktie, her head and shoulders framed in a close-up}\n{Tags: close-up, portrait, head out of frame, long_hair, pink_hair, grey_eyes, twin_braids, side_ponytail, hair_ribbon, choker, black_choker, white_shirt, collared_shirt, grey_jacket, green_necktie, striped_necktie, looking_at_viewer, slight_smile, simple_background, white_background, soft_lighting, gentle_shading}\n{Nltags: A close-up portrait of chihaya_anon with long pink hair styled in twin side ponytails tied with small ribbons, grey eyes and a slight confident smile, wearing a black choker, a white collared shirt, a grey jacket and a green striped necktie, her head and shoulders filling the frame against a clean white background with soft lighting. background_mode_default_portrait}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair styled with twin side ponytails tied with small ribbons, grey eyes, a gentle confident expression,\nchihaya anon wears a black choker around her neck, a white collared shirt with a grey jacket over it and a green striped necktie, her head and shoulders framed in a close-up,\ntogawa sakiko, chihaya anon, close-up, portrait, head out of frame, twin braids, side ponytail, choker, black choker, white shirt, collared shirt, grey jacket, green necktie, striped necktie, looking at viewer, slight smile, simple background, white background, soft lighting, gentle shading,\nNltags: A close-up portrait of chihaya anon with long pink hair styled in twin side ponytails tied with small ribbons, grey eyes and a slight confident smile, wearing a black choker, a white collared shirt, a grey jacket and a green striped necktie, her head and shoulders filling the frame against a clean white background with soft lighting.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成丰川祥子的发型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发梳成丰川祥子的发型，脖子有项圈\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发梳成丰川祥子的发型，脖子有项圈\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "winter_uniform",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie",
+              "black_socks"
+            ],
+            "removed_tags": [],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "winter_uniform",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie",
+            "black_socks"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [],
+          "stale_cached_tags": [
+            "grey_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        1216,
+        832
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair styled with twin side ponytails tied with small ribbons, grey eyes, a gentle confident expression,\nchihaya anon wears a black choker around her neck, a white collared shirt with a grey jacket over it and a green striped necktie, her head and shoulders framed in a close-up,\ntogawa sakiko, chihaya anon, close-up, portrait, head out of frame, twin braids, side ponytail, choker, black choker, white shirt, collared shirt, grey jacket, green necktie, striped necktie, looking at viewer, slight smile, simple background, white background, soft lighting, gentle shading, rurudo,\nNltags: A close-up portrait of chihaya anon with long pink hair styled in twin side ponytails tied with small ribbons, grey eyes and a slight confident smile, wearing a black choker, a white collared shirt, a grey jacket and a green striped necktie, her head and shoulders filling the frame against a clean white background with soft lighting.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "2bec9b0e379d44bfa468d834d2ff6e18",
+      "time": "2026-10-19T17:34:26.763511",
+      "original_prompt": "千早爱音大头照，头发梳成two sides up，脖子有项圈#rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成two sides up\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled in two side up twin tails, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black choker around her neck, a grey jacket over a white collared shirt with a green striped necktie, and she looks at the viewer with a gentle smile}\n{Tags: portrait, close-up, headshot, upper body, two side up, twin braids, pink hair, grey eyes, black choker, grey jacket, white shirt, collared shirt, green necktie, striped necktie, long sleeves, smile, looking at viewer, simple background, white background, soft lighting}\n{Nltags: A close-up headshot portrait of chihaya_anon, who has long pink hair styled in two side up twin tails and grey eyes, wearing a black choker on her neck along with a grey jacket, white collared shirt, and green striped necktie; she faces the viewer with a gentle smile against a plain white background, softly lit. background_mode_default_portrait}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has grey eyes, long hair, pink hair, (flat chest:1.4),\nchihaya anon wears a black choker around her neck over a white collared shirt with a green striped necktie, and she looks at the viewer with a gentle smile,\nchihaya anon, portrait, close-up, headshot, upper body, two side up, twin braids, black choker, green necktie, striped necktie, long sleeves, smile, looking at viewer, simple background, white background, soft lighting,\nNltags: A close-up headshot portrait of chihaya anon, who has long pink hair styled in two side up twin tails and grey eyes, wearing a black choker on her neck along with a grey jacket, and green striped necktie, she faces the viewer with a gentle smile against a plain white background, softly lit.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成two sides up (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发梳成two sides up，脖子有项圈\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发梳成two sides up，脖子有项圈\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "winter_uniform",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        1216,
+        832
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has grey eyes, long hair, pink hair, (flat chest:1.4),\nchihaya anon wears a black choker around her neck over a white collared shirt with a green striped necktie, and she looks at the viewer with a gentle smile,\nchihaya anon, portrait, close-up, headshot, upper body, two side up, twin braids, black choker, green necktie, striped necktie, long sleeves, smile, looking at viewer, simple background, white background, soft lighting, rurudo,\nNltags: A close-up headshot portrait of chihaya anon, who has long pink hair styled in two side up twin tails and grey eyes, wearing a black choker on her neck along with a grey jacket, and green striped necktie, she faces the viewer with a gentle smile against a plain white background, softly lit.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "b149d4cc30f54b51a4aacf65ff9e5c00",
+      "time": "2026-10-19T17:36:04.541550",
+      "original_prompt": "千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer#rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成two sides up\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair tied into two sides up with twin buns, grey eyes, and a gentle smile}\n{Details: chihaya_anon wears a black choker around her neck, a white collared shirt with a grey jacket, and looks directly at the viewer}\n{Tags: close-up, portrait, headshot, upper body, looking at viewer, two side up, twin buns, pink hair, long hair, grey eyes, smile, choker, black choker, white shirt, collared shirt, grey jacket, long sleeves, blue sky, outdoors, daylight, sunlight, soft lighting, wind, hair blowing}\n{Nltags: A close-up headshot of chihaya_anon with long pink hair styled in two sides up twin buns, grey eyes, and a gentle smile, wearing a black choker, a white collared shirt, and a grey jacket, looking directly at the viewer against a bright blue sky outdoors with soft daylight and a light breeze in her hair. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair tied into two sides up with twin buns, grey eyes, a gentle smile,\nchihaya anon wears a black choker around her neck with a grey jacket, and looks directly at the viewer,\nchihaya anon, close-up, portrait, headshot, upper body, looking at viewer, two side up, twin buns, smile, choker, black choker, long sleeves, blue sky, outdoors, daylight, sunlight, soft lighting, wind, hair blowing,\nNltags: A close-up headshot of chihaya anon with long pink hair styled in two sides up twin buns, grey eyes, and a gentle smile, wearing a black choker,, looking directly at the viewer against a bright blue sky outdoors with soft daylight and a light breeze in her hair.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成two sides up (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "winter_uniform",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        1216,
+        832
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair tied into two sides up with twin buns, grey eyes, a gentle smile,\nchihaya anon wears a black choker around her neck with a grey jacket, and looks directly at the viewer,\nchihaya anon, close-up, portrait, headshot, upper body, looking at viewer, two side up, twin buns, smile, choker, black choker, long sleeves, blue sky, outdoors, daylight, sunlight, soft lighting, wind, hair blowing, rurudo,\nNltags: A close-up headshot of chihaya anon with long pink hair styled in two sides up twin buns, grey eyes, and a gentle smile, wearing a black choker,, looking directly at the viewer against a bright blue sky outdoors with soft daylight and a light breeze in her hair.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "c32b7d88f27643f9ad7ae02dfdb16cd0",
+      "time": "2026-10-19T17:39:51.910497",
+      "original_prompt": "千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer#rurudo",
+      "ok": false,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair tied into two side-up buns with loose strands framing her face, and grey eyes}\n{Details: chihaya_anon wears a black choker around her neck, a white collared shirt with a green striped necktie under a grey jacket, and she looks directly at the viewer with a gentle confident smile}\n{Tags: close-up, portrait, headshot, looking_at_viewer, pink_hair, long_hair, two_side_up, hair_bun, grey_eyes, choker, black_choker, collared_shirt, white_shirt, grey_jacket, green_necktie, striped_necktie, diagonal-striped_necktie, long_sleeves, smile, blue_sky, outdoors, daylight, soft_lighting, wind, hair_blowing}\n{Nltags: A close-up headshot of chihaya_anon looking directly at the viewer, her long pink hair styled in two side-up buns with a few loose strands catching the breeze, a black choker snug around her neck, wearing a white collared shirt with a green diagonal-striped necktie beneath a grey jacket, her grey eyes bright and a gentle confident smile on her lips, with a clear blue sky behind her in soft daylight. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair tied into two side-up buns with loose strands framing her face, grey eyes,\nchihaya anon wears a black choker around her neck with a green striped necktie under a grey jacket, and she looks directly at the viewer with a gentle confident smile,\nchihaya anon, close-up, portrait, headshot, looking at viewer, two side up, hair bun, choker, black choker, green necktie, striped necktie, diagonal-striped necktie, long sleeves, smile, blue sky, outdoors, daylight, soft lighting, wind, hair blowing,\nNltags: A close-up headshot of chihaya anon looking directly at the viewer, her long pink hair styled in two side-up buns with a few loose strands catching the breeze, a black choker snug around her neck, with a green diagonal-striped necktie beneath a grey jacket, her grey eyes bright and a gentle confident smile on her lips, with a clear blue sky behind her in soft daylight.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "winter_uniform",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "submission_check": "No saved output PNG"
+    },
+    {
+      "task_id": "42e4f8c0604f4531867be3aaffc67899",
+      "time": "2026-10-19T17:40:55.154859",
+      "original_prompt": "1024*1536千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer#rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成two sides up\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair tied up into two sides up, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black choker around her neck, a grey jacket over a white collared shirt with a green diagonally striped necktie, and looks directly at the viewer with a soft smile}\n{Tags: portrait, close-up, headshot, looking_at_viewer, two_sides_up, pink_hair, grey_eyes, choker, black_choker, grey_jacket, white_shirt, collared_shirt, green_necktie, striped_necktie, diagonal-striped_necktie, long_sleeves, blue_sky, outdoors, daylight, soft_lighting, wind, hair_ornament}\n{Nltags: A close-up headshot portrait of chihaya_anon, who has long pink hair styled in two sides up and grey eyes, wearing a black choker and a grey jacket over a white collared shirt with a green diagonally striped necktie. She looks directly at the viewer with a gentle smile, framed against a clear blue sky in soft daylight with a light breeze moving her hair. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair tied up into two sides up, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck over a white collared shirt with a green diagonally striped necktie, and looks directly at the viewer with a soft smile,\nchihaya anon, portrait, close-up, headshot, looking at viewer, two sides up, choker, black choker, green necktie, striped necktie, diagonal-striped necktie, long sleeves, blue sky, outdoors, daylight, soft lighting, wind, hair ornament,\nNltags: A close-up headshot portrait of chihaya anon, who has long pink hair styled in two sides up and grey eyes, wearing a black choker over a white collared shirt with a green diagonally striped necktie. She looks directly at the viewer with a gentle smile, framed against a clear blue sky in soft daylight with a light breeze moving her hair.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成two sides up (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n1024*1536千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：1024*1536千早爱音大头照，头发梳成two sides up，脖子有项圈，背景蓝天，looking at viewer\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "winter_uniform",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair tied up into two sides up, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck over a white collared shirt with a green diagonally striped necktie, and looks directly at the viewer with a soft smile,\nchihaya anon, portrait, close-up, headshot, looking at viewer, two sides up, choker, black choker, green necktie, striped necktie, diagonal-striped necktie, long sleeves, blue sky, outdoors, daylight, soft lighting, wind, hair ornament, rurudo,\nNltags: A close-up headshot portrait of chihaya anon, who has long pink hair styled in two sides up and grey eyes, wearing a black choker over a white collared shirt with a green diagonally striped necktie. She looks directly at the viewer with a gentle smile, framed against a clear blue sky in soft daylight with a light breeze moving her hair.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "64dc448b02454123a6821e355449f3a4",
+      "time": "2026-10-19T17:42:00.682904",
+      "original_prompt": "1024*1536千早爱音超级大头照，头发梳成丰川祥子发型，脖子有项圈，背景蓝天，looking at viewer#rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成丰川祥子发型\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled with the distinctive side-swept bangs and twin-tail-like silhouette of togawa_sakiko's hairstyle, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black choker around her neck along with a grey jacket over a white collared shirt and a green striped necktie, looking directly at the viewer with a bright confident expression in an extreme close-up of her head and shoulders}\n{Tags: extreme close-up, headshot, portrait, looking at viewer, blue sky, outdoors, daylight, black choker, long hair, pink hair, grey eyes, side-swept bangs, hair between eyes, grey jacket, white shirt, collared shirt, green necktie, striped necktie, diagonal-striped necktie, smile, parted lips, sunlight, clear sky, upper body}\n{Nltags: An extreme close-up headshot of chihaya_anon fills the tall frame, her long pink hair styled with togawa_sakiko's characteristic side-swept bangs and silhouette, grey eyes gazing straight at the viewer, a black choker on her neck, grey jacket over a white collared shirt with a green diagonally striped necktie, her head and shoulders set against a clear blue sky with bright daylight and a cheerful confident smile background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair styled with the distinctive side-swept bangs, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck along with a grey jacket over a white collared shirt and a green striped necktie, looking directly at the viewer with a bright confident expression in an extreme close-up of her head and shoulders,\ntogawa sakiko, chihaya anon, extreme close-up, headshot, portrait, looking at viewer, blue sky, outdoors, daylight, black choker, side-swept bangs, hair between eyes, green necktie, striped necktie, diagonal-striped necktie, smile, parted lips, sunlight, clear sky, upper body,\nNltags: An extreme close-up headshot of chihaya anon fills the tall frame, her long pink hair styled with togawa sakiko's characteristic side-swept bangs and silhouette, grey eyes gazing straight at the viewer, a black choker on her neck over a white collared shirt with a green diagonally striped necktie, her head and shoulders set against a clear blue sky with bright daylight and a cheerful confident smile",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成丰川祥子发型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n1024*1536千早爱音超级大头照，头发梳成丰川祥子发型，脖子有项圈，背景蓝天，looking at viewer\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：1024*1536千早爱音超级大头照，头发梳成丰川祥子发型，脖子有项圈，背景蓝天，looking at viewer\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair styled with the distinctive side-swept bangs, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck along with a grey jacket over a white collared shirt and a green striped necktie, looking directly at the viewer with a bright confident expression in an extreme close-up of her head and shoulders,\ntogawa sakiko, chihaya anon, extreme close-up, headshot, portrait, looking at viewer, blue sky, outdoors, daylight, black choker, side-swept bangs, hair between eyes, green necktie, striped necktie, diagonal-striped necktie, smile, parted lips, sunlight, clear sky, upper body, rurudo,\nNltags: An extreme close-up headshot of chihaya anon fills the tall frame, her long pink hair styled with togawa sakiko's characteristic side-swept bangs and silhouette, grey eyes gazing straight at the viewer, a black choker on her neck over a white collared shirt with a green diagonally striped necktie, her head and shoulders set against a clear blue sky with bright daylight and a cheerful confident smile",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "1368e69ee3e542d482e9078c86460599",
+      "time": "2026-10-19T17:43:14.285734",
+      "original_prompt": "1024*1536千早爱音超级大头照，把头发梳成丰川祥子的发型，脖子有项圈，头顶蓝天，looking at viewer#rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled with the parted side-swept bangs and half-up twin-tail-like silhouette of togawa_sakiko's hairstyle, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black choker around her neck and a haneoka_school_uniform with a grey jacket, white collared shirt, green striped necktie, and green plaid pleated skirt, looking at the viewer with a bright expression}\n{Tags: super close-up, giant face, headshot, looking at viewer, choker, blue sky, outdoors, pink hair, grey eyes, parted bangs, side-swept bangs, hair between eyes, grey jacket, white shirt, collared shirt, green necktie, striped necktie, long sleeves, smile, sunlight, day, upper body, portrait}\n{Nltags: An extreme super close-up headshot of chihaya_anon looking directly at the viewer, her long pink hair styled after togawa_sakiko with elegant side-swept bangs and a distinctive half-up silhouette, a black choker around her neck, wearing her grey Haneoka school uniform jacket over a white collared shirt with a green striped necktie, bright blue sky overhead, cheerful expression, crisp daylight. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair styled with the parted side-swept bangs, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck and a haneoka school uniform with a grey jacket, green striped necktie,, looking at the viewer with a bright expression,\ntogawa sakiko, chihaya anon, super close-up, giant face, headshot, looking at viewer, choker, blue sky, outdoors, parted bangs, side-swept bangs, hair between eyes, green necktie, striped necktie, long sleeves, smile, sunlight, day, upper body, portrait,\nNltags: An extreme super close-up headshot of chihaya anon looking directly at the viewer, her long pink hair styled after togawa sakiko with elegant side-swept bangs and a distinctive half-up silhouette, a black choker around her neck, wearing her grey Haneoka school uniform jacket over a white collared shirt with a green striped necktie, bright blue sky overhead, cheerful expression, crisp daylight.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 把头发梳成丰川祥子的发型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n1024*1536千早爱音超级大头照，把头发梳成丰川祥子的发型，脖子有项圈，头顶蓝天，looking at viewer\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：1024*1536千早爱音超级大头照，把头发梳成丰川祥子的发型，脖子有项圈，头顶蓝天，looking at viewer\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, nsfw,\nchihaya anon has long pink hair styled with the parted side-swept bangs, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck and a haneoka school uniform with a grey jacket, green striped necktie,, looking at the viewer with a bright expression,\ntogawa sakiko, chihaya anon, super close-up, giant face, headshot, looking at viewer, choker, blue sky, outdoors, parted bangs, side-swept bangs, hair between eyes, green necktie, striped necktie, long sleeves, smile, sunlight, day, upper body, portrait, rurudo,\nNltags: An extreme super close-up headshot of chihaya anon looking directly at the viewer, her long pink hair styled after togawa sakiko with elegant side-swept bangs and a distinctive half-up silhouette, a black choker around her neck, wearing her grey Haneoka school uniform jacket over a white collared shirt with a green striped necktie, bright blue sky overhead, cheerful expression, crisp daylight.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "9d11fecd4beb4421a8aa5ee447cdb0d0",
+      "time": "2026-10-19T18:32:53.375767",
+      "original_prompt": "千早爱音大头照，头发梳成丰川祥子的造型，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头 #rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成丰川祥子的造型\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled like togaawa_sakiko's signature twin-tail-like half-updo with a dark ribbon, grey eyes, and a gentle devoted expression}\n{Details: chihaya_anon wears a black choker around her neck, a white collared shirt with a grey jacket, and looks deeply into the camera in a close-up headshot}\n{Tags: close-up, portrait, headshot, long_hair, pink_hair, grey_eyes, hair_ribbon, choker, white_shirt, collared_shirt, grey_jacket, looking_at_viewer, devoted_expression, blue_sky, detailed_sky, clouds, sunlight, depth_of_field}\n{Nltags: a close-up headshot of chihaya_anon with long pink hair styled after togaawa_sakiko's distinctive half-updo and ribbon, grey eyes gazing deeply and affectionately into the camera, a black choker on her neck, wearing a white collared shirt under a grey jacket, with a detailed vivid blue sky and soft clouds above her head, warm sunlight and shallow depth of field. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has grey eyes, a gentle devoted expression, long hair, pink hair,\nchihaya anon wears a black choker around her neck with a grey jacket, and looks deeply into the camera in a close-up headshot,\ntogawa sakiko, chihaya anon, close-up, portrait, headshot, choker, looking at viewer, devoted expression, blue sky, detailed sky, clouds, sunlight, depth of field,\nNltags: a close-up headshot of chihaya anon with long pink hair styled after togaawa sakiko's distinctive half-updo and ribbon, grey eyes gazing deeply and affectionately into the camera, a black choker on her neck, with a detailed vivid blue sky and soft clouds above her head, warm sunlight and shallow depth of field.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成丰川祥子的造型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发梳成丰川祥子的造型，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发梳成丰川祥子的造型，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 看着镜头 => looking_at_viewer\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has grey eyes, a gentle devoted expression, long hair, pink hair,\nchihaya anon wears a black choker around her neck with a grey jacket, and looks deeply into the camera in a close-up headshot,\ntogawa sakiko, chihaya anon, close-up, portrait, headshot, choker, looking at viewer, devoted expression, blue sky, detailed sky, clouds, sunlight, depth of field, rurudo,\nNltags: a close-up headshot of chihaya anon with long pink hair styled after togaawa sakiko's distinctive half-updo and ribbon, grey eyes gazing deeply and affectionately into the camera, a black choker on her neck, with a detailed vivid blue sky and soft clouds above her head, warm sunlight and shallow depth of field.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "db310f710f124e649bc1852e748dabe1",
+      "time": "2026-10-19T18:34:53.749548",
+      "original_prompt": "千早爱音大头照，头发梳成丰川祥子的双马尾辫造型，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头 #rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发梳成丰川祥子的双马尾辫造型\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: banG Dream!}\n{Identity: chihaya_anon has long pink hair styled in twintails with pink hair ties, grey eyes, and a gentle loving expression}\n{Details: chihaya_anon wears a black choker around her neck, a white collared shirt with a grey jacket, and gazes deeply into the camera with a soft blush}\n{Tags: close-up, portrait, twintails, pink hair, grey eyes, choker, white shirt, grey jacket, collared shirt, long sleeves, looking at viewer, deep gaze, soft blush, gentle smile, blue sky, detailed sky, clouds, sunlight, golden hour lighting, lens flare, wind, hair blowing, cinematic lighting, shallow depth of field, bokeh, low angle}\n{Nltags: A close-up portrait of chihaya_anon with long pink hair styled in twintails, wearing a black choker and a white collared shirt under a grey jacket. She gazes deeply and lovingly into the camera with a soft blush. Above her is a vast, detailed blue sky with drifting clouds, warm sunlight, and a gentle breeze stirring her hair. The low-angle composition places the sky behind her head, with cinematic lighting, soft lens flare, shallow depth of field, and bokeh. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbanG Dream!, high quality,\nchihaya anon has long pink hair styled in twintails with pink hair ties, grey eyes, a gentle loving expression,\nchihaya anon wears a black choker around her neck with a grey jacket, and gazes deeply into the camera with a soft blush,\ntogawa sakiko, chihaya anon, close-up, portrait, twintails, choker, long sleeves, looking at viewer, deep gaze, soft blush, gentle smile, blue sky, detailed sky, clouds, sunlight, golden hour lighting, lens flare, wind, hair blowing, cinematic lighting, shallow depth of field, bokeh, low angle,\nNltags: A close-up portrait of chihaya anon with long pink hair styled in twintails, wearing a black choker under a grey jacket. She gazes deeply and lovingly into the camera with a soft blush. Above her is a vast, detailed blue sky with drifting clouds, warm sunlight, and a gentle breeze stirring her hair. The low-angle composition places the sky behind her head, with cinematic lighting, soft lens flare, shallow depth of field, and bokeh.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发梳成丰川祥子的双马尾辫造型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发梳成丰川祥子的双马尾辫造型，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发梳成丰川祥子的双马尾辫造型，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 双马尾 => twintails\n- 看着镜头 => looking_at_viewer\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbanG Dream!, high quality,\nchihaya anon has long pink hair styled in twintails with pink hair ties, grey eyes, a gentle loving expression,\nchihaya anon wears a black choker around her neck with a grey jacket, and gazes deeply into the camera with a soft blush,\ntogawa sakiko, chihaya anon, close-up, portrait, twintails, choker, long sleeves, looking at viewer, deep gaze, soft blush, gentle smile, blue sky, detailed sky, clouds, sunlight, golden hour lighting, lens flare, wind, hair blowing, cinematic lighting, shallow depth of field, bokeh, low angle, rurudo,\nNltags: A close-up portrait of chihaya anon with long pink hair styled in twintails, wearing a black choker under a grey jacket. She gazes deeply and lovingly into the camera with a soft blush. Above her is a vast, detailed blue sky with drifting clouds, warm sunlight, and a gentle breeze stirring her hair. The low-angle composition places the sky behind her head, with cinematic lighting, soft lens flare, shallow depth of field, and bokeh.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "affa3bdf00f543709f664dff67c44451",
+      "time": "2026-10-19T18:36:26.064470",
+      "original_prompt": "千早爱音大头照，头发变成丰川祥子的双马尾辫，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头 #rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"头发变成丰川祥子的双马尾辫\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair tied into twintails, grey eyes, and a gentle expression}\n{Details: chihaya_anon wears a black choker around her neck, a grey jacket over a white collared shirt with green diagonal-striped necktie, and she gazes deeply at the viewer with a soft affectionate look}\n{Tags: portrait, close-up, headshot, twintails, pink_hair, grey_eyes, black_choker, looking_at_viewer, affectionate, soft smile, grey_jacket, white_shirt, collared_shirt, green_necktie, striped_necktie, diagonal-striped_necktie, blue_sky, detailed_sky, clouds, sunlight, depth_of_field, upper_body}\n{Nltags: A close-up headshot of chihaya_anon with long pink hair styled in twintails, wearing a black choker, a grey jacket over a white collared shirt with a green diagonal-striped necktie; she gazes deeply and affectionately at the viewer with a soft expression, while above her head a richly detailed blue sky filled with clouds and sunlight spreads across the top of the frame. background_mode_explicit_scene}\n{background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pink hair tied into twintails, grey eyes, a gentle expression,\nchihaya anon wears a black choker around her neck over a white collared shirt with green diagonal-striped necktie, and she gazes deeply at the viewer with a soft affectionate look,\ntogawa sakiko, chihaya anon, portrait, close-up, headshot, twintails, black choker, looking at viewer, affectionate, soft smile, green necktie, striped necktie, diagonal-striped necktie, blue sky, detailed sky, clouds, sunlight, depth of field, upper body,\nNltags: A close-up headshot of chihaya anon with long pink hair styled in twintails, wearing a black choker over a white collared shirt with a green diagonal-striped necktie, she gazes deeply and affectionately at the viewer with a soft expression, while above her head a richly detailed blue sky filled with clouds and sunlight spreads across the top of the frame.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 头发变成丰川祥子的双马尾辫 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，头发变成丰川祥子的双马尾辫，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，头发变成丰川祥子的双马尾辫，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 双马尾 => twintails\n- 看着镜头 => looking_at_viewer\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pink hair tied into twintails, grey eyes, a gentle expression,\nchihaya anon wears a black choker around her neck over a white collared shirt with green diagonal-striped necktie, and she gazes deeply at the viewer with a soft affectionate look,\ntogawa sakiko, chihaya anon, portrait, close-up, headshot, twintails, black choker, looking at viewer, affectionate, soft smile, green necktie, striped necktie, diagonal-striped necktie, blue sky, detailed sky, clouds, sunlight, depth of field, upper body, rurudo,\nNltags: A close-up headshot of chihaya anon with long pink hair styled in twintails, wearing a black choker over a white collared shirt with a green diagonal-striped necktie, she gazes deeply and affectionately at the viewer with a soft expression, while above her head a richly detailed blue sky filled with clouds and sunlight spreads across the top of the frame.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "bcdf344664d84eaaa029c72ef6db8a3c",
+      "time": "2026-10-19T18:37:44.342737",
+      "original_prompt": "千早爱音大头照，粉色头发变成丰川祥子的，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头 #rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_color\",\"operation\":\"replace\",\"source_text\":\"粉色头发变成丰川祥子的\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pastel blue hair and grey eyes, with a gentle affectionate expression}\n{Details: chihaya_anon wears a black choker and a white collared shirt with a grey jacket, looking at viewer with a tender gaze}\n{Tags: close-up, portrait, headshot, looking_at_viewer, blue_sky, detailed_sky, clouds, sunbeams, light_rays, lens_flare, soft_lighting, black_choker, white_shirt, collared_shirt, grey_jacket, long_hair, pastel_blue_hair, grey_eyes, gentle_smile, depth_of_field, outdoors}\n{Nltags: chihaya_anon is shown in a close-up headshot portrait with long pastel blue hair and grey eyes, wearing a black choker along with a white collared shirt and grey jacket, giving a deep affectionate look straight at the camera. Above her is a vivid blue sky filled with detailed soft clouds, with gentle sunbeams and a subtle lens flare adding atmosphere. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pastel blue hair, grey eyes, a gentle affectionate expression,\nchihaya anon wears a black choker with a grey jacket, looking at viewer with a tender gaze,\ntogawa sakiko, chihaya anon, close-up, portrait, headshot, looking at viewer, blue sky, detailed sky, clouds, sunbeams, light rays, lens flare, soft lighting, black choker, pastel blue hair, gentle smile, depth of field, outdoors,\nNltags: chihaya anon is shown in a close-up headshot portrait with long pastel blue hair and grey eyes, wearing a black choker along with a white collared shirt, giving a deep affectionate look straight at the camera. Above her is a vivid blue sky filled with detailed soft clouds, with gentle sunbeams and a subtle lens flare adding atmosphere.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nOther confirmed non-wardrobe hard tags: togawa_sakiko\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 粉色头发变成丰川祥子的 (hair_color; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: default reference = haneoka_school_uniform, grey_jacket, white_shirt, collared_shirt, winter_uniform, green_skirt, plaid_skirt, pleated_skirt, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, black_socks. Use when context fits; otherwise adapt to the scene.\n\n\n\n\n用户原始要求：\n千早爱音大头照，粉色头发变成丰川祥子的，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，粉色头发变成丰川祥子的，脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 看着镜头 => looking_at_viewer\n- 粉色头发 => pink_hair\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "default_reference",
+            "wardrobe_anchor_id": "",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "winter_uniform",
+              "long_sleeves",
+              "green_necktie",
+              "striped_necktie",
+              "diagonal-striped_necktie"
+            ],
+            "removed_tags": [
+              "grey_jacket",
+              "white_shirt",
+              "collared_shirt",
+              "green_skirt",
+              "plaid_skirt",
+              "pleated_skirt",
+              "black_socks"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": false,
+            "resolution_state": "unspecified",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "winter_uniform",
+            "long_sleeves",
+            "green_necktie",
+            "striped_necktie",
+            "diagonal-striped_necktie"
+          ],
+          "source_grounding_tags": [],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "grey_jacket",
+            "white_shirt",
+            "collared_shirt",
+            "green_skirt",
+            "plaid_skirt",
+            "pleated_skirt",
+            "black_socks"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "white_socks",
+            "black_shoes",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon",
+          "togawa_sakiko"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pastel blue hair, grey eyes, a gentle affectionate expression,\nchihaya anon wears a black choker with a grey jacket, looking at viewer with a tender gaze,\ntogawa sakiko, chihaya anon, close-up, portrait, headshot, looking at viewer, blue sky, detailed sky, clouds, sunbeams, light rays, lens flare, soft lighting, black choker, pastel blue hair, gentle smile, depth of field, outdoors, rurudo,\nNltags: chihaya anon is shown in a close-up headshot portrait with long pastel blue hair and grey eyes, wearing a black choker along with a white collared shirt, giving a deep affectionate look straight at the camera. Above her is a vivid blue sky filled with detailed soft clouds, with gentle sunbeams and a subtle lens flare adding atmosphere.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "61900b5c4b57401f81b0c0704c62215c",
+      "time": "2026-10-19T18:40:01.698819",
+      "original_prompt": "千早爱音大头照，把丰川祥子的发型套到千早爱音的头上。千早爱音脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头 #rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":\"丰川祥子\",\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把丰川祥子的发型套到千早爱音的头上\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled in a half-up ponytail with side-swept bangs, grey eyes, and a soft blushing face}\n{Details: chihaya_anon wears a white collared shirt with long sleeves, a green diagonal-striped necktie, a grey jacket, a black choker around her neck, and a small black hair ribbon, gazing at the viewer with a deeply affectionate expression}\n{Tags: close-up, portrait, looking_at_viewer, pink_hair, grey_eyes, long_hair, half-up_ponytail, sidelocks, black_choker, white_shirt, collared_shirt, green_necktie, striped_necktie, grey_jacket, black_hair_ribbon, gentle_smile, blush, tilted_head, soft_lighting, rim_light, blue_sky, detailed_clouds, cumulus_clouds, sunlight, lens_flare, sky_background}\n{Nltags: a close-up portrait of chihaya_anon with long pink hair in a half-up ponytail and side-swept bangs, wearing a black choker, a white collared shirt with a green diagonal-striped necktie, a grey jacket, and a black hair ribbon; she gazes directly at the viewer with a deeply affectionate, blushing expression, her head slightly tilted against a bright blue sky filled with detailed cumulus clouds, soft sunlight and gentle rim light illuminating her hair and face. background_mode_explicit_scene}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pink hair styled in a half-up ponytail with side-swept bangs, grey eyes, a soft blushing face,\nchihaya anon with long sleeves, a green diagonal-striped necktie, a black choker around her neck, and a small black hair ribbon, gazing at the viewer with a deeply affectionate expression,\nchihaya anon, close-up, portrait, looking at viewer, half-up ponytail, sidelocks, black choker, green necktie, striped necktie, black hair ribbon, gentle smile, blush, tilted head, soft lighting, rim light, blue sky, detailed clouds, cumulus clouds, sunlight, lens flare, sky background,\nNltags: a close-up portrait of chihaya anon with long pink hair in a half-up ponytail and side-swept bangs, wearing a black choker with a green diagonal-striped necktie, and a black hair ribbon, she gazes directly at the viewer with a deeply affectionate, blushing expression, her head slightly tilted against a bright blue sky filled with detailed cumulus clouds, soft sunlight and gentle rim light illuminating her hair and face.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 把丰川祥子的发型套到千早爱音的头上 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: cosplay source = togawa_sakiko; verified outfit anchors = white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, striped_necktie, white_socks, black_shoes. Complete recognizable source clothing only; keep the wearer's own face, hair, body and identity.\n\n\n\n\n用户原始要求：\n千早爱音大头照，把丰川祥子的发型套到千早爱音的头上。千早爱音脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，把丰川祥子的发型套到千早爱音的头上。千早爱音脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 看着镜头 => looking_at_viewer\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "outfit_source",
+            "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "long_sleeves",
+              "black_ribbon",
+              "hair_ribbon",
+              "neck_ribbon",
+              "green_necktie",
+              "diagonal-striped_necktie",
+              "striped_necktie"
+            ],
+            "removed_tags": [
+              "white_shirt",
+              "collared_shirt",
+              "grey_jacket",
+              "plaid_skirt",
+              "grey_skirt",
+              "pleated_skirt",
+              "white_socks",
+              "black_shoes"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": true,
+            "resolution_state": "resolved",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie"
+          ],
+          "source_grounding_tags": [
+            "haneoka_school_uniform",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie"
+          ],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "white_socks",
+            "black_shoes"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pink hair styled in a half-up ponytail with side-swept bangs, grey eyes, a soft blushing face,\nchihaya anon with long sleeves, a green diagonal-striped necktie, a black choker around her neck, and a small black hair ribbon, gazing at the viewer with a deeply affectionate expression,\nchihaya anon, close-up, portrait, looking at viewer, half-up ponytail, sidelocks, black choker, green necktie, striped necktie, black hair ribbon, gentle smile, blush, tilted head, soft lighting, rim light, blue sky, detailed clouds, cumulus clouds, sunlight, lens flare, sky background, rurudo,\nNltags: a close-up portrait of chihaya anon with long pink hair in a half-up ponytail and side-swept bangs, wearing a black choker with a green diagonal-striped necktie, and a black hair ribbon, she gazes directly at the viewer with a deeply affectionate, blushing expression, her head slightly tilted against a bright blue sky filled with detailed cumulus clouds, soft sunlight and gentle rim light illuminating her hair and face.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "b7375fe2b5284f3cad1b2f6106001a31",
+      "time": "2026-10-19T18:43:56.025538",
+      "original_prompt": "千早爱音大头照，千早爱音梳成丰川祥子的发型。千早爱音脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头 #rurudo",
+      "ok": true,
+      "summary": {
+        "raw_mode": false,
+        "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":\"丰川祥子\",\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"千早爱音梳成丰川祥子的发型\"}]}]}",
+        "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled in togawa_sakiko's hairstyle with a side ponytail and black hair ribbon, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black choker around her neck, a white collared shirt with long sleeves, a green diagonal-striped necktie, a grey jacket, a grey plaid pleated skirt, white socks, and black shoes, gazing deeply at the viewer with a tender expression in a close-up headshot}\n{Tags: close-up, portrait, headshot, looking_at_viewer, choker, black choker, side ponytail, hair ribbon, black ribbon, white shirt, collared shirt, long sleeves, green necktie, diagonal-striped necktie, striped necktie, grey jacket, plaid skirt, grey skirt, pleated skirt, white socks, black shoes, blue sky, detailed sky, clouds, sunlight, soft lighting, wind, gentle smile, blush, depth of field, bokeh}\n{Nltags: A close-up headshot of chihaya_anon with long pink hair styled in togawa_sakiko's signature side ponytail tied with a black hair ribbon, grey eyes, and a flat chest, wearing a black choker, a white collared long-sleeved shirt, a green diagonal-striped necktie, a grey jacket, a grey plaid pleated skirt, white socks, and black shoes, gazing deeply and tenderly at the viewer with a gentle smile and a faint blush; above her is a vividly detailed blue sky with soft clouds, warm sunlight, and a gentle breeze, with shallow depth of field and soft bokeh. background_mode_explicit_scene}\n{Background: detailed blue sky}",
+        "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pink hair styled in togawa sakiko's hairstyle with a side ponytail, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck with long sleeves, a green diagonal-striped necktie,, gazing deeply at the viewer with a tender expression in a close-up headshot,\nchihaya anon, close-up, portrait, headshot, looking at viewer, choker, black choker, side ponytail, hair ribbon, black ribbon, long sleeves, green necktie, diagonal-striped necktie, striped necktie, blue sky, detailed sky, clouds, sunlight, soft lighting, wind, gentle smile, blush, depth of field, bokeh,\nNltags: A close-up headshot of chihaya anon with long pink hair styled in togawa sakiko's signature side ponytail tied with a black hair ribbon, grey eyes, and a flat chest, wearing a black choker, a white collared long-sleeved shirt, a green diagonal-striped necktie,, gazing deeply and tenderly at the viewer with a gentle smile and a faint blush, above her is a vividly detailed blue sky with soft clouds, warm sunlight, and a gentle breeze, with shallow depth of field and soft bokeh.",
+        "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 千早爱音梳成丰川祥子的发型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nPer-character clothing evidence:\n- 千早爱音: cosplay source = togawa_sakiko; verified outfit anchors = white_shirt, collared_shirt, haneoka_school_uniform, grey_jacket, plaid_skirt, grey_skirt, pleated_skirt, long_sleeves, black_ribbon, hair_ribbon, neck_ribbon, green_necktie, diagonal-striped_necktie, striped_necktie, white_socks, black_shoes. Complete recognizable source clothing only; keep the wearer's own face, hair, body and identity.\n\n\n\n\n用户原始要求：\n千早爱音大头照，千早爱音梳成丰川祥子的发型。千早爱音脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，千早爱音梳成丰川祥子的发型。千早爱音脖子有项圈，头顶蓝天，蓝天要有细节，千早爱音深情看着镜头\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 看着镜头 => looking_at_viewer\n- 蓝天 => blue_sky\n- 项圈 => choker\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+        "semantic_character_outfits": [
+          {
+            "target_anchor_id": "target_1",
+            "target": "千早爱音",
+            "wardrobe_kind": "outfit_source",
+            "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+            "effective_tags": [
+              "haneoka_school_uniform",
+              "long_sleeves",
+              "black_ribbon",
+              "hair_ribbon",
+              "neck_ribbon",
+              "green_necktie",
+              "diagonal-striped_necktie",
+              "striped_necktie"
+            ],
+            "removed_tags": [
+              "white_shirt",
+              "collared_shirt",
+              "grey_jacket",
+              "plaid_skirt",
+              "grey_skirt",
+              "pleated_skirt",
+              "white_socks",
+              "black_shoes"
+            ],
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ],
+            "complete_named_profile": true,
+            "resolution_state": "resolved",
+            "unresolved_evidence": []
+          }
+        ],
+        "wardrobe_authority": {
+          "has_character_plans": true,
+          "all_creative": false,
+          "cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "haneoka_school_uniform",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ],
+          "explicit_tags": [],
+          "selected_tags": [
+            "haneoka_school_uniform",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie"
+          ],
+          "source_grounding_tags": [
+            "haneoka_school_uniform",
+            "long_sleeves",
+            "black_ribbon",
+            "hair_ribbon",
+            "neck_ribbon",
+            "green_necktie",
+            "diagonal-striped_necktie",
+            "striped_necktie"
+          ],
+          "unbound_grounding_tags": [],
+          "removed_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "white_socks",
+            "black_shoes"
+          ],
+          "stale_cached_tags": [
+            "white_shirt",
+            "collared_shirt",
+            "grey_jacket",
+            "plaid_skirt",
+            "grey_skirt",
+            "pleated_skirt",
+            "white_socks",
+            "black_shoes",
+            "winter_uniform",
+            "green_skirt",
+            "black_socks"
+          ]
+        },
+        "required_core_tags": [
+          "chihaya_anon"
+        ],
+        "prompt_builder_template_customized": true,
+        "semantic_plan_attempt_count": 1,
+        "prompt_llm_attempt_count": 1,
+        "global_outfit_reinforcement_tags": [],
+        "low_cfg_harness": false,
+        "danbooru_semantic_character_appearance_profiles": [
+          {
+            "aliases": [
+              "丰川祥子",
+              "togawa_sakiko",
+              "祥子",
+              "togawa sakiko",
+              "丰川祥子常服",
+              "祥子的演出服",
+              "祥子 stage outfit",
+              "丰川祥子的演出服",
+              "丰川祥子 stage outfit"
+            ],
+            "source_tag": "togawa_sakiko",
+            "appearance_tags": [
+              "blue_hair",
+              "long_hair",
+              "yellow_eyes",
+              "sidelocks",
+              "two_side_up",
+              "large_breasts",
+              "yellow_eyes_blue_hair",
+              "two_sides_up"
+            ]
+          },
+          {
+            "aliases": [
+              "千早爱音",
+              "chihaya_anon",
+              "爱音",
+              "千早爱音常服",
+              "千早爱音演出服",
+              "千早爱音的演出服",
+              "千早爱音演出服 stage outfit",
+              "千早爱音 stage outfit"
+            ],
+            "source_tag": "chihaya_anon",
+            "appearance_tags": [
+              "long_hair",
+              "pink_hair",
+              "grey_eyes",
+              "(flat_chest:1.4)"
+            ]
+          }
+        ]
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, high quality,\nchihaya anon has long pink hair styled in togawa sakiko's hairstyle with a side ponytail, grey eyes, (flat chest:1.4),\nchihaya anon wears a black choker around her neck with long sleeves, a green diagonal-striped necktie,, gazing deeply at the viewer with a tender expression in a close-up headshot,\nchihaya anon, close-up, portrait, headshot, looking at viewer, choker, black choker, side ponytail, hair ribbon, black ribbon, long sleeves, green necktie, diagonal-striped necktie, striped necktie, blue sky, detailed sky, clouds, sunlight, soft lighting, wind, gentle smile, blush, depth of field, bokeh, rurudo,\nNltags: A close-up headshot of chihaya anon with long pink hair styled in togawa sakiko's signature side ponytail tied with a black hair ribbon, grey eyes, and a flat chest, wearing a black choker, a white collared long-sleeved shirt, a green diagonal-striped necktie,, gazing deeply and tenderly at the viewer with a gentle smile and a faint blush, above her is a vividly detailed blue sky with soft clouds, warm sunlight, and a gentle breeze, with shallow depth of field and soft bokeh.",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_final_plus_suffix": true
+    },
+    {
+      "task_id": "a94cdeaf9154403f9f429f37904bb410",
+      "time": "2026-10-19T19:04:56.189951",
+      "original_prompt": "无优化 1girl, solo, chihaya anon, @rurudo, two sides up, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile",
+      "ok": true,
+      "summary": {
+        "raw_mode": true
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "1girl, solo, chihaya anon, @rurudo, two sides up, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_supplied_raw": true
+    },
+    {
+      "task_id": "534270ffd1b1425cb943eb2e06508b6a",
+      "time": "2026-10-19T19:05:33.818255",
+      "original_prompt": "无优化 1girl, solo, chihaya anon, @rurudo, {{{two sides up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile",
+      "ok": true,
+      "summary": {
+        "raw_mode": true
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "1girl, solo, chihaya anon, @rurudo, {{{two sides up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_supplied_raw": true
+    },
+    {
+      "task_id": "e5035c09ebe84a5b87655b274b7cfb23",
+      "time": "2026-10-19T19:05:57.401913",
+      "original_prompt": "无优化 1girl, solo, chihaya anon, @rurudo, {{{two side up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile, close shot",
+      "ok": true,
+      "summary": {
+        "raw_mode": true
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "1girl, solo, chihaya anon, @rurudo, {{{two side up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile, close shot",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_supplied_raw": true
+    },
+    {
+      "task_id": "d87560990d9f48479fcf9d8c293e0409",
+      "time": "2026-10-19T19:07:06.416322",
+      "original_prompt": "无优化 1girl, solo, chihaya anon, @rurudo, {{{two side up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile, close shot, black collar, collar",
+      "ok": true,
+      "summary": {
+        "raw_mode": true
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "1girl, solo, chihaya anon, @rurudo, {{{two side up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile, close shot, black collar, collar",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_supplied_raw": true
+    },
+    {
+      "task_id": "47f8c143f1504d1eb24b746192633e0b",
+      "time": "2026-10-19T19:07:50.124436",
+      "original_prompt": "无优化 1024x1024 1girl, solo, chihaya anon, @rurudo, {{{two side up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile, 0.7::close shot::, black collar, collar",
+      "ok": true,
+      "summary": {
+        "raw_mode": true
+      },
+      "image_size": [
+        832,
+        1216
+      ],
+      "submitted_text_before_conversion": "1024x1024 1girl, solo, chihaya anon, @rurudo, {{{two side up}}}, hair ribbon, togawa sakiko, pink hair, grey eyes, sky, clouds, smile, 0.7::close shot::, black collar, collar",
+      "generator_model": "NAI Diffusion V5 Full",
+      "submission_matches_supplied_raw": true
+    }
+  ],
+  "identity_replays_current_source": [
+    {
+      "task_id": "c75441a3038342b0952c667c02616369",
+      "raw_identity": "chihaya_anon has long pink hair styled with twin side ponytails tied with small ribbons and grey eyes, with a gentle confident expression",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled with twin side ponytails tied with small ribbons, grey eyes, a gentle confident expression"
+    },
+    {
+      "task_id": "2bec9b0e379d44bfa468d834d2ff6e18",
+      "raw_identity": "chihaya_anon has long pink hair styled in two side up twin tails, grey eyes, and a flat chest",
+      "classified_dimensions": [
+        "chest_size",
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled in two side up twin tails, grey eyes, (flat_chest:1.4)"
+    },
+    {
+      "task_id": "b149d4cc30f54b51a4aacf65ff9e5c00",
+      "raw_identity": "chihaya_anon has long pink hair tied into two sides up with twin buns, grey eyes, and a gentle smile",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair tied into two sides up with twin buns, grey eyes, a gentle smile"
+    },
+    {
+      "task_id": "c32b7d88f27643f9ad7ae02dfdb16cd0",
+      "raw_identity": "chihaya_anon has long pink hair tied into two side-up buns with loose strands framing her face, and grey eyes",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has grey eyes, long_hair, pink_hair"
+    },
+    {
+      "task_id": "42e4f8c0604f4531867be3aaffc67899",
+      "raw_identity": "chihaya_anon has long pink hair tied up into two sides up, grey eyes, and a flat chest",
+      "classified_dimensions": [
+        "chest_size",
+        "eye_color",
+        "hair_color",
+        "hair_length"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair tied up into two sides up, grey eyes, (flat_chest:1.4)"
+    },
+    {
+      "task_id": "64dc448b02454123a6821e355449f3a4",
+      "raw_identity": "chihaya_anon has long pink hair styled with the distinctive side-swept bangs and twin-tail-like silhouette of togawa_sakiko's hairstyle, grey eyes, and a flat chest",
+      "classified_dimensions": [
+        "chest_size",
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style",
+        "tail"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled with the distinctive side-swept bangs, grey eyes, (flat_chest:1.4)"
+    },
+    {
+      "task_id": "1368e69ee3e542d482e9078c86460599",
+      "raw_identity": "chihaya_anon has long pink hair styled with the parted side-swept bangs and half-up twin-tail-like silhouette of togawa_sakiko's hairstyle, grey eyes, and a flat chest",
+      "classified_dimensions": [
+        "chest_size",
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled with the parted side-swept bangs, half-up twin-tail-like silhouette of togawa_sakiko's hairstyle, grey eyes, (flat_chest:1.4)"
+    },
+    {
+      "task_id": "9d11fecd4beb4421a8aa5ee447cdb0d0",
+      "raw_identity": "chihaya_anon has long pink hair styled like togaawa_sakiko's signature twin-tail-like half-updo with a dark ribbon, grey eyes, and a gentle devoted expression",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled like togaawa_sakiko's signature twin-tail-like half-updo with a dark ribbon, grey eyes, a gentle devoted expression"
+    },
+    {
+      "task_id": "db310f710f124e649bc1852e748dabe1",
+      "raw_identity": "chihaya_anon has long pink hair styled in twintails with pink hair ties, grey eyes, and a gentle loving expression",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled in twintails with pink hair ties, grey eyes, a gentle loving expression"
+    },
+    {
+      "task_id": "affa3bdf00f543709f664dff67c44451",
+      "raw_identity": "chihaya_anon has long pink hair tied into twintails, grey eyes, and a gentle expression",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair tied into twintails, grey eyes, a gentle expression"
+    },
+    {
+      "task_id": "bcdf344664d84eaaa029c72ef6db8a3c",
+      "raw_identity": "chihaya_anon has long pastel blue hair and grey eyes, with a gentle affectionate expression",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length"
+      ],
+      "replayed_identity": "chihaya_anon has long pastel blue hair, grey eyes, a gentle affectionate expression"
+    },
+    {
+      "task_id": "61900b5c4b57401f81b0c0704c62215c",
+      "raw_identity": "chihaya_anon has long pink hair styled in a half-up ponytail with side-swept bangs, grey eyes, and a soft blushing face",
+      "classified_dimensions": [
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled in a half-up ponytail with side-swept bangs, grey eyes, a soft blushing face"
+    },
+    {
+      "task_id": "b7375fe2b5284f3cad1b2f6106001a31",
+      "raw_identity": "chihaya_anon has long pink hair styled in togawa_sakiko's hairstyle with a side ponytail and black hair ribbon, grey eyes, and a flat chest",
+      "classified_dimensions": [
+        "chest_size",
+        "eye_color",
+        "hair_color",
+        "hair_length",
+        "hair_style"
+      ],
+      "replayed_identity": "chihaya_anon has long pink hair styled in togawa_sakiko's hairstyle with a side ponytail, grey eyes, (flat_chest:1.4)"
+    }
+  ],
+  "deterministic_checks": {
+    "hairstyle_tail_false_positive": [
+      "hair_style"
+    ],
+    "unrelated_real_tail_control": [
+      "tail"
+    ],
+    "chinese_headshot_hidden_slots": [
+      "footwear",
+      "handwear",
+      "legwear",
+      "lower_body.pants",
+      "lower_body.skirt",
+      "lower_body.underwear",
+      "one_piece.dress",
+      "outerwear",
+      "upper_body.corset",
+      "upper_body.neckwear",
+      "upper_body.primary",
+      "upper_body.sleeves"
+    ],
+    "english_headshot_hidden_slots": [
+      "footwear",
+      "handwear",
+      "legwear",
+      "lower_body.pants",
+      "lower_body.skirt",
+      "lower_body.underwear",
+      "one_piece.dress",
+      "outerwear",
+      "upper_body.corset",
+      "upper_body.neckwear",
+      "upper_body.primary",
+      "upper_body.sleeves"
+    ],
+    "english_headshot_with_upper_hidden_slots": [
+      "footwear",
+      "handwear",
+      "legwear",
+      "lower_body.pants",
+      "lower_body.skirt",
+      "lower_body.underwear",
+      "one_piece.dress",
+      "outerwear",
+      "upper_body.corset",
+      "upper_body.neckwear",
+      "upper_body.primary",
+      "upper_body.sleeves"
+    ],
+    "necktie_slot": "upper_body.neckwear",
+    "long_sleeves_slot": "upper_body.sleeves",
+    "hair_ribbon_wardrobe_filter_result": []
+  },
+  "baseline_deterministic_checks": {
+    "hairstyle_tail_false_positive": [
+      "tail"
+    ],
+    "unrelated_real_tail_control": [
+      "tail"
+    ],
+    "chinese_headshot_hidden_slots": [],
+    "english_headshot_hidden_slots": [
+      "footwear",
+      "handwear",
+      "legwear",
+      "lower_body.pants",
+      "lower_body.skirt",
+      "lower_body.underwear",
+      "one_piece.dress",
+      "outerwear",
+      "upper_body.corset",
+      "upper_body.primary"
+    ],
+    "english_headshot_with_upper_hidden_slots": [
+      "footwear",
+      "handwear",
+      "legwear",
+      "lower_body.pants",
+      "lower_body.skirt",
+      "lower_body.underwear",
+      "one_piece.dress",
+      "outerwear",
+      "upper_body.corset",
+      "upper_body.primary"
+    ],
+    "necktie_slot": "",
+    "long_sleeves_slot": "",
+    "hair_ribbon_wardrobe_filter_result": []
+  },
+  "wardrobe_replay_note": "Historical request-wide authority has no new wearer-scoped hairstyle accessory permissions; that new binding is covered by tests/test_appearance_reference_scope.py.",
+  "scope": "Historical records and PNG metadata only; no pixel assessment, API calls, configuration changes or production source changes."
+}

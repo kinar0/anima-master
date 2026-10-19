@@ -1,0 +1,23 @@
+{
+  "task_id": "76ffd0c270f349d6810153167ec195cc",
+  "user_sections": 17,
+  "source_partition_complete": true,
+  "schema_shape_preserved": true,
+  "request_copies_preserved": 2,
+  "vocabulary_rows_preserved": 15,
+  "anchor_rows_preserved": 2,
+  "saved_rules_match_current_builder": true,
+  "source_files_changed_since_snapshot": [],
+  "user_characters": {
+    "source": 21071,
+    "translation": 8750
+  },
+  "system_characters": {
+    "source": 3378,
+    "translation": 1339
+  },
+  "llm_calls": 0,
+  "image_calls": 0,
+  "semantic_equivalence_proven": false,
+  "model_quality_or_cost_savings_verified": false
+}

@@ -1,0 +1,39 @@
+{
+  "queries": [
+    {
+      "keyword": "two_side_up",
+      "match_mode": "exact",
+      "limit": 5,
+      "group": "appearance",
+      "id": "hair"
+    },
+    {
+      "keyword": "two_sides_up",
+      "match_mode": "exact",
+      "limit": 5,
+      "group": "appearance",
+      "id": "hair_plural"
+    },
+    {
+      "keyword": "hair_ribbon",
+      "match_mode": "exact",
+      "limit": 5,
+      "group": "clothing",
+      "id": "ribbon"
+    },
+    {
+      "category": "general",
+      "match_mode": "exact",
+      "limit": 5,
+      "keyword": "two_side_up",
+      "id": "hair_general"
+    },
+    {
+      "category": "general",
+      "match_mode": "exact",
+      "limit": 5,
+      "keyword": "two_sides_up",
+      "id": "plural_general"
+    }
+  ]
+}
