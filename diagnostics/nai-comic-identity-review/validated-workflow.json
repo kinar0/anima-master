@@ -1,0 +1,260 @@
+{
+  "source": "live-fixed/reported_six_panel.json",
+  "submitted": false,
+  "model_calls": 2,
+  "population_correction": {
+    "previous": [
+      "6girls"
+    ],
+    "current": [
+      "7girls"
+    ],
+    "instance_count": 7
+  },
+  "final_prompt": "7girls, 0.95::artist:ciloranko::, 1.2::artist:lemonail::, 0.4::artist:quasarcake::, 0.3::artist:nou ( nounknown ) ::, 0.1::artist:akina422 ::, 0.1::artist:watanabe tomari::, 0.1::artist:kamiya yuu::, 0.5::artist:hosato mikine::, 0.2::whoopin::, year 2024, year 2025, year 2026, dynamic angle, 2::thick outlines::, 1.5::dithering::, oekaki, skindentation, masterpiece, best quality, questionable, 6 panel, comic, multiple views, portrait, daytime, noon, indoor, ramen restaurant, table, bowl, noodles, blurry background, backlighting, 六个格子组成的一页漫画, 时间均为正午。左上小格是祥子发愣的眼睛特写, 右上小格是俯视背后视角下千早爱音用黑色发圈扎好马尾的瞬间, 中间大格是爱音坐在桌子对面吃面, 右侧两个小格是祥子害羞低头, 底部宽格是店内侧面中景里两人一起吃面。",
+  "characters": [
+    {
+      "anchor_id": "target_1",
+      "source_text": "左上小格子：祥子眼部特写，45度侧面，表情发愣，眼睛张的较大",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, eyes_close-up, 45-degree_profile, looking_down, wide_eyes, blank_stare, surprised, upper_body, 祥子的眼部特写, 45度侧面, 她表情发愣, 眼睛张得较大, 神情像在发呆。",
+      "interaction_tags": [],
+      "position_reason": "Eye close-up fills the top-left panel as a 45-degree profile; only the eye and surrounding face area are visible.",
+      "x": 0.25,
+      "y": 0.12
+    },
+    {
+      "anchor_id": "target_2",
+      "source_text": "右上小格子：俯视视角、背后视角，千早爱音用一根黑色的发圈扎好了马尾，画面中是她的马尾发型。背景模糊，为饭桌，桌上有碗面",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, pink_hair, long_hair, ponytail, black_scrunchie, hair_ornament, from_above, from_behind, back_view, blurry_background, table, bowl, noodles, haneoka_school_uniform, 千早爱音以俯视和背后视角出现, 一根黑色的发圈把马尾扎好, 画面中突出她的马尾发型, 背景模糊, 是摆着碗面的饭桌。",
+      "interaction_tags": [],
+      "position_reason": "Seen from above/behind in the top-right panel so her tied ponytail and the black scrunchie are the visible focus.",
+      "x": 0.75,
+      "y": 0.12
+    },
+    {
+      "anchor_id": "target_2",
+      "source_text": "第三格：左侧中间大格子，爱音坐在桌子对面，穿着羽丘冬季校服，扎着马尾，开始吃面条，上半身视角，逆光，表情自然微笑",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, pink_hair, long_hair, ponytail, grey_eyes, haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, wing_collar, sitting, upper_body, table, bowl, noodles, eating, eating_noodles, chopsticks, smile, happy, natural_smile, backlighting, 千早爱音穿着羽丘冬季校服, 扎着马尾坐在桌子对面, 上半身入镜, 逆光中自然地微笑, 开始用筷子吃碗里的面条。",
+      "interaction_tags": [],
+      "position_reason": "Large left-middle panel centers her seated upper body with the bowl and eating gesture visible under backlighting.",
+      "x": 0.3,
+      "y": 0.42
+    },
+    {
+      "anchor_id": "target_1",
+      "source_text": "第四格：右侧中间靠上，祥子头、肩部特写，表情害羞，略微低头",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, head_and_shoulders, close-up, embarrassed, blush, slight_looking_down, shy, neutral_expression, haneoka_school_uniform, black_ribbon, green_necktie, 祥子的头和肩部特写出现在右侧中间靠上的小格, 她害羞地略微低头, 脸颊泛红。",
+      "interaction_tags": [],
+      "position_reason": "Right-middle upper small panel is a close-up of her head and shoulders, head tilted slightly down.",
+      "x": 0.75,
+      "y": 0.36
+    },
+    {
+      "anchor_id": "target_1",
+      "source_text": "第五格：右侧中间靠下，祥子侧脸，面部特写，慌张害羞地低头",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, profile, face_close-up, embarrassed, blush, flustered, looking_down, shy, haneoka_school_uniform, black_ribbon, 祥子的侧脸面部特写位于右侧中间靠下的小格, 她慌张又害羞地低着头。",
+      "interaction_tags": [],
+      "position_reason": "Right-middle lower small panel focuses tightly on her profile face as she looks down flustered.",
+      "x": 0.75,
+      "y": 0.55
+    },
+    {
+      "anchor_id": "target_2",
+      "source_text": "第六格：底部宽格子。店内侧面中景，爱音绑着马尾开心地吃面，祥子低头害羞地吃面",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, pink_hair, long_hair, ponytail, grey_eyes, haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, wing_collar, sitting, from_side, medium_shot, table, bowl, noodles, eating, eating_noodles, chopsticks, happy, smile, open_mouth, 千早爱音在底部宽格中以侧面中景出现, 绑着马尾坐在桌边, 开心地吃面并露出笑容。",
+      "interaction_tags": [],
+      "position_reason": "Bottom wide panel places her on the left side of the table in profile medium shot, eating happily.",
+      "x": 0.32,
+      "y": 0.82
+    },
+    {
+      "anchor_id": "target_1",
+      "source_text": "第六格：底部宽格子。店内侧面中景，爱音绑着马尾开心地吃面，祥子低头害羞地吃面",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, haneoka_school_uniform, black_ribbon, green_necktie, sitting, from_side, medium_shot, table, bowl, noodles, eating, eating_noodles, chopsticks, looking_down, embarrassed, shy, blush, 祥子在底部宽格中与爱音同桌, 以侧面中景出现, 她低着头害羞地吃面。",
+      "interaction_tags": [],
+      "position_reason": "Bottom wide panel places her on the right side of the table opposite Anon, head down while eating shyly.",
+      "x": 0.68,
+      "y": 0.82
+    }
+  ],
+  "workflow": {
+    "1": {
+      "class_type": "NovelAIGenerator",
+      "inputs": {
+        "prompt": [
+          "9",
+          0
+        ],
+        "negative_prompt": [
+          "12",
+          0
+        ],
+        "model": "NAI Diffusion V5 Full",
+        "width": 1024,
+        "height": 1536,
+        "sampler": "k_euler",
+        "steps": 28,
+        "cfg_scale": 6,
+        "seed": 123,
+        "scheduler": "karras",
+        "cfg_rescale": 0,
+        "prefer_brownian": false,
+        "variety_boost": true,
+        "limit_opus_free": false,
+        "characterPrompts": [
+          "13",
+          0
+        ]
+      }
+    },
+    "3": {
+      "class_type": "Textbox",
+      "inputs": {
+        "text": "7girls, 0.95::artist:ciloranko::, 1.2::artist:lemonail::, 0.4::artist:quasarcake::, 0.3::artist:nou ( nounknown ) ::, 0.1::artist:akina422 ::, 0.1::artist:watanabe tomari::, 0.1::artist:kamiya yuu::, 0.5::artist:hosato mikine::, 0.2::whoopin::, year 2024, year 2025, year 2026, dynamic angle, 2::thick outlines::, 1.5::dithering::, oekaki, skindentation, masterpiece, best quality, questionable, 6 panel, comic, multiple views, portrait, daytime, noon, indoor, ramen restaurant, table, bowl, noodles, blurry background, backlighting, 六个格子组成的一页漫画, 时间均为正午。左上小格是祥子发愣的眼睛特写, 右上小格是俯视背后视角下千早爱音用黑色发圈扎好马尾的瞬间, 中间大格是爱音坐在桌子对面吃面, 右侧两个小格是祥子害羞低头, 底部宽格是店内侧面中景里两人一起吃面。"
+      }
+    },
+    "9": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": [
+          "3",
+          0
+        ]
+      }
+    },
+    "11": {
+      "class_type": "Textbox",
+      "inputs": {
+        "text": "blurry"
+      }
+    },
+    "12": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": [
+          "11",
+          0
+        ]
+      }
+    },
+    "10": {
+      "class_type": "SaveImage",
+      "inputs": {
+        "images": [
+          "1",
+          0
+        ],
+        "filename_prefix": "astrbot/2026-10-18/unknown/1018025159"
+      }
+    },
+    "14": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, eyes_close-up, 45-degree_profile, looking_down, wide_eyes, blank_stare, surprised, upper_body, 祥子的眼部特写, 45度侧面, 她表情发愣, 眼睛张得较大, 神情像在发呆。"
+      }
+    },
+    "15": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, chihaya_anon, pink_hair, long_hair, ponytail, black_scrunchie, hair_ornament, from_above, from_behind, back_view, blurry_background, table, bowl, noodles, haneoka_school_uniform, 千早爱音以俯视和背后视角出现, 一根黑色的发圈把马尾扎好, 画面中突出她的马尾发型, 背景模糊, 是摆着碗面的饭桌。"
+      }
+    },
+    "16": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, chihaya_anon, pink_hair, long_hair, ponytail, grey_eyes, haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, wing_collar, sitting, upper_body, table, bowl, noodles, eating, eating_noodles, chopsticks, smile, happy, natural_smile, backlighting, 千早爱音穿着羽丘冬季校服, 扎着马尾坐在桌子对面, 上半身入镜, 逆光中自然地微笑, 开始用筷子吃碗里的面条。"
+      }
+    },
+    "17": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, head_and_shoulders, close-up, embarrassed, blush, slight_looking_down, shy, neutral_expression, haneoka_school_uniform, black_ribbon, green_necktie, 祥子的头和肩部特写出现在右侧中间靠上的小格, 她害羞地略微低头, 脸颊泛红。"
+      }
+    },
+    "18": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, profile, face_close-up, embarrassed, blush, flustered, looking_down, shy, haneoka_school_uniform, black_ribbon, 祥子的侧脸面部特写位于右侧中间靠下的小格, 她慌张又害羞地低着头。"
+      }
+    },
+    "19": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, chihaya_anon, pink_hair, long_hair, ponytail, grey_eyes, haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, wing_collar, sitting, from_side, medium_shot, table, bowl, noodles, eating, eating_noodles, chopsticks, happy, smile, open_mouth, 千早爱音在底部宽格中以侧面中景出现, 绑着马尾坐在桌边, 开心地吃面并露出笑容。"
+      }
+    },
+    "20": {
+      "class_type": "ComfyUIToNovelAIV4",
+      "inputs": {
+        "comfyui_prompt": "girl, togawa_sakiko, blue_hair, long_hair, yellow_eyes, sidelocks, two_side_up, haneoka_school_uniform, black_ribbon, green_necktie, sitting, from_side, medium_shot, table, bowl, noodles, eating, eating_noodles, chopsticks, looking_down, embarrassed, shy, blush, 祥子在底部宽格中与爱音同桌, 以侧面中景出现, 她低着头害羞地吃面。"
+      }
+    },
+    "13": {
+      "class_type": "CharacterPromptSelect",
+      "inputs": {
+        "character1_uc": "",
+        "character1_x": 0.25,
+        "character1_y": 0.12,
+        "character1": [
+          "14",
+          0
+        ],
+        "character2_enable": true,
+        "character2_uc": "",
+        "character2_x": 0.75,
+        "character2_y": 0.12,
+        "character2": [
+          "15",
+          0
+        ],
+        "character3_enable": true,
+        "character3_uc": "",
+        "character3_x": 0.3,
+        "character3_y": 0.42,
+        "character3": [
+          "16",
+          0
+        ],
+        "character4_enable": true,
+        "character4_uc": "",
+        "character4_x": 0.75,
+        "character4_y": 0.36,
+        "character4": [
+          "17",
+          0
+        ],
+        "character5_enable": true,
+        "character5_uc": "",
+        "character5_x": 0.75,
+        "character5_y": 0.55,
+        "character5": [
+          "18",
+          0
+        ],
+        "character6_enable": true,
+        "character6_uc": "",
+        "character6_x": 0.32,
+        "character6_y": 0.82,
+        "character6": [
+          "19",
+          0
+        ],
+        "character7_enable": true,
+        "character7_uc": "",
+        "character7_x": 0.68,
+        "character7_y": 0.82,
+        "character7": [
+          "20",
+          0
+        ]
+      }
+    }
+  }
+}

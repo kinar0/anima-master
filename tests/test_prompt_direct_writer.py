@@ -90,6 +90,12 @@ def plan(characters, global_prompt="2girls, garden"):
     ))
 
 
+def with_identity_review(output, name, visibility, source_text):
+    data = json.loads(output)
+    data["identity_review"] = [dict(name=name, visibility=visibility, source_text=source_text)]
+    return json.dumps(data, ensure_ascii=False)
+
+
 def test_restored_scene_responsibilities_stay_inside_the_direct_nai_writer():
     output = plan([("character_a", "girl, pink hair, feeding character_b with a spoon", .3),
                    ("character_b", "girl, blue hair, accepting food from character_a", .7)])
@@ -218,9 +224,9 @@ def test_interaction_downgrade_does_not_bypass_required_structure_or_identity(de
         layout["characters"][0]["name"] = "unconfirmed_other"
     output = "{invalid" if defect == "json" else json.dumps(layout)
     result, calls = run("-r 角色甲站立", {"characters": [semantic_character("角色甲")]}, output,
-                        resolver=ConfirmedIdentity())
+                        resolver=ConfirmedIdentity(), repair=output)
     assert not result.final_prompt
-    assert len(calls) == 2
+    assert len(calls) == 3  # Structure and identity share the same bounded repair.
     assert result.summary["skipped_reason"] == "nai_character_plan_failed"
     assert "invalid_interaction_pairs" not in result.summary["llm_error"]
 
@@ -548,13 +554,14 @@ def test_unplanned_reference_is_optional_and_explicit_clothing_never_loads_defau
     result, calls = run(
         "-r 角色甲穿角色乙的衣服，角色乙只作参考不出现在画面中",
         {"characters": [semantic_character("角色甲")]},
-        plan([("character_a", "girl, wearing a new ceremonial robe", .5)], "1girl, white background"),
+        with_identity_review(plan([("character_a", "girl, wearing a new ceremonial robe", .5)], "1girl, white background"),
+                             "character_b", "offscreen", "角色乙只作参考不出现在画面中"),
         resolver=CachedClothing(),
     )
     assert result.final_prompt, result.summary
     assert len(result.summary["nai_characters"]) == 1
     assert result.summary["nai_bound_local_profile_references"] == []
-    assert result.summary["nai_local_profile_references"] == []
+    assert len(result.summary["nai_local_profile_references"]) == 1
     assert "角色乙: default reference =" not in calls[1]["prompt"]
     assert "new ceremonial robe" in result.summary["nai_characters"][0]["prompt"]
 
@@ -617,7 +624,8 @@ def test_unselected_local_reference_does_not_claim_clothing_from_visible_wearer(
             )
     result, calls = run(
         "-r 角色甲站立，角色乙的名字写在牌子上", {"characters": [semantic_character("角色甲")]},
-        plan([("character_a", "girl, blue_dress, standing", .5)], "1girl, white background"),
+        with_identity_review(plan([("character_a", "girl, blue_dress, standing", .5)], "1girl, white background"),
+                             "character_b", "quoted", "角色乙的名字写在牌子上"),
         resolver=CachedClothing(),
     )
     assert result.final_prompt, result.summary
@@ -788,12 +796,14 @@ def test_clothing_donor_is_not_a_visible_character_or_target_appearance(donor_vi
     characters = [("character_a", "girl, blonde hair, green eyes, wearing a black dress", .3)]
     if donor_visible:
         characters.append(("donor_character", "girl, blonde hair, green eyes, sitting", .7))
-    result, calls = run(request, semantic,
-                        plan(characters, ("2girls" if donor_visible else "1girl") + ", white background"), resolver=DonorResolver())
-    assert len(calls) == 2
+    output = plan(characters, ("2girls" if donor_visible else "1girl") + ", white background")
+    if donor_visible is False:
+        output = with_identity_review(output, "donor_character", "donor", "角色甲cosplay来源角色")
+    result, calls = run(request, semantic, output, resolver=DonorResolver())
+    assert len(calls) == (3 if donor_visible is True else 2)
     if donor_visible is True:
         assert result.final_prompt == ""
-        assert result.summary["llm_error"] == "nai_character_plan_visible_outfit_source"
+        assert result.summary["nai_identity_initial_validation_errors"]
     else:
         assert result.final_prompt, result.summary
         prompt = result.summary["nai_characters"][0]["prompt"]

@@ -206,7 +206,7 @@ def test_nai_writer_contract_separates_counts_and_requires_chinese_prompt_prose(
     assert "Compare tags with prose for each expressed appearance" in instruction
     assert "even when everyone wears the same named outfit" in instruction
     assert "source_text must quote the exact applicable request clause" in instruction
-    assert "Otherwise leave it empty" in instruction
+    assert "Otherwise it may be empty unless used to identify the instance's panel" in instruction
     assert "original language, without translation" in instruction
     assert "Write all prompt strings in English" not in instruction
     assert "artist tags, quality" not in instruction

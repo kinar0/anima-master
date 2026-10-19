@@ -1,0 +1,1058 @@
+{
+  "day": "2026-10-19",
+  "timezone": "Asia/Shanghai",
+  "latest_task_start": "2026-10-19T19:25:35.381345",
+  "all_tasks": 122,
+  "explicit_r_tasks": 84,
+  "explicit_r_failures": 10,
+  "failure_rate_percent": 11.9,
+  "excluded_failures": [
+    {
+      "task_id": "c32b7d88f27643f9ad7ae02dfdb16cd0",
+      "time": "2026-10-19T17:39:51.910497",
+      "error": "nai_size_requires_multiple_of_64"
+    }
+  ],
+  "cases": [
+    {
+      "task_id": "3ff1b78a805c423da0ce5c292659e6f6",
+      "time": "2026-10-19T02:26:12.026297",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_character_plan_invalid_json",
+      "writer_attempts": 1,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 1495,
+          "sha256": "fd9b4c9babc38b283c37b49a163430c910a08de8dc3cd0f74c6e597b3bab8241",
+          "json_error": "Expecting ',' delimiter",
+          "error_offset": 864,
+          "ends_with_object_close": true,
+          "extra_closures_before_interaction_tags": 2,
+          "json_parses_after_removing_those_closures": true,
+          "diagnostic_character_count": 2
+        }
+      },
+      "later_exact_success": [
+        {
+          "task_id": "a8911b4727304238b4cff7efc1516f67",
+          "time": "2026-10-19T02:26:51.018979"
+        }
+      ]
+    },
+    {
+      "task_id": "ee23dd3f90c845bb8f5a83e96c9d0176",
+      "time": "2026-10-19T02:33:17.522711",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_character_plan_invalid_position",
+      "writer_attempts": 1,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 1795,
+          "sha256": "43e96dd22d4bcbcab28fcb7a58e50d9b7f20db86bd6b117ea1df3f3803e53a06",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt"
+            ]
+          ],
+          "coordinates": [
+            [
+              null,
+              null
+            ],
+            [
+              null,
+              null
+            ]
+          ],
+          "review_names": [
+            "togawa_sakiko",
+            "chihaya_anon"
+          ],
+          "panel_labels": []
+        }
+      },
+      "later_exact_success": [
+        {
+          "task_id": "26f80c2530bb4342b7ae71c7aabc6444",
+          "time": "2026-10-19T02:33:41.588212"
+        }
+      ]
+    },
+    {
+      "task_id": "f52cbbfdad1043419d8af025dfdfbec4",
+      "time": "2026-10-19T02:34:51.582113",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_character_plan_missing_composition_analysis",
+      "writer_attempts": 1,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 2081,
+          "sha256": "74cd80cb0cdd3b76c4ae77e7de6a1db6b1890bbfc54a8fddee847469007dcfd9",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "projection",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.5,
+              0.26
+            ],
+            [
+              0.5,
+              0.74
+            ]
+          ],
+          "review_names": [
+            "togawa_sakiko",
+            "chihaya_anon"
+          ],
+          "panel_labels": []
+        }
+      },
+      "later_exact_success": []
+    },
+    {
+      "task_id": "8243c826688f42e1a8d53555039c12ed",
+      "time": "2026-10-19T02:49:46.412788",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_character_plan_missing_composition_analysis",
+      "writer_attempts": 1,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 1636,
+          "sha256": "a154fb469fe0ce0db91ceaaeda3232e59ee505cda41a6380cfbff4f9889c5ca9",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "关系"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.5,
+              0.62
+            ],
+            [
+              0.5,
+              0.22
+            ]
+          ],
+          "review_names": [
+            "chihaya_anon",
+            "togawa_sakiko"
+          ],
+          "panel_labels": []
+        }
+      },
+      "later_exact_success": [
+        {
+          "task_id": "a7ff5eb048354697bc4b05fb7d1a570d",
+          "time": "2026-10-19T02:50:10.071709"
+        }
+      ]
+    },
+    {
+      "task_id": "9647497d2bd04a45b12ddaea49135ecb",
+      "time": "2026-10-19T12:57:23.822831",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_character_plan_invalid_json",
+      "writer_attempts": 1,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 1840,
+          "sha256": "a0edfea98fbf1862800457b55004385bdf4e107f312ca7bbb4c2549c6c23b984",
+          "json_error": "Expecting ',' delimiter",
+          "error_offset": 955,
+          "ends_with_object_close": true,
+          "extra_closures_before_interaction_tags": 2,
+          "json_parses_after_removing_those_closures": true,
+          "diagnostic_character_count": 2
+        }
+      },
+      "later_exact_success": [
+        {
+          "task_id": "2891f8eb52a247c29532b744fd33d066",
+          "time": "2026-10-19T12:57:42.174252"
+        }
+      ]
+    },
+    {
+      "task_id": "1d8ebfeaaec84a28b81fd10daca0f76d",
+      "time": "2026-10-19T14:20:47.004191",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_identity_plan_invalid: nai_text_ungrounded_panel: 0; nai_text_ungrounded_panel: 1; identity_review needs unambiguous known identity and exact contextual evidence: togawa_sakiko",
+      "writer_attempts": 2,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 3437,
+          "sha256": "2eab463cae272041bdd38dad6cc15d9b5dc18d778a99d0936ee802c180a67ee1",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.5,
+              0.25
+            ],
+            [
+              0.5,
+              0.75
+            ]
+          ],
+          "review_names": [
+            "chihaya_anon",
+            "togawa_sakiko"
+          ],
+          "panel_labels": [
+            "第一格",
+            "第二格"
+          ]
+        },
+        "nai_character_plan_retry_raw": {
+          "chars": 3260,
+          "sha256": "8759fb621a8393a60ce166c6466a5648968432261fe08eee5cb82ca8ae4ee91e",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 3,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.52,
+              0.24
+            ],
+            [
+              0.48,
+              0.78
+            ],
+            [
+              0.46,
+              0.53
+            ]
+          ],
+          "review_names": [
+            "chihaya_anon",
+            "togawa_sakiko"
+          ],
+          "panel_labels": [
+            "第一格",
+            "第二格"
+          ]
+        }
+      },
+      "later_exact_success": [],
+      "replay": {
+        "identity_errors_match_expected_mode": true,
+        "historical_identity_errors": [
+          "identity_review needs unambiguous known identity and exact contextual evidence: togawa_sakiko"
+        ],
+        "known_profile_mentions": [
+          {
+            "source": "爱音",
+            "canonical_tags": [
+              "chihaya_anon"
+            ]
+          },
+          {
+            "source": "祥祥",
+            "canonical_tags": [
+              "togawa_sakiko"
+            ]
+          }
+        ],
+        "confirmed_bindings": [
+          {
+            "source": "爱音",
+            "canonical_tag": "chihaya_anon"
+          },
+          {
+            "source": "祥祥",
+            "canonical_tag": "togawa_sakiko"
+          }
+        ],
+        "identity_errors": [],
+        "text_errors": [
+          "nai_text_ungrounded_panel: 0",
+          "nai_text_ungrounded_panel: 1"
+        ],
+        "identity_errors_without_out_of_roster_review_rows": [],
+        "panel_grounding": [
+          {
+            "id": 0,
+            "panel": "第一格",
+            "in_registry_context": false
+          },
+          {
+            "id": 1,
+            "panel": "第二格",
+            "in_registry_context": false
+          }
+        ],
+        "text_errors_without_invented_panel_labels": []
+      }
+    },
+    {
+      "task_id": "3a532f8f08e8433cb6ad71b436ef9cc3",
+      "time": "2026-10-19T14:21:12.757352",
+      "error": "nai_text_plan_failed",
+      "llm_error": "nai_text_plan_invalid: nai_text_ungrounded_panel: 0; nai_text_ungrounded_panel: 1",
+      "writer_attempts": 2,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 3661,
+          "sha256": "e002266348b9b40dc9bc7e9cffb29255ff15d84354bf13362ec5a134acd61769",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.45,
+              0.22
+            ],
+            [
+              0.5,
+              0.72
+            ]
+          ],
+          "review_names": [
+            "chihaya_anon"
+          ],
+          "panel_labels": [
+            "第一格",
+            "第二格"
+          ]
+        },
+        "nai_character_plan_retry_raw": {
+          "chars": 3626,
+          "sha256": "4693576d6c0a4ba660e819ebf21d15ad7fd5c69825704fc40094b4260959139e",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.45,
+              0.22
+            ],
+            [
+              0.5,
+              0.72
+            ]
+          ],
+          "review_names": [
+            "chihaya_anon"
+          ],
+          "panel_labels": [
+            "第一格",
+            "第二格"
+          ]
+        }
+      },
+      "later_exact_success": [],
+      "replay": {
+        "identity_errors_match_expected_mode": true,
+        "historical_identity_errors": [],
+        "known_profile_mentions": [
+          {
+            "source": "爱音",
+            "canonical_tags": [
+              "chihaya_anon"
+            ]
+          }
+        ],
+        "confirmed_bindings": [
+          {
+            "source": "爱音",
+            "canonical_tag": "chihaya_anon"
+          }
+        ],
+        "identity_errors": [],
+        "text_errors": [
+          "nai_text_ungrounded_panel: 0",
+          "nai_text_ungrounded_panel: 1"
+        ],
+        "identity_errors_without_out_of_roster_review_rows": [],
+        "panel_grounding": [
+          {
+            "id": 0,
+            "panel": "第一格",
+            "in_registry_context": false
+          },
+          {
+            "id": 1,
+            "panel": "第二格",
+            "in_registry_context": false
+          }
+        ],
+        "text_errors_without_invented_panel_labels": []
+      }
+    },
+    {
+      "task_id": "e3c9632deff24206be54e26eda786547",
+      "time": "2026-10-19T14:22:20.238158",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_identity_plan_invalid: identity_review needs unambiguous known identity and exact contextual evidence: 祥祥",
+      "writer_attempts": 2,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 2991,
+          "sha256": "201fa22ba963fc83e283fc47fd821411a3c19f9578aa742ed676fc2a50ef815f",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 3,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.5,
+              0.17
+            ],
+            [
+              0.45,
+              0.5
+            ],
+            [
+              0.5,
+              0.82
+            ]
+          ],
+          "review_names": [
+            "祥祥"
+          ],
+          "panel_labels": [
+            "第一格：生气地看着viewer的爱音，说着“我怎么会变成祥祥的脚的奴隶！”",
+            "第三格：爱音躺在地上阿黑颜高潮，说着“我是❤️祥祥脚的奴隶❤️”"
+          ]
+        },
+        "nai_character_plan_retry_raw": {
+          "chars": 3164,
+          "sha256": "9695495401981b28643c76befe5a13fda46934a6683bda28fb2e60fd7dd92da8",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 3,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.5,
+              0.17
+            ],
+            [
+              0.45,
+              0.5
+            ],
+            [
+              0.5,
+              0.82
+            ]
+          ],
+          "review_names": [
+            "祥祥"
+          ],
+          "panel_labels": [
+            "第一格：生气地看着viewer的爱音，说着“我怎么会变成祥祥的脚的奴隶！”",
+            "第三格：爱音躺在地上阿黑颜高潮，说着“我是❤️祥祥脚的奴隶❤️”"
+          ]
+        }
+      },
+      "later_exact_success": [],
+      "replay": {
+        "identity_errors_match_expected_mode": true,
+        "historical_identity_errors": [
+          "identity_review needs unambiguous known identity and exact contextual evidence: 祥祥"
+        ],
+        "known_profile_mentions": [
+          {
+            "source": "爱音",
+            "canonical_tags": [
+              "chihaya_anon"
+            ]
+          }
+        ],
+        "confirmed_bindings": [
+          {
+            "source": "爱音",
+            "canonical_tag": "chihaya_anon"
+          }
+        ],
+        "identity_errors": [],
+        "text_errors": [],
+        "identity_errors_without_out_of_roster_review_rows": [],
+        "panel_grounding": [
+          {
+            "id": 0,
+            "panel": "第一格：生气地看着viewer的爱音，说着“我怎么会变成祥祥的脚的奴隶！”",
+            "in_registry_context": true
+          },
+          {
+            "id": 1,
+            "panel": "第三格：爱音躺在地上阿黑颜高潮，说着“我是❤️祥祥脚的奴隶❤️”",
+            "in_registry_context": true
+          }
+        ],
+        "text_errors_without_invented_panel_labels": []
+      }
+    },
+    {
+      "task_id": "1b70399be6fe425f8588a8728d882ee2",
+      "time": "2026-10-19T18:14:07.795273",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_identity_plan_invalid: identity_review needs unambiguous known identity and exact contextual evidence: misumi_uika",
+      "writer_attempts": 2,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 1877,
+          "sha256": "ec88b519cd765e4a5ca4a486a17a9914c238a2afb153468eab4ebd05565948f7",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.4,
+              0.5
+            ],
+            [
+              0.58,
+              0.56
+            ]
+          ],
+          "review_names": [
+            "wakaba_mutsumi",
+            "misumi_uika"
+          ],
+          "panel_labels": []
+        },
+        "nai_character_plan_retry_raw": {
+          "chars": 1963,
+          "sha256": "83326dd01f835f9f4e6e0370081b8eaf41b146af58cb24a8ac23b7a883b5eab2",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.4,
+              0.5
+            ],
+            [
+              0.58,
+              0.56
+            ]
+          ],
+          "review_names": [
+            "wakaba_mutsumi",
+            "misumi_uika"
+          ],
+          "panel_labels": []
+        }
+      },
+      "later_exact_success": [],
+      "replay": {
+        "identity_errors_match_expected_mode": true,
+        "historical_identity_errors": [
+          "identity_review needs unambiguous known identity and exact contextual evidence: misumi_uika"
+        ],
+        "known_profile_mentions": [
+          {
+            "source": "若叶睦",
+            "canonical_tags": [
+              "wakaba_mutsumi"
+            ]
+          },
+          {
+            "source": "初华",
+            "canonical_tags": [
+              "misumi_uika"
+            ]
+          }
+        ],
+        "confirmed_bindings": [
+          {
+            "source": "若叶睦",
+            "canonical_tag": "wakaba_mutsumi"
+          },
+          {
+            "source": "初华",
+            "canonical_tag": "misumi_uika"
+          }
+        ],
+        "identity_errors": [],
+        "text_errors": [],
+        "identity_errors_without_out_of_roster_review_rows": [],
+        "panel_grounding": [],
+        "text_errors_without_invented_panel_labels": []
+      }
+    },
+    {
+      "task_id": "0332f4be1e4a4cfdbeb50bda1c97053a",
+      "time": "2026-10-19T18:28:25.279410",
+      "error": "nai_character_plan_failed",
+      "llm_error": "nai_identity_plan_invalid: identity_review needs unambiguous known identity and exact contextual evidence: 初华",
+      "writer_attempts": 2,
+      "final_prompt_chars": 0,
+      "outputs": [],
+      "elapsed_seconds": null,
+      "recorded_llm_ok": true,
+      "raw": {
+        "nai_character_plan_initial_raw": {
+          "chars": 1950,
+          "sha256": "a753b3b6c44a307913b527de232b4159a91535627f583abf61fab441fa7f5080",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.56,
+              0.47
+            ],
+            [
+              0.36,
+              0.66
+            ]
+          ],
+          "review_names": [
+            "wakaba_mutsumi",
+            "初华"
+          ],
+          "panel_labels": []
+        },
+        "nai_character_plan_retry_raw": {
+          "chars": 1912,
+          "sha256": "8d2246672960f18c7cffbaf0cea2d8d9a8dc08657411db84c60a8368baef0210",
+          "json_valid": true,
+          "analysis_keys": [
+            "viewpoint",
+            "layout",
+            "relations"
+          ],
+          "character_count": 2,
+          "character_fields": [
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ],
+            [
+              "name",
+              "anchor_id",
+              "source_text",
+              "prompt",
+              "interaction_tags",
+              "position_reason",
+              "x",
+              "y"
+            ]
+          ],
+          "coordinates": [
+            [
+              0.57,
+              0.46
+            ],
+            [
+              0.37,
+              0.65
+            ]
+          ],
+          "review_names": [
+            "wakaba_mutsumi",
+            "初华"
+          ],
+          "panel_labels": []
+        }
+      },
+      "later_exact_success": [],
+      "replay": {
+        "identity_errors_match_expected_mode": true,
+        "historical_identity_errors": [
+          "identity_review needs unambiguous known identity and exact contextual evidence: 初华"
+        ],
+        "known_profile_mentions": [
+          {
+            "source": "若叶睦",
+            "canonical_tags": [
+              "wakaba_mutsumi"
+            ]
+          }
+        ],
+        "confirmed_bindings": [
+          {
+            "source": "若叶睦",
+            "canonical_tag": "wakaba_mutsumi"
+          }
+        ],
+        "identity_errors": [],
+        "text_errors": [],
+        "identity_errors_without_out_of_roster_review_rows": [],
+        "panel_grounding": [],
+        "text_errors_without_invented_panel_labels": []
+      }
+    }
+  ],
+  "limits": [
+    "Historical tasks have no immutable source-code revision or per-call usage attached.",
+    "Review replay uses current code and recorded identity inputs, not the full runtime.",
+    "No model, image request, config change, or running-service reload was performed.",
+    "No original requests, dialogue, or generated prompt strings are exported here."
+  ]
+}

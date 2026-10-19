@@ -1,0 +1,103 @@
+{
+  "identity_review": [
+    {
+      "name": "togawa_sakiko",
+      "visibility": "visible",
+      "source_text": [
+        "左上小格子：祥子眼部特写",
+        "第四格：右侧中间靠上，祥子头、肩部特写",
+        "第五格：右侧中间靠下，祥子侧脸",
+        "祥子低头害羞地吃面"
+      ]
+    },
+    {
+      "name": "chihaya_anon",
+      "visibility": "visible",
+      "source_text": [
+        "右上小格子：千早爱音用一根黑色的发圈扎好了马尾",
+        "第三格：爱音坐在桌子对面",
+        "爱音绑着马尾开心地吃面"
+      ]
+    }
+  ],
+  "composition_analysis": {
+    "viewpoint": "竖版六格漫画页：左列窄上格与中部大格，右列上下两小格，底部通栏宽格；多为近景与特写，底部为中景侧面。",
+    "layout": "1格祥子眼部45度侧特写；2格爱音背后俯视马尾；3格爱音上半身吃面逆光；4格祥子头肩害羞低头；5格祥子侧脸特写慌张低头；6格宽幅侧面双人中景同吃面。",
+    "relations": "各格独立：格1祥子眼部特写（无接触）；格2爱音用手将黑色发圈扎入马尾（自主动作）；格3爱音持筷吃面；格4、5祥子低头害羞（无接触）；格6爱音吃面微笑，祥子低头吃面，二人对面而坐，无明确身体接触。"
+  },
+  "global_prompt": "6koma, comic, multiple_views, vertical_layout, upper_body, close-up, profile, from_behind, from_above, backlighting, blurry_background, table, bowl, noodles, daytime, indoors, 正午的六格漫画, 店内饭桌场景。第一格为祥子眼部45度侧脸特写, 第二格从背后俯视爱音用黑色发圈扎好马尾, 第三格爱音在桌对面吃面, 第四格祥子头肩害羞低头, 第五格祥子侧脸慌张低头, 第六格侧面中景中爱音快乐吃面, 祥子低头害羞吃面。",
+  "characters": [
+    {
+      "anchor_id": "target_1",
+      "source_text": "左上小格子：祥子眼部特写，45度侧面，表情发愣，眼睛张的较大。",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, upper_body, close-up, profile, 45_degree_angle, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, wide_eyes, blank_stare, expressionless, looking_away, daytime, 祥子的眼部特写, 45度侧面, 蓝色长发与侧发, 黄色眼睛睁得较大, 神情发愣, 正午光线。",
+      "interaction_tags": [],
+      "position_reason": "左上小格，眼部近距特写，45度侧脸朝右。",
+      "x": 0.22,
+      "y": 0.1
+    },
+    {
+      "anchor_id": "target_2",
+      "source_text": "右上小格子：俯视视角、背后视角，千早爱音用一根黑色的发圈扎好了马尾，画面中是她的马尾发型。背景模糊，为饭桌，桌上有碗面。",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, from_behind, from_above, upper_body, close-up, pink_hair, long_hair, ponytail, black_scrunchie, scrunchie, hand_up, holding_hair, blurry_background, table, bowl, noodles, daytime, 俯视背后视角, 千早爱音用一根黑色发圈把粉色长发扎成马尾, 画面突出马尾发型, 背景模糊的饭桌上有碗面。",
+      "interaction_tags": [],
+      "position_reason": "右上小格，从背后俯视，马尾与发圈在画面中上部。",
+      "x": 0.78,
+      "y": 0.1
+    },
+    {
+      "anchor_id": "target_2",
+      "source_text": "第三格：左侧中间大格子，爱音坐在桌子对面，穿着羽丘冬季校服，扎着马尾，开始吃面条，上半身视角，逆光，表情自然微笑。",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, upper_body, sitting, at_table, facing_viewer, haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, wing_collar, pink_hair, long_hair, ponytail, black_scrunchie, grey_eyes, smile, happy, eating, holding_chopsticks, noodles, bowl, backlighting, daytime, 爱音坐在桌子对面, 穿羽丘冬季校服, 扎马尾, 一手拿筷子开始吃面条, 上半身入镜, 逆光, 自然微笑。",
+      "interaction_tags": [],
+      "position_reason": "左中大格，居中上半身，面碗在身前。",
+      "x": 0.3,
+      "y": 0.42
+    },
+    {
+      "anchor_id": "target_1",
+      "source_text": "第四格：右侧中间靠上，祥子头、肩部特写，表情害羞，略微低头。",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, upper_body, head_and_shoulders, close-up, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, blush, embarrassed, shy, looking_down, slight_head_tilt, daytime, 祥子的头部与肩部特写, 蓝发侧发可见, 脸泛红, 表情害羞, 略微低头。",
+      "interaction_tags": [],
+      "position_reason": "右列上格，头肩近距，脸略朝下。",
+      "x": 0.78,
+      "y": 0.4
+    },
+    {
+      "anchor_id": "target_1",
+      "source_text": "第五格：右侧中间靠下，祥子侧脸，面部特写，慌张害羞地低头。",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, close-up, face_focus, profile, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, blush, embarrassed, flustered, looking_down, parted_lips, daytime, 祥子侧脸面部特写, 蓝发侧发, 脸颊泛红, 神情慌张害羞, 低着头。",
+      "interaction_tags": [],
+      "position_reason": "右列下格，侧脸特写，面朝左下。",
+      "x": 0.78,
+      "y": 0.62
+    },
+    {
+      "anchor_id": "target_2",
+      "source_text": "第六格：底部宽格子。店内侧面中景，爱音绑着马尾开心地吃面，祥子低头害羞地吃面",
+      "name": "chihaya_anon",
+      "prompt": "girl, chihaya_anon, medium_shot, from_side, sitting, at_table, haneoka_school_uniform, winter_uniform, long_sleeves, green_necktie, striped_necktie, diagonal-striped_necktie, wing_collar, pink_hair, long_hair, ponytail, black_scrunchie, grey_eyes, happy, smile, eating, holding_chopsticks, noodles, bowl, daytime, 店内侧面中景, 爱音绑着马尾, 穿羽丘冬季校服, 开心地吃面。",
+      "interaction_tags": [],
+      "position_reason": "底部宽格左侧，侧面中景，面碗在前。",
+      "x": 0.3,
+      "y": 0.87
+    },
+    {
+      "anchor_id": "target_1",
+      "source_text": "第六格：底部宽格子。店内侧面中景，爱音绑着马尾开心地吃面，祥子低头害羞地吃面",
+      "name": "togawa_sakiko",
+      "prompt": "girl, togawa_sakiko, medium_shot, from_side, sitting, at_table, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, blush, embarrassed, shy, looking_down, eating, holding_chopsticks, noodles, bowl, daytime, 店内侧面中景, 祥子坐在爱音对面, 低头害羞地吃面。",
+      "interaction_tags": [],
+      "position_reason": "底部宽格右侧，与爱音相对而坐，侧面中景。",
+      "x": 0.7,
+      "y": 0.87
+    }
+  ],
+  "dropped_interaction_tags": [],
+  "dropped_global_character_tags": []
+}

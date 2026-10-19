@@ -1,0 +1,60 @@
+{
+  "queries": [
+    {
+      "id": "two_side_up",
+      "keyword": "two_side_up",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "two_sides_up",
+      "keyword": "two_sides_up",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "yellow_eyes_blue_hair",
+      "keyword": "yellow_eyes_blue_hair",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "hands_on_own_lap",
+      "keyword": "hands_on_own_lap",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "sitting_on_bed",
+      "keyword": "sitting_on_bed",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "teasing",
+      "keyword": "teasing",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "bed_sheet",
+      "keyword": "bed_sheet",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    },
+    {
+      "id": "master_of_melodia",
+      "keyword": "master_of_melodia",
+      "category": "general",
+      "limit": 5,
+      "match_mode": "exact"
+    }
+  ]
+}

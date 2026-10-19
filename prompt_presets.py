@@ -705,7 +705,7 @@ def strip_raw_prefix(prompt: str) -> tuple[bool, str]:
     lowered = text.lower()
     for prefix in RAW_PREFIXES:
         if lowered.startswith(prefix.lower()):
-            return True, text[len(prefix) :].strip(" ，,：:")
+            return True, text[len(prefix) :].lstrip(" ，,：:").rstrip()
     return False, text
 
 

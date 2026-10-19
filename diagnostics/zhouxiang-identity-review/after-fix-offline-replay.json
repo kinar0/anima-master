@@ -1,0 +1,661 @@
+[
+  {
+    "case": "complete_roster",
+    "hypothetical": false,
+    "neutral_request": "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。",
+    "synthetic_llm1": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "粥祥",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ],
+    "synthetic_llm2": {
+      "composition_analysis": {
+        "viewpoint": "front",
+        "layout": "separate regions",
+        "relations": "two instances"
+      },
+      "global_prompt": "3girls, living_room, 几人在沙发旁合影。",
+      "characters": [
+        {
+          "name": "togawa_sakiko",
+          "prompt": "girl, sitting, 丰川祥子坐在沙发上。",
+          "x": 0.3,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "togawa_sakiko_(master_of_melodia)",
+          "prompt": "girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+          "x": 0.5,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "chihaya_anon",
+          "prompt": "girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+          "x": 0.7,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        }
+      ]
+    },
+    "successful": true,
+    "error": null,
+    "bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "粥祥",
+        "canonical_tag": "togawa_sakiko_(master_of_melodia)"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "references": [],
+    "bound_references": [],
+    "identity_review": [],
+    "initial_identity_errors": [],
+    "final_characters": [
+      {
+        "name": "togawa_sakiko",
+        "prompt": "togawa_sakiko, girl, sitting, 丰川祥子坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.3,
+        "y": 0.5
+      },
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "prompt": "togawa_sakiko_(master_of_melodia), girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.5,
+        "y": 0.5
+      },
+      {
+        "name": "chihaya_anon",
+        "prompt": "chihaya_anon, girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.7,
+        "y": 0.5
+      }
+    ],
+    "call_count": 2
+  },
+  {
+    "case": "omitted_rescued_by_reference",
+    "hypothetical": false,
+    "neutral_request": "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。",
+    "synthetic_llm1": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ],
+    "synthetic_llm2": {
+      "composition_analysis": {
+        "viewpoint": "front",
+        "layout": "separate regions",
+        "relations": "two instances"
+      },
+      "global_prompt": "3girls, living_room, 几人在沙发旁合影。",
+      "characters": [
+        {
+          "name": "togawa_sakiko",
+          "prompt": "girl, sitting, 丰川祥子坐在沙发上。",
+          "x": 0.3,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "togawa_sakiko_(master_of_melodia)",
+          "prompt": "girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+          "x": 0.5,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "chihaya_anon",
+          "prompt": "girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+          "x": 0.7,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        }
+      ]
+    },
+    "successful": true,
+    "error": null,
+    "bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "references": [
+      {
+        "anchor_id": "nai_local_reference_1",
+        "source": "粥祥",
+        "canonical_tags": [
+          "togawa_sakiko_(master_of_melodia)"
+        ]
+      }
+    ],
+    "bound_references": [
+      "nai_local_reference_1"
+    ],
+    "identity_review": [],
+    "initial_identity_errors": [],
+    "final_characters": [
+      {
+        "name": "togawa_sakiko",
+        "prompt": "togawa_sakiko, girl, sitting, 丰川祥子坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.3,
+        "y": 0.5
+      },
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "prompt": "togawa_sakiko_(master_of_melodia), girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.5,
+        "y": 0.5
+      },
+      {
+        "name": "chihaya_anon",
+        "prompt": "chihaya_anon, girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.7,
+        "y": 0.5
+      }
+    ],
+    "call_count": 2
+  },
+  {
+    "case": "reference_not_mandatory_writer_omits",
+    "hypothetical": false,
+    "neutral_request": "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。",
+    "synthetic_llm1": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ],
+    "synthetic_llm2": {
+      "composition_analysis": {
+        "viewpoint": "front",
+        "layout": "separate regions",
+        "relations": "two instances"
+      },
+      "global_prompt": "2girls, living_room, 几人在沙发旁合影。",
+      "characters": [
+        {
+          "name": "togawa_sakiko",
+          "prompt": "girl, sitting, 丰川祥子坐在沙发上。",
+          "x": 0.3,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "chihaya_anon",
+          "prompt": "girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+          "x": 0.7,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        }
+      ]
+    },
+    "successful": true,
+    "error": null,
+    "bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "references": [
+      {
+        "anchor_id": "nai_local_reference_1",
+        "source": "粥祥",
+        "canonical_tags": [
+          "togawa_sakiko_(master_of_melodia)"
+        ]
+      }
+    ],
+    "bound_references": [
+      "nai_local_reference_1"
+    ],
+    "identity_review": [],
+    "initial_identity_errors": [
+      "Review omitted/source-classified identity 粥祥: return its visible instance or identity_review with visibility visible/donor/quoted/offscreen and exact contextual source_text. Shared clothing descriptions do not turn a co-present person into a donor."
+    ],
+    "final_characters": [
+      {
+        "name": "togawa_sakiko",
+        "prompt": "togawa_sakiko, girl, sitting, 丰川祥子坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.3,
+        "y": 0.5
+      },
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "prompt": "togawa_sakiko_(master_of_melodia), girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.5,
+        "y": 0.5
+      },
+      {
+        "name": "chihaya_anon",
+        "prompt": "chihaya_anon, girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.7,
+        "y": 0.5
+      }
+    ],
+    "call_count": 3
+  },
+  {
+    "case": "hypothetical_source_misclassification",
+    "hypothetical": true,
+    "neutral_request": "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。",
+    "synthetic_llm1": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": "粥祥衣服",
+        "clothing_source": "粥祥",
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ],
+    "synthetic_llm2": {
+      "composition_analysis": {
+        "viewpoint": "front",
+        "layout": "separate regions",
+        "relations": "two instances"
+      },
+      "global_prompt": "2girls, living_room, 几人在沙发旁合影。",
+      "characters": [
+        {
+          "name": "togawa_sakiko",
+          "prompt": "girl, sitting, 丰川祥子坐在沙发上。",
+          "x": 0.3,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "chihaya_anon",
+          "prompt": "girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+          "x": 0.7,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        }
+      ]
+    },
+    "successful": true,
+    "error": null,
+    "bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "references": [
+      {
+        "anchor_id": "nai_local_reference_1",
+        "source": "粥祥",
+        "canonical_tags": [
+          "togawa_sakiko_(master_of_melodia)"
+        ]
+      }
+    ],
+    "bound_references": [
+      "nai_local_reference_1"
+    ],
+    "identity_review": [
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "visibility": "visible",
+        "source_text": "丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。"
+      }
+    ],
+    "initial_identity_errors": [
+      "Review omitted/source-classified identity 粥祥: return its visible instance or identity_review with visibility visible/donor/quoted/offscreen and exact contextual source_text. Shared clothing descriptions do not turn a co-present person into a donor."
+    ],
+    "final_characters": [
+      {
+        "name": "togawa_sakiko",
+        "prompt": "togawa_sakiko, girl, sitting, 丰川祥子坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.3,
+        "y": 0.5
+      },
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "prompt": "togawa_sakiko_(master_of_melodia), girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.5,
+        "y": 0.5
+      },
+      {
+        "name": "chihaya_anon",
+        "prompt": "chihaya_anon, girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.7,
+        "y": 0.5
+      }
+    ],
+    "call_count": 3
+  },
+  {
+    "case": "hypothetical_source_and_unmapped_name",
+    "hypothetical": true,
+    "neutral_request": "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。",
+    "synthetic_llm1": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": "粥祥衣服",
+        "clothing_source": "粥祥",
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ],
+    "synthetic_llm2": {
+      "composition_analysis": {
+        "viewpoint": "front",
+        "layout": "separate regions",
+        "relations": "two instances"
+      },
+      "global_prompt": "3girls, living_room, 几人在沙发旁合影。",
+      "characters": [
+        {
+          "name": "togawa_sakiko",
+          "prompt": "girl, sitting, 丰川祥子坐在沙发上。",
+          "x": 0.3,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "粥祥",
+          "prompt": "girl, brown_hair, sitting, 粥祥坐在沙发上。",
+          "x": 0.5,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "chihaya_anon",
+          "prompt": "girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+          "x": 0.7,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        }
+      ]
+    },
+    "successful": true,
+    "error": null,
+    "bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "references": [
+      {
+        "anchor_id": "nai_local_reference_1",
+        "source": "粥祥",
+        "canonical_tags": [
+          "togawa_sakiko_(master_of_melodia)"
+        ]
+      }
+    ],
+    "bound_references": [
+      "nai_local_reference_1"
+    ],
+    "identity_review": [
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "visibility": "visible",
+        "source_text": "丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。"
+      }
+    ],
+    "initial_identity_errors": [
+      "Review omitted/source-classified identity 粥祥: return its visible instance or identity_review with visibility visible/donor/quoted/offscreen and exact contextual source_text. Shared clothing descriptions do not turn a co-present person into a donor."
+    ],
+    "final_characters": [
+      {
+        "name": "togawa_sakiko",
+        "prompt": "togawa_sakiko, girl, sitting, 丰川祥子坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.3,
+        "y": 0.5
+      },
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "prompt": "togawa_sakiko_(master_of_melodia), girl, blue_hair, horns, sitting, 粥祥坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.5,
+        "y": 0.5
+      },
+      {
+        "name": "chihaya_anon",
+        "prompt": "chihaya_anon, girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.7,
+        "y": 0.5
+      }
+    ],
+    "call_count": 3
+  },
+  {
+    "case": "legitimate_offscreen_donor",
+    "hypothetical": false,
+    "neutral_request": "-r 丰川祥子穿粥祥衣服坐在沙发上，千早爱音在旁边拿着自拍杆。",
+    "synthetic_llm1": [
+      {
+        "name": "丰川祥子",
+        "aliases": [],
+        "clothing": "粥祥衣服",
+        "clothing_source": "粥祥",
+        "clothing_changes": [],
+        "appearance_changes": []
+      },
+      {
+        "name": "千早爱音",
+        "aliases": [],
+        "clothing": null,
+        "clothing_source": null,
+        "clothing_changes": [],
+        "appearance_changes": []
+      }
+    ],
+    "synthetic_llm2": {
+      "composition_analysis": {
+        "viewpoint": "front",
+        "layout": "separate regions",
+        "relations": "two instances"
+      },
+      "global_prompt": "2girls, living_room, 几人在沙发旁合影。",
+      "characters": [
+        {
+          "name": "togawa_sakiko",
+          "prompt": "girl, sitting, 丰川祥子坐在沙发上。",
+          "x": 0.3,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        },
+        {
+          "name": "chihaya_anon",
+          "prompt": "girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+          "x": 0.7,
+          "y": 0.5,
+          "interaction_tags": [],
+          "position_reason": "separate visible region"
+        }
+      ],
+      "identity_review": [
+        {
+          "name": "togawa_sakiko_(master_of_melodia)",
+          "visibility": "donor",
+          "source_text": "丰川祥子穿粥祥衣服坐在沙发上，千早爱音在旁边拿着自拍杆。"
+        }
+      ]
+    },
+    "successful": true,
+    "error": null,
+    "bindings": [
+      {
+        "source": "丰川祥子",
+        "canonical_tag": "togawa_sakiko"
+      },
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "references": [
+      {
+        "anchor_id": "nai_local_reference_1",
+        "source": "粥祥",
+        "canonical_tags": [
+          "togawa_sakiko_(master_of_melodia)"
+        ]
+      }
+    ],
+    "bound_references": [],
+    "identity_review": [
+      {
+        "name": "togawa_sakiko_(master_of_melodia)",
+        "visibility": "donor",
+        "source_text": "丰川祥子穿粥祥衣服坐在沙发上，千早爱音在旁边拿着自拍杆。"
+      }
+    ],
+    "initial_identity_errors": [],
+    "final_characters": [
+      {
+        "name": "togawa_sakiko",
+        "prompt": "togawa_sakiko, girl, sitting, 丰川祥子坐在沙发上。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.3,
+        "y": 0.5
+      },
+      {
+        "name": "chihaya_anon",
+        "prompt": "chihaya_anon, girl, holding_selfie_stick, 千早爱音拿着自拍杆。",
+        "interaction_tags": [],
+        "position_reason": "separate visible region",
+        "x": 0.7,
+        "y": 0.5
+      }
+    ],
+    "call_count": 2
+  }
+]

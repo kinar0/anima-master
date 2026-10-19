@@ -9,11 +9,11 @@ try:
         EXPLICIT_SCENE_MARKER,
     )
     from .prompt_keyword_rules import MatchedPromptRule, build_keyword_rule_block
-    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY
+    from .prompt_visibility import APPEARANCE_VISIBILITY_POLICY, VISUAL_FOCUS_POLICY, ORDINARY_NARRATIVE_SCOPE_POLICY
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from prompt_background import DEFAULT_PORTRAIT_MARKER, EXPLICIT_SCENE_MARKER
     from prompt_keyword_rules import MatchedPromptRule, build_keyword_rule_block
-    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY
+    from prompt_visibility import APPEARANCE_VISIBILITY_POLICY, VISUAL_FOCUS_POLICY, ORDINARY_NARRATIVE_SCOPE_POLICY
 
 DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面提示词的 AI 画师。
 
@@ -26,16 +26,16 @@ DEFAULT_LLM_PROMPT_TEMPLATE = """你是为 Anima 图像生成模型编写正面�
   `{{Copyright: vocaloid}}`
   `{{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}}`
   `{{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}}`
-  `{{Tags: full body, composition, lighting, background, creative visual details}}`
-  `{{Nltags: hatsune_miku and kagamine_rin are ......}}`
+  `{{Tags: full body, requested composition, visible background and props}}`
+  `{{Nltags: hatsune_miku waves to kagamine_rin, who holds the book toward her}}`
 - `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。
 - Copyright输出角色所属作品的danbooru tag。
-- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。
+- 服装和角色外表按用户要求和逐角色证据决定。保留用户的主体、人数、姿态、构图、镜头、色彩、氛围与特效要求；未指定部分只为完整表达主题和动作作必要设计。不要为润色擅加光影、风、景深、虚化或镜头特效，不罗列画外衣物。具体外貌迁移只改变所指维度，已知 canonical 特征写进接收者自己的 Identity/Details，不能只放共享 Tags；不得用近义但不同形状的发型替代。
 - 默认使用 simple background 和 white background；若用户的主题、事件或动作明确或隐含需要环境才能完整表达，则补足相关场景，不与白底并存。明确简单/白底时遵循原文。没有场景需求时不要自行增加地点；补足环境不等于擅自增加雨夜、夕阳等装饰设定。
 - Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。
 - 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。
 - Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。
-- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。
+- Nltags用连贯英文补充前面字段尚未表达清楚的关系、动作方向、身体归属、接触点及空间/场景联系；不复述已经完整表达的外貌、衣物、镜头和背景。没有额外含义时留空；不能为避免重复而漏掉必要的多人互动或复杂关系。
 - Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等
 - `Identity` 中每位角色写成完整、语法连贯的一句话。
 - 不要输出解释、分析、标题、编号、Markdown、代码块或中文。
@@ -97,6 +97,8 @@ SENSUAL_EXPRESSION_POLICY = """
 
 
 LEGACY_BUILTIN_TEMPLATE_HASHES = {
+    # Built-in before scoped appearance references and supplementary Nltags.
+    "e0f248b0f2686e6c0ba53ac2f06250b59133b727f576a61bb9b2fd1fef649dfe",
     # Built-in before removing viewer-gaze guidance from prompt instructions.
     "8d5e5b50d7049b880b3dc664522d5b0ce17b9e708a6698bca04d95bc49a38d25",
     # Built-in immediately before the model-owned background policy.
@@ -282,6 +284,8 @@ def build_llm_prompt(
         )
     # Keep the single wardrobe authority block last so legacy/custom templates,
     # sensual guidance, and background rules cannot accidentally override it.
+    prompt += VISUAL_FOCUS_POLICY
+    prompt += ORDINARY_NARRATIVE_SCOPE_POLICY
     prompt += WARDROBE_AUTHORITY_POLICY
     # Outside template expansion: genuine custom templates receive it too.
     prompt += APPEARANCE_VISIBILITY_POLICY

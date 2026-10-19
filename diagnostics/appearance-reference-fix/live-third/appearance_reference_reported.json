@@ -1,0 +1,413 @@
+{
+  "case": "reported",
+  "prompt": "千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。",
+  "calls": [
+    {
+      "system_prompt": "Extract only what the user said about each visible character. Copy phrases exactly, use null for unknown clothing, never guess tags or lore, and return JSON only.",
+      "prompt": "List each visible character once. Preserve the complete visible-character roster. Do not merge, summarize, sample, or omit characters. A character used only as an appearance, cosplay or clothing reference is not visible. Copy all text values exactly from the request; never translate, guess tags, or fill missing clothes.\n\nReturn only:\n{\"characters\":[{\"name\":\"exact visible entity mention\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}\n\nname = only the exact entity mention for the visible character, never a whole descriptive clause. aliases = exact alternate names explicitly paired with that same entity in A (B), otherwise []. For example, 复仇者（revenant） uses name=复仇者 and aliases=[revenant], while 巨乳（huge breasts）的粉发美少女 uses name=粉发美少女 and aliases=[]; appearance, clothing, pose, action, and translation glosses are not character aliases.\nclothing = the exact stated garment/set phrase, or null when unstated.\nclothing_source = the exact character/persona whose outfit is copied, or null. For A cosplay C or A wearing C's clothes (including A穿C衣服 without 的), A is the wearer and C is clothing_source; clothing still copies the full original garment/source phrase. A clothing donor is not a visible instance unless independently present in the scene. A reference to someone's hair, eyes, body feature or other appearance is NOT clothing: keep clothing and clothing_source null unless clothes are independently requested. Never put a hair/appearance phrase into clothing.\nclothing_changes = explicit changes only. Every item MUST be an object with operation, slots, color, source_text; source_text must be exact. operation MUST be one of remove, damage, replace_color, recolor_all, add, keep_only. slots MUST use only upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, headwear, face_accessory.mask, handwear, legwear, footwear, lower_body.all, misc. If an item does not clearly fit a named slot, ALWAYS use misc instead of inventing another slot. Use remove (never removed/removal) for an item the character no longer wears; use damage for torn/ripped clothing, not remove. Torn or damaged clothing is a change, not removal. Use [] only when there is no explicit clothing change.\nappearance_changes = explicit request phrases only. Prefer objects with dimension (eye_color, hair_color, hair_length, hair_style, skin_color, chest_size, animal_ears, tail, horns, age_presentation, or gender_presentation), operation (replace, additive, or omit), and exact source_text, plus reference_character (the exact name of the person whose feature is copied, otherwise null); do not output tags. Copying B's hairstyle/eye color/horns onto A changes only the stated dimension of A. B is an appearance reference, not an outfit donor or an additional visible person unless independently present. Clothing and appearance references may differ in the same request. Do not infer unstated source features or accessories. Use omit when the user says a visible feature must not be drawn or must be completely hidden (for example, no visible eyes); this suppresses that dimension's saved profile. Do not use omit for missing highlights, a dull gaze, closed eyes, or a changed eye color. operation=replace means the new value supersedes the old value; operation=additive means both remain visibly present. A trait immediately before a name belongs only to that person (扶她千早爱音 means only 千早爱音 is futanari); futanari is not chest_size. Shared words such as both/all/双方/两人/都 must be copied onto every affected character.\n\nUser request: 千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。",
+      "response": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[{\"operation\":\"add\",\"slots\":\"misc\",\"color\":\"黑色\",\"source_text\":\"脖子戴黑色项圈\"}],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\",\"reference_character\":\"丰川祥子\"}]}]}"
+    },
+    {
+      "system_prompt": "Extract only what the user said about each visible character. Copy phrases exactly, use null for unknown clothing, never guess tags or lore, and return JSON only.",
+      "prompt": "List each visible character once. Preserve the complete visible-character roster. Do not merge, summarize, sample, or omit characters. A character used only as an appearance, cosplay or clothing reference is not visible. Copy all text values exactly from the request; never translate, guess tags, or fill missing clothes.\n\nReturn only:\n{\"characters\":[{\"name\":\"exact visible entity mention\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}\n\nname = only the exact entity mention for the visible character, never a whole descriptive clause. aliases = exact alternate names explicitly paired with that same entity in A (B), otherwise []. For example, 复仇者（revenant） uses name=复仇者 and aliases=[revenant], while 巨乳（huge breasts）的粉发美少女 uses name=粉发美少女 and aliases=[]; appearance, clothing, pose, action, and translation glosses are not character aliases.\nclothing = the exact stated garment/set phrase, or null when unstated.\nclothing_source = the exact character/persona whose outfit is copied, or null. For A cosplay C or A wearing C's clothes (including A穿C衣服 without 的), A is the wearer and C is clothing_source; clothing still copies the full original garment/source phrase. A clothing donor is not a visible instance unless independently present in the scene. A reference to someone's hair, eyes, body feature or other appearance is NOT clothing: keep clothing and clothing_source null unless clothes are independently requested. Never put a hair/appearance phrase into clothing.\nclothing_changes = explicit changes only. Every item MUST be an object with operation, slots, color, source_text; source_text must be exact. operation MUST be one of remove, damage, replace_color, recolor_all, add, keep_only. slots MUST use only upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, headwear, face_accessory.mask, handwear, legwear, footwear, lower_body.all, misc. If an item does not clearly fit a named slot, ALWAYS use misc instead of inventing another slot. Use remove (never removed/removal) for an item the character no longer wears; use damage for torn/ripped clothing, not remove. Torn or damaged clothing is a change, not removal. Use [] only when there is no explicit clothing change.\nappearance_changes = explicit request phrases only. Prefer objects with dimension (eye_color, hair_color, hair_length, hair_style, skin_color, chest_size, animal_ears, tail, horns, age_presentation, or gender_presentation), operation (replace, additive, or omit), and exact source_text, plus reference_character (the exact name of the person whose feature is copied, otherwise null); do not output tags. Copying B's hairstyle/eye color/horns onto A changes only the stated dimension of A. B is an appearance reference, not an outfit donor or an additional visible person unless independently present. Clothing and appearance references may differ in the same request. Do not infer unstated source features or accessories. Use omit when the user says a visible feature must not be drawn or must be completely hidden (for example, no visible eyes); this suppresses that dimension's saved profile. Do not use omit for missing highlights, a dull gaze, closed eyes, or a changed eye color. operation=replace means the new value supersedes the old value; operation=additive means both remain visibly present. A trait immediately before a name belongs only to that person (扶她千早爱音 means only 千早爱音 is futanari); futanari is not chest_size. Shared words such as both/all/双方/两人/都 must be copied onto every affected character.\n\nUser request: 千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。\n\nYour previous response failed structural validation:\n- characters[1].clothing_changes[1] must use a supported grounded operation, slot, color, and exact source_text\nRepair the complete intent JSON object. Preserve every correctly understood character, clothing change, and appearance request. Do not invent tags, candidates, lookups, IDs, or unstated facts. Every name and source_text must be copied from the request. Return the corrected complete JSON object only.\n\nPrevious response:\n{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[{\"operation\":\"add\",\"slots\":\"misc\",\"color\":\"黑色\",\"source_text\":\"脖子戴黑色项圈\"}],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\",\"reference_character\":\"丰川祥子\"}]}]}",
+      "response": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[{\"operation\":\"add\",\"slots\":\"misc\",\"color\":\"黑色\",\"source_text\":\"脖子戴黑色项圈\"}],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\",\"reference_character\":\"丰川祥子\"}]}]}"
+    },
+    {
+      "system_prompt": "你是 Anima 模型的 Danbooru tag 提示词助手。请在内部充分推理和校验参考对象的视觉特征，但不要输出思考过程。只输出英文 danbooru tags，用英文逗号分隔。不要解释，不要 Markdown，不要输出质量词或画师词。背景按原文完整语义判断：默认简单白底，明确或隐含需要环境时补足场景。背景控制标记只用于诊断；自行避免场景与白底冲突。Follow the user prompt's seven-brace-block response format exactly. Count must contain an exact Danbooru people-count tag; never write a bare number, omit Count, or merge it into Characters. Characters contains names only. Every character appears exactly once in both Identity and Details; keep its clothing in its own Details clause. Never invent sex characteristics or genital anatomy that the user did not positively request; erotic acts and masturbation are not evidence for them, and explicitly negated traits are forbidden. 用户的具体修改优先于常见角色造型和装饰性扩写。已提供的适用 canonical 外貌特征必须带归属写入接收者自己的 Identity/Details，不能只写在共享 Tags。只写当前镜头中可见的衣物；默认档案不能使大头照变成衣柜展示。未要求时不增加柔光、日光、风、景深、虚化或镜头特效。已核实的来源特征使用提供的 canonical 拼写（可把下划线写成空格），不要把已知标签重新猜成另一种形状。未知或歧义来源只保留用户的参考关系，不得凭空补出该来源的具体造型。Nltags只补充前面字段未清楚表达的关系、方向、接触与空间含义，不得复述完整人物和整幅画面；没有额外含义就留空。Copyright只列画面中可见人物所属作品，外貌或服装参考不额外带入来源作品。保留全部明确人物、画格、动作、服装修改及复杂关系。这些具体边界优先于自定义模板中笼统的自由扩写和允许重复的说明。",
+      "prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 把头发梳成丰川祥子的发型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nAppearance references by recipient (only the listed dimensions are copied; these do not select clothes or add visible people):\n- 千早爱音 <= 丰川祥子 (togawa_sakiko): dimensions=hair_style; known facts=sidelocks, two_side_up; optional visible hair accessories=hair_ribbon; user evidence=把头发梳成丰川祥子的发型\nUse an applicable supplied canonical fact instead of inventing a competing hairstyle/feature. Write the applicable canonical facts in that recipient's own Identity/Details (or actual NAI instance prompt), not only in shared Tags or analysis. Keep other dimensions of the recipient. Source clothes and unrequested source colors/body traits are not transferred. Accessories are optional writer choices, never a checklist. Source-only copyright metadata is not the recipient's copyright. Explicit edits/removals and visibility win.\nPer-character clothing evidence:\n- 千早爱音: default reference = no saved garments visible at this framing; do not invent out-of-frame clothing. Use when context fits; otherwise adapt to the scene. Saved profile components outside the requested framing were omitted; do not restore them.\n\n\n\n\n用户原始要求：\n千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。\n\n\nVisual focus and faithful scope (takes priority over general permission to embellish):\nPreserve every requested person, panel, feature, garment, prop, action, expression,\nrelationship and explicit modifier. Make the user's distinguishing feature or\nchange legible; do not dilute it with alternative hairstyles or near-synonymous\nfeature tags. Use supplied applicable canonical facts; do not change a known\nfeature into a different shape just to describe it more richly. A reference to\nanother person's appearance transfers only the explicitly requested dimensions,\nnot that person's other traits, clothes or presence in the image. Clothing\nreferences likewise do not transfer appearance without a separate explicit edit.\nKeep the recipient's other visible profile facts. Evaluate each wearer/instance\nindependently, including shared requests and repeated identities across panels.\nUse the requested camera and only its visible garments/details. Defaults are soft\nevidence, not instructions to enumerate a complete wardrobe or widen a close view.\nComplete unspecified details only where needed for a coherent image or a requested\ncreative/expressive theme, preserving all existing sensual and action requirements.\nDo not add wind, weather effects, decorative lighting, lens effects, bokeh or depth\nof field solely as polish. Lighting is expressed only when requested or essential\nto an explicitly requested visible event. Keep tags and prose consistent in each\ndimension; never restore discarded clothing or a competing feature in prose.\nNo fixed tag quota: stop when the requested visual meaning is fully represented.\nKeep concise natural-language relations, direction, contact, ownership and spatial\nmeaning where tags alone cannot express them. For NAI instance output, retain the required English\nvisual tags AND full user-language sentences in base and every instance, including\nthe actual interactions and ownership, without duplicating an entire character\ndescription across scopes. This scope rule never replaces language, identity,\nvisibility, wardrobe, direction, coordinate, text-binding or review requirements.\n\n\nNltags adds remaining relational/spatial meaning rather than retelling Identity,\nDetails and Tags. It may be empty when nothing remains. This requirement takes\npriority over an earlier template's general permission to repeat the whole scene.\nKeep every necessary actor, recipient, direction, body owner, contact and setting\nrelation; do not shorten away meaning that has no clear expression elsewhere.\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 黑色项圈 => black_collar\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+      "response": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled with sidelocks and two side up hair, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black collar around her neck}\n{Tags: portrait, close-up, headshot, long hair, pink hair, sidelocks, two side up, grey eyes, black collar, looking at viewer, blue sky, clouds, daytime}\n{Nltags: A close-up headshot of chihaya_anon with long pink hair arranged in sidelocks and two side up, grey eyes looking at the viewer, wearing a black collar around her neck, with a blue sky and white clouds behind her. background_mode_explicit_scene}"
+    }
+  ],
+  "summary": {
+    "prompt_optimize_enabled": true,
+    "mode": "txt2img",
+    "requested_outfit_mode": "",
+    "multi_person_mode": false,
+    "nai_r_mode": false,
+    "original_prompt_head": "千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。",
+    "unspecified_wardrobe_policy": "scene_adaptive",
+    "scene_adaptive_wardrobe_marker": "",
+    "keyword_prompt_rule_markers": [],
+    "confirmed_character_bindings": [
+      {
+        "source": "千早爱音",
+        "canonical_tag": "chihaya_anon"
+      }
+    ],
+    "danbooru_semantic_status": "resolved",
+    "semantic_plan_attempt_count": 2,
+    "semantic_plan_validation_errors": [
+      "characters[1].clothing_changes[1] must use a supported grounded operation, slot, color, and exact source_text"
+    ],
+    "semantic_wardrobe_fallback_used": false,
+    "danbooru_semantic_confirmed_tags": [
+      "togawa_sakiko",
+      "chihaya_anon"
+    ],
+    "danbooru_explicit_term_tags": [
+      "blue_sky",
+      "black_collar"
+    ],
+    "danbooru_semantic_outfit_sources": [],
+    "danbooru_semantic_outfit_tags": [
+      "white_shirt",
+      "collared_shirt",
+      "haneoka_school_uniform",
+      "grey_jacket",
+      "plaid_skirt",
+      "grey_skirt",
+      "pleated_skirt",
+      "long_sleeves",
+      "black_ribbon",
+      "hair_ribbon",
+      "neck_ribbon",
+      "green_necktie",
+      "diagonal-striped_necktie",
+      "striped_necktie",
+      "white_socks",
+      "black_shoes",
+      "winter_uniform",
+      "green_skirt",
+      "black_socks"
+    ],
+    "danbooru_semantic_appearance_tags": [
+      "blue_hair",
+      "long_hair",
+      "yellow_eyes",
+      "sidelocks",
+      "two_side_up",
+      "large_breasts",
+      "yellow_eyes_blue_hair",
+      "pink_hair",
+      "grey_eyes",
+      "(flat_chest:1.4)"
+    ],
+    "danbooru_semantic_character_appearance_profiles": [
+      {
+        "aliases": [
+          "丰川祥子",
+          "togawa_sakiko",
+          "祥子",
+          "togawa sakiko",
+          "丰川祥子常服",
+          "祥子的演出服",
+          "祥子 stage outfit",
+          "丰川祥子的演出服",
+          "丰川祥子 stage outfit"
+        ],
+        "source_tag": "togawa_sakiko",
+        "appearance_tags": [
+          "blue_hair",
+          "long_hair",
+          "yellow_eyes",
+          "sidelocks",
+          "two_side_up",
+          "large_breasts",
+          "yellow_eyes_blue_hair"
+        ]
+      },
+      {
+        "aliases": [
+          "千早爱音",
+          "chihaya_anon",
+          "爱音",
+          "千早爱音常服",
+          "千早爱音演出服",
+          "千早爱音的演出服",
+          "千早爱音演出服 stage outfit",
+          "千早爱音 stage outfit"
+        ],
+        "source_tag": "chihaya_anon",
+        "appearance_tags": [
+          "long_hair",
+          "pink_hair",
+          "grey_eyes",
+          "(flat_chest:1.4)"
+        ]
+      }
+    ],
+    "danbooru_semantic_source_outfit_profiles": [
+      {
+        "alias": "丰川祥子",
+        "source_tag": "togawa_sakiko",
+        "qualifier": "default",
+        "outfit_tags": [
+          "white_shirt",
+          "collared_shirt",
+          "haneoka_school_uniform",
+          "grey_jacket",
+          "plaid_skirt",
+          "grey_skirt",
+          "pleated_skirt",
+          "long_sleeves",
+          "black_ribbon",
+          "hair_ribbon",
+          "neck_ribbon",
+          "green_necktie",
+          "diagonal-striped_necktie",
+          "striped_necktie",
+          "white_socks",
+          "black_shoes"
+        ]
+      },
+      {
+        "alias": "千早爱音",
+        "source_tag": "chihaya_anon",
+        "qualifier": "default",
+        "outfit_tags": [
+          "haneoka_school_uniform",
+          "grey_jacket",
+          "white_shirt",
+          "collared_shirt",
+          "winter_uniform",
+          "green_skirt",
+          "plaid_skirt",
+          "pleated_skirt",
+          "long_sleeves",
+          "green_necktie",
+          "striped_necktie",
+          "diagonal-striped_necktie",
+          "black_socks"
+        ]
+      }
+    ],
+    "danbooru_semantic_named_outfit_tags": [],
+    "danbooru_semantic_missing": [],
+    "danbooru_semantic_candidates": [],
+    "appearance_reference_evidence": [
+      {
+        "character": "千早爱音",
+        "reference": "丰川祥子",
+        "canonical_reference": "togawa_sakiko",
+        "dimensions": [
+          "hair_style"
+        ],
+        "guarded_dimensions": [
+          "hair_style"
+        ],
+        "source_text": "把头发梳成丰川祥子的发型",
+        "tags": [
+          "sidelocks",
+          "two_side_up"
+        ],
+        "optional_accessories": [
+          "hair_ribbon"
+        ]
+      }
+    ],
+    "appearance_omissions": [],
+    "prompt_llm_attempt_count": 1,
+    "prompt_llm_accepted_attempt": "initial",
+    "structured_initial_validation_errors": [],
+    "structured_scope_warnings": [],
+    "structured_unscoped_identity": [],
+    "structured_unscoped_details": [],
+    "sexual_trait_authority": {
+      "futa_allowed": false,
+      "male_genitals_allowed": false,
+      "removed": []
+    },
+    "structured_character_mode": true,
+    "structured_prompt_mode": true,
+    "structured_character_count": 1,
+    "structured_roster_tags": [
+      "1girl"
+    ],
+    "structured_copyright_tags": [
+      "bang_dream!"
+    ],
+    "required_profile_tags": [],
+    "removed_unbound_directional_tags": [],
+    "character_resolution_statuses": [
+      {
+        "name": "chihaya_anon",
+        "status": "semantic_confirmed",
+        "canonical_tag": "chihaya_anon",
+        "identity_tags": [
+          "chihaya_anon"
+        ]
+      }
+    ],
+    "local_character_hints": [],
+    "explicit_cosplay_tags": [],
+    "danbooru_term_fallback_tags": [],
+    "raw_mode": false,
+    "web_search": false,
+    "deep_thinking": false,
+    "search_reason": "",
+    "thinking_reason": "",
+    "fixed_character": false,
+    "fixed_character_name": "",
+    "sensual_mode": false,
+    "default_style": true,
+    "low_cfg_harness": false,
+    "background_mode": "explicit_scene",
+    "background_mode_source": "llm_marker",
+    "constraint_mode": false,
+    "weighted_style_tags": [],
+    "constraint_tags": [],
+    "removed_constraint_tags": [],
+    "constraint_reason": "",
+    "required_count_tags": [
+      "1girl"
+    ],
+    "required_core_tags": [
+      "chihaya_anon"
+    ],
+    "named_character_detected": false,
+    "character_resolution_status": "not_requested",
+    "character_canonical_tag": "",
+    "character_identity_tags": [],
+    "character_candidate_hints": [],
+    "character_resolution_evidence": [],
+    "outfit_transfer": false,
+    "outfit_transfer_source": "",
+    "outfit_transfer_target": "",
+    "outfit_summary_source": "suppressed_by_character_authority",
+    "outfit_summary_chars": 0,
+    "wardrobe_source": "configured_default",
+    "explicit_wardrobe_evidence": false,
+    "creative_shared_tags_allowed": false,
+    "outfit_effective_tags": [],
+    "outfit_removed_tags": [
+      "haneoka_school_uniform",
+      "grey_jacket",
+      "white_shirt",
+      "collared_shirt",
+      "winter_uniform",
+      "green_skirt",
+      "plaid_skirt",
+      "pleated_skirt",
+      "long_sleeves",
+      "green_necktie",
+      "striped_necktie",
+      "diagonal-striped_necktie",
+      "black_socks"
+    ],
+    "outfit_added_tags": [],
+    "wardrobe_authority": {
+      "has_character_plans": true,
+      "all_creative": false,
+      "cached_tags": [
+        "white_shirt",
+        "collared_shirt",
+        "haneoka_school_uniform",
+        "grey_jacket",
+        "plaid_skirt",
+        "grey_skirt",
+        "pleated_skirt",
+        "long_sleeves",
+        "black_ribbon",
+        "hair_ribbon",
+        "neck_ribbon",
+        "green_necktie",
+        "diagonal-striped_necktie",
+        "striped_necktie",
+        "white_socks",
+        "black_shoes",
+        "winter_uniform",
+        "green_skirt",
+        "black_socks"
+      ],
+      "explicit_tags": [],
+      "selected_tags": [],
+      "source_grounding_tags": [],
+      "unbound_grounding_tags": [],
+      "removed_tags": [
+        "haneoka_school_uniform",
+        "grey_jacket",
+        "white_shirt",
+        "collared_shirt",
+        "winter_uniform",
+        "green_skirt",
+        "plaid_skirt",
+        "pleated_skirt",
+        "long_sleeves",
+        "green_necktie",
+        "striped_necktie",
+        "diagonal-striped_necktie",
+        "black_socks"
+      ],
+      "stale_cached_tags": [
+        "white_shirt",
+        "collared_shirt",
+        "haneoka_school_uniform",
+        "grey_jacket",
+        "plaid_skirt",
+        "grey_skirt",
+        "pleated_skirt",
+        "long_sleeves",
+        "black_ribbon",
+        "neck_ribbon",
+        "green_necktie",
+        "diagonal-striped_necktie",
+        "striped_necktie",
+        "white_socks",
+        "black_shoes",
+        "winter_uniform",
+        "green_skirt",
+        "black_socks"
+      ]
+    },
+    "semantic_character_outfits": [
+      {
+        "target_anchor_id": "target_1",
+        "target": "千早爱音",
+        "wardrobe_kind": "default_reference",
+        "wardrobe_anchor_id": "",
+        "effective_tags": [],
+        "removed_tags": [
+          "haneoka_school_uniform",
+          "grey_jacket",
+          "white_shirt",
+          "collared_shirt",
+          "winter_uniform",
+          "green_skirt",
+          "plaid_skirt",
+          "pleated_skirt",
+          "long_sleeves",
+          "green_necktie",
+          "striped_necktie",
+          "diagonal-striped_necktie",
+          "black_socks"
+        ],
+        "appearance_tags": [
+          "long_hair",
+          "pink_hair",
+          "grey_eyes",
+          "(flat_chest:1.4)"
+        ],
+        "complete_named_profile": false,
+        "resolution_state": "unspecified",
+        "unresolved_evidence": []
+      }
+    ],
+    "wardrobe_resolution_states": {
+      "千早爱音": "unspecified"
+    },
+    "global_outfit_reinforcement_tags": [],
+    "outfit_user_patches": [],
+    "outfit_source_anchor_emitted": true,
+    "llm_failed": false,
+    "llm_error": "",
+    "llm_content_tag_count": 10,
+    "removed_content_tag_count": 0,
+    "llm_content_chars": 112,
+    "nltags_chars": 212,
+    "final_prompt_chars": 592,
+    "final_prompt_head": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, (@isemori:1.2),\nchihaya anon has long pink hair styled with sidelocks, two side up hair, grey eyes, (flat chest:1.4),\nchihaya anon wears a black collar around her neck,\nchihaya anon, portrait, close-up, headshot, sidelocks, two side up, black collar, looking at viewer, blue sky, clouds, daytime,\nNltags: A close-up headshot of chihaya anon with long pink hair arranged in sidelocks and two side up, grey eyes looking at the viewer, wearing a black collar around her neck, with a blue sky and white clouds behind her.",
+    "prompt_builder_template_customized": true,
+    "semantic_plan_prompt": "List each visible character once. Preserve the complete visible-character roster. Do not merge, summarize, sample, or omit characters. A character used only as an appearance, cosplay or clothing reference is not visible. Copy all text values exactly from the request; never translate, guess tags, or fill missing clothes.\n\nReturn only:\n{\"characters\":[{\"name\":\"exact visible entity mention\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}\n\nname = only the exact entity mention for the visible character, never a whole descriptive clause. aliases = exact alternate names explicitly paired with that same entity in A (B), otherwise []. For example, 复仇者（revenant） uses name=复仇者 and aliases=[revenant], while 巨乳（huge breasts）的粉发美少女 uses name=粉发美少女 and aliases=[]; appearance, clothing, pose, action, and translation glosses are not character aliases.\nclothing = the exact stated garment/set phrase, or null when unstated.\nclothing_source = the exact character/persona whose outfit is copied, or null. For A cosplay C or A wearing C's clothes (including A穿C衣服 without 的), A is the wearer and C is clothing_source; clothing still copies the full original garment/source phrase. A clothing donor is not a visible instance unless independently present in the scene. A reference to someone's hair, eyes, body feature or other appearance is NOT clothing: keep clothing and clothing_source null unless clothes are independently requested. Never put a hair/appearance phrase into clothing.\nclothing_changes = explicit changes only. Every item MUST be an object with operation, slots, color, source_text; source_text must be exact. operation MUST be one of remove, damage, replace_color, recolor_all, add, keep_only. slots MUST use only upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, headwear, face_accessory.mask, handwear, legwear, footwear, lower_body.all, misc. If an item does not clearly fit a named slot, ALWAYS use misc instead of inventing another slot. Use remove (never removed/removal) for an item the character no longer wears; use damage for torn/ripped clothing, not remove. Torn or damaged clothing is a change, not removal. Use [] only when there is no explicit clothing change.\nappearance_changes = explicit request phrases only. Prefer objects with dimension (eye_color, hair_color, hair_length, hair_style, skin_color, chest_size, animal_ears, tail, horns, age_presentation, or gender_presentation), operation (replace, additive, or omit), and exact source_text, plus reference_character (the exact name of the person whose feature is copied, otherwise null); do not output tags. Copying B's hairstyle/eye color/horns onto A changes only the stated dimension of A. B is an appearance reference, not an outfit donor or an additional visible person unless independently present. Clothing and appearance references may differ in the same request. Do not infer unstated source features or accessories. Use omit when the user says a visible feature must not be drawn or must be completely hidden (for example, no visible eyes); this suppresses that dimension's saved profile. Do not use omit for missing highlights, a dull gaze, closed eyes, or a changed eye color. operation=replace means the new value supersedes the old value; operation=additive means both remain visibly present. A trait immediately before a name belongs only to that person (扶她千早爱音 means only 千早爱音 is futanari); futanari is not chest_size. Shared words such as both/all/双方/两人/都 must be copied onto every affected character.\n\nUser request: 千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。",
+    "semantic_plan_initial_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[{\"operation\":\"add\",\"slots\":\"misc\",\"color\":\"黑色\",\"source_text\":\"脖子戴黑色项圈\"}],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\",\"reference_character\":\"丰川祥子\"}]}]}",
+    "semantic_plan_repair_prompt": "List each visible character once. Preserve the complete visible-character roster. Do not merge, summarize, sample, or omit characters. A character used only as an appearance, cosplay or clothing reference is not visible. Copy all text values exactly from the request; never translate, guess tags, or fill missing clothes.\n\nReturn only:\n{\"characters\":[{\"name\":\"exact visible entity mention\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}\n\nname = only the exact entity mention for the visible character, never a whole descriptive clause. aliases = exact alternate names explicitly paired with that same entity in A (B), otherwise []. For example, 复仇者（revenant） uses name=复仇者 and aliases=[revenant], while 巨乳（huge breasts）的粉发美少女 uses name=粉发美少女 and aliases=[]; appearance, clothing, pose, action, and translation glosses are not character aliases.\nclothing = the exact stated garment/set phrase, or null when unstated.\nclothing_source = the exact character/persona whose outfit is copied, or null. For A cosplay C or A wearing C's clothes (including A穿C衣服 without 的), A is the wearer and C is clothing_source; clothing still copies the full original garment/source phrase. A clothing donor is not a visible instance unless independently present in the scene. A reference to someone's hair, eyes, body feature or other appearance is NOT clothing: keep clothing and clothing_source null unless clothes are independently requested. Never put a hair/appearance phrase into clothing.\nclothing_changes = explicit changes only. Every item MUST be an object with operation, slots, color, source_text; source_text must be exact. operation MUST be one of remove, damage, replace_color, recolor_all, add, keep_only. slots MUST use only upper_body.primary, lower_body.skirt, one_piece.dress, outerwear, headwear, face_accessory.mask, handwear, legwear, footwear, lower_body.all, misc. If an item does not clearly fit a named slot, ALWAYS use misc instead of inventing another slot. Use remove (never removed/removal) for an item the character no longer wears; use damage for torn/ripped clothing, not remove. Torn or damaged clothing is a change, not removal. Use [] only when there is no explicit clothing change.\nappearance_changes = explicit request phrases only. Prefer objects with dimension (eye_color, hair_color, hair_length, hair_style, skin_color, chest_size, animal_ears, tail, horns, age_presentation, or gender_presentation), operation (replace, additive, or omit), and exact source_text, plus reference_character (the exact name of the person whose feature is copied, otherwise null); do not output tags. Copying B's hairstyle/eye color/horns onto A changes only the stated dimension of A. B is an appearance reference, not an outfit donor or an additional visible person unless independently present. Clothing and appearance references may differ in the same request. Do not infer unstated source features or accessories. Use omit when the user says a visible feature must not be drawn or must be completely hidden (for example, no visible eyes); this suppresses that dimension's saved profile. Do not use omit for missing highlights, a dull gaze, closed eyes, or a changed eye color. operation=replace means the new value supersedes the old value; operation=additive means both remain visibly present. A trait immediately before a name belongs only to that person (扶她千早爱音 means only 千早爱音 is futanari); futanari is not chest_size. Shared words such as both/all/双方/两人/都 must be copied onto every affected character.\n\nUser request: 千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。\n\nYour previous response failed structural validation:\n- characters[1].clothing_changes[1] must use a supported grounded operation, slot, color, and exact source_text\nRepair the complete intent JSON object. Preserve every correctly understood character, clothing change, and appearance request. Do not invent tags, candidates, lookups, IDs, or unstated facts. Every name and source_text must be copied from the request. Return the corrected complete JSON object only.\n\nPrevious response:\n{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[{\"operation\":\"add\",\"slots\":\"misc\",\"color\":\"黑色\",\"source_text\":\"脖子戴黑色项圈\"}],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\",\"reference_character\":\"丰川祥子\"}]}]}",
+    "semantic_plan_raw": "{\"characters\":[{\"name\":\"千早爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[{\"operation\":\"add\",\"slots\":\"misc\",\"color\":\"黑色\",\"source_text\":\"脖子戴黑色项圈\"}],\"appearance_changes\":[{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"把头发梳成丰川祥子的发型\",\"reference_character\":\"丰川祥子\"}]}]}",
+    "llm_prompt": "你是为 Anima 图像生成模型编写正面提示词的 AI 画师。\n\n请根据用户的原始要求设计一幅完整、协调、具有视觉吸引力的画面，并将你构思的画面输出为七个单行花括号字段。\n\n输出要求：\n- 只输出七个单行花括号字段，字段外不得输出任何文字，以下为样例：\n  `{Count: 2girls, yuri}`\n  `{Characters: hatsune_miku, kagamine_rin}`\n  `{Copyright: vocaloid}`\n  `{Identity: hatsune_miku has teal hair and teal eyes; kagamine_rin has blonde hair and blue eyes}`\n  `{Details: hatsune_miku smiles and waves; kagamine_rin looks aside and holds a book}`\n  `{Tags: full body, composition, lighting, background, creative visual details}`\n  `{Nltags: hatsune_miku and kagamine_rin are ......}`\n- `Count` 统计画面中所有可见人物，按以下规则一步确定，禁止反复核算或自我怀疑；`Characters` 只列能确认 canonical 名称的角色，不要为匿名人物编造名字。若画面有人但全是匿名、裁切或被景深遮蔽的人物，保留正确的 `Count`，并允许 `Characters`、`Copyright`、`Identity`、`Details` 留空，把可见特征写入 `Tags` 和 `Nltags`。若有命名角色，在 `Characters` 里用英文逗号各列一次；无人物才写 `no humans`。仅 1 人按性别写 `1girl` 或 `1boy`（性别不明写 `1girl`）；2 人及以上按已知性别组合，全部女性写 `Ngirls`，全部男性写 `Nboys`，男女混合写 `Ngirls, Mboys`。不得根据自慰、性行为、体位、服装或胸部尺寸猜测用户没有正向指定的性征；用户明确否定的概念不得出现在任何字段。`Copyright` 只能含命名角色所属作品的标准 Danbooru copyright tags；原创或无法确认作品时留空。每个已列出的命名角色必须恰好在 `Identity` 和 `Details` 中各出现一次。\n- Copyright输出角色所属作品的danbooru tag。\n- 服装和角色外表按用户要求和相关角色和动态上下文等补充信息决定。除此之外可以自由决定姿态、构图、镜头、光影、色彩、氛围和特效。\n- 用户未要求地点、环境或背景时，按单张角色立绘设计，不要自行创造场景。反之则可以根据要求进行有表现力的扩写。\n- Identity（角色外貌、身体特征）和Details（角色的穿着、动作等）根据后文用户需求判断，可以为了场景进行一定程度的改写，但不要遗漏用户希望保留的信息。\n- 但是，Identity 中每个角色都必须有一个以其 canonical 名开头的分句。Details 同样如此。\n- Tags存放用户要求及画面设计中的可见元素、构图、衣物、光影、氛围、材质、动作、背景、道具等视觉细节，尽量用danbooru tag描述。不得仅因画面具有色情、自慰或性行为内容就自行增加用户没有正向指定的生殖器或双性特征。\n- Nltags存放整个画面（角色、构图、动作、背景、……任何东西）的完整自然语言描述，可以和之前的内容重复。\n- Identity,Details,Nltags中使用的角色名必须与Characters使用的角色名英文完全一致，包括姓和名的先后顺序、拼写等\n- `Identity` 中每位角色写成完整、语法连贯的一句话。\n- 不要输出解释、分析、标题、编号、Markdown、代码块或中文。\n- 不要输出 masterpiece、best quality、score 等质量前缀。\n- 不要输出画师 tags；质量词和画师组会由程序另行拼接。\n- 尽量使用模型容易理解的可见画面描述。\n- 保持用户明确指定的角色、主体、人数、关键服装、动作、表情和道具。\n- 以最终图像协调、精致、有表现力和好看为优先，不需要机械追求固定 Tag 数量。\n- 不要为了数量重复同义词；画面已经完整时即可停止。\n- 请自行解决明显冲突，直接输出你认为最适合生成最终画面的版本。\n\n角色和动态上下文：\n点名作品角色时使用最可信的 Danbooru 角色 tag；未知时不要伪造作品。\n\nconfirmed visible character roster (authoritative):\nUse these canonical names in Characters, Identity, Details and Nltags:\n- 千早爱音 => chihaya_anon\nStable appearance facts by wearer (express visible features only; user edits take priority):\n- 千早爱音: long_hair, pink_hair, grey_eyes, (flat_chest:1.4)\nExplicit user appearance changes by wearer; never assign one person's change to another:\n- 千早爱音: 把头发梳成丰川祥子的发型 (hair_style; operation=replace)\nFollow each change operation exactly: additive keeps the compatible baseline value and also states the new visible value; replace supersedes only that dimension; omit means the feature is not visible and its saved color or shape must not be mentioned anywhere.\nAppearance references by recipient (only the listed dimensions are copied; these do not select clothes or add visible people):\n- 千早爱音 <= 丰川祥子 (togawa_sakiko): dimensions=hair_style; known facts=sidelocks, two_side_up; optional visible hair accessories=hair_ribbon; user evidence=把头发梳成丰川祥子的发型\nUse an applicable supplied canonical fact instead of inventing a competing hairstyle/feature. Write the applicable canonical facts in that recipient's own Identity/Details (or actual NAI instance prompt), not only in shared Tags or analysis. Keep other dimensions of the recipient. Source clothes and unrequested source colors/body traits are not transferred. Accessories are optional writer choices, never a checklist. Source-only copyright metadata is not the recipient's copyright. Explicit edits/removals and visibility win.\nPer-character clothing evidence:\n- 千早爱音: default reference = no saved garments visible at this framing; do not invent out-of-frame clothing. Use when context fits; otherwise adapt to the scene. Saved profile components outside the requested framing were omitted; do not restore them.\n\n\n\n\n用户原始要求：\n千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。\n\n背景由你根据用户原文的完整语义决定。默认使用 simple background 和 white background；主题、事件或动作明确或隐含需要环境时，补足相关场景且不使用白底，不擅自增加无关地点和光照。仅有椅子等动作道具不必扩展成完整房间。用户明确简单/白底时优先遵守。场景选择后，Nltags末尾写 background_mode_explicit_scene；选择简单白底则写 background_mode_default_portrait。标记仅供诊断，程序不会替你补删背景；不要写互相冲突的背景条件。\n用户原文：千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。\n\n\nVisual focus and faithful scope (takes priority over general permission to embellish):\nPreserve every requested person, panel, feature, garment, prop, action, expression,\nrelationship and explicit modifier. Make the user's distinguishing feature or\nchange legible; do not dilute it with alternative hairstyles or near-synonymous\nfeature tags. Use supplied applicable canonical facts; do not change a known\nfeature into a different shape just to describe it more richly. A reference to\nanother person's appearance transfers only the explicitly requested dimensions,\nnot that person's other traits, clothes or presence in the image. Clothing\nreferences likewise do not transfer appearance without a separate explicit edit.\nKeep the recipient's other visible profile facts. Evaluate each wearer/instance\nindependently, including shared requests and repeated identities across panels.\nUse the requested camera and only its visible garments/details. Defaults are soft\nevidence, not instructions to enumerate a complete wardrobe or widen a close view.\nComplete unspecified details only where needed for a coherent image or a requested\ncreative/expressive theme, preserving all existing sensual and action requirements.\nDo not add wind, weather effects, decorative lighting, lens effects, bokeh or depth\nof field solely as polish. Lighting is expressed only when requested or essential\nto an explicitly requested visible event. Keep tags and prose consistent in each\ndimension; never restore discarded clothing or a competing feature in prose.\nNo fixed tag quota: stop when the requested visual meaning is fully represented.\nKeep concise natural-language relations, direction, contact, ownership and spatial\nmeaning where tags alone cannot express them. For NAI instance output, retain the required English\nvisual tags AND full user-language sentences in base and every instance, including\nthe actual interactions and ownership, without duplicating an entire character\ndescription across scopes. This scope rule never replaces language, identity,\nvisibility, wardrobe, direction, coordinate, text-binding or review requirements.\n\n\nNltags adds remaining relational/spatial meaning rather than retelling Identity,\nDetails and Tags. It may be empty when nothing remains. This requirement takes\npriority over an earlier template's general permission to repeat the whole scene.\nKeep every necessary actor, recipient, direction, body owner, contact and setting\nrelation; do not shorten away meaning that has no clear expression elsewhere.\n\n\n服装：逐角色遵守上面的本地证据与用户修改。命名套组按给定组件；cosplay 来源可补全辨识性服装，但不复制来源角色外貌；默认衣柜只是未指定服装时的参考。不得恢复明确删除或替换的衣物，不得把一人的服装写给另一人。\n\n\nVisible appearance: follow the user's specified composition, or your chosen\ncomposition where unspecified. For each instance, first determine which body parts\nappear within the frame. Then describe only their actually visible appearance,\nconsidering viewpoint, pose, clothing, occlusion and reflections. A body part being\nin frame does not make every feature of that part visible. Omit features that are\noutside the frame, hidden or not discernible; retain the visible shapes and details.\nApply this throughout tags, prose and priority tags. Saved profiles supply facts,\nnot a checklist to reproduce. Do not change the composition or pose to expose a\nsaved feature, or reintroduce an invisible feature in another field. Evaluate each\nperson and each panel independently, including repeated identities. Keep canonical\nidentity, and obey user edits and profile facts for the features you describe.\n\n\n本地名词翻译（仅对应用户原文中未被否定的概念）：\n- 蓝天 => blue_sky\n- 黑色项圈 => black_collar\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、归属和可见性决定是否采用；可以不采用或用自然语言表达，没有必须输出的 tag 清单。不要把一人的条件分给另一人。",
+    "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: chihaya_anon}\n{Copyright: bang_dream!}\n{Identity: chihaya_anon has long pink hair styled with sidelocks and two side up hair, grey eyes, and a flat chest}\n{Details: chihaya_anon wears a black collar around her neck}\n{Tags: portrait, close-up, headshot, long hair, pink hair, sidelocks, two side up, grey eyes, black collar, looking at viewer, blue sky, clouds, daytime}\n{Nltags: A close-up headshot of chihaya_anon with long pink hair arranged in sidelocks and two side up, grey eyes looking at the viewer, wearing a black collar around her neck, with a blue sky and white clouds behind her. background_mode_explicit_scene}",
+    "prompt_llm_retry_content": "",
+    "outfit_summary": "",
+    "constraint_plan": "",
+    "llm_content": "portrait, close-up, headshot, sidelocks, two side up, black collar, looking at viewer, blue sky, clouds, daytime",
+    "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, (@isemori:1.2),\nchihaya anon has long pink hair styled with sidelocks, two side up hair, grey eyes, (flat chest:1.4),\nchihaya anon wears a black collar around her neck,\nchihaya anon, portrait, close-up, headshot, sidelocks, two side up, black collar, looking at viewer, blue sky, clouds, daytime,\nNltags: A close-up headshot of chihaya anon with long pink hair arranged in sidelocks and two side up, grey eyes looking at the viewer, wearing a black collar around her neck, with a blue sky and white clouds behind her."
+  },
+  "final_prompt": "masterpiece, best quality, questionable, 1girl,\nchihaya anon,\nbang dream!, (@isemori:1.2),\nchihaya anon has long pink hair styled with sidelocks, two side up hair, grey eyes, (flat chest:1.4),\nchihaya anon wears a black collar around her neck,\nchihaya anon, portrait, close-up, headshot, sidelocks, two side up, black collar, looking at viewer, blue sky, clouds, daytime,\nNltags: A close-up headshot of chihaya anon with long pink hair arranged in sidelocks and two side up, grey eyes looking at the viewer, wearing a black collar around her neck, with a blue sky and white clouds behind her."
+}

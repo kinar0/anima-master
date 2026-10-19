@@ -204,6 +204,10 @@
 
   // 调试项默认关闭。只在排查问题时再开。
   "debug_prompt_enabled": false,
+  // 仅记录接口实际返回的推理内容；不会主动开启思考或额外调用模型。
+  "debug_llm_reasoning_enabled": false,
+  // 逐阶段记录用量、耗时、初次/重试标记和结束原因，不记录推理正文。
+  "debug_llm_usage_enabled": false,
   "debug_image_reference_enabled": false,
   "debug_send_payload_enabled": false
 }

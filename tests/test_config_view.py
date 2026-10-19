@@ -50,6 +50,23 @@ def test_config_field_groups_cover_debug_and_comfyui_sections():
     assert "workflow" in CONFIG_FIELD_GROUPS["comfyui"]
     assert "enable_verify" in CONFIG_FIELD_GROUPS["verify_debug"]
     assert "debug_prompt_enabled" in CONFIG_FIELD_GROUPS["verify_debug"]
+    assert "debug_llm_reasoning_enabled" in CONFIG_FIELD_GROUPS["verify_debug"]
+    assert "debug_llm_usage_enabled" in CONFIG_FIELD_GROUPS["verify_debug"]
+
+
+def test_llm_diagnostic_defaults_and_debug_status(tmp_path: Path):
+    from config_defaults import flatten_config, group_config, schema_defaults
+
+    schema = PLUGIN_DIR / "_conf_schema.json"
+    defaults = flatten_config(schema_defaults(schema))
+    for key in ("debug_llm_reasoning_enabled", "debug_llm_usage_enabled"):
+        assert defaults[key] is False
+    configured = {"debug_llm_reasoning_enabled": True, "debug_llm_usage_enabled": True}
+    grouped = group_config(configured, schema)
+    assert grouped["anima_master_debug"]["debug_llm_reasoning_enabled"] is True
+    assert grouped["anima_master_debug"]["debug_llm_usage_enabled"] is True
+    lines = build_config_debug_lines(configured, task_path=tmp_path / "last_task.json", task_exists=False)
+    assert "reasoning=True，usage=True" in "\n".join(lines)
 
 
 def test_config_debug_lines_show_effective_turbo_profile(tmp_path: Path):

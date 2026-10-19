@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -210,6 +211,14 @@ def _build(live_pipeline, prompt: str, *, multi_person: bool = False, canvas_siz
                 _Event(), prompt, multi_person=multi_person,
                 canvas_size=canvas_size, canvas_size_explicit=canvas_size is not None,
             )
+            if report_root := os.getenv("ANIMA_LIVE_REPORT_DIR"):
+                report_dir = Path(report_root)
+                report_dir.mkdir(parents=True, exist_ok=True)
+                identifier = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:12]
+                (report_dir / f"build_{identifier}.json").write_text(json.dumps({
+                    "prompt": prompt, "calls": context.calls, "summary": result.summary,
+                    "final_prompt": result.final_prompt,
+                }, ensure_ascii=False, indent=2), encoding="utf-8")
             return result, list(context.calls)
         finally:
             await context.provider.terminate()
@@ -222,6 +231,70 @@ def _assert_successful_english_prompt(result) -> str:
     assert not result.summary.get("llm_failed"), result.summary
     assert not _CJK_RE.search(result.final_prompt), result.final_prompt
     return result.final_prompt.lower()
+
+
+@pytest.mark.parametrize("case", ["shared_clothes_1", "shared_clothes_2", "donor", "quoted", "offscreen"])
+def test_live_nai_known_identity_completeness(live_pipeline, tmp_path, case):
+    """Neutral scenes only; inspect both actual model replies and final boxes."""
+    if case.startswith("shared_clothes"):
+        prompt = "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。三人在客厅合影。"
+    elif case == "donor":
+        prompt = "-r 丰川祥子穿粥祥的衣服坐在沙发上，千早爱音在旁边拿着自拍杆。粥祥只作为服装来源，不出现在画面中。"
+    elif case == "quoted":
+        prompt = "-r 丰川祥子和千早爱音在客厅合影，墙上的牌子写着粥祥的名字，粥祥本人不出现。"
+    else:
+        prompt = "-r 丰川祥子和千早爱音坐在沙发上，粥祥在画外说话，不画粥祥。"
+    result, calls = _build(live_pipeline, prompt)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / f"nai_identity_{case}.json").write_text(json.dumps({
+        "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    assert result.final_prompt, result.summary
+    rows = result.summary["nai_characters"]
+    names = [row["name"] for row in rows]
+    expected = {"togawa_sakiko", "chihaya_anon"}
+    if case.startswith("shared_clothes"):
+        expected.add("togawa_sakiko_(master_of_melodia)")
+    assert set(names) == expected and len(names) == len(expected), names
+    assert len(calls) in {2, 3, 4}, result.summary
+    assert all("粥祥" != row["name"] for row in rows)
+    for row in rows:
+        if row["name"] == "togawa_sakiko_(master_of_melodia)":
+            assert "brown_hair" not in row["prompt"]
+
+
+@pytest.mark.parametrize("source_misclassified", [False, True])
+def test_live_nai_writer_recovers_incomplete_first_stage(live_pipeline, tmp_path, source_misclassified):
+    pipeline, context = live_pipeline
+    first = {"characters": [
+        dict(name="丰川祥子", aliases=[], clothing="粥祥衣服" if source_misclassified else None,
+             clothing_source="粥祥" if source_misclassified else None,
+             clothing_changes=[], appearance_changes=[]),
+        dict(name="千早爱音", aliases=[], clothing=None, clothing_source=None,
+             clothing_changes=[], appearance_changes=[]),
+    ]}
+
+    async def injected_first_stage(**_kwargs):
+        raw = json.dumps(first, ensure_ascii=False)
+        context.calls.append(dict(synthetic_first_stage=True, response=raw))
+        return raw
+
+    pipeline._generate_semantic_plan_with_llm = injected_first_stage
+    prompt = "-r 丰川祥子和粥祥衣服略显凌乱地坐在沙发上，千早爱音在旁边拿着自拍杆。"
+    result, calls = _build(live_pipeline, prompt)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / f"nai_identity_injected_source_{source_misclassified}.json").write_text(json.dumps({
+        "prompt": prompt, "synthetic_first_stage": True, "real_writer": True,
+        "calls": calls, "summary": result.summary, "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    assert result.final_prompt, result.summary
+    names = [row["name"] for row in result.summary["nai_characters"]]
+    assert set(names) == {"togawa_sakiko", "togawa_sakiko_(master_of_melodia)", "chihaya_anon"}
+    assert len(names) == 3
+    assert result.summary["nai_bound_local_profile_references"]
 
 
 @pytest.mark.parametrize("order", ("alias_first", "alias_last"))
@@ -295,9 +368,10 @@ def test_live_shared_named_uniform_is_complete_and_nltags_stays_english(
             "pleated_skirt",
             "diagonal-striped_necktie",
         } <= tags
-    assert writer_call["prompt"].count(
-        "named outfit = haneoka_school_uniform"
-    ) == 2
+    # Verify each wearer's actual evidence, not an obsolete context label.
+    for wearer in ("丰川祥子", "千早爱音"):
+        assert any(line.startswith(f"- {wearer}:") and "haneoka_school_uniform" in line
+                   for line in writer_call["prompt"].splitlines())
     assert writer_call["prompt"].count("brown_sweater_vest") >= 2
     assert writer_call["prompt"].count("green_skirt") >= 2
     assert "haneoka school uniform" in final
@@ -743,3 +817,106 @@ def test_live_nai_bilingual_details_with_repeated_identity(live_pipeline, tmp_pa
         assert "tsukinomori school uniform" not in english_tags(right["prompt"]), right
         assert all({"smile", "smiling", "grin", "grinning"} & english_tags(row["prompt"])
                    for row in sakikos), sakikos
+
+
+@pytest.mark.parametrize("case", ["reported_six_panel", "single_scene_counterexample"])
+def test_live_nai_comic_identity_instances(live_pipeline, tmp_path, case):
+    """Repeated panel appearances and repeated names are different cardinalities."""
+    expected = {"togawa_sakiko": 4, "chihaya_anon": 3}
+    if case == "reported_six_panel":
+        failure = _read_json(PLUGIN_DIR / "diagnostics/nai-comic-identity-review/original-failure.json")
+        prompt = failure["original_prompt"]
+    else:
+        prompt = (
+            "-r 单一连续画面，千早爱音和丰川祥子在桌边吃面。"
+            "爱音穿白衬衫、扎马尾，开心地拿着筷子；祥子穿灰色毛衣，低头害羞地吃面。"
+            "两人都只出现一次，没有分格。"
+        )
+        expected = {"togawa_sakiko": 1, "chihaya_anon": 1}
+    live_pipeline[0].config["debug_prompt_enabled"] = True
+    result, calls = _build(live_pipeline, prompt)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    report_path = report_dir / f"{case}.json"
+    report_path.write_text(json.dumps({
+        "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"Live comic identity evidence: {report_path}")
+    assert result.final_prompt, result.summary
+    rows = result.summary["nai_characters"]
+    assert len(rows) == sum(expected.values()), rows
+    for name, count in expected.items():
+        assert sum(row["name"] == name for row in rows) == count
+    assert len({(row["x"], row["y"]) for row in rows}) == len(rows)
+    assert len(calls) <= 3
+    assert all(_CJK_RE.search(row["prompt"]) for row in rows)
+    assert not result.summary.get("nai_identity_retry_validation_errors")
+
+
+@pytest.mark.parametrize("case", [
+    "reported", "reported_repeat", "different_source_and_recipient", "eye_color",
+    "two_wearers", "nai_repeated_instances", "real_clothing_source", "unknown_reference",
+])
+def test_live_dimension_scoped_appearance_references(live_pipeline, tmp_path, case):
+    """Real LLM1 + real LLM2; never submit ComfyUI/NAI generation."""
+    requests = {
+        "reported": "千早爱音大头照，把头发梳成丰川祥子的发型，脖子戴黑色项圈，背景是蓝天白云。",
+        "reported_repeat": "千早爱音超级大头照，千早爱音采用丰川祥子的发型，粉色头发和灰色眼睛不变，戴黑色项圈，头顶蓝天和云。",
+        "different_source_and_recipient": "若叶睦大头照，采用重音tetoSV的发型，保留原有绿色头发和黄色眼睛，白底。",
+        "eye_color": "千早爱音脸部特写，瞳色采用丰川祥子的瞳色，头发保持粉色，白底。",
+        "two_wearers": "千早爱音穿白色毛衣，采用丰川祥子的发型；丰川祥子穿黑色连衣裙，采用重音tetoSV的发型。两人上半身同框合影，白底。",
+        "nai_repeated_instances": "-r 两格漫画。左格：千早爱音采用丰川祥子的发型，戴黑色项圈，大头照。右格：千早爱音采用重音tetoSV的发型，戴白色项圈，大头照。两格都保持爱音自己的粉发灰眼，白底。丰川祥子和重音tetoSV只提供发型参考，本人不出场。",
+        "real_clothing_source": "千早爱音穿丰川祥子的衣服，保持自己的粉色头发和灰色眼睛，上半身肖像，白底。",
+        "unknown_reference": "千早爱音大头照，采用陌生角色Zeta的发型，粉发灰眼不变，白底。Zeta只作发型参考，不出场。",
+    }
+    pipeline, _context = live_pipeline
+    pipeline.config["debug_prompt_enabled"] = True
+    prompt = requests[case]
+    result, calls = _build(live_pipeline, prompt)
+    report_dir = Path(os.getenv("ANIMA_LIVE_REPORT_DIR") or tmp_path)
+    report_dir.mkdir(parents=True, exist_ok=True)
+    (report_dir / f"appearance_reference_{case}.json").write_text(json.dumps({
+        "case": case, "prompt": prompt, "calls": calls, "summary": result.summary,
+        "final_prompt": result.final_prompt,
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+    assert result.final_prompt and not result.summary.get("llm_failed"), result.summary
+    assert 2 <= len(calls) <= 4
+    first = json.loads(result.summary["semantic_plan_raw"])
+    if case == "real_clothing_source":
+        assert first["characters"][0]["clothing_source"] == "丰川祥子"
+        assert any(row["wardrobe_kind"] == "outfit_source"
+                   for row in result.summary["semantic_character_outfits"])
+        return
+    assert all(not row.get("clothing_source") for row in first["characters"]), first
+    refs = result.summary["appearance_reference_evidence"]
+    if case == "unknown_reference":
+        assert not refs
+        assert len(first["characters"]) == 1
+        return
+    assert refs, result.summary
+    if case == "eye_color":
+        assert any(row["dimensions"] == ["eye_color"] and row["tags"] == ["yellow_eyes"] for row in refs)
+        assert "yellow eyes" in result.final_prompt.lower().replace("_", " ")
+        assert "blue hair" not in result.final_prompt.lower().replace("_", " ")
+    elif case in {"reported", "reported_repeat"}:
+        assert any("two_side_up" in row["tags"] for row in refs)
+        text = result.final_prompt.lower().replace("_", " ")
+        assert "two side up" in text
+        assert "green necktie" not in text and "long sleeves" not in text
+        assert not any(tag in text for tag in ("twin braids", "side ponytail", "twin buns", "lens flare", "bokeh", "depth of field", "rim light"))
+    elif case == "different_source_and_recipient":
+        assert any("drill_hair" in row["tags"] for row in refs)
+        text = result.final_prompt.lower().replace("_", " ")
+        assert "drill" in text
+        assert "red hair" not in text and "red eyes" not in text
+    elif case == "two_wearers":
+        assert {row["character"] for row in refs} == {"千早爱音", "丰川祥子"}
+        assert len(first["characters"]) == 2
+        assert {row["reference"] for row in refs} == {"丰川祥子", "重音tetoSV"}
+    else:
+        instances = result.summary["nai_characters"]
+        assert len(instances) == 2 and all(row["name"] == "chihaya_anon" for row in instances)
+        assert all(_CJK_RE.search(row["prompt"]) for row in instances)
+        assert any("two_side_up" in row["prompt"] for row in instances)
+        assert any("drill" in row["prompt"] for row in instances)

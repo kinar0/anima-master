@@ -1545,7 +1545,9 @@ def test_identity_merge_preserves_leading_is_with_attributes() -> None:
         "togawa_sakiko",
         "togawa_sakiko is a tall mature woman with long blue hair, "
         "yellow eyes, sidelocks, two side up buns, huge breasts, and wide hips",
-        ("long_hair", "blue_hair", "yellow_eyes", "huge_breasts"),
+        # These styling facts now participate in the hairstyle dimension; give
+        # the grammar regression a matching baseline rather than an unknown one.
+        ("long_hair", "blue_hair", "yellow_eyes", "huge_breasts", "sidelocks", "two_side_up"),
         frozenset(),
     )
 
@@ -4233,7 +4235,7 @@ def test_nai_r_noun_coverage_never_retries_or_blocks_valid_layout(
 
     class _Context:
         def __init__(self):
-            self.outputs = ["not json" if invalid else layout]
+            self.outputs = ["not json", "not json"] if invalid else [layout]
             self.prompts = []
 
         async def get_current_chat_provider_id(self, _umo):
@@ -4295,7 +4297,7 @@ def test_nai_r_noun_coverage_never_retries_or_blocks_valid_layout(
     event = type("_Event", (), {"unified_msg_origin": "session"})()
     result = asyncio.run(pipeline.build(event, f"-r {alias}女孩站立"))
 
-    assert len(context.prompts) == 1
+    assert len(context.prompts) == (2 if invalid else 1)
     if not mapping_enabled:
         assert "本地名词翻译" not in context.prompts[0]
         assert f"{alias} => {tag}" not in context.prompts[0]

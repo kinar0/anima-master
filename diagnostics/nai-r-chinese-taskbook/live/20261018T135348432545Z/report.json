@@ -1,0 +1,61 @@
+{
+  "output_directory": "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\data\\plugins\\astrbot_plugin_anima_master\\diagnostics\\nai-r-chinese-taskbook\\live\\20261018T135348432545Z",
+  "source_task_id": "76ffd0c270f349d6810153167ec195cc",
+  "provider_id": "deepseek/deepseek-v4-flash",
+  "live_application_calls": 1,
+  "image_generation_calls": 0,
+  "production_configuration_changed": false,
+  "baseline_origin": "User-supplied usage logs for the recorded English writer call; not a new English control call.",
+  "baseline": {
+    "input_tokens": 5077,
+    "input_cached_tokens": 4864,
+    "input_uncached_tokens": 213,
+    "output_tokens": 1883,
+    "total_tokens": 6960,
+    "elapsed_ms": 7951.81,
+    "finish_reason": "stop"
+  },
+  "elapsed_ms": 7757.63,
+  "usage": {
+    "usage_available": true,
+    "input_tokens": 5305,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 5305,
+    "output_tokens": 1798,
+    "reasoning_tokens": null,
+    "total_tokens": 7103,
+    "finish_reason": "stop"
+  },
+  "returned_model": "deepseek-flash",
+  "reasoning_returned": false,
+  "parser": {
+    "ok": true,
+    "instance_count": 7,
+    "identity_counts": {
+      "togawa_sakiko": 4,
+      "chihaya_anon": 3
+    },
+    "global_has_chinese": true,
+    "all_instances_have_chinese": true
+  },
+  "offline_replay": {
+    "ok": true,
+    "replayed_stage_count": 2,
+    "extra_live_calls": 0,
+    "instance_count": 7,
+    "identity_counts": {
+      "togawa_sakiko": 4,
+      "chihaya_anon": 3
+    },
+    "error": "",
+    "identity_validation_errors": [],
+    "population_correction": {
+      "previous": [],
+      "current": [
+        "7girls"
+      ],
+      "instance_count": 7
+    },
+    "evidence_origin": "Historical LLM1 response, current configuration and copied current profiles; regenerated English taskbook is used only for offline post-processing context, never sent to a model."
+  }
+}
