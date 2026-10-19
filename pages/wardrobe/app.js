@@ -170,6 +170,14 @@ function addEntry() {
   card?.querySelector("input, textarea")?.focus();
 }
 
+$("#toolbox-entry").addEventListener("click", (event) => {
+  const leave = new Event("anima:before-page-leave", { cancelable: true });
+  window.dispatchEvent(leave);
+  if (state.dirty || state.busy || leave.defaultPrevented) {
+    event.preventDefault();
+    showToast("请先保存或放弃当前修改，再打开 Toolbox 词库。");
+  }
+});
 elements.tabs.forEach((tab) => tab.addEventListener("click", () => { if (state.tab === tab.dataset.tab) return; state.tab = tab.dataset.tab; indexedView = null; render(); }));
 elements.sort.addEventListener("change", () => { state.outfitSort = elements.sort.value; indexedView = null; pagination.reset(); render(); });
 elements.search.addEventListener("input", () => { state.search = elements.search.value.trim(); indexedView = null; pagination.scopes.forEach((value) => value.page = 1); render(); }); elements.add.addEventListener("click", addEntry); elements.save.addEventListener("click", save); elements.dirtySave.addEventListener("click", save); elements.refresh.addEventListener("click", load); elements.discard.addEventListener("click", () => pristine && hydrate(pristine));

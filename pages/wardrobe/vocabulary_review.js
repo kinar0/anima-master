@@ -114,3 +114,4 @@ el("review-refresh").addEventListener("click", load);
 el("review-prev").addEventListener("click", () => { page -= 1; load(); });
 el("review-next").addEventListener("click", () => { page += 1; load(); });
 window.addEventListener("beforeunload", (event) => { if (drafts.size) { event.preventDefault(); event.returnValue = ""; } });
+window.addEventListener("anima:before-page-leave", (event) => { if (drafts.size || saving) event.preventDefault(); });
