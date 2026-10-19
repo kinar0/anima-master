@@ -44,6 +44,9 @@ CONFIG_FIELD_GROUPS: dict[str, tuple[str, ...]] = {
         "prompt_builder_deep_thinking_enabled",
         "prompt_builder_reasoning_effort",
         "danbooru_core_tag_lookup_enabled",
+        "toolbox_vocabulary_mode",
+        "toolbox_vocabulary_path",
+        "toolbox_vocabulary_max_chars",
     ),
     "character_style": (
         "fixed_characters",

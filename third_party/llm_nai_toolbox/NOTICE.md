@@ -31,3 +31,28 @@ If upstream publishes a more specific notice, preserve that notice with future
 updates. Electron's license is not used as a substitute.
 
 MIT text reference: https://opensource.org/license/mit
+
+## 2026-10-19: optional runtime vocabulary adapter
+
+`toolbox_vocabulary.py` adapts the local scoring and data access of Toolbox
+0.9.8 (package author: lyf; README/package license: MIT). Exact `search.ts`,
+`gloss.ts`, and `browse.ts` are retained in `reference/`, including their original
+koishi-plugin-reforge attribution. Hashes are in `runtime-source-manifest.json`.
+These TypeScript files are reference material, not a Node/Electron runtime.
+The supplied source has neither separate copyright text nor Git metadata;
+neither is invented. The earlier koishi-plugin-reforge source/license could not
+independently be retrieved in this task; its attribution chain is preserved,
+not represented as an independently completed audit of that earlier project.
+
+No release dataset, wiki body, image, character-feature CSV, binary, dependency
+tree, user configuration, credential or history is added by this adapter. It
+reads the user's existing tagdb directory. Third-party data is not asserted to
+be MIT merely because the application declares MIT; later data redistribution
+needs its own provenance/notice check. The existing review catalog retains its
+previously documented maintenance-only scope and provenance.
+
+Intentional adaptations: general-only loading; bounded requests/candidates and
+rendered characters; conservative negative/literal filtering and abstention on
+weak nonliteral matches; background loading/cache; optional evidence with no
+identity, appearance, wardrobe or required-tag authority. No upstream system
+prompt, model tool loop, model HTTP client or generation backend is imported.

@@ -1,0 +1,490 @@
+{
+  "source": "llm-nai-toolbox 0.9.8 search.ts; synthetic entries, no copied vocabulary dataset",
+  "entries": [
+    {
+      "zh": [
+        "俯视",
+        "从上方拍摄"
+      ],
+      "zhFull": [],
+      "zhShort": [],
+      "zhNick": [],
+      "ja": [],
+      "en": [],
+      "other": [],
+      "series": [],
+      "tag": "from_above",
+      "count": 500
+    },
+    {
+      "zh": [
+        "俯视",
+        "低头"
+      ],
+      "zhFull": [],
+      "zhShort": [],
+      "zhNick": [],
+      "ja": [],
+      "en": [],
+      "other": [],
+      "series": [],
+      "tag": "looking_down",
+      "count": 400
+    },
+    {
+      "zh": [
+        "牛仔构图"
+      ],
+      "zhFull": [],
+      "zhShort": [],
+      "zhNick": [],
+      "ja": [],
+      "en": [],
+      "other": [],
+      "series": [],
+      "tag": "cowboy_shot",
+      "count": 300
+    },
+    {
+      "zh": [
+        "湿衣服",
+        "湿衣"
+      ],
+      "zhFull": [],
+      "zhShort": [],
+      "zhNick": [],
+      "ja": [],
+      "en": [],
+      "other": [],
+      "series": [],
+      "tag": "wet_clothes",
+      "count": 200
+    },
+    {
+      "zh": [
+        "脏衣服"
+      ],
+      "zhFull": [],
+      "zhShort": [],
+      "zhNick": [],
+      "ja": [],
+      "en": [],
+      "other": [],
+      "series": [],
+      "tag": "dirty_clothes",
+      "count": 100
+    },
+    {
+      "zh": [
+        "马尾"
+      ],
+      "zhFull": [
+        "马尾"
+      ],
+      "zhShort": [
+        "尾"
+      ],
+      "zhNick": [
+        "小马尾"
+      ],
+      "ja": [],
+      "en": [],
+      "other": [],
+      "series": [],
+      "tag": "ponytail",
+      "count": 100
+    }
+  ],
+  "pairs": [
+    {
+      "q": "cowboy_shot",
+      "t": "cowboy shot",
+      "expected": 1
+    },
+    {
+      "q": "ponytial",
+      "t": "ponytail",
+      "expected": 0.9
+    },
+    {
+      "q": "湿衣服",
+      "t": "脏衣服",
+      "expected": 0.5175
+    },
+    {
+      "q": "湿衣服",
+      "t": "湿衣",
+      "expected": 0.7999999999999999
+    },
+    {
+      "q": "蒸汽身体",
+      "t": "蒸汽",
+      "expected": 0.75
+    },
+    {
+      "q": "絵桜",
+      "t": "绘樱",
+      "expected": 1
+    },
+    {
+      "q": "W",
+      "t": "white dress",
+      "expected": 0.0625
+    },
+    {
+      "q": "舌头上的物件",
+      "t": "物件在舌头上",
+      "expected": 0.7228571428571428
+    },
+    {
+      "q": "😀hat",
+      "t": "😀hut",
+      "expected": 0.9199999999999999
+    },
+    {
+      "q": "unknown",
+      "t": "unknown",
+      "expected": 1
+    }
+  ],
+  "matches": [
+    {
+      "q": "俯视",
+      "expected": [
+        {
+          "score": 1,
+          "field": "zh"
+        },
+        {
+          "score": 1,
+          "field": "zh"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.01,
+          "field": "zhFull"
+        }
+      ]
+    },
+    {
+      "q": "牛仔构图",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 1,
+          "field": "zh"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.01,
+          "field": "zhFull"
+        }
+      ]
+    },
+    {
+      "q": "湿衣服",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 1,
+          "field": "zh"
+        },
+        {
+          "score": 0.5175,
+          "field": "zh"
+        },
+        {
+          "score": 0.01,
+          "field": "zhFull"
+        }
+      ]
+    },
+    {
+      "q": "脏衣服",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.5175,
+          "field": "zh"
+        },
+        {
+          "score": 1,
+          "field": "zh"
+        },
+        {
+          "score": 0.01,
+          "field": "zhFull"
+        }
+      ]
+    },
+    {
+      "q": "ponytial",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.93,
+          "field": "tag"
+        }
+      ]
+    },
+    {
+      "q": "马尾",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 1,
+          "field": "zhFull"
+        }
+      ]
+    },
+    {
+      "q": "小马尾",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.99,
+          "field": "zhNick"
+        }
+      ]
+    },
+    {
+      "q": "W",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.0925,
+          "field": "tag"
+        },
+        {
+          "score": 0.0925,
+          "field": "tag"
+        },
+        {
+          "score": 0.0925,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.01,
+          "field": "zhFull"
+        }
+      ]
+    },
+    {
+      "q": "unrelated",
+      "expected": [
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0,
+          "field": "tag"
+        },
+        {
+          "score": 0.01,
+          "field": "zhFull"
+        }
+      ]
+    }
+  ],
+  "searches": [
+    {
+      "q": "俯视",
+      "expected": [
+        {
+          "tag": "from_above",
+          "score": 1
+        },
+        {
+          "tag": "looking_down",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "q": "牛仔构图",
+      "expected": [
+        {
+          "tag": "cowboy_shot",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "q": "湿衣服",
+      "expected": [
+        {
+          "tag": "wet_clothes",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "q": "脏衣服",
+      "expected": [
+        {
+          "tag": "dirty_clothes",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "q": "ponytial",
+      "expected": [
+        {
+          "tag": "ponytail",
+          "score": 0.93
+        }
+      ]
+    },
+    {
+      "q": "马尾",
+      "expected": [
+        {
+          "tag": "ponytail",
+          "score": 1
+        }
+      ]
+    },
+    {
+      "q": "小马尾",
+      "expected": [
+        {
+          "tag": "ponytail",
+          "score": 0.99
+        }
+      ]
+    },
+    {
+      "q": "W",
+      "expected": []
+    },
+    {
+      "q": "unrelated",
+      "expected": []
+    }
+  ]
+}

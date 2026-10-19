@@ -1,0 +1,214 @@
+{
+  "data_sha256": {
+    "tags_index_v2.json": "9f65b55527f4e219d8e41f41dc3f9c717774539d7c473552ffcc15250d35466f",
+    "tag_gloss.json": "77ad49e97fe04241b7d930a77c2319350a0ff278d4751331b2a793c6ac73cf87",
+    "tag_browse.json": "4f90a3608afa494025cc783510d4752c5ead52da5eb7360b1c210dfa379a46ca",
+    "tag_deprecated.json": "0a500e1f4f3e7fbb286f5851483d2c963898b2be12167aef4335664963e5578b"
+  },
+  "synthetic_only": true,
+  "model_calls": 0,
+  "network_requests": 0,
+  "results": [
+    {
+      "synthetic_request": "俯视",
+      "wall_ms": 2085.94,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [
+        {
+          "tag": "looking_down",
+          "score": 0.99,
+          "field": "zhNick"
+        },
+        {
+          "tag": "from_above",
+          "score": 0.96,
+          "field": "zhFull"
+        }
+      ],
+      "rows_chars": 74,
+      "added_chars_upper_bound": 674,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 2080.83,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "从上往下看",
+      "wall_ms": 1.01,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [
+        {
+          "tag": "looking_down",
+          "score": 0.78,
+          "field": "zh"
+        }
+      ],
+      "rows_chars": 43,
+      "added_chars_upper_bound": 643,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 0.78,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "牛仔构图",
+      "wall_ms": 2.8,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [],
+      "rows_chars": 0,
+      "added_chars_upper_bound": 0,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 2.59,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "湿衣服",
+      "wall_ms": 6.45,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [
+        {
+          "tag": "wet_clothes",
+          "score": 0.75,
+          "field": "zhShort"
+        }
+      ],
+      "rows_chars": 39,
+      "added_chars_upper_bound": 639,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 5.92,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "不要湿衣服",
+      "wall_ms": 1.64,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [],
+      "rows_chars": 0,
+      "added_chars_upper_bound": 0,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 1.26,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "人物低头，微笑",
+      "wall_ms": 5.49,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 2,
+      "entries": 36893,
+      "candidates": [
+        {
+          "tag": "looking_down",
+          "score": 0.74,
+          "field": "zhNick"
+        },
+        {
+          "tag": "smile",
+          "score": 1.0,
+          "field": "zhFull"
+        },
+        {
+          "tag": "light_smile",
+          "score": 1.0,
+          "field": "zhFull"
+        }
+      ],
+      "rows_chars": 100,
+      "added_chars_upper_bound": 700,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 5.22,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "甲说：“湿衣服”",
+      "wall_ms": 1.43,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [],
+      "rows_chars": 0,
+      "added_chars_upper_bound": 0,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 1.16,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "左格甲穿白衬衫，右格甲穿黑外套，俯视",
+      "wall_ms": 2.72,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 3,
+      "entries": 36893,
+      "candidates": [
+        {
+          "tag": "white_shirt",
+          "score": 0.75,
+          "field": "zhFull"
+        },
+        {
+          "tag": "looking_down",
+          "score": 0.99,
+          "field": "zhNick"
+        },
+        {
+          "tag": "from_above",
+          "score": 0.96,
+          "field": "zhFull"
+        }
+      ],
+      "rows_chars": 106,
+      "added_chars_upper_bound": 706,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 2.44,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    {
+      "synthetic_request": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "wall_ms": 0.88,
+      "mode": "observe",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [],
+      "rows_chars": 0,
+      "added_chars_upper_bound": 0,
+      "max_chars": 1200,
+      "load_ms": 2072.33,
+      "elapsed_ms": 0.66,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    }
+  ],
+  "peak_process_working_set_bytes": 265146368,
+  "working_set_note": "Peak for standalone probe process, including interpreter and JSON parsing; not incremental AstrBot memory."
+}

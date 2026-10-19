@@ -187,15 +187,16 @@ def resolve_nai_canvas(
 
 def build_nai_character_plan_prompt(
     user_prompt: str, final_prompt: str, canvas: dict[str, Any],
-    *, noun_mappings: tuple[tuple[str, str], ...] = (),
+    *, noun_mappings: tuple[tuple[str, str], ...] = (), vocabulary_context: str = "",
 ) -> str:
     """Describe the NAI instance contract once, followed by request evidence."""
     width, height = int(canvas["width"]), int(canvas["height"])
     noun_rule = ""
-    if noun_mappings:
+    if noun_mappings or vocabulary_context:
         noun_rule = (
             "\nVocabulary references (source phrase => canonical tag):\n"
             + "\n".join(f"- {alias} => {tag}" for alias, tag in noun_mappings)
+            + ("\n" + vocabulary_context if vocabulary_context else "")
             + "\nUse only mappings that fit the request and the correct owner; natural "
             "language or a directional action tag may express the meaning instead. "
             "When expressing the same mapped concept as a tag, prefer the supplied "

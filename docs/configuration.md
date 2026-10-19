@@ -348,6 +348,8 @@ Canonical Tag: haneoka_school_uniform
 
 ## Toolbox 词库导入与撤回记录
 
+独立的可选检索见下文“Toolbox 本地词汇参考”，不会恢复已撤回的全量导入。
+
 **当前状态（2026-10-13）：全量导入已按用户要求撤回，名词翻译恢复原有 1427 条。** 已核对原列表完全一致、其他配置未变，记录见 `toolbox_import/restored.json`。原因是来源别名存在口语覆盖不足、日语混写及语义不等价问题；导入数量和格式正确不能证明提示词质量改善。下述命令仅为工具用法与历史记录，不是重新全量导入的建议。后续见 [中文口语词库质量改进与新对话交接](中文口语词库质量改进与新对话交接.md)。
 
 本地 `toolbox_terms.py` 直接读取 Toolbox Release 的 `resources/tagdb/tags_index_v2.json`，只使用 general 区的 `zhFull / zhShort / zhNick / zh`，不调用翻译模型。它把有效、含汉字、长度 2–80 的单值别名填入现有 `danbooru_term_mappings`；同词多 tag 跳过，人工映射优先，合并总数不得超过 50000。只向提示词模型发送本次命中的参考，不发送整库。
@@ -372,3 +374,21 @@ $taskPython = Resolve-Path '..\..\..\.venv\Scripts\python.exe'
 这个离线入口修改配置文件，须重载插件并刷新词库页面后生效；不要让旧页面的未保存内容覆盖新词库。现有页面或 `/anm term_import` 的批量模型翻译导入仍使用自己的断点与热更新入口，未被替换。本次代码没有重启运行中的 AstrBot。
 
 Toolbox 作者信息、原始 README/package 许可声明和 MIT 许可文本保存在 `third_party/llm_nai_toolbox/`。提供的源代码与 Release 没有独立作者版权/许可全文文件，因此未虚构版权年份或持有人；若上游补发具体声明，后续更新须一并保留。Electron 许可不能替代作者 MIT 声明。
+
+## Toolbox 本地词汇参考
+
+默认关闭，普通文本优化及 NAI `-r` 在第二阶段前读取用户本机已有的数据，不要求启动 Toolbox 或安装 Node/Electron，不增加模型查询轮次。
+
+| 配置 | 默认 | 含义 |
+| --- | --- | --- |
+| `toolbox_vocabulary_mode` | `off` | `off` 不读取；`observe` 只记候选，不改模型输入；`reference` 注入受限参考 |
+| `toolbox_vocabulary_path` | 空 | 已有 `resources/tagdb` 目录，不自动下载或复制 |
+| `toolbox_vocabulary_max_chars` | 1200 | 新增资料字符预算，硬上限 2400；预留说明开销 600，预算过小时不注入 |
+
+本机路径示例：`D:\Users\69493\Desktop\llm-nai-toolbox-0.9.8-win-x64\resources\tagdb`。开发交付不自动修改生产配置。需有 `tags_index_v2.json` 的 general 区；可选 `tag_gloss.json`、`tag_browse.json`、`tag_deprecated.json`。不读取完整 wiki、角色特征 CSV、账户设置、密钥或历史，也不把别名导入名词映射。文件缺失/损坏时只记 `unavailable`，沿原提示词路径继续。读取和检索在后台线程执行；首次有加载成本，文件版本改变后缓存失效。
+
+每请求最多 8 个原文片段、每片段 2 个候选、每次评分最多 1000 条并记录裁剪。匹配分数不是语义正确概率；低分且没有明确词面依据时弃权，陌生改写仍交给写作者。优先为必要误读/辨析补短解释，同 canonical 新增释义只出现一次，与已有名词参考放在同一区。预算包含新增说明，不截断原文、用户修改、人物归属、台词或既有任务书。字符数不是 token 数。
+
+模型可舍弃参考或用自然语言；遗漏不补 tag、不重试/拒绝，不选择衣柜、不建立身份/外貌权限、不猜穿着者。`danbooru_term_mappings_enabled=false` 一并停用。raw、关闭优化、手工 `#`、旧独立多人不进入；图生图及 low-CFG/Turbo 首版跳过。
+
+摘要 `toolbox_vocabulary` 包含模式、状态、候选 tag/分数、弃权及裁剪计数、参考字符数/上界、加载与检索耗时。无命中或不可用时无新增任务书。建议先 `observe`；开发仅完成本地回归和自制请求测量，未新增真实模型/图片对照。第三方数据许可需单独核对；本次只读本地数据，不新打包词库，来源与精确参考文件见 `third_party/llm_nai_toolbox/NOTICE.md`。

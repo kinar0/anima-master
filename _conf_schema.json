@@ -571,6 +571,28 @@
         "default": true,
         "hint": "关闭后，普通模式和 NAI -r 均不把名词映射交给提示词模型；已保存映射、批量翻译断点和页面管理仍保留。"
       },
+      "toolbox_vocabulary_mode": {
+        "description": "Toolbox 本地词汇参考",
+        "type": "string",
+        "default": "off",
+        "options": ["off", "observe", "reference"],
+        "hint": "off 关闭；observe 只记录候选，不改变模型输入；reference 给普通优化和 NAI -r 提供受限词汇参考。不增加模型查询轮次，不覆盖角色/服装权限。名词翻译总开关关闭时一并停用。",
+        "collapsed": true
+      },
+      "toolbox_vocabulary_path": {
+        "description": "Toolbox 本地数据目录",
+        "type": "string",
+        "default": "",
+        "hint": "填写 AstrBot 所在机器上已有的 resources/tagdb 目录，需有 tags_index_v2.json，可选 tag_gloss.json、tag_browse.json、tag_deprecated.json。不读取账户配置，不自动下载或导入词库。",
+        "collapsed": true
+      },
+      "toolbox_vocabulary_max_chars": {
+        "description": "Toolbox 新增参考字符预算",
+        "type": "int",
+        "default": 1200,
+        "hint": "仅限制本次新增可选资料（含必要说明），不截断用户原文和既有规则。实现硬上限 2400，预留说明开销 600；小于预留值时不新增资料。字符数不是 token 数。",
+        "collapsed": true
+      },
       "danbooru_term_mappings": {
         "description": "名词翻译映射",
         "type": "list",

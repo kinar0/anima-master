@@ -7,9 +7,11 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 try:
+    from .toolbox_vocabulary import ToolboxVocabulary
     from .llm_diagnostics import LLMDiagnostics
     from .nai_text import NaiTextRequest, extract_nai_text_request
 except ImportError:
+    from toolbox_vocabulary import ToolboxVocabulary
     from llm_diagnostics import LLMDiagnostics
     from nai_text import NaiTextRequest, extract_nai_text_request
 
@@ -4625,6 +4627,7 @@ class PromptPipeline:
         self._float = get_float
         self._str = get_str
         self._shorten = shorten
+        self._toolbox_vocabulary = ToolboxVocabulary()
 
     def _model_refusal_result(
         self,
@@ -5848,6 +5851,7 @@ class PromptPipeline:
         keyword_rules: tuple[Any, ...], mode: str, sensual_mode: bool,
         local_references: tuple[CharacterEffectiveOutfit, ...] = (),
         text_request: NaiTextRequest = NaiTextRequest(),
+        vocabulary_context: str = "",
     ) -> PromptPipelineResult:
         """Second-stage NAI writer: local evidence directly to instance JSON."""
         debug = self._bool("debug_prompt_enabled", False)
@@ -5903,6 +5907,7 @@ class PromptPipeline:
             plan_prompt = build_nai_character_plan_prompt(
                 prompt, "\n".join(part for part in (hints, evidence) if part),
                 canvas, noun_mappings=noun_mappings,
+                vocabulary_context=vocabulary_context,
             )
             if original_prompt and original_prompt.strip() != prompt.strip():
                 plan_prompt += (
@@ -7547,6 +7552,26 @@ class PromptPipeline:
                             f"(source={change.reference_character}; dimensions={', '.join(change.dimensions)})"
                             for change in unresolved_references)
             )
+        # Optional vocabulary has no path into semantic/wardrobe authority. Only
+        # the authoritative visual request supplies retrieval phrases; references
+        # and lettering must not manufacture new positive concepts.
+        toolbox_mode = str(prompt_config.get("toolbox_vocabulary_mode", "off"))
+        if (not term_mappings_enabled or mode != "txt2img"
+                or prompt_config.get("low_cfg_harness_enabled", False)):
+            toolbox_mode = "off"
+        toolbox_packet = await self._toolbox_vocabulary.prepare(
+            directory=str(prompt_config.get("toolbox_vocabulary_path", "")),
+            mode=toolbox_mode, text=background_intent_prompt,
+            mappings=matched_term_mappings,
+            phrases=tuple(dict.fromkeys((
+                *(anchor.source_text for anchor in semantic_anchors
+                  if anchor.role in {"clothing", "outfit"}),
+                *(change.source_text for change in semantic_appearance_changes),
+            ))),
+            max_chars=self._int("toolbox_vocabulary_max_chars", 1200),
+        )
+        summary["toolbox_vocabulary"] = toolbox_packet.diagnostics
+        vocabulary_context = toolbox_packet.rows
         if nai_r_mode:
             if self._bool("debug_prompt_enabled", False):
                 summary.update(semantic_plan_raw=semantic_plan_raw,
@@ -7569,6 +7594,7 @@ class PromptPipeline:
                     semantic_result, implicit_mode=implicit_wardrobe_mode,
                 ),
                 text_request=text_request,
+                vocabulary_context=vocabulary_context,
             )
         llm_prompt = build_llm_prompt(
             prompt,
@@ -7606,7 +7632,7 @@ class PromptPipeline:
             original_theme=background_intent_prompt,
             keyword_prompt_rules=keyword_rules,
         )
-        if explicit_term_tags:
+        if explicit_term_tags or vocabulary_context:
             translation_lines = (
                 tuple(
                     f"- {alias} => {tag}"
@@ -7618,6 +7644,7 @@ class PromptPipeline:
             llm_prompt += (
                 "\n\n本地名词翻译（仅对应用户原文中未被否定的概念）："
                 "\n" + "\n".join(translation_lines)
+                + ("\n" + vocabulary_context if vocabulary_context else "")
                 + "\n这些映射仅为词汇参考，可能不符合当前语义。请根据原文、否定、"
                 "归属和可见性决定是否采用；可以不采用或用自然语言表达，"
                 "没有必须输出的 tag 清单。不要把一人的条件分给另一人。"

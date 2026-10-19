@@ -1,0 +1,25 @@
+{
+  "upstream": "https://github.com/sadlywish/llm-nai-toolbox",
+  "version": "0.9.8",
+  "author_declaration": "lyf (package.json)",
+  "license_declaration": "MIT (README.md and package.json)",
+  "upstream_commit": null,
+  "commit_note": "Provided source directory has no .git metadata.",
+  "source_files": {
+    "src/shared/tagdb/search.ts": "f4adcfd151b23b0385536baff8c294169626b35ac585eb6ab3a1971c1a75f207",
+    "src/main/tagdb/gloss.ts": "5a584ce40dc27d5778b6dd8caa6fd1693e922b181b82f059ceeb75f38c2958e6",
+    "src/main/tagdb/browse.ts": "817e19217fda23b93529a1a3bebda930e27454dc6613108238870c79f8eeae08"
+  },
+  "package_json_sha256": "a417c5701e456b2988e9fdb2f735f94c0ee6d466ee69670c94e0823bf562e8ed",
+  "earlier_source": "koishi-plugin-reforge attribution retained; earlier license not independently retrieved",
+  "runtime": "Python in AstrBot existing environment; no Node/Electron dependency",
+  "data_distribution": "No new release datasets copied; read user's existing local tagdb directory",
+  "validation": "Synthetic offline fixture generated from exact upstream TypeScript scoring/ranking functions",
+  "adaptations": [
+    "general-only; 8 request queries; 2 candidates/query; 1000 scored entries/query",
+    "weak automatic references require literal local name evidence",
+    "no wiki text; optional short definitions/traps/contrasts only",
+    "1200 added characters by default, 600 wrapper reserve, 2400 configurable hard bound",
+    "no extra model loop, required tags, identity/wardrobe/appearance authority or term import"
+  ]
+}

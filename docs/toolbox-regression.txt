@@ -1,0 +1,29 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\69493\.codex\worktrees\dev-toolbox-integration\astrbot_plugin_anima_master
+configfile: pytest.ini
+plugins: anyio-4.14.2, asyncio-1.4.0, cov-7.1.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 454 items
+
+tests\test_toolbox_vocabulary.py ..............................          [  6%]
+tests\test_toolbox_pipeline.py ...........                               [  9%]
+tests\test_prompt_direct_writer.py ..................................... [ 17%]
+...............................                                          [ 24%]
+tests\test_nai_workflow.py ............................................. [ 33%]
+.......................................                                  [ 42%]
+tests\test_prompt_strategy.py .......................................... [ 51%]
+........................................................................ [ 67%]
+.....................................................................    [ 82%]
+tests\test_appearance_reference_scope.py ............................... [ 89%]
+...............                                                          [ 92%]
+tests\test_nai_submission_failures.py ............................       [ 99%]
+tests\test_config_view.py ....                                           [100%]
+
+============================== warnings summary ===============================
+..\..\..\..\.astrbot_launcher\instances\1617d9a4-b150-48c1-a04e-cc719eaf7a73\core\astrbot\core\utils\tencent_record_helper.py:4
+  C:\Users\69493\.astrbot_launcher\instances\1617d9a4-b150-48c1-a04e-cc719eaf7a73\core\astrbot\core\utils\tencent_record_helper.py:4: DeprecationWarning: 'audioop' is deprecated and slated for removal in Python 3.13
+    import audioop
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 454 passed, 1 warning in 10.39s =======================

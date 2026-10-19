@@ -1,5 +1,11 @@
 # 故障排查
 
+## Toolbox 本地检索没有参考或参考不准确
+
+先检查 `toolbox_vocabulary_mode`、本机 `toolbox_vocabulary_path` 和名词翻译总开关。`observe` 有候选但不改变模型输入是预期行为；`off` 不读取文件。摘要 `toolbox_vocabulary.state=unavailable` 表示数据缺失/损坏或加载失败，不影响原流程；文件版本改变后可重新读取。`weak_without_literal` 表示弱字面候选没有明确词面依据而弃权；`clipped_searches` 表示评分候选达到上限。这些都不触发模型重试或补 tag。
+
+只核对同一请求实际给 LLM2 的词汇区，不能把相似度、合法 canonical 或目录存在当作语义正确证明。否定、文字提及、短词和陌生改写可能无候选；原文仍完整传递。检查 `rows_chars` 与 `added_chars_upper_bound`，后者预留说明开销，不是精确 token。首次加载有成本，后续使用文件版本缓存。不要通过恢复全量名词导入或删除既有提示词职责来处理。首版默认关闭，未做新的真实模型/图片验收。
+
 ## 借外貌后条件膨胀或核心特征消失（2026-10-19）
 
 对照 `semantic_plan_raw`、`appearance_reference_evidence`、`prompt_llm_initial_content / prompt_llm_retry_content` 与 `final_prompt`，不要仅按 tag 数量判断。先区分来源错误（发型被误作借衣或来源本人出场）、证据缺失（只给姓名让模型猜）、后置误删（发型 tail 被当身体尾巴、发饰被旧衣柜过滤）、画外默认衣柜和自由装饰/跨字段复述。质量前缀、画师与 `#` 尾缀是独立宿主通道，不能都算作模型添加。
