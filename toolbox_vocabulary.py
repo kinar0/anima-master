@@ -2,7 +2,7 @@
 
 Scoring is adapted from llm-nai-toolbox 0.9.8 (lyf, MIT), whose search.ts
 attributes koishi-plugin-reforge. See third_party/llm_nai_toolbox/NOTICE.md.
-Data is read from the user's installation, never imported into term mappings.
+Data is read from the configured local copy, never imported into term mappings.
 """
 from __future__ import annotations
 
@@ -21,8 +21,10 @@ from typing import Any
 
 try:
     from .term_match_context import TermMatchContext
+    from .toolbox_overrides import OVERLAY_FILE, read_overlay
 except ImportError:
     from term_match_context import TermMatchContext
+    from toolbox_overrides import OVERLAY_FILE, read_overlay
 
 _PAIRS = (
     "戦战絵绘桜樱剣剑沢泽様样竜龙鉄铁気气焼烧転转悪恶霊灵氷冰浜滨撃击歩步弾弹糸丝戯戏辺边隠隐"
@@ -189,7 +191,7 @@ class ToolboxVocabulary:
 
     def _load(self, directory: Path) -> dict[str, Any]:
         signatures = []
-        for name in _FILES:
+        for name in (*_FILES, OVERLAY_FILE):
             p = directory/name
             try:
                 st = p.stat()
@@ -215,12 +217,6 @@ class ToolboxVocabulary:
                 count = row.get("count", 0)
                 count = max(0, count) if isinstance(count, (int, float)) and math.isfinite(count) else 0
                 entry = {"tag":tag, "count":count, **{k:_strings(row.get(k)) for k in _FIELDS}}
-                number = len(entries)
-                grams = set()
-                for name in (tag, *(s for k in _FIELDS for s in entry[k])):
-                    grams.update(_grams(normalize(name)))
-                for gram in grams:
-                    index[gram].append(number)
                 entries.append(entry)
                 by_tag[tag] = entry
             gloss, categories, deprecated = {}, defaultdict(list), {}
@@ -248,8 +244,40 @@ class ToolboxVocabulary:
                                     gloss[tag] = {"g":_clean(row["g"]), "trap":"", "vs":()}
                 else:
                     deprecated = {t:_clean(v) for t,v in value.items() if t in by_tag and isinstance(v, str)}
+            overrides, _ = read_overlay(directory)
+            # Base evidence remains available to the editor for inspection/restore.
+            base = {e['tag']: e for e in entries}
+            base_gloss = dict(gloss)
+            base_categories = {t:list(c) for t,c in categories.items()}
+            effective, disabled = [], set()
+            for tag in dict.fromkeys((*base, *overrides)):
+                entry = dict(base.get(tag, {"tag":tag, "count":0, **{k:() for k in _FIELDS}}))
+                edit = overrides.get(tag)
+                if edit is not None:
+                    # Edited aliases replace the Chinese trigger set, including
+                    # structured upstream aliases. Other languages stay intact.
+                    base_aliases = {s for k in ('zhFull', 'zhShort', 'zhNick', 'zh') for s in entry[k]}
+                    if set(edit['aliases']) != base_aliases:
+                        entry.update(zh=tuple(edit['aliases']), zhFull=(), zhShort=(), zhNick=())
+                    gloss[tag] = {'g':edit['definition'], 'trap':edit['trap'],
+                                  'vs':tuple(tuple(x) for x in edit['contrasts'])}
+                    categories[tag] = list(edit['categories'])
+                    if edit['disabled']:
+                        disabled.add(tag)
+                effective.append(entry)
+            entries = [e for e in effective if e['tag'] not in disabled]
+            by_tag = {e['tag']:e for e in entries}
+            for number, entry in enumerate(entries):
+                grams = set()
+                for name in (entry['tag'], *(s for k in _FIELDS for s in entry[k])):
+                    grams.update(_grams(normalize(name)))
+                for gram in grams:
+                    index[gram].append(number)
             self._data = {"entries":entries, "by_tag":by_tag, "index":dict(index), "gloss":gloss,
                           "categories":dict(categories), "deprecated":deprecated,
+                          "catalog":effective, "base":base, "base_gloss":base_gloss,
+                          "base_categories":base_categories, "overrides":overrides,
+                          "disabled":disabled,
                           "load_ms":round((time.perf_counter()-started)*1000, 2)}
             return self._data
         except Exception as exc:
@@ -304,7 +332,7 @@ class ToolboxVocabulary:
         """
         with self._lock:
             data = self._load(Path(directory))
-            tags = [tag for tag,cats in data["categories"].items() if category in cats]
+            tags = [tag for tag,cats in data["categories"].items() if category in cats and tag in data['by_tag']]
             q = keyword.casefold().strip()
             tags.sort(key=lambda tag:(
                 not (q and q in (tag+" "+data["gloss"].get(tag,{}).get("g","")).casefold()),

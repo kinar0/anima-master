@@ -379,6 +379,8 @@ Toolbox 作者信息、原始 README/package 许可声明和 MIT 许可文本保
 
 默认关闭，普通文本优化及 NAI `-r` 在第二阶段前读取用户本机已有的数据，不要求启动 Toolbox 或安装 Node/Electron，不增加模型查询轮次。
 
+独立的 **Toolbox 词库** 插件页面提供分类翻阅、搜索、本地试查与维护。用户可将所需数据复制到插件的 `data/toolbox/tagdb` 后将下方路径改到该目录，运行不再依赖原安装文件夹；原始数据不变，本地编辑另存 `local_overrides.json`。编辑别名、释义、分类或停用后，下一次检索生效。具体范围、恢复方式和复制工具见 [独立窗口与本地副本](Toolbox词库窗口与本地副本.md)。这份用户本机副本不加入 Git 或公开发布包。
+
 | 配置 | 默认 | 含义 |
 | --- | --- | --- |
 | `toolbox_vocabulary_mode` | `off` | `off` 不读取；`observe` 只记候选，不改模型输入；`reference` 注入受限参考 |

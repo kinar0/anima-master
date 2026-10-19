@@ -17,6 +17,7 @@ from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.utils.astrbot_path import get_astrbot_plugin_data_path
 
 try:
+    from .toolbox_library import ToolboxLibrary
     from .vocabulary_review import VocabularyReview
     from .agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from .autofilter_settings import AutofilterSettings
@@ -45,6 +46,7 @@ try:
     )
     from .prompt_block_rules import matches_blocked_prompt
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
+    from toolbox_library import ToolboxLibrary
     from vocabulary_review import VocabularyReview
     from agent_tools.comfyui_sizes import MAX_NON_WHITELIST_EXPLICIT_PIXELS
     from autofilter_settings import AutofilterSettings
@@ -164,6 +166,7 @@ class ComfyUIAgentPlugin(Star):
         self._runtime = self._services.runtime
         self._runtime.autofilter_settings = self._autofilter_settings
         self._prompt_pipeline = self._services.prompt_pipeline
+        self._toolbox_library = ToolboxLibrary(self._prompt_pipeline._toolbox_vocabulary)
         self._prompt_pipeline.artist_session_settings = self._artist_session_settings
         self._generation_task = self._services.generation_task
         self._action_handler = self._services.action_handler
@@ -182,6 +185,10 @@ class ComfyUIAgentPlugin(Star):
             "保存 Anima 服装词库",
         )
         for path, handler, methods, label in (
+            ("toolbox/library", self.get_toolbox_library, ["GET"], "翻阅 Toolbox 词库"),
+            ("toolbox/entry", self.get_toolbox_entry, ["GET"], "查看 Toolbox 词条"),
+            ("toolbox/save", self.save_toolbox_entry, ["POST"], "维护 Toolbox 词条"),
+            ("toolbox/probe", self.probe_toolbox, ["POST"], "本地试查 Toolbox"),
             ("noun-translation", self.get_noun_translation, ["GET"], "查看名词翻译进度"),
             ("noun-translation/status", self.get_noun_translation_status, ["GET"], "查看名词翻译任务状态"),
             ("vocabulary-review", self.get_vocabulary_review, ["GET"], "查看词汇候选与释义"),
@@ -205,6 +212,51 @@ class ComfyUIAgentPlugin(Star):
             ["POST"],
             "保存会话图片打码设置",
         )
+
+    async def _toolbox_api(self, operation):
+        try:
+            self._ensure_dashboard_user()
+            return json_response(await operation())
+        except PermissionError:
+            return error_response("请先登录 AstrBot 管理页面。", status_code=403)
+        except (ValueError, TypeError) as exc:
+            return error_response(str(exc), status_code=409 if "刷新" in str(exc) else 400)
+        except OSError:
+            logger.exception("Toolbox 本地词库操作失败")
+            return error_response("无法读取或保存词库，请检查本地文件。", status_code=500)
+
+    def _toolbox_directory(self):
+        return str(self.config.get("toolbox_vocabulary_path", ""))
+
+    async def get_toolbox_library(self):
+        async def operation():
+            p = request.query
+            value = await asyncio.to_thread(self._toolbox_library.list, self._toolbox_directory(),
+                query=p.get("query", ""), category=p.get("category", ""), state=p.get("state", "all"),
+                page=int(p.get("page", 1)), page_size=int(p.get("page_size", 30)))
+            value["mode"] = str(self.config.get("toolbox_vocabulary_mode", "off"))
+            value["max_chars"] = int(self.config.get("toolbox_vocabulary_max_chars", 1200))
+            return value
+        return await self._toolbox_api(operation)
+
+    async def get_toolbox_entry(self):
+        async def operation():
+            return await asyncio.to_thread(self._toolbox_library.detail, self._toolbox_directory(), request.query.get("tag", ""))
+        return await self._toolbox_api(operation)
+
+    async def save_toolbox_entry(self):
+        async def operation():
+            payload = await request.json(default={})
+            return await asyncio.to_thread(self._toolbox_library.save, self._toolbox_directory(), payload)
+        return await self._toolbox_api(operation)
+
+    async def probe_toolbox(self):
+        async def operation():
+            payload = await request.json(default={})
+            if not isinstance(payload, dict):
+                raise ValueError("请求格式无效")
+            return await asyncio.to_thread(self._toolbox_library.probe, self._toolbox_directory(), payload.get("text", ""))
+        return await self._toolbox_api(operation)
 
     async def get_autofilter(self):
         try:

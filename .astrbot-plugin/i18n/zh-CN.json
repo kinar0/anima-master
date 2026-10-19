@@ -1,5 +1,9 @@
 {
   "pages": {
+    "toolbox": {
+      "title": "Toolbox 词库",
+      "description": "翻阅分类、查看释义并维护本地别名与易混词。"
+    },
     "wardrobe": {
       "title": "服装词库",
       "description": "查看并编辑服装档案、服装套组和名词翻译。"
