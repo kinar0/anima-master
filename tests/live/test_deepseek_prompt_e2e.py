@@ -233,6 +233,94 @@ def _assert_successful_english_prompt(result) -> str:
     return result.final_prompt.lower()
 
 
+@pytest.mark.parametrize("case", ["mortis_focus", "cut_skirt", "cut_skirt_nai", "other_garment", "two_wearers"])
+def test_live_borrowed_outfit_partial_changes(live_pipeline, case):
+    """Real planner + writer; no ComfyUI submission or production cache writes."""
+    if case == "mortis_focus":
+        prompt = "若叶睦穿着mortis的衣服（没有面具），一脸厌恶地抬起一只脚，用黑丝脚底对着镜头。脚底散发着蒸汽。热气腾腾的高筒皮靴放在地上.foot focus"
+    elif case.startswith("cut_skirt"):
+        prompt = "丰川祥子穿着oblivionis的衣服（没有面具），裙子经过剪裁，只留下身体侧面的部分，露出被黑丝包裹的双腿"
+        if case.endswith("nai"):
+            prompt = "-r " + prompt
+    elif case == "other_garment":
+        prompt = "千早爱音穿着oblivionis的衣服（没有面具），上衣经过剪裁，只留下肩膀和袖口部分；其余衣物保持原样，全身站立。"
+    else:
+        prompt = "千早爱音穿着oblivionis的衣服（没有面具），丰川祥子穿着mortis的衣服（没有帽子）。两人全身并排站立。"
+    result, calls = _build(live_pipeline, prompt)
+    assert result.final_prompt and not result.summary.get("llm_failed"), result.summary
+    from tag_cleaner import split_tags
+
+    def has_source_tag(text, tag):
+        key = lambda value: re.sub(r"[\s_\\]+", "", value.lower())
+        return key(tag) in {key(part) for part in split_tags(text)}
+
+    if case.endswith("nai"):
+        rows = result.summary["nai_characters"]
+        assert len(rows) == 1 and rows[0]["name"] == "togawa_sakiko", rows
+        actual = rows[0]["prompt"].lower().replace("_", " ")
+        assert "black pantyhose" in actual, actual
+        assert any(item in actual for item in ("red shirt", "corset")), actual
+        assert has_source_tag(rows[0]["prompt"], "oblivionis_(bang_dream!)"), rows
+        assert not has_source_tag(result.final_prompt, "oblivionis_(bang_dream!)")
+    else:
+        actual = _assert_successful_english_prompt(result)
+        outfits = result.summary["semantic_character_outfits"]
+        assert len(outfits) == (2 if case == "two_wearers" else 1), outfits
+        for row in outfits:
+            assert not set(row["removed_tags"]).intersection({"black_pantyhose", "black_corset", "red_shirt", "white_shirt"}), row
+        if case != "other_garment":
+            assert "pantyhose" in actual, actual
+        if case == "mortis_focus":
+            assert "white shirt" in actual and "red hat" in actual, actual
+            assert not any("mask" in tag for tag in result.summary["wardrobe_authority"]["selected_tags"])
+        elif case == "cut_skirt":
+            assert "black pantyhose" in actual and any(t in actual for t in ("red shirt", "corset")), actual
+        elif case == "two_wearers":
+            # Check the wearer's actual prose, not an unscoped tag left elsewhere.
+            sakiko_clause = next(clause for clause in actual.replace("\n", ";").split(";")
+                                 if "togawa sakiko wears" in clause)
+            assert "green brooch" in sakiko_clause, sakiko_clause
+        for tag in (("oblivionis_(bang_dream!)", "mortis_(bang_dream!)") if case == "two_wearers"
+                    else ("mortis_(bang_dream!)",) if case == "mortis_focus"
+                    else ("oblivionis_(bang_dream!)",)):
+            assert has_source_tag(result.final_prompt, tag), result.final_prompt
+    # Real replies and final text are saved by _build, including any bounded repair.
+    assert all(not call.get("synthetic_first_stage") for call in calls)
+
+
+def test_live_borrowed_outfit_repairs_recorded_missing_donor_review(live_pipeline):
+    """Replay only the recorded broken writer draft; planner and repair are real."""
+    evidence = PLUGIN_DIR / "diagnostics/borrowed-outfit-2026-10-20/reported-evidence.json"
+    if not evidence.exists():
+        pytest.skip("reported draft evidence is unavailable")
+    original = next(row for row in _read_json(evidence)
+                    if row["task_id"] == "a30844314446429da512a518dcd26634")
+    raw = original["summary"]["nai_character_plan_raw"]
+    pipeline, context = live_pipeline
+    generate = context.llm_generate
+    supplied_draft = False
+
+    async def replay_initial_draft(**kwargs):
+        nonlocal supplied_draft
+        prompt = kwargs.get("prompt", "")
+        if "Design a complete, coherent NAI image" in prompt and not supplied_draft:
+            supplied_draft = True
+            context.calls.append(dict(prompt=prompt, system_prompt=kwargs.get("system_prompt", ""),
+                                      response=raw, replayed_writer_draft=True))
+            return type("Response", (), {"completion_text": raw})()
+        return await generate(**kwargs)
+
+    context.llm_generate = replay_initial_draft
+    result, calls = _build(live_pipeline, original["original_prompt"])
+    assert result.final_prompt, result.summary
+    assert result.summary["nai_identity_initial_validation_errors"]
+    assert not result.summary["nai_identity_retry_validation_errors"]
+    assert len(result.summary["nai_characters"]) == 1
+    assert any(row["visibility"] == "donor" for row in result.summary["nai_identity_review"])
+    assert any(call.get("replayed_writer_draft") for call in calls)
+    assert "identity_review" in calls[-1]["response"]
+
+
 @pytest.mark.parametrize("case", ["shared_clothes_1", "shared_clothes_2", "donor", "quoted", "offscreen"])
 def test_live_nai_known_identity_completeness(live_pipeline, tmp_path, case):
     """Neutral scenes only; inspect both actual model replies and final boxes."""

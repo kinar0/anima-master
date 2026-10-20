@@ -129,6 +129,29 @@ def test_anm_size_and_prompt_are_space_separated():
     )
 
 
+def test_numeric_size_can_directly_precede_chinese_description():
+    for separator in ("x", "X", "×", "*", "＊", "✕", "✖", "х", "Х"):
+        for prefix in ("", "-r ", "-s1 ", "-r -s1 "):
+            assert parse_generation_size(
+                f"{prefix}1024{separator}1536少女站在河岸", ALLOWED_SIZES
+            ) == (f"{prefix}少女站在河岸".strip(), (1024, 1536), None)
+    assert parse_generation_size("1216x832少女站立", ALLOWED_SIZES) == (
+        "少女站立", (1216, 832), None,
+    )
+    assert parse_generation_size("分辨率1024×1536少女站立", ALLOWED_SIZES) == (
+        "少女站立", (1024, 1536), None,
+    )
+
+
+def test_numeric_size_does_not_consume_partial_numbers_or_scene_mentions():
+    for text in (
+        "1024x153600少女", "1024x1536.png", "1024x1536canvas",
+        "牌子上写着1024x1536", "少女举着牌子#1024x1536",
+        "分辨率1024x153600少女", "分辨率1024x1536.png",
+    ):
+        assert parse_generation_size(text, ALLOWED_SIZES) == (text, None, None)
+
+
 def test_leading_generation_switches_preserve_explicit_size_and_alias():
     for text in (
         "-r 1216x832 少女站在河岸",

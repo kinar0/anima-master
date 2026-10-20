@@ -93,7 +93,11 @@ def test_edit_blocks_combination_before_comfyui_readiness() -> None:
     handler._ensure_ready = unexpected_ready
     result = asyncio.run(handler.edit(object(), "词乙和词甲"))
 
-    assert result == "请求包含禁止的词语组合，已拒绝生成。"
+    assert result == (
+        "请求包含禁止的词语组合，已拒绝生成。\n"
+        "本次命中词语：「词甲」、「词乙」。\n"
+        "请修改后再试。"
+    )
 
 
 def test_generate_action_passes_one_time_size_override():
@@ -132,6 +136,64 @@ def test_generate_action_accepts_space_after_explicit_size():
 
     assert result is None
     assert calls == [("少女站在河岸", {"width": 1216, "height": 832})]
+
+
+def test_glued_chinese_size_is_checked_before_quota_and_generation():
+    from main import ComfyUIAgentPlugin
+
+    class Event:
+        def __init__(self, sender_id):
+            self.sender_id = sender_id
+            self.messages = []
+
+        def get_sender_id(self):
+            return self.sender_id
+
+        def plain_result(self, text):
+            return text
+
+        async def send(self, result):
+            self.messages.append(result)
+
+    plugin = ComfyUIAgentPlugin.__new__(ComfyUIAgentPlugin)
+    plugin.config = {"generation_whitelist_sender_ids": ["white"]}
+    reserved = []
+
+    def reserve(event):
+        reserved.append(event.sender_id)
+        # Stop at the quota boundary: no LLM or ComfyUI request is needed.
+        return "已通过尺寸检查"
+
+    async def unexpected_generation(*_args, **_kwargs):
+        raise AssertionError("must stop before prompt building or submission")
+
+    plugin._reserve_generation_call = reserve
+    plugin._generate_payload = unexpected_generation
+    handler = _handler(
+        config={"artist_presets": ["test=artist:test"]},
+        generate=plugin._generate,
+    )
+    for action in ("generate", "multi_person"):
+        for prefix in ("", "-r ", "-s1 ", "-r -s1 "):
+            for size in ("1024*1536", "1536×1024", "1024x1028"):
+                event = Event("ordinary")
+                assert asyncio.run(handler.handle_action(
+                    event, action, f"{prefix}{size}两名少女合影"
+                )) is None
+                assert len(event.messages) == 1 and "1MP" in event.messages[0]
+    assert reserved == []
+
+    # The same syntax must preserve valid sizes and the whitelist exemption.
+    for sender, size in (
+        ("ordinary", "1024x1024"),
+        ("ordinary", "1216x832"),
+        ("ordinary", "512x1756"),
+        ("white", "1024*1536"),
+    ):
+        event = Event(sender)
+        asyncio.run(handler.handle_action(event, "generate", f"{size}少女合影"))
+        assert event.messages == ["已通过尺寸检查"]
+    assert reserved == ["ordinary", "ordinary", "ordinary", "white"]
 
 
 def test_generate_action_accepts_size_after_generation_switches():

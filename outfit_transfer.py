@@ -339,6 +339,10 @@ _GARMENT_SLOTS = {
     "大衣": "outerwear",
     "jacket": "outerwear",
     "coat": "outerwear",
+    "帽子": "headwear",
+    "头饰": "headwear",
+    "头纱": "headwear",
+    "hat": "headwear",
     "面具": "face_accessory.mask",
     "面罩": "face_accessory.mask",
     "mask": "face_accessory.mask",
@@ -474,7 +478,8 @@ def parse_user_outfit_patches(
         rf"(?P<color>{color_pattern})(?:的)?(?P<garment>{garment_pattern})"
     )
     remove_re = re.compile(
-        rf"(?:没穿|没有穿|不穿|未穿|脱掉(?:了)?|去掉(?:了)?|不要)\s*(?:着)?(?:任何)?"
+        rf"(?:没穿|没有穿|不穿|未穿|没戴|没有戴|不戴|未戴|摘掉(?:了)?|摘下(?:了)?|"
+        rf"脱掉(?:了)?|去掉(?:了)?|不要|没有)\s*(?:着)?(?:任何)?"
         rf"(?P<garment>{garment_pattern})"
     )
     add_re = re.compile(
@@ -615,7 +620,7 @@ def build_effective_outfit_plan(
         if patch.operation == "keep_only":
             allowed_slots = set(filter(None, patch.slot.split(",")))
             for tag in tuple(effective):
-                if (outfit_tag_slot(tag) or "misc") not in allowed_slots:
+                if not any(_profile_tag_matches_slot(tag, slot) for slot in allowed_slots):
                     effective.remove(tag)
                     if tag not in removed:
                         removed.append(tag)

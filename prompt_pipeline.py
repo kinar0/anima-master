@@ -2019,7 +2019,9 @@ class WardrobeAuthority:
         return r"\s+".join(re.escape(word) for word in words)
 
     @classmethod
-    def _remove_prose_tag(cls, text: str, tag: str) -> str:
+    def _remove_prose_tag(
+        cls, text: str, tag: str, *, protected_tags: tuple[str, ...] = (),
+    ) -> str:
         """Remove one known-conflicting wardrobe assertion conservatively.
 
         Match actual wearing/list grammar, not every occurrence of a garment
@@ -2027,6 +2029,21 @@ class WardrobeAuthority:
         lift`` or ``beneath her skirt`` intact.
         """
         phrase = cls._prose_pattern(tag)
+        # A different wearer owning generic ``brooch``/``shirt`` does not
+        # invalidate this wearer's selected ``green_brooch``/``red_shirt``.
+        # Protect only the longer grounded phrase within this actual match;
+        # forbidden components elsewhere are still removed normally.
+        protected = tuple(
+            cls._prose_pattern(own) for own in protected_tags
+            if cls._key(own) != cls._key(tag)
+            and re.search(rf"\b{phrase}\b", cls._key(own).replace("_", " "), re.I)
+        )
+
+        def remove_unless_owned(match: re.Match[str]) -> str:
+            return match.group(0) if any(
+                re.search(rf"\b{own}\b", match.group(0), re.I) for own in protected
+            ) else ""
+
         action_suffix = r"(?:lift|tug|pull|grab|adjustment|adjusting|flutter|spread)"
         if cls._key(tag) in {"bottomless", "topless", "nude", "naked"}:
             return re.sub(
@@ -2046,7 +2063,7 @@ class WardrobeAuthority:
             rf"\b(?:wears?|wearing|dressed in|clad in|in)\s+"
             rf"(?:(?:a|an|the)\s+)?{optional_modifiers}{phrase}\b"
             rf"(?!\s+{action_suffix}\b)",
-            "",
+            remove_unless_owned,
             text,
             flags=re.I,
         )
@@ -2057,7 +2074,7 @@ class WardrobeAuthority:
             result = re.sub(
                 rf"\b(?:holds?|holding|carries|carrying)\s+"
                 rf"(?:(?:a|an|the)\s+)?{optional_modifiers}{phrase}\b",
-                "",
+                remove_unless_owned,
                 result,
                 flags=re.I,
             )
@@ -2065,7 +2082,7 @@ class WardrobeAuthority:
             rf"(?:,\s*|\s+and\s+)(?:(?:a|an|the)\s+)?"
             rf"{optional_modifiers}{phrase}\b"
             rf"(?!\s+{action_suffix}\b)",
-            "",
+            remove_unless_owned,
             result,
             flags=re.I,
         )
@@ -2100,14 +2117,14 @@ class WardrobeAuthority:
             or outfit_tag_slot(part) in plan.appearance_accessory_slots
         )))
 
-    def filter_prose(self, text: str) -> str:
+    def filter_prose(self, text: str, *, protected_tags: tuple[str, ...] = ()) -> str:
         result = str(text or "")
         for tag in sorted(
             (*self.stale_cached_tags, *self.removed_tags),
             key=len,
             reverse=True,
         ):
-            result = self._remove_prose_tag(result, tag)
+            result = self._remove_prose_tag(result, tag, protected_tags=protected_tags)
         result = re.sub(r"\bwears?\s*(?=,|;|\band\b|$)", "", result, flags=re.I)
         result = re.sub(r"\s+,", ",", result)
         return re.sub(r"\s{2,}", " ", result).strip(" ,;")
@@ -2117,13 +2134,13 @@ class WardrobeAuthority:
     ) -> str:
         """Remove only grounded outfit evidence owned by another wearer."""
         authority = self.for_character(plan)
-        result = authority.filter_prose(text)
         own_keys = {
             self._key(tag)
             for target_id, tags in authority.character_selected_tags
             if target_id.lower() == plan.target_anchor_id.lower()
             for tag in tags
         }
+        result = authority.filter_prose(text, protected_tags=tuple(own_keys))
         other_tags = tuple(
             tag
             for target_id, tags in authority.character_selected_tags
@@ -2133,7 +2150,7 @@ class WardrobeAuthority:
             and outfit_tag_slot(tag) not in plan.appearance_accessory_slots
         )
         for tag in sorted(other_tags, key=len, reverse=True):
-            result = self._remove_prose_tag(result, tag)
+            result = self._remove_prose_tag(result, tag, protected_tags=tuple(own_keys))
         result = re.sub(r"\s+and\s+(?=(?:is|are)\b)", " ", result, flags=re.I)
         return re.sub(r"\s{2,}", " ", result).strip(" ,;")
 
@@ -2961,6 +2978,35 @@ def explicit_cosplay_assignments(
                 if pair not in assignments:
                     assignments.append(pair)
     return tuple(assignments)
+
+
+def selected_outfit_source_tags(
+    anchors: tuple[SemanticAnchor, ...],
+    outfits: tuple[CharacterEffectiveOutfit, ...],
+) -> tuple[str, ...]:
+    """Keep confirmed, wearer-bound costume anchors separate from visible identities.
+
+    Borrowing clothes does not require a cosplay verb. User garment edits change
+    components, not the selected costume's canonical source. Unknown/unbound
+    sources and mere appearance references never acquire this authority.
+    """
+    by_id = {anchor.anchor_id: anchor for anchor in anchors}
+    return tuple(dict.fromkeys(
+        outfit.wardrobe_tag
+        for outfit in outfits
+        if outfit.wardrobe_kind == "outfit_source"
+        and outfit.resolution_state == "resolved"
+        and (source := by_id.get(outfit.wardrobe_anchor_id)) is not None
+        and source.role == "outfit_source"
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_:'!().+\-]*", outfit.wardrobe_tag)
+    ))
+
+
+def append_outfit_source_tags(text: str, tags: tuple[str, ...]) -> str:
+    """Preserve source anchors as standalone tags inside the wearer's own scope."""
+    written = {_normalized_character_key(part) for part in split_tags(text)}
+    missing = tuple(tag for tag in tags if _normalized_character_key(tag) not in written)
+    return ", ".join(part for part in (str(text or "").strip(" ,"), *missing) if part)
 
 
 def explicit_cosplay_tags(
@@ -4393,7 +4439,7 @@ def _enforce_nai_cosplay_tags(
     outfits: tuple[CharacterEffectiveOutfit, ...],
     user_prompt: str,
 ) -> None:
-    """Keep deterministic cosplay tags in their wearer's NAI instance box."""
+    """Keep source anchors and explicit cosplay tags in their wearer's NAI box."""
     def tag_key(value: str) -> str:
         return re.sub(r"[\s_\\]+", "", value.casefold())
 
@@ -4403,17 +4449,17 @@ def _enforce_nai_cosplay_tags(
             tag
             for outfit in outfits
             if _character_outfit_matches(character["name"], outfit)
-            for tag in explicit_cosplay_tags(anchors, (outfit,), user_prompt)
+            for tag in (*selected_outfit_source_tags(anchors, (outfit,)),
+                        *explicit_cosplay_tags(anchors, (outfit,), user_prompt))
         ))
-        if len(tags) != 1:
-            continue
-        rendered = display_tag_text(tags[0])
-        assigned.add(tag_key(rendered))
-        if not any(
-            tag_key(part) == tag_key(rendered)
-            for part in split_tags(character["prompt"])
-        ):
-            character["prompt"] += f", {rendered}"
+        for tag in tags:
+            rendered = display_tag_text(tag)
+            assigned.add(tag_key(rendered))
+            if not any(
+                tag_key(part) == tag_key(rendered)
+                for part in split_tags(character["prompt"])
+            ):
+                character["prompt"] += f", {rendered}"
     if assigned:
         retained = ", ".join(
             part for part in split_tags(nai_plan["global_prompt"])
@@ -4564,6 +4610,12 @@ def character_wardrobe_authority_context(
                 f"verified outfit anchors = {tags}. "
                 "Complete recognizable source clothing only; keep the wearer's own face, "
                 "hair, body and identity."
+                " Keep the confirmed source canonical tag as a standalone tag in this "
+                "wearer's Details (NAI: actual instance prompt), including ordinary "
+                "borrowing without a cosplay verb and modified source clothes. It "
+                "conditions the costume, not an extra visible person; never add the "
+                "donor to Characters/count or copy their appearance. User component "
+                "removals, recolors and tailoring still take priority over the source."
                 f"{mutation_rule}{crop_rule}"
             )
         elif plan.wardrobe_kind in CHARACTER_PROFILE_WARDROBE_KINDS - {
@@ -6130,7 +6182,13 @@ class PromptPipeline:
                                  "Use matching action tags for directed pairs; remove invented roles "
                                  "instead of inventing an extra participant. Repair missing/duplicate lettering "
                                  "ids, panel/instance ownership and placement tokens. Literal source spans "
-                                 "already belong to immutable registry ids; do not reconstruct source_text. "
+                                 "already belong to immutable registry ids; do not reconstruct text-registry source_text. "
+                                 "This lettering rule does not waive identity evidence: an absent "
+                                 "known identity still requires a top-level identity_review entry "
+                                 "with canonical name, visibility=donor/quoted/offscreen and exact "
+                                 "contextual source_text. When the error reports an omitted clothing "
+                                 "source and it is not independently visible, keep it out of characters "
+                                 "and add its donor review quoting the original borrowing phrase. "
                                  "For cross-panel-instance errors, SPLIT that character object into "
                                  "separate panel instances with their own prompts/centres, then update "
                                  "all affected zero-based character_index values. The unique-identity "
@@ -6254,6 +6312,13 @@ class PromptPipeline:
                     scoped_nai_plan = {"characters": [character], "global_prompt": nai_plan["global_prompt"]}
                     _enforce_nai_cosplay_tags(scoped_nai_plan, anchors, (wearer,), prompt)
                     nai_plan["global_prompt"] = scoped_nai_plan["global_prompt"]
+                    source_tags = selected_outfit_source_tags(anchors, (wearer,))
+                    if source_tags:
+                        summary.setdefault("outfit_source_bindings", []).append({
+                            "target_anchor_id": wearer.target_anchor_id,
+                            "name": character["name"], "source_tags": list(source_tags),
+                        })
+                        summary["outfit_source_anchor_emitted"] = True
             expected = set(confirmed_semantic_character_tags(semantic_result))
             actual = {_normalized_character_key(character["name"])
                       for character in nai_plan["characters"]}
@@ -8142,6 +8207,11 @@ class PromptPipeline:
                 ):
                     detail = rewrite_target_outfit_detail(detail, effective_outfit)
                     outfit_target_display = character.name.replace("_", " ")
+                if character_outfit is not None:
+                    detail = append_outfit_source_tags(
+                        detail or character.name,
+                        selected_outfit_source_tags(semantic_anchors, (character_outfit,)),
+                    )
                 effective_detail_blocks.append(detail)
                 identity_block = character.identity_tags
                 if character_outfit and character_outfit.appearance_tags:
@@ -8459,13 +8529,21 @@ class PromptPipeline:
             semantic_anchors, character_effective_outfits, prompt
         )
         summary["explicit_cosplay_tags"] = list(cosplay_tags)
+        bound_source_tags = selected_outfit_source_tags(semantic_anchors, character_effective_outfits)
+        summary["bound_outfit_source_tags"] = list(bound_source_tags)
+        summary["outfit_source_bindings"] = [
+            {"target_anchor_id": outfit.target_anchor_id, "name": outfit.target_source_text,
+             "source_tags": list(tags)}
+            for outfit in character_effective_outfits
+            if (tags := selected_outfit_source_tags(semantic_anchors, (outfit,)))
+        ]
         if structured_prompt_mode:
             structured_extra_tags = tuple(dict.fromkeys(
                 (*structured_extra_tags, *cosplay_tags)
             ))
         else:
             required_core_tags = tuple(dict.fromkeys(
-                (*required_core_tags, *cosplay_tags)
+                (*required_core_tags, *bound_source_tags, *cosplay_tags)
             ))
         if generated_scene_selected:
             structured_extra_tags = tuple(split_tags(
@@ -8625,7 +8703,7 @@ class PromptPipeline:
                     }
                     for patch in effective_outfit.patches
                 ],
-                "outfit_source_anchor_emitted": include_source_anchor,
+                "outfit_source_anchor_emitted": bool(bound_source_tags) or include_source_anchor,
                 "llm_failed": llm_failed,
                 "llm_error": self._shorten(llm_error, 300),
                 "llm_content_tag_count": content_tag_count,

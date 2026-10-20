@@ -19,7 +19,13 @@ except ImportError:  # pragma: no cover - direct script-style import.
 
 _ROUTE_PREFIX_RE = re.compile(r"^\s*/?", re.IGNORECASE)
 _SPACES_RE = re.compile(r"\s+")
-_SIZE_VALUE_PATTERN = r"(?P<width>\d{2,5})\s*[xX×*＊✕✖хХ]\s*(?P<height>\d{2,5})"
+# Chinese descriptions may directly follow a leading size without a space.
+# Keep a boundary after the height so longer numbers and filenames do not match.
+_SIZE_VALUE_END = r"(?=$|\s|[：:,，;；。!！?？（(\u3400-\u9fff])"
+_SIZE_VALUE_PATTERN = (
+    r"(?P<width>\d{2,5})\s*[xX×*＊✕✖хХ]\s*(?P<height>\d{2,5})"
+    + _SIZE_VALUE_END
+)
 _SIZE_ALIASES = {
     "方图": 1.0,
     "正方形": 1.0,
@@ -76,7 +82,7 @@ def parse_generation_size(
     for pattern in (
         rf"(?<!\S)--(?:尺寸|分辨率)\s*(?:=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
         rf"(?:尺寸|分辨率)\s*(?:为|是|=|＝|:|：)?\s*{_SIZE_VALUE_PATTERN}",
-        rf"^\s*(?:(?:-r|-s\d+)\s+)*(?P<bare_size>{_SIZE_VALUE_PATTERN}(?=$|\s|[：:,，])\s*[：:,，]?)",
+        rf"^\s*(?:(?:-r|-s\d+)\s+)*(?P<bare_size>{_SIZE_VALUE_PATTERN}\s*[：:,，]?)",
     ):
         size_match = re.search(pattern, prompt, flags=re.IGNORECASE)
         if size_match:

@@ -156,6 +156,14 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
         for tag in _FRAMING_TAG_GROUPS[group]:
             if skip_closeup and tag == "close up":
                 continue
+            # A focal subject is not a visible-extent boundary. A whole figure
+            # can present a foot/hand towards the camera. Only a local close-up
+            # supplies the extra crop evidence, and full-body extent wins.
+            if tag.endswith(" focus") and (
+                not re.search(r"\bclose up\b|特写", normalized)
+                or re.search(r"\bfull body\b|全身", normalized)
+            ):
+                continue
             if group in {"upper", "lower"}:
                 # Body-region words also occur in nudity/mutation prose. Treat
                 # them as framing only when they are standalone tags or carry a
@@ -179,12 +187,12 @@ def framing_hidden_outfit_slots(text: str) -> frozenset[str]:
         return False
 
     chinese_view = re.compile(
-        r"(?:只(?:露出|拍|画|显示|看见)|重点(?:拍|画|显示))\s*"
+        r"(?:只(?:露出|拍|画|显示|看见))\s*"
         r"(?P<part>上半身|下半身|头部|脸部|面部|眼部|嘴部|头发|手部|双手|"
         r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)|"
         r"(?P<part2>上半身|下半身|头部|脸部|面部|眼部|嘴部|头发|手部|双手|"
         r"脚部|足部|双脚|双足|腿部|大腿|臀部|腹部|肚脐)"
-        r"(?:肖像|人像|构图|镜头|特写|入镜|可见|出镜|聚焦|视图|画面|为主体)",
+        r"(?:肖像|人像|构图|镜头|特写|入镜|可见|出镜|视图|画面|为主体)",
         re.I,
     )
     chinese_parts = {

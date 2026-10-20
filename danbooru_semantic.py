@@ -436,7 +436,7 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "requested. Never put a hair/appearance phrase into clothing.\n"
         "clothing_changes = explicit changes only. Every item MUST be an object "
         "with operation, slots, color, source_text; source_text must be exact. "
-        "operation MUST be one of remove, damage, replace_color, recolor_all, add, "
+        "operation MUST be one of remove, damage, modify, replace_color, recolor_all, add, "
         "keep_only. slots MUST use only upper_body.primary, lower_body.skirt, "
         "one_piece.dress, outerwear, headwear, face_accessory.mask, handwear, "
         "legwear, footwear, lower_body.all, misc. If an item does not clearly fit "
@@ -444,7 +444,14 @@ def build_semantic_plan_prompt(user_prompt: str) -> str:
         "remove (never removed/removal) for an item the character no longer wears; "
         "use damage for torn/ripped clothing, not remove. Torn or damaged clothing "
         "is a change, not removal. Use [] only when there is no explicit clothing "
-        "change.\n"
+        "change. Use modify for local tailoring, cutouts or reshaping of a garment; "
+        "preserve the other garments and copy the exact alteration in source_text. "
+        "keep_only means the character wears ONLY the listed whole garment slots "
+        "and removes ALL other clothing. It MUST NOT represent retaining only part "
+        "of one garment: '裙子只留下侧面的部分' is modify lower_body.skirt, not "
+        "keep_only, and must not remove the shirt, gloves or legwear. Explicit "
+        "accessory absence such as 没有面具/不戴帽子 belongs in remove for that "
+        "slot, including when it is parenthesized inside the clothing phrase.\n"
         "appearance_changes = explicit request phrases only. Prefer objects with "
         "dimension (eye_color, hair_color, hair_length, hair_style, skin_color, "
         "chest_size, animal_ears, tail, horns, age_presentation, or "
@@ -551,7 +558,7 @@ def parse_semantic_plan(raw: str, user_prompt: str) -> tuple[SemanticAnchor, ...
 
 
 _OUTFIT_DIRECTIVE_OPERATIONS = {
-    "remove", "damage", "replace_color", "recolor_all", "add", "keep_only"
+    "remove", "damage", "modify", "replace_color", "recolor_all", "add", "keep_only"
 }
 _OUTFIT_DIRECTIVE_SLOTS = {
     "upper_body.primary",
@@ -581,6 +588,7 @@ _OUTFIT_DIRECTIVE_OPERATION_ALIASES = {
     "omitted": "remove", "take_off": "remove", "taken_off": "remove",
     "damage": "damage", "damaged": "damage", "torn": "damage",
     "ripped": "damage",
+    "modify": "modify", "modified": "modify", "alter": "modify", "altered": "modify",
     "replace_color": "replace_color", "replace_colour": "replace_color",
     "recolor": "replace_color", "recolored": "replace_color",
     "recoloured": "replace_color", "change_color": "replace_color",
@@ -835,6 +843,32 @@ def _appearance_reference_only_names(characters: list[Any], user_prompt: str) ->
     ))
 
 
+def _clothing_reference_only_names(characters: list[Any], user_prompt: str) -> frozenset[str]:
+    """Withhold visibility only when every donor mention is in bound clothing.
+
+    A separate occurrence (even in the same sentence) preserves the person. An
+    ungrounded/incomplete clothing phrase cannot remove a visible character.
+    """
+    request = user_prompt.casefold()
+    spans: dict[str, list[tuple[int, int]]] = {}
+    for item in characters:
+        if not isinstance(item, dict):
+            continue
+        donor = str(item.get("clothing_source") or "").strip().casefold()
+        clothing = str(item.get("clothing") or "").strip().casefold()
+        wearer = str(item.get("name") or "").strip().casefold()
+        if not donor or donor == wearer or donor not in clothing or clothing == donor:
+            continue
+        spans.setdefault(donor, []).extend(
+            (match.start(), match.end())
+            for match in re.finditer(re.escape(clothing), request)
+        )
+    return frozenset(name for name, ranges in spans.items() if ranges and all(
+        any(start <= match.start() and match.end() <= end for start, end in ranges)
+        for match in re.finditer(re.escape(name), request)
+    ))
+
+
 def _simple_semantic_to_legacy(
     data: dict[str, Any], user_prompt: str
 ) -> dict[str, Any]:
@@ -856,7 +890,8 @@ def _simple_semantic_to_legacy(
         return data
     if intent_only:
         lookups = []
-        reference_only = _appearance_reference_only_names(characters, user_prompt)
+        reference_only = (_appearance_reference_only_names(characters, user_prompt)
+                          | _clothing_reference_only_names(characters, user_prompt))
         characters = [item for item in characters if not isinstance(item, dict)
                       or str(item.get("name") or "").strip().casefold() not in reference_only]
 
@@ -1097,6 +1132,20 @@ def _normalize_outfit_directive_operation(value: Any) -> str:
     return _OUTFIT_DIRECTIVE_OPERATION_ALIASES.get(key, "")
 
 
+def _partial_retention_as_whole_outfit(operation: str, evidence: str) -> bool:
+    """Reject a destructive whole-outfit allowlist for quoted garment parts.
+
+    This does not infer the alteration or produce garment tags. The planner
+    must repair its operation; the original request remains the writer's input.
+    """
+    return operation == "keep_only" and bool(re.search(
+        r"(?:只|仅)(?:保留|留下?|剩下?).{0,40}(?:部分|局部|布料|面料|侧片)|"
+        r"\b(?:only|keep|retain)\b[^.;。；]{0,80}"
+        r"\b(?:parts?|panels?|sections?|fabric|material|hems?|cuffs?|collars?)\b",
+        evidence, re.I,
+    ))
+
+
 def _normalize_outfit_directive_slots(
     value: Any, *, unknown_to_misc: bool = True
 ) -> tuple[str, ...]:
@@ -1141,7 +1190,9 @@ def _parse_outfit_directive_item(
         return None
     if operation == "recolor_all" and slots:
         return None
-    if operation in {"remove", "damage", "replace_color", "add"} and len(slots) != 1:
+    if _partial_retention_as_whole_outfit(operation, source_text):
+        return None
+    if operation in {"remove", "damage", "modify", "replace_color", "add"} and len(slots) != 1:
         return None
     if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
         return None
@@ -1266,6 +1317,7 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
             )
         request_has_parentheses = bool(re.search(r"[（(][^（）()]{1,120}[）)]", user_prompt))
         reference_only = _appearance_reference_only_names(characters, user_prompt) if readable_intent else frozenset()
+        clothing_only = _clothing_reference_only_names(characters, user_prompt) if readable_intent else frozenset()
         for index, item in enumerate(
             characters[:MAX_SEMANTIC_CHARACTERS], start=1
         ):
@@ -1273,6 +1325,11 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                 issues.append(f"characters[{index}] must be an object")
                 continue
             name = str(item.get("name") or "").strip()
+            if name.casefold() in clothing_only:
+                issues.append(
+                    f"characters[{index}]: {name} occurs only inside another person's "
+                    "clothing phrase. Keep it as clothing_source, not a visible character."
+                )
             if name.casefold() in reference_only:
                 issues.append(
                     f"characters[{index}]: {name} occurs only inside another person's "
@@ -1327,6 +1384,15 @@ def semantic_plan_validation_issues(raw: str, user_prompt: str) -> tuple[str, ..
                         continue
                     if field == "clothing_changes":
                         for change_index, change in enumerate(value[:8], start=1):
+                            if isinstance(change, dict) and _partial_retention_as_whole_outfit(
+                                _normalize_outfit_directive_operation(change.get("operation")),
+                                str(change.get("source_text") or ""),
+                            ):
+                                issues.append(
+                                    f"characters[{index}].clothing_changes[{change_index}]: "
+                                    "keep_only removes ALL other clothing; partial garment "
+                                    "retention must use modify with the affected garment slot."
+                                )
                             if _parse_outfit_directive_item(
                                 change,
                                 user_prompt=user_prompt,
@@ -1651,7 +1717,9 @@ def parse_semantic_outfit_directives(
             continue
         if operation == "keep_only" and len(slots) > 4:
             continue
-        if operation in {"remove", "damage", "replace_color", "add"} and len(slots) != 1:
+        if _partial_retention_as_whole_outfit(operation, source_text):
+            continue
+        if operation in {"remove", "damage", "modify", "replace_color", "add"} and len(slots) != 1:
             continue
         if operation in {"replace_color", "recolor_all", "add"} and color not in _OUTFIT_DIRECTIVE_COLORS:
             continue

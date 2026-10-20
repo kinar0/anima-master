@@ -4,12 +4,16 @@ import asyncio
 from pathlib import Path
 import sys
 
+import pytest
+
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
 
 from main import ComfyUIAgentPlugin  # noqa: E402
 from prompt_block_rules import (  # noqa: E402
+    blocked_prompt_message,
+    find_blocked_prompt_terms,
     matches_blocked_combination,
     matches_blocked_prompt,
 )
@@ -70,7 +74,57 @@ def test_legacy_combinations_remain_active() -> None:
     )
 
 
-def test_blocked_generation_returns_before_quota_and_submission() -> None:
+def test_details_include_all_triggered_rules_but_no_unpaired_terms() -> None:
+    config = {
+        "blocked_prompt_rules": [
+            {"group_a": ["黑丝", "Blue Hair", "未出现"], "group_b": ["雨天"]},
+            {"group_a": ["披风"], "group_b": ["雪地"]},
+            {"group_a": ["独立词"], "group_b": ["缺失词"]},
+        ],
+        "blocked_prompt_combinations": ["黑丝 && 披风", "独立词 && 未出现"],
+    }
+    assert find_blocked_prompt_terms(
+        "雨天，黑丝，BLUE HAIR，雪地，披风，独立词", config
+    ) == ["黑丝", "Blue Hair", "雨天", "披风", "雪地"]
+    assert blocked_prompt_message("黑丝和雪地，独立词", config) == ""
+
+
+def test_details_keep_config_spelling_and_deduplicate_compatible_rules() -> None:
+    config = {
+        "blocked_prompt_rules": [
+            {"group_a": [" Ｂｌｕｅ Hair ", "blue hair"], "group_b": ["SWORD"]},
+        ],
+        "blocked_prompt_group_a": ["Blue Hair"],
+        "blocked_prompt_group_b": ["Sword", "盾"],
+        "blocked_prompt_combinations": ["blue hair && sword && 盾", "盾 && 缺失"],
+    }
+    assert find_blocked_prompt_terms("blue hair # sword, 盾", config) == [
+        "Ｂｌｕｅ Hair", "SWORD", "盾"
+    ]
+    assert find_blocked_prompt_terms(
+        "乙和甲", {"blocked_prompt_combinations": ["甲 && 乙"]}
+    ) == ["甲", "乙"]
+    assert find_blocked_prompt_terms(
+        "乙和甲", {"blocked_prompt_group_a": ["甲"], "blocked_prompt_group_b": ["乙"]}
+    ) == ["甲", "乙"]
+
+
+def test_invalid_rules_do_not_appear_in_details() -> None:
+    config = {
+        "blocked_prompt_rules": [
+            None,
+            {"__template_key": "unknown", "group_a": ["甲"], "group_b": ["乙"]},
+            {"group_a": [None, " "], "group_b": ["乙"]},
+            {"group_a": "甲", "group_b": ["乙"]},
+        ],
+        "blocked_prompt_combinations": [None, "甲", "甲 &&", "&& 乙"],
+    }
+    assert blocked_prompt_message("甲和乙", config) == ""
+    assert blocked_prompt_message("甲和乙", None) == ""
+
+
+@pytest.mark.parametrize("multi_person", [False, True])
+def test_blocked_generation_returns_before_quota_and_submission(multi_person: bool) -> None:
     class Event:
         def __init__(self) -> None:
             self.messages: list[str] = []
@@ -99,7 +153,13 @@ def test_blocked_generation_returns_before_quota_and_submission() -> None:
     )
     event = Event()
 
-    result = asyncio.run(plugin._generate(event, "无优化 禁词B # 禁词A", multi_person=True))
+    result = asyncio.run(
+        plugin._generate(event, "无优化 禁词B # 禁词A", multi_person=multi_person)
+    )
 
-    assert result == "请求包含禁止的词语组合，已拒绝生成。"
+    assert result == (
+        "请求包含禁止的词语组合，已拒绝生成。\n"
+        "本次命中词语：「禁词A」、「禁词B」。\n"
+        "请修改后再试。"
+    )
     assert event.messages == [result]

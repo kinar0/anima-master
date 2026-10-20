@@ -5065,11 +5065,11 @@ def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
     assert "red shirt" not in result.final_prompt
     assert "blue jacket" in result.final_prompt
     assert "black skirt" in result.final_prompt
-    assert "oblivionis (bang dream!)" not in result.final_prompt
+    assert r"oblivionis \(bang dream!\)" in result.final_prompt
     assert result.summary["outfit_transfer"] is False
     assert result.summary["outfit_removed_tags"] == ["red_shirt"]
     assert result.summary["outfit_added_tags"] == ["pink_shirt"]
-    assert result.summary["outfit_source_anchor_emitted"] is False
+    assert result.summary["outfit_source_anchor_emitted"] is True
     assert "pink_shirt" in context.calls[1]["prompt"]
     assert "不得恢复明确删除或替换的衣物" in context.calls[1]["prompt"]
 
@@ -5097,7 +5097,7 @@ def test_user_outfit_override_replaces_cached_color_across_pipeline() -> None:
     assert "black pantyhose" in no_skirt.final_prompt
     assert "bottomless" not in no_skirt.final_prompt
     assert "without a skirt" in no_skirt.final_prompt
-    assert "oblivionis (bang dream!)" not in no_skirt.final_prompt
+    assert r"oblivionis \(bang dream!\)" in no_skirt.final_prompt
     assert no_skirt.summary["outfit_removed_tags"] == ["black_skirt"]
 
     removed_accessories_context = _Context()

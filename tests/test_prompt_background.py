@@ -53,8 +53,8 @@ def test_closeup_respects_explicit_visible_body_extent():
         assert "upper_body.primary" not in hidden
         assert "outerwear" not in hidden
     assert not framing_hidden_outfit_slots("full_body, close-up")
-    assert framing_hidden_outfit_slots("hand_focus, close-up") == framing_hidden_outfit_slots("hand_focus")
-    assert framing_hidden_outfit_slots("navel_focus, close-up") == framing_hidden_outfit_slots("navel_focus")
+    assert framing_hidden_outfit_slots("hand_focus, close-up")
+    assert framing_hidden_outfit_slots("navel_focus, close-up")
     assert "upper_body.primary" in framing_hidden_outfit_slots("face_focus, close-up")
 
 
@@ -187,7 +187,7 @@ def test_framing_reuses_general_visibility_taxonomy_for_outfit_slots() -> None:
             "legwear",
             "footwear",
         },
-        "face focus": {
+        "face focus, close-up": {
             "upper_body.primary",
             "lower_body.skirt",
             "one_piece.dress",
@@ -202,26 +202,35 @@ def test_framing_reuses_general_visibility_taxonomy_for_outfit_slots() -> None:
             "face_accessory.mask",
             "handwear",
         },
-        "feet focus": {
+        "feet focus, close-up": {
             "upper_body.primary",
             "outerwear",
             "headwear",
             "face_accessory.mask",
             "handwear",
         },
-        "hand focus": {
+        "hand focus, close-up": {
             "lower_body.skirt",
             "headwear",
             "face_accessory.mask",
             "legwear",
             "footwear",
         },
-        "thigh focus": {"upper_body.primary", "headwear", "footwear"},
-        "navel focus": {"headwear", "face_accessory.mask", "legwear", "footwear"},
+        "thigh focus, close-up": {"upper_body.primary", "headwear", "footwear"},
+        "navel focus, close-up": {"headwear", "face_accessory.mask", "legwear", "footwear"},
         "head out of frame": {"headwear", "hair_accessory", "face_accessory.mask"},
     }
     for framing, required_hidden in cases.items():
         assert required_hidden <= framing_hidden_outfit_slots(framing), framing
+
+
+def test_focal_subject_alone_does_not_prove_the_rest_of_the_body_is_out_of_frame():
+    for focus in ("foot focus", "hand_focus", "face focus", "navel focus", "leg focus",
+                  "thigh focus", "breast focus", "重点拍脚部", "手部聚焦"):
+        assert not framing_hidden_outfit_slots(focus), focus
+        assert not framing_hidden_outfit_slots(f"full body, {focus}, close-up"), focus
+    assert "upper_body.primary" in framing_hidden_outfit_slots("只拍脚部")
+    assert "footwear" in framing_hidden_outfit_slots("只画上半身，hand focus")
 
 
 def test_clothing_mutation_body_words_are_not_misread_as_camera_framing() -> None:

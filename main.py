@@ -44,7 +44,7 @@ try:
         build_import_plan, parse_existing_mappings, review_rows,
         select_general_tags, translate_with_astrbot, translation_review_rows, verify_with_astrbot,
     )
-    from .prompt_block_rules import matches_blocked_prompt
+    from .prompt_block_rules import blocked_prompt_message
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     from toolbox_library import ToolboxLibrary
     from vocabulary_review import VocabularyReview
@@ -73,7 +73,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
         build_import_plan, parse_existing_mappings, review_rows,
         select_general_tags, translate_with_astrbot, translation_review_rows, verify_with_astrbot,
     )
-    from prompt_block_rules import matches_blocked_prompt
+    from prompt_block_rules import blocked_prompt_message
 
 
 class ComfyUIAgentPlugin(Star):
@@ -526,8 +526,8 @@ class ComfyUIAgentPlugin(Star):
                 getattr(getattr(event, "message_obj", None), "message_id", ""),
             )
             return ""
-        if matches_blocked_prompt(prompt, self.config):
-            message = "请求包含禁止的词语组合，已拒绝生成。"
+        message = blocked_prompt_message(prompt, self.config)
+        if message:
             await event.send(event.plain_result(message))
             return message
         if (
