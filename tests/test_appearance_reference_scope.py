@@ -321,6 +321,104 @@ def test_source_only_mentions_do_not_become_required_people_but_independent_occu
     assert any(anchor.role == "target_character" and anchor.source_text == "角色乙" for anchor in anchors) == independently_visible
 
 
+@pytest.mark.parametrize("names,phrase,dimensions", [
+    (("爱音", "祥子"), "爱音祥子交换发色发型和瞳色", ("hair_color", "hair_style", "eye_color")),
+    (("角色甲", "角色乙"), "角色甲与角色乙互换角和肤色", ("horns", "skin_color")),
+    (("Alice", "Beatrice", "Celia"), "Alice, Beatrice and Celia rotate eye colours", ("eye_color",)),
+])
+def test_grounded_appearance_recipients_can_also_be_sources(names, phrase, dimensions):
+    rows = [semantic_character(name, changes=[dict(
+        dimension=dimension, operation="replace", source_text=phrase,
+        reference_character=names[(index + 1) % len(names)],
+    ) for dimension in dimensions]) for index, name in enumerate(names)]
+    raw = json.dumps(dict(characters=rows), ensure_ascii=False)
+    assert semantic_plan_validation_issues(raw, phrase) == ()
+    anchors = parse_semantic_plan(raw, phrase)
+    assert [anchor.source_text for anchor in anchors if anchor.role == "target_character"] == list(names)
+    plans = parse_semantic_character_plans(raw, phrase, anchors)
+    assert len(plans) == len(names)
+    assert all(plan.wardrobe.kind == "none" for plan in plans)
+    assert len(parse_semantic_appearance_changes(raw, phrase)) == len(names) * len(dimensions)
+
+
+def test_reference_with_own_grounded_edit_survives_without_a_reciprocal_copy():
+    prompt = "角色甲采用角色乙的瞳色，角色乙改成卷发"
+    rows = [semantic_character("角色甲", changes=[dict(
+        dimension="eye_color", operation="replace", source_text=prompt, reference_character="角色乙",
+    )]), semantic_character("角色乙", changes=[dict(
+        dimension="hair_style", operation="replace", source_text="角色乙改成卷发",
+    )])]
+    raw = json.dumps(dict(characters=rows), ensure_ascii=False)
+    assert semantic_plan_validation_issues(raw, prompt) == ()
+    assert len([a for a in parse_semantic_plan(raw, prompt) if a.role == "target_character"]) == 2
+
+
+@pytest.mark.parametrize("defect", ["no_edit", "ungrounded", "unknown_dimension", "unknown_operation"])
+def test_invalid_recipient_evidence_does_not_promote_a_reference_only_person(defect):
+    prompt = "角色甲采用角色乙的瞳色，白底"
+    change = dict(dimension="hair_style", operation="replace", source_text="角色乙改成卷发")
+    if defect == "unknown_dimension":
+        change.update(dimension="invented", source_text=prompt)
+    elif defect == "unknown_operation":
+        change.update(operation="invented", source_text=prompt)
+    rows = [semantic_character("角色甲", changes=[dict(
+        dimension="eye_color", operation="replace", source_text=prompt, reference_character="角色乙",
+    )]), semantic_character("角色乙", changes=[] if defect == "no_edit" else [change])]
+    raw = json.dumps(dict(characters=rows), ensure_ascii=False)
+    assert any("without an independent visible occurrence" in issue
+               for issue in semantic_plan_validation_issues(raw, prompt))
+    assert not any(a.role == "target_character" and a.source_text == "角色乙"
+                   for a in parse_semantic_plan(raw, prompt))
+
+
+@pytest.mark.parametrize("nai", [False, True])
+def test_exchange_reaches_writer_and_final_prompt_without_spurious_planner_repair(nai):
+    phrase = "角色甲角色乙交换发色发型和瞳色"
+    rows = [semantic_character(name, changes=[dict(
+        dimension=dimension, operation="replace", source_text=phrase, reference_character=source,
+    ) for dimension in ("hair_color", "hair_style", "eye_color")])
+            for name, source in (("角色甲", "角色乙"), ("角色乙", "角色甲"))]
+    if nai:
+        writer = json.dumps(dict(
+            composition_analysis=dict(viewpoint="front", layout="side by side", relations="exchange appearance"),
+            global_prompt="2girls, white_background, 两人并排展示交换后的外貌。",
+            characters=[dict(name=name, prompt=text, x=x, y=.5, position_reason="side by side", interaction_tags=[])
+                        for name, text, x in (
+                            ("character_a", "girl, character_a, blue_hair, yellow_eyes, two_side_up, 角色甲换成蓝发黄眼与两侧扎发。", .3),
+                            ("character_b", "girl, character_b, pink_hair, grey_eyes, straight_hair, 角色乙换成粉发灰眼与直发。", .7),
+                        )],
+        ), ensure_ascii=False)
+    else:
+        writer = ("{Count: 2girls}\n{Characters: character_a, character_b}\n{Copyright:}\n"
+                  "{Identity: character_a has blue hair, yellow eyes and two side up hair | "
+                  "character_b has pink hair, grey eyes and straight hair}\n"
+                  "{Details: character_a stands on the left | character_b stands on the right}\n"
+                  "{Tags: white background}\n{Nltags:}")
+    class ExchangeResolver(ReferenceResolver):
+        def cached_outfit_profiles_for_prompt(self, prompt):
+            cache = super().cached_outfit_profiles_for_prompt(prompt)
+            return replace(cache, confirmed_tags=("character_a", "character_b"),
+                           character_appearance_profiles=cache.character_appearance_profiles[:2],
+                           source_outfit_profiles=cache.source_outfit_profiles[:1])
+
+    result, calls = run(("-r " if nai else "") + phrase, dict(characters=rows), writer,
+                        resolver=ExchangeResolver(), config={"debug_prompt_enabled": True})
+    assert result.final_prompt and not result.summary.get("llm_failed"), result.summary
+    assert len(calls) == 2
+    assert result.summary["semantic_plan_attempt_count"] == 1
+    assert result.summary["prompt_llm_initial_content"] == writer
+    assert "角色甲 <= 角色乙" in calls[1]["prompt"]
+    assert "角色乙 <= 角色甲" in calls[1]["prompt"]
+    if nai:
+        first, second = result.summary["nai_characters"]
+        assert first["name"] == "character_a" and second["name"] == "character_b"
+        assert "blue_hair" in first["prompt"] and "yellow_eyes" in first["prompt"]
+        assert "pink_hair" in second["prompt"] and "grey_eyes" in second["prompt"]
+    else:
+        assert "character a" in result.final_prompt and "character b" in result.final_prompt
+        assert "blue hair" in result.final_prompt and "pink hair" in result.final_prompt
+
+
 @pytest.mark.parametrize("repair_succeeds", [True, False])
 def test_known_source_fact_missing_in_own_field_uses_only_existing_writer_repair(repair_succeeds):
     change = dict(dimension="hair_style", operation="replace", source_text="采用角色乙的发型", reference_character="角色乙")

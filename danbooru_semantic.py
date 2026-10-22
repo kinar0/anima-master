@@ -820,9 +820,18 @@ def _appearance_reference_only_names(characters: list[Any], user_prompt: str) ->
 
     This denies mandatory visibility, not a semantic decision about implied
     participants. Any independently quoted occurrence keeps the visible row.
+    A grounded appearance recipient is not source-only even when another
+    character cites the same complete request as its reference evidence.
     The original request still reaches the writer unchanged.
     """
     request = user_prompt.casefold()
+    recipients = frozenset(
+        change.character_name.casefold()
+        for change in parse_semantic_appearance_changes(
+            json.dumps({"characters": characters}, ensure_ascii=False), user_prompt
+        )
+        if change.dimensions and change.operation in {"replace", "additive", "omit"}
+    )
     spans: dict[str, list[tuple[int, int]]] = {}
     for item in characters:
         if not isinstance(item, dict) or not isinstance(item.get("appearance_changes"), list):
@@ -837,10 +846,13 @@ def _appearance_reference_only_names(characters: list[Any], user_prompt: str) ->
             spans.setdefault(reference, []).extend(
                 (match.start(), match.end()) for match in re.finditer(re.escape(phrase), request)
             )
-    return frozenset(name for name, ranges in spans.items() if ranges and all(
-        any(start <= match.start() and match.end() <= end for start, end in ranges)
-        for match in re.finditer(re.escape(name), request)
-    ))
+    return frozenset(
+        name for name, ranges in spans.items()
+        if name not in recipients and ranges and all(
+            any(start <= match.start() and match.end() <= end for start, end in ranges)
+            for match in re.finditer(re.escape(name), request)
+        )
+    )
 
 
 def _clothing_reference_only_names(characters: list[Any], user_prompt: str) -> frozenset[str]:

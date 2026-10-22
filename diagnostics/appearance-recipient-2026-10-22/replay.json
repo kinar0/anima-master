@@ -1,0 +1,106 @@
+{
+  "request": "爱音祥子交换发色发型和瞳色",
+  "model_raw_output": "{\"characters\":[{\"name\":\"爱音\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_color\",\"operation\":\"replace\",\"source_text\":\"爱音祥子交换发色发型和瞳色\",\"reference_character\":\"祥子\"},{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"爱音祥子交换发色发型和瞳色\",\"reference_character\":\"祥子\"},{\"dimension\":\"eye_color\",\"operation\":\"replace\",\"source_text\":\"爱音祥子交换发色发型和瞳色\",\"reference_character\":\"祥子\"}]},{\"name\":\"祥子\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[{\"dimension\":\"hair_color\",\"operation\":\"replace\",\"source_text\":\"爱音祥子交换发色发型和瞳色\",\"reference_character\":\"爱音\"},{\"dimension\":\"hair_style\",\"operation\":\"replace\",\"source_text\":\"爱音祥子交换发色发型和瞳色\",\"reference_character\":\"爱音\"},{\"dimension\":\"eye_color\",\"operation\":\"replace\",\"source_text\":\"爱音祥子交换发色发型和瞳色\",\"reference_character\":\"爱音\"}]}]}",
+  "validation_issues": [],
+  "anchors": [
+    {
+      "anchor_id": "target_1",
+      "role": "target_character",
+      "group": "character",
+      "source_text": "爱音",
+      "description": "爱音",
+      "candidates": [],
+      "profile_key": "",
+      "literal_name": "",
+      "source_category": null
+    },
+    {
+      "anchor_id": "target_2",
+      "role": "target_character",
+      "group": "character",
+      "source_text": "祥子",
+      "description": "祥子",
+      "candidates": [],
+      "profile_key": "",
+      "literal_name": "",
+      "source_category": null
+    }
+  ],
+  "plans": [
+    {
+      "target_anchor_id": "target_1",
+      "wardrobe": {
+        "kind": "none",
+        "anchor_id": ""
+      },
+      "directives": [],
+      "clothing_anchor_id": ""
+    },
+    {
+      "target_anchor_id": "target_2",
+      "wardrobe": {
+        "kind": "none",
+        "anchor_id": ""
+      },
+      "directives": [],
+      "clothing_anchor_id": ""
+    }
+  ],
+  "appearance_changes": [
+    {
+      "character_name": "爱音",
+      "source_text": "爱音祥子交换发色发型和瞳色",
+      "dimensions": [
+        "hair_color"
+      ],
+      "operation": "replace",
+      "reference_character": "祥子"
+    },
+    {
+      "character_name": "爱音",
+      "source_text": "爱音祥子交换发色发型和瞳色",
+      "dimensions": [
+        "hair_style"
+      ],
+      "operation": "replace",
+      "reference_character": "祥子"
+    },
+    {
+      "character_name": "爱音",
+      "source_text": "爱音祥子交换发色发型和瞳色",
+      "dimensions": [
+        "eye_color"
+      ],
+      "operation": "replace",
+      "reference_character": "祥子"
+    },
+    {
+      "character_name": "祥子",
+      "source_text": "爱音祥子交换发色发型和瞳色",
+      "dimensions": [
+        "hair_color"
+      ],
+      "operation": "replace",
+      "reference_character": "爱音"
+    },
+    {
+      "character_name": "祥子",
+      "source_text": "爱音祥子交换发色发型和瞳色",
+      "dimensions": [
+        "hair_style"
+      ],
+      "operation": "replace",
+      "reference_character": "爱音"
+    },
+    {
+      "character_name": "祥子",
+      "source_text": "爱音祥子交换发色发型和瞳色",
+      "dimensions": [
+        "eye_color"
+      ],
+      "operation": "replace",
+      "reference_character": "爱音"
+    }
+  ],
+  "verification_scope": "Replay of original LLM1 output only; no provider, ComfyUI or image generation calls"
+}
