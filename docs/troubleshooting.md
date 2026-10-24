@@ -1,5 +1,28 @@
 # 故障排查
 
+## DeepSeek 输出 token 远多于输入，关闭思考或输出上限未生效（2026-10-24）
+
+当前安装的 AstrBot 4.29.1 OpenAI 适配器接收调用 kwargs，却未将 `thinking`、
+`reasoning_effort` 和 `max_tokens` 合入请求体。插件任务摘要的 `deep_thinking=false`
+只代表本地意图，不能证明远端已关闭思考。DeepSeek 当前默认开启思考，推理计入输出；
+没有传入预算也不等于沿用插件设置的上限。控制台比较还应将命中缓存与未命中缓存的输入相加。
+
+插件现由 `llm_request.py` 在统一 LLM 入口为每次 OpenAI 兼容请求建立独立的 provider
+配置副本，通过主机实际会序列化的 `custom_extra_body` 传递该阶段开关与预算。
+调用级参数优先，明确关闭思考时同时移除继承的 effort，避免 provider 默认值重新启用思考。
+共享 provider 配置和其他并发请求不改；非 OpenAI adapter 沿用原 SDK 调用。
+仅改调用时的 `extra_body` 不能修复当前主机，因为它也会丢弃这一 kwargs。
+
+修复保留 LLM1、普通/NAI LLM2 及修复各自的预算，关键词开启深度思考仍有效；
+提示词内容、两阶段、角色/衣柜/外貌权限、raw/# 和提交/下载/交付边界保持。
+预算现在真正生效，若出现 `finish_reason=length`，需按具体阶段与模型原始回复诊断，
+不能为掩盖截断而重新去掉上限。`debug_llm_usage_enabled` 可记录阶段、尝试及真实 usage，
+无需开启推理正文日志；reasoning 是 output 的子集，不重复相加。
+
+须重载插件后用于新请求。离线真实主机/SDK 请求体回归包含思考开关、各阶段预算、
+NAI 两次调用、并发隔离及取消，不调用收费模型或生图；历史账单占比未验证。
+证据与修复记录见 [token 审计](../diagnostics/deepseek-token-audit-2026-10-24/README.md)。
+
 ## 交换外貌的双方被要求从角色名单移除（2026-10-22）
 
 21:27:58 的“爱音祥子交换发色发型和瞳色”中，LLM1 初稿正确列出了两人和各自三个 `replace` 修改，但宿主随后将双方都判成 `occurs only inside another person's appearance reference`。旧检查把完整 `source_text` 当作来源专属范围；双方引用同一句交换原文时，名字都被覆盖。该检查还用于内部解析，即使修复失败也可能丢掉可见角色。

@@ -1,4 +1,4 @@
-"""Opt-in observation of existing LLM responses, without changing requests."""
+"""Opt-in response observation around request-local LLM control delivery."""
 
 from __future__ import annotations
 
@@ -8,6 +8,11 @@ from contextvars import ContextVar
 from time import perf_counter
 from typing import Any
 from uuid import uuid4
+
+try:
+    from .llm_request import generate_with_request_controls
+except ImportError:  # Direct helper/test imports.
+    from llm_request import generate_with_request_controls
 
 
 def _field(value: Any, name: str) -> Any:
@@ -85,7 +90,7 @@ class LLMDiagnostics:
         reasoning_enabled = self._bool("debug_llm_reasoning_enabled", False)
         usage_enabled = self._bool("debug_llm_usage_enabled", False)
         if not reasoning_enabled and not usage_enabled:
-            return await context.llm_generate(**kwargs)
+            return await generate_with_request_controls(context, **kwargs)
 
         call_id = uuid4().hex
         metadata = {
@@ -100,7 +105,7 @@ class LLMDiagnostics:
         }
         started = perf_counter()
         try:
-            response = await context.llm_generate(**kwargs)
+            response = await generate_with_request_controls(context, **kwargs)
         except BaseException as exc:
             # Preserve errors and cancellation exactly; avoid logging exception
             # messages, which can contain provider request bodies or credentials.

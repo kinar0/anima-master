@@ -1,0 +1,475 @@
+{
+  "network": "MockTransport only; no API calls or real credentials",
+  "config": {
+    "prompt_builder_provider_id": "deepseek/deepseek-v4-flash",
+    "prompt_builder_max_tokens": 5000,
+    "prompt_builder_deep_thinking_enabled": true,
+    "prompt_builder_reasoning_effort": "high",
+    "debug_llm_usage_enabled": false,
+    "debug_llm_reasoning_enabled": false
+  },
+  "wire_capture": {
+    "per_call_disabled": {
+      "requested": {
+        "max_tokens": 900,
+        "thinking": {
+          "type": "disabled"
+        }
+      },
+      "provider_custom_extra_body": {},
+      "wire_body": {
+        "model": "deepseek-v4-flash",
+        "stream": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": "offline system"
+          },
+          {
+            "role": "user",
+            "content": "offline request"
+          }
+        ]
+      }
+    },
+    "per_call_enabled": {
+      "requested": {
+        "max_tokens": 5000,
+        "thinking": {
+          "type": "enabled"
+        },
+        "reasoning_effort": "high"
+      },
+      "provider_custom_extra_body": {},
+      "wire_body": {
+        "model": "deepseek-v4-flash",
+        "stream": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": "offline system"
+          },
+          {
+            "role": "user",
+            "content": "offline request"
+          }
+        ]
+      }
+    },
+    "per_call_extra_body": {
+      "requested": {
+        "extra_body": {
+          "max_tokens": 900,
+          "thinking": {
+            "type": "disabled"
+          }
+        }
+      },
+      "provider_custom_extra_body": {},
+      "wire_body": {
+        "model": "deepseek-v4-flash",
+        "stream": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": "offline system"
+          },
+          {
+            "role": "user",
+            "content": "offline request"
+          }
+        ]
+      }
+    },
+    "provider_custom_body_control": {
+      "requested": {},
+      "provider_custom_extra_body": {
+        "max_tokens": 900,
+        "thinking": {
+          "type": "disabled"
+        }
+      },
+      "wire_body": {
+        "model": "deepseek-v4-flash",
+        "stream": false,
+        "messages": [
+          {
+            "role": "system",
+            "content": "offline system"
+          },
+          {
+            "role": "user",
+            "content": "offline request"
+          }
+        ],
+        "max_tokens": 900,
+        "thinking": {
+          "type": "disabled"
+        }
+      }
+    }
+  },
+  "task_statistics": {
+    "daily": {
+      "2026-10-18": {
+        "tasks": 71,
+        "successful": 68,
+        "nai_r_tasks": 52,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 79,
+        "semantic_plan_attempt_count_recorded_tasks": 71,
+        "semantic_plan_attempt_count_retried_tasks": 8,
+        "prompt_llm_attempt_count_total": 73,
+        "prompt_llm_attempt_count_recorded_tasks": 71,
+        "prompt_llm_attempt_count_retried_tasks": 2,
+        "nai_character_plan_attempt_count_total": 54,
+        "nai_character_plan_attempt_count_recorded_tasks": 52,
+        "nai_character_plan_attempt_count_retried_tasks": 2
+      },
+      "2026-10-19": {
+        "tasks": 152,
+        "successful": 141,
+        "nai_r_tasks": 101,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 151,
+        "semantic_plan_attempt_count_recorded_tasks": 147,
+        "semantic_plan_attempt_count_retried_tasks": 4,
+        "prompt_llm_attempt_count_total": 153,
+        "prompt_llm_attempt_count_recorded_tasks": 147,
+        "prompt_llm_attempt_count_retried_tasks": 6,
+        "nai_character_plan_attempt_count_total": 107,
+        "nai_character_plan_attempt_count_recorded_tasks": 101,
+        "nai_character_plan_attempt_count_retried_tasks": 6
+      },
+      "2026-10-20": {
+        "tasks": 187,
+        "successful": 183,
+        "nai_r_tasks": 113,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 177,
+        "semantic_plan_attempt_count_recorded_tasks": 174,
+        "semantic_plan_attempt_count_retried_tasks": 3,
+        "prompt_llm_attempt_count_total": 180,
+        "prompt_llm_attempt_count_recorded_tasks": 174,
+        "prompt_llm_attempt_count_retried_tasks": 6,
+        "nai_character_plan_attempt_count_total": 117,
+        "nai_character_plan_attempt_count_recorded_tasks": 112,
+        "nai_character_plan_attempt_count_retried_tasks": 5
+      },
+      "2026-10-21": {
+        "tasks": 180,
+        "successful": 178,
+        "nai_r_tasks": 123,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 192,
+        "semantic_plan_attempt_count_recorded_tasks": 179,
+        "semantic_plan_attempt_count_retried_tasks": 13,
+        "prompt_llm_attempt_count_total": 185,
+        "prompt_llm_attempt_count_recorded_tasks": 179,
+        "prompt_llm_attempt_count_retried_tasks": 6,
+        "nai_character_plan_attempt_count_total": 128,
+        "nai_character_plan_attempt_count_recorded_tasks": 123,
+        "nai_character_plan_attempt_count_retried_tasks": 5
+      },
+      "2026-10-22": {
+        "tasks": 312,
+        "successful": 303,
+        "nai_r_tasks": 291,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 346,
+        "semantic_plan_attempt_count_recorded_tasks": 312,
+        "semantic_plan_attempt_count_retried_tasks": 34,
+        "prompt_llm_attempt_count_total": 324,
+        "prompt_llm_attempt_count_recorded_tasks": 312,
+        "prompt_llm_attempt_count_retried_tasks": 12,
+        "nai_character_plan_attempt_count_total": 302,
+        "nai_character_plan_attempt_count_recorded_tasks": 291,
+        "nai_character_plan_attempt_count_retried_tasks": 11
+      },
+      "2026-10-23": {
+        "tasks": 75,
+        "successful": 72,
+        "nai_r_tasks": 56,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 87,
+        "semantic_plan_attempt_count_recorded_tasks": 75,
+        "semantic_plan_attempt_count_retried_tasks": 12,
+        "prompt_llm_attempt_count_total": 75,
+        "prompt_llm_attempt_count_recorded_tasks": 74,
+        "prompt_llm_attempt_count_retried_tasks": 1,
+        "nai_character_plan_attempt_count_total": 57,
+        "nai_character_plan_attempt_count_recorded_tasks": 56,
+        "nai_character_plan_attempt_count_retried_tasks": 1
+      },
+      "2026-10-24": {
+        "tasks": 107,
+        "successful": 101,
+        "nai_r_tasks": 86,
+        "deep_thinking_requested": 0,
+        "semantic_plan_attempt_count_total": 113,
+        "semantic_plan_attempt_count_recorded_tasks": 107,
+        "semantic_plan_attempt_count_retried_tasks": 8,
+        "prompt_llm_attempt_count_total": 107,
+        "prompt_llm_attempt_count_recorded_tasks": 107,
+        "prompt_llm_attempt_count_retried_tasks": 0,
+        "nai_character_plan_attempt_count_total": 86,
+        "nai_character_plan_attempt_count_recorded_tasks": 86,
+        "nai_character_plan_attempt_count_retried_tasks": 0
+      }
+    },
+    "text_chars_not_tokens": {
+      "2026-10-18/llm_prompt": {
+        "samples": 68,
+        "mean": 17028,
+        "min": 3784,
+        "max": 25913
+      },
+      "2026-10-18/nai_character_plan_initial_raw": {
+        "samples": 52,
+        "mean": 2574,
+        "min": 1003,
+        "max": 5411
+      },
+      "2026-10-18/nai_character_plan_prompt": {
+        "samples": 52,
+        "mean": 21885,
+        "min": 17174,
+        "max": 25913
+      },
+      "2026-10-18/prompt_llm_initial_content": {
+        "samples": 68,
+        "mean": 2293,
+        "min": 908,
+        "max": 5411
+      },
+      "2026-10-18/semantic_plan_initial_raw": {
+        "samples": 71,
+        "mean": 281,
+        "min": 130,
+        "max": 590
+      },
+      "2026-10-18/semantic_plan_raw": {
+        "samples": 71,
+        "mean": 272,
+        "min": 130,
+        "max": 590
+      },
+      "2026-10-19/llm_prompt": {
+        "samples": 137,
+        "mean": 16126,
+        "min": 3583,
+        "max": 26575
+      },
+      "2026-10-19/nai_character_plan_initial_raw": {
+        "samples": 101,
+        "mean": 2041,
+        "min": 1303,
+        "max": 3948
+      },
+      "2026-10-19/nai_character_plan_prompt": {
+        "samples": 101,
+        "mean": 21571,
+        "min": 19545,
+        "max": 26575
+      },
+      "2026-10-19/prompt_llm_initial_content": {
+        "samples": 137,
+        "mean": 1734,
+        "min": 438,
+        "max": 3948
+      },
+      "2026-10-19/semantic_plan_initial_raw": {
+        "samples": 147,
+        "mean": 234,
+        "min": 17,
+        "max": 485
+      },
+      "2026-10-19/semantic_plan_raw": {
+        "samples": 147,
+        "mean": 233,
+        "min": 17,
+        "max": 485
+      },
+      "2026-10-20/llm_prompt": {
+        "samples": 173,
+        "mean": 17327,
+        "min": 6325,
+        "max": 27519
+      },
+      "2026-10-20/nai_character_plan_initial_raw": {
+        "samples": 112,
+        "mean": 1854,
+        "min": 819,
+        "max": 3454
+      },
+      "2026-10-20/nai_character_plan_prompt": {
+        "samples": 112,
+        "mean": 22895,
+        "min": 19776,
+        "max": 27519
+      },
+      "2026-10-20/prompt_llm_initial_content": {
+        "samples": 173,
+        "mean": 1579,
+        "min": 544,
+        "max": 3454
+      },
+      "2026-10-20/semantic_plan_initial_raw": {
+        "samples": 174,
+        "mean": 258,
+        "min": 17,
+        "max": 550
+      },
+      "2026-10-20/semantic_plan_raw": {
+        "samples": 174,
+        "mean": 258,
+        "min": 17,
+        "max": 543
+      },
+      "2026-10-21/llm_prompt": {
+        "samples": 178,
+        "mean": 18062,
+        "min": 6677,
+        "max": 28857
+      },
+      "2026-10-21/nai_character_plan_initial_raw": {
+        "samples": 123,
+        "mean": 1913,
+        "min": 760,
+        "max": 4188
+      },
+      "2026-10-21/nai_character_plan_prompt": {
+        "samples": 123,
+        "mean": 22967,
+        "min": 21527,
+        "max": 28857
+      },
+      "2026-10-21/prompt_llm_initial_content": {
+        "samples": 178,
+        "mean": 1652,
+        "min": 585,
+        "max": 4188
+      },
+      "2026-10-21/semantic_plan_initial_raw": {
+        "samples": 179,
+        "mean": 239,
+        "min": 17,
+        "max": 526
+      },
+      "2026-10-21/semantic_plan_raw": {
+        "samples": 179,
+        "mean": 239,
+        "min": 17,
+        "max": 526
+      },
+      "2026-10-22/llm_prompt": {
+        "samples": 304,
+        "mean": 21965,
+        "min": 6309,
+        "max": 27758
+      },
+      "2026-10-22/nai_character_plan_initial_raw": {
+        "samples": 291,
+        "mean": 2042,
+        "min": 143,
+        "max": 6965
+      },
+      "2026-10-22/nai_character_plan_prompt": {
+        "samples": 290,
+        "mean": 23067,
+        "min": 19268,
+        "max": 27758
+      },
+      "2026-10-22/prompt_llm_initial_content": {
+        "samples": 304,
+        "mean": 1965,
+        "min": 492,
+        "max": 6965
+      },
+      "2026-10-22/semantic_plan_initial_raw": {
+        "samples": 312,
+        "mean": 302,
+        "min": 17,
+        "max": 891
+      },
+      "2026-10-22/semantic_plan_raw": {
+        "samples": 312,
+        "mean": 298,
+        "min": 17,
+        "max": 891
+      },
+      "2026-10-23/llm_prompt": {
+        "samples": 72,
+        "mean": 19588,
+        "min": 7099,
+        "max": 28070
+      },
+      "2026-10-23/nai_character_plan_initial_raw": {
+        "samples": 56,
+        "mean": 2633,
+        "min": 165,
+        "max": 8700
+      },
+      "2026-10-23/nai_character_plan_prompt": {
+        "samples": 54,
+        "mean": 23562,
+        "min": 22121,
+        "max": 28070
+      },
+      "2026-10-23/prompt_llm_initial_content": {
+        "samples": 72,
+        "mean": 2376,
+        "min": 593,
+        "max": 8700
+      },
+      "2026-10-23/semantic_plan_initial_raw": {
+        "samples": 74,
+        "mean": 381,
+        "min": 130,
+        "max": 974
+      },
+      "2026-10-23/semantic_plan_raw": {
+        "samples": 74,
+        "mean": 380,
+        "min": 130,
+        "max": 974
+      },
+      "2026-10-24/llm_prompt": {
+        "samples": 102,
+        "mean": 20257,
+        "min": 6305,
+        "max": 28502
+      },
+      "2026-10-24/nai_character_plan_initial_raw": {
+        "samples": 84,
+        "mean": 2138,
+        "min": 97,
+        "max": 5075
+      },
+      "2026-10-24/nai_character_plan_prompt": {
+        "samples": 83,
+        "mean": 23661,
+        "min": 21422,
+        "max": 28502
+      },
+      "2026-10-24/prompt_llm_initial_content": {
+        "samples": 102,
+        "mean": 1970,
+        "min": 394,
+        "max": 5075
+      },
+      "2026-10-24/semantic_plan_initial_raw": {
+        "samples": 105,
+        "mean": 304,
+        "min": 17,
+        "max": 1008
+      },
+      "2026-10-24/semantic_plan_raw": {
+        "samples": 105,
+        "mean": 299,
+        "min": 17,
+        "max": 1008
+      }
+    }
+  }
+}
