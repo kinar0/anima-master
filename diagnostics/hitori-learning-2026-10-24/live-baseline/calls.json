@@ -1,0 +1,30 @@
+[
+  {
+    "label": "historical/single/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "error_type": "APIConnectionError",
+    "parsed_candidates": []
+  },
+  {
+    "label": "historical/double/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "error_type": "APIConnectionError",
+    "parsed_candidates": []
+  }
+]

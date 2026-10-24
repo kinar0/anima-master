@@ -1,0 +1,22 @@
+{
+  "queries": [
+    {
+      "keyword": "gotoh_hitori",
+      "id": "canonical",
+      "group": "character",
+      "limit": 5
+    },
+    {
+      "keyword": "bocchi_(bocchi_the_rock!)",
+      "id": "official_alias",
+      "group": "character",
+      "limit": 5
+    },
+    {
+      "keyword": "gotoh_hitori_(bocchi_the_rock!)",
+      "id": "invented_suffix",
+      "group": "character",
+      "limit": 5
+    }
+  ]
+}

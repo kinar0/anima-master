@@ -1,0 +1,127 @@
+[
+  {
+    "label": "current/single/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\"]}",
+    "usage_available": true,
+    "input_tokens": 341,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 213,
+    "output_tokens": 32,
+    "reasoning_tokens": null,
+    "total_tokens": 373,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "gotoh_hitori"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/double/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\"]}",
+    "usage_available": true,
+    "input_tokens": 354,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 226,
+    "output_tokens": 32,
+    "reasoning_tokens": null,
+    "total_tokens": 386,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "gotoh_hitori"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/single/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\",\"hitori_gotoh\"]}",
+    "usage_available": true,
+    "input_tokens": 341,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 213,
+    "output_tokens": 38,
+    "reasoning_tokens": null,
+    "total_tokens": 379,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori",
+      "hitori_gotoh"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "gotoh_hitori"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/double/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\"]}",
+    "usage_available": true,
+    "input_tokens": 354,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 226,
+    "output_tokens": 32,
+    "reasoning_tokens": null,
+    "total_tokens": 386,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "gotoh_hitori"
+      ]
+    ],
+    "local_missing": []
+  }
+]

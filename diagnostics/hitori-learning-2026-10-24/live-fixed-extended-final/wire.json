@@ -1,0 +1,212 @@
+[
+  {
+    "at": "2026-10-24T13:32:23.645747+00:00",
+    "label": "current/reversed/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 后藤独和千早爱音并排站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:24.841868+00:00",
+    "label": "current/other_double/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 绫波丽\nKnown work/copyright scope hints: none\nUser request: 初音未来和绫波丽并排站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:25.813378+00:00",
+    "label": "current/variant/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 重音Teto（kasane teto (sv)）\nKnown work/copyright scope hints: none\nUser request: 重音Teto（kasane teto (sv)）和初音未来站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:27.067415+00:00",
+    "label": "current/punctuation/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 小夜骑士（S:P Little Knight）\nKnown work/copyright scope hints: none\nUser request: 小夜骑士（S:P Little Knight）和初音未来站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:28.399877+00:00",
+    "label": "current/unnamed/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: not separately specified\nKnown work/copyright scope hints: none\nUser request: 一位没有名字的原创人物站在白色背景前\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:29.259842+00:00",
+    "label": "current/reversed/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 后藤独和千早爱音并排站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:30.559914+00:00",
+    "label": "current/other_double/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 绫波丽\nKnown work/copyright scope hints: none\nUser request: 初音未来和绫波丽并排站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:31.914971+00:00",
+    "label": "current/variant/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 重音Teto（kasane teto (sv)）\nKnown work/copyright scope hints: none\nUser request: 重音Teto（kasane teto (sv)）和初音未来站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:33.254399+00:00",
+    "label": "current/punctuation/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 小夜骑士（S:P Little Knight）\nKnown work/copyright scope hints: none\nUser request: 小夜骑士（S:P Little Knight）和初音未来站在一起\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  },
+  {
+    "at": "2026-10-24T13:32:34.175931+00:00",
+    "label": "current/unnamed/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: not separately specified\nKnown work/copyright scope hints: none\nUser request: 一位没有名字的原创人物站在白色背景前\nInitial character tags to cross-check: "
+        }
+      ],
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    }
+  }
+]

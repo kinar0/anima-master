@@ -1,0 +1,324 @@
+[
+  {
+    "case": "double",
+    "task_id": "89a2f68d9dd142eb829c671f754d3157",
+    "removed_profiles": [
+      "后藤独"
+    ],
+    "before_bindings": [
+      [
+        "target_1",
+        "chihaya_anon"
+      ]
+    ],
+    "after_bindings": [
+      [
+        "target_1",
+        "chihaya_anon"
+      ],
+      [
+        "target_2",
+        "gotoh_hitori"
+      ]
+    ],
+    "candidate_attempts": [
+      {
+        "target_name": "后藤独",
+        "status": "candidates_ready",
+        "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+        "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\"]}",
+        "source_name": "后藤独",
+        "candidates": [
+          "gotoh_hitori"
+        ],
+        "rejected_candidates": []
+      }
+    ],
+    "learned_profiles": [
+      [
+        "后藤独",
+        {
+          "kind": "character_outfit",
+          "qualifier": "default",
+          "aliases": [
+            "后藤独",
+            "gotoh_hitori"
+          ],
+          "source_tags": [
+            "gotoh_hitori"
+          ],
+          "copyright_tags": [],
+          "outfit_tags": [
+            "pink_jacket",
+            "track_jacket",
+            "black_skirt",
+            "long_sleeves",
+            "black_socks",
+            "brown_shoes"
+          ],
+          "evidence": {
+            "sample_mode": "single_character",
+            "total_posts": 100,
+            "selected_posts": 43,
+            "focused_posts": 24,
+            "anchor_tag": "pink_jacket",
+            "tag_counts": {
+              "pink_jacket": 24,
+              "track_jacket": 14,
+              "black_skirt": 8,
+              "long_sleeves": 8,
+              "black_socks": 4,
+              "brown_shoes": 2
+            },
+            "sample_ids": [
+              "md5:6db3517699bf78813af0112c0d4e360e",
+              "md5:756b1bcd90d50777ba7b24858befd0cc",
+              "md5:d6f74454f8f6ac66eb798163134096e1",
+              "md5:ad4057ec47673b0542e5dfc3b562adec",
+              "md5:f64aa4bf5110d0c99dd3efd68a79bc42",
+              "md5:52ed925baa78e7177485fc0c60c98eb4",
+              "md5:3d0885ee3bf666e68f3a4e5e64539152",
+              "md5:3d4c1e082fde761004c26ccc1be84c28",
+              "md5:6e657e8336ef7ff26efe8bb7718bb106",
+              "md5:af711a35dda5faa92c08191ce91b6a13",
+              "md5:d8f54ffd6cf2d6e5f34acb22b3eea794",
+              "md5:ef4cead4922b15598a69594cab09d757",
+              "md5:e367960c246f30d678d7c93749dd46c9",
+              "md5:b6ca7eedbef7191032c611ccae6a3e2a",
+              "md5:f5b867c0080b30e24ab4816211f490d0",
+              "md5:948dbe51b1a2741e2f81d4ffe66dc08d",
+              "md5:dcaec554e377ada9d192f2b695484989",
+              "md5:eee65ad64e04178a7fd521955ddf4de2",
+              "md5:215fd2330072f2d953e67bc1f1771203",
+              "md5:4972cad98864411099fba8483b5497b4",
+              "md5:939ae077580c7d074de1c1a1495ddce6",
+              "md5:c6b6951d02b2a203660ba65b821f411a",
+              "md5:ccb8b36f72722e3f17ccd7d11073a6e7",
+              "md5:2a907a312e96e092f701bab3cabb2e7e",
+              "md5:b056c2cd7b0380e8a27a6dd877df3881",
+              "md5:4f4da8a6e56e679e07e1a0b2adc73287",
+              "md5:7873c30416f7847bf94b1101a4f5765b",
+              "md5:e26469a6460abfe759219a334bbf8230",
+              "md5:d2d46e8ae76ee524c8895c1976759405",
+              "md5:8eb44e0082ac8c189d7636d061e47308",
+              "md5:1efcaa77492697d3c85157f78a91c375",
+              "md5:b5dec4f176914a49f0d03e536684240c",
+              "md5:59b3f8c0be06e2f9b26aeb63e6b253cd",
+              "md5:d60ac1c1020b596a94d3a820f74569c8",
+              "md5:00f2fb8ed950cbc6d2d53cd395cd3269",
+              "md5:66c9e3a7aaec59bb6195a09b6a2e3fb4",
+              "md5:fd8d4b033cc5270764d04bca6fad5cbe",
+              "md5:ce54a0b5441e866da986bc77a94d596b",
+              "md5:3afc9992d88588cc9f6ec6bea2403483",
+              "md5:51e7abeff4575fd22dd94267f8f8b7b4",
+              "md5:5edeb2eb3046266fba063708ca9d8e39",
+              "md5:a22b2bb110acc72c4c256becf07f0391",
+              "md5:c921febdb562ac59d6f2dac85bb0770d"
+            ],
+            "queries": [
+              "gotoh_hitori"
+            ],
+            "rejected_posts": 57,
+            "request_errors": [],
+            "appearance_tags": [
+              "pink_hair",
+              "long_hair",
+              "blue_eyes"
+            ],
+            "algorithm_version": 4,
+            "created_at": 1792848630.3902621,
+            "updated_at": 1792848630.3902621
+          }
+        }
+      ]
+    ],
+    "character_profiles": [
+      [
+        "target_1",
+        "chihaya_anon",
+        [
+          "haneoka_school_uniform",
+          "grey_jacket",
+          "white_shirt",
+          "collared_shirt",
+          "winter_uniform",
+          "green_skirt",
+          "plaid_skirt",
+          "pleated_skirt",
+          "long_sleeves",
+          "green_necktie",
+          "striped_necktie",
+          "diagonal-striped_necktie",
+          "black_socks"
+        ],
+        [
+          "long_hair",
+          "pink_hair",
+          "grey_eyes",
+          "(flat_chest:1.4)"
+        ]
+      ],
+      [
+        "target_2",
+        "gotoh_hitori",
+        [
+          "pink_jacket",
+          "track_jacket",
+          "black_skirt",
+          "long_sleeves",
+          "black_socks",
+          "brown_shoes"
+        ],
+        [
+          "pink_hair",
+          "long_hair",
+          "blue_eyes"
+        ]
+      ]
+    ]
+  },
+  {
+    "case": "single",
+    "task_id": "d7c81ee4cbc04d4d9ee6f18ca7df2f61",
+    "removed_profiles": [
+      "后藤独"
+    ],
+    "before_bindings": [],
+    "after_bindings": [
+      [
+        "target_1",
+        "gotoh_hitori"
+      ]
+    ],
+    "candidate_attempts": [
+      {
+        "target_name": "后藤独",
+        "status": "candidates_ready",
+        "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+        "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\"]}",
+        "source_name": "后藤独",
+        "candidates": [
+          "gotoh_hitori"
+        ],
+        "rejected_candidates": []
+      }
+    ],
+    "learned_profiles": [
+      [
+        "后藤独",
+        {
+          "kind": "character_outfit",
+          "qualifier": "default",
+          "aliases": [
+            "后藤独",
+            "gotoh_hitori"
+          ],
+          "source_tags": [
+            "gotoh_hitori"
+          ],
+          "copyright_tags": [],
+          "outfit_tags": [
+            "pink_jacket",
+            "track_jacket",
+            "black_skirt",
+            "long_sleeves",
+            "black_socks",
+            "brown_shoes"
+          ],
+          "evidence": {
+            "sample_mode": "single_character",
+            "total_posts": 100,
+            "selected_posts": 43,
+            "focused_posts": 24,
+            "anchor_tag": "pink_jacket",
+            "tag_counts": {
+              "pink_jacket": 24,
+              "track_jacket": 14,
+              "black_skirt": 8,
+              "long_sleeves": 8,
+              "black_socks": 4,
+              "brown_shoes": 2
+            },
+            "sample_ids": [
+              "md5:6db3517699bf78813af0112c0d4e360e",
+              "md5:756b1bcd90d50777ba7b24858befd0cc",
+              "md5:d6f74454f8f6ac66eb798163134096e1",
+              "md5:ad4057ec47673b0542e5dfc3b562adec",
+              "md5:f64aa4bf5110d0c99dd3efd68a79bc42",
+              "md5:52ed925baa78e7177485fc0c60c98eb4",
+              "md5:3d0885ee3bf666e68f3a4e5e64539152",
+              "md5:3d4c1e082fde761004c26ccc1be84c28",
+              "md5:6e657e8336ef7ff26efe8bb7718bb106",
+              "md5:af711a35dda5faa92c08191ce91b6a13",
+              "md5:d8f54ffd6cf2d6e5f34acb22b3eea794",
+              "md5:ef4cead4922b15598a69594cab09d757",
+              "md5:e367960c246f30d678d7c93749dd46c9",
+              "md5:b6ca7eedbef7191032c611ccae6a3e2a",
+              "md5:f5b867c0080b30e24ab4816211f490d0",
+              "md5:948dbe51b1a2741e2f81d4ffe66dc08d",
+              "md5:dcaec554e377ada9d192f2b695484989",
+              "md5:eee65ad64e04178a7fd521955ddf4de2",
+              "md5:215fd2330072f2d953e67bc1f1771203",
+              "md5:4972cad98864411099fba8483b5497b4",
+              "md5:939ae077580c7d074de1c1a1495ddce6",
+              "md5:c6b6951d02b2a203660ba65b821f411a",
+              "md5:ccb8b36f72722e3f17ccd7d11073a6e7",
+              "md5:2a907a312e96e092f701bab3cabb2e7e",
+              "md5:b056c2cd7b0380e8a27a6dd877df3881",
+              "md5:4f4da8a6e56e679e07e1a0b2adc73287",
+              "md5:7873c30416f7847bf94b1101a4f5765b",
+              "md5:e26469a6460abfe759219a334bbf8230",
+              "md5:d2d46e8ae76ee524c8895c1976759405",
+              "md5:8eb44e0082ac8c189d7636d061e47308",
+              "md5:1efcaa77492697d3c85157f78a91c375",
+              "md5:b5dec4f176914a49f0d03e536684240c",
+              "md5:59b3f8c0be06e2f9b26aeb63e6b253cd",
+              "md5:d60ac1c1020b596a94d3a820f74569c8",
+              "md5:00f2fb8ed950cbc6d2d53cd395cd3269",
+              "md5:66c9e3a7aaec59bb6195a09b6a2e3fb4",
+              "md5:fd8d4b033cc5270764d04bca6fad5cbe",
+              "md5:ce54a0b5441e866da986bc77a94d596b",
+              "md5:3afc9992d88588cc9f6ec6bea2403483",
+              "md5:51e7abeff4575fd22dd94267f8f8b7b4",
+              "md5:5edeb2eb3046266fba063708ca9d8e39",
+              "md5:a22b2bb110acc72c4c256becf07f0391",
+              "md5:c921febdb562ac59d6f2dac85bb0770d"
+            ],
+            "queries": [
+              "gotoh_hitori"
+            ],
+            "rejected_posts": 57,
+            "request_errors": [],
+            "appearance_tags": [
+              "pink_hair",
+              "long_hair",
+              "blue_eyes"
+            ],
+            "algorithm_version": 4,
+            "created_at": 1792848633.5872607,
+            "updated_at": 1792848633.5872607
+          }
+        }
+      ]
+    ],
+    "character_profiles": [
+      [
+        "target_1",
+        "gotoh_hitori",
+        [
+          "pink_jacket",
+          "track_jacket",
+          "black_skirt",
+          "long_sleeves",
+          "black_socks",
+          "brown_shoes"
+        ],
+        [
+          "pink_hair",
+          "long_hair",
+          "blue_eyes"
+        ]
+      ]
+    ]
+  }
+]

@@ -1,0 +1,151 @@
+[
+  {
+    "label": "current/single/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"Bocchi the Rock!\",\"tag_candidates\":[\"gotoh_hitori\",\"hitori_gotoh\",\"gotou_hitori\",\"hitori_gotou\",\"gotoh_hitori_(bocchi_the_rock!)\"]}",
+    "usage_available": true,
+    "input_tokens": 220,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 220,
+    "output_tokens": 58,
+    "reasoning_tokens": null,
+    "total_tokens": 278,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori",
+      "hitori_gotoh",
+      "gotou_hitori",
+      "hitori_gotou"
+    ]
+  },
+  {
+    "label": "current/double/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"Bocchi the Rock!\",\"tag_candidates\":[\"gotoh_hitori_(bocchi_the_rock!)\"]}",
+    "usage_available": true,
+    "input_tokens": 233,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 233,
+    "output_tokens": 36,
+    "reasoning_tokens": null,
+    "total_tokens": 269,
+    "finish_reason": "stop",
+    "parsed_candidates": []
+  },
+  {
+    "label": "current/single/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"Bocchi the Rock!\",\"tag_candidates\":[\"gotoh_hitori\",\"hitori_gotoh\",\"gotou_hitori\",\"hitori_gotou\",\"gotoh_hitori_(bocchi_the_rock!)\",\"gotou_hitori_(bocchi_the_rock!)\"]}",
+    "usage_available": true,
+    "input_tokens": 220,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 220,
+    "output_tokens": 71,
+    "reasoning_tokens": null,
+    "total_tokens": 291,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori",
+      "hitori_gotoh",
+      "gotou_hitori",
+      "hitori_gotou"
+    ]
+  },
+  {
+    "label": "current/double/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"Bocchi the Rock!\",\"tag_candidates\":[\"gotoh_hitori\",\"gotoh_hitori_(bocchi_the_rock!)\"]}",
+    "usage_available": true,
+    "input_tokens": 233,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 233,
+    "output_tokens": 41,
+    "reasoning_tokens": null,
+    "total_tokens": 274,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori"
+    ]
+  },
+  {
+    "label": "current/single/3",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"ぼっち・ざ・ろっく！\",\"tag_candidates\":[\"gotoh_hitori\",\"hitori_gotoh\",\"gotou_hitori\",\"hitori_gotou\",\"bocchi_(bocchi_the_rock!)\"]}",
+    "usage_available": true,
+    "input_tokens": 220,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 220,
+    "output_tokens": 61,
+    "reasoning_tokens": null,
+    "total_tokens": 281,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "gotoh_hitori",
+      "hitori_gotoh",
+      "gotou_hitori",
+      "hitori_gotou"
+    ]
+  },
+  {
+    "label": "current/double/3",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"后藤独\",\"copyright\":\"Bocchi the Rock!\",\"tag_candidates\":[\"gotoh_hitori_(bocchi_the_rock!)\"]}",
+    "usage_available": true,
+    "input_tokens": 233,
+    "input_cached_tokens": 0,
+    "input_uncached_tokens": 233,
+    "output_tokens": 36,
+    "reasoning_tokens": null,
+    "total_tokens": 269,
+    "finish_reason": "stop",
+    "parsed_candidates": []
+  }
+]

@@ -4853,6 +4853,7 @@ class PromptPipeline:
         rejected_content: str,
         target_name: str = "",
         copyright_hints: tuple[str, ...] = (),
+        diagnostics: list[dict[str, Any]] | None = None,
     ) -> tuple[str, ...]:
         """Extract bounded Danbooru character candidates from the user request.
 
@@ -4862,42 +4863,63 @@ class PromptPipeline:
             rejected_content: Initial LLM tags that online lookup could not verify.
             target_name: Optional character name selected by a multi-person plan.
             copyright_hints: First-round work scopes used only for disambiguation.
+            diagnostics: Optional request-local list of candidate call outcomes.
 
         Returns:
             Normalized candidate tags proposed for evidence-based lookup.
         """
-        response = await self._llm_diagnostics.generate(
-            self.context, stage="character_candidates",
-            chat_provider_id=provider_id,
-            prompt=(
-                "Extract the explicitly named existing anime/game character from "
-                "the user request and propose up to 6 possible canonical Danbooru "
-                "character tags. Preserve the exact source-language name and infer "
-                "the work/copyright separately. Candidate tags must use lowercase "
-                "ASCII, underscores, and a work disambiguation suffix when known.\n\n"
-                'Return JSON only: {"source_name":"原文中的名字",'
-                '"copyright":"work name","tag_candidates":["name_(work)"]}.\n'
-                "The source_name must be an exact substring of the user request. "
-                "Do not invent a character when none is explicitly named. A localized "
-                "class/title may be the official localized name of a character: recover "
-                "that character's official English or romanized proper name instead of "
-                "literally translating it as a generic noun.\n\n"
-                f"Target name: {target_name or 'not separately specified'}\n"
-                "Known work/copyright scope hints: "
-                f"{', '.join(copyright_hints) or 'none'}\n"
-                f"User request: {user_prompt}\n"
-                f"Initial character tags to cross-check: "
-                f"{self._shorten(rejected_content, 500)}"
-            ),
-            system_prompt=(
-                "You resolve named anime and game characters to candidate Danbooru "
-                "tags. Return valid JSON only. Your candidates are search hints, "
-                "not authoritative answers."
-            ),
-            max_tokens=350,
-            thinking={"type": "disabled"},
+        diagnostic: dict[str, Any] = {"target_name": target_name, "status": "started"}
+        if diagnostics is not None:
+            diagnostics.append(diagnostic)
+        candidate_prompt = (
+            "Extract the explicitly named existing anime/game character from "
+            "the user request and propose up to 6 possible canonical Danbooru "
+            "character tags. Preserve the exact source-language name and infer "
+            "the work/copyright separately. Candidate tags must use lowercase "
+            "ASCII and underscores. Preserve a disambiguation/persona suffix "
+            "only when it belongs to the actual canonical tag; knowing the work "
+            "does NOT mean the character tag needs a work suffix. Do not invent "
+            "a suffix by appending the copyright. Preserve explicit character "
+            "versions/personas from the request, and do not substitute their "
+            "base character. Every candidate must name that same requested "
+            "version/persona; do not include the base character as an extra "
+            "alternative. Canonical punctuation such as ! and : is valid.\n\n"
+            'Return JSON only: {"source_name":"原文中的名字",'
+            '"copyright":"work name","tag_candidates":["canonical_character_tag"]}.\n'
+            "The source_name must be an exact substring of the user request. "
+            "When Target name is specified, resolve ONLY that exact entity and "
+            "copy Target name exactly into source_name; other named characters "
+            "are context, not alternative targets. "
+            "Do not invent a character when none is explicitly named. A localized "
+            "class/title may be the official localized name of a character: recover "
+            "that character's official English or romanized proper name instead of "
+            "literally translating it as a generic noun.\n\n"
+            f"Target name: {target_name or 'not separately specified'}\n"
+            "Known work/copyright scope hints: "
+            f"{', '.join(copyright_hints) or 'none'}\n"
+            f"User request: {user_prompt}\n"
+            f"Initial character tags to cross-check: "
+            f"{self._shorten(rejected_content, 500)}"
         )
+        try:
+            response = await self._llm_diagnostics.generate(
+                self.context, stage="character_candidates",
+                chat_provider_id=provider_id,
+                prompt=candidate_prompt,
+                system_prompt=(
+                    "You resolve named anime and game characters to candidate Danbooru "
+                    "tags. Return valid JSON only. Your candidates are search hints, "
+                    "not authoritative answers."
+                ),
+                max_tokens=350,
+                thinking={"type": "disabled"},
+            )
+        except Exception as exc:
+            diagnostic.update(status="provider_error", error_type=type(exc).__name__)
+            raise
         raw = _extract_completion_text(response)
+        if self._bool("debug_prompt_enabled", False):
+            diagnostic.update(prompt=candidate_prompt, raw=raw)
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
         raw = re.sub(r"\s*```$", "", raw)
         match = re.search(r"\{.*\}", raw, flags=re.S)
@@ -4906,23 +4928,38 @@ class PromptPipeline:
         try:
             data = json.loads(raw)
         except (TypeError, ValueError):
+            diagnostic["status"] = "invalid_json"
             return ()
         if not isinstance(data, dict):
+            diagnostic["status"] = "invalid_object"
             return ()
         source_name = str(data.get("source_name") or "").strip()
+        diagnostic["source_name"] = source_name
         if not source_name or source_name not in user_prompt:
+            diagnostic["status"] = "ungrounded_source_name"
+            return ()
+        if target_name and source_name != target_name:
+            diagnostic["status"] = "wrong_target"
             return ()
         raw_candidates = data.get("tag_candidates")
         if not isinstance(raw_candidates, list):
+            diagnostic["status"] = "invalid_candidates"
             return ()
         candidates: list[str] = []
+        rejected_candidates: list[str] = []
         for item in raw_candidates:
             candidate = str(item or "").strip().lower()
             candidate = re.sub(r"\s+", "_", candidate)
-            if not re.fullmatch(r"[a-z0-9_.'():-]{3,100}", candidate):
+            if not re.fullmatch(r"[a-z0-9_.'():!\-]{3,100}", candidate):
+                rejected_candidates.append(candidate)
                 continue
             if candidate not in candidates:
                 candidates.append(candidate)
+        diagnostic.update(
+            status="candidates_ready" if candidates else "empty_candidates",
+            candidates=candidates[:6],
+            rejected_candidates=rejected_candidates,
+        )
         return tuple(candidates[:6])
 
     async def _refine_unresolved_semantic_characters(
@@ -4932,6 +4969,7 @@ class PromptPipeline:
         user_prompt: str,
         anchors: tuple[SemanticAnchor, ...],
         result: SemanticLookupResult,
+        diagnostics: list[dict[str, Any]] | None = None,
     ) -> tuple[SemanticAnchor, ...]:
         """Add bounded canonical guesses for unresolved visible characters."""
         anchor_tag_map = dict(result.anchor_tags)
@@ -4983,6 +5021,7 @@ class PromptPipeline:
                     rejected_content=", ".join(anchor.candidates),
                     target_name=anchor.source_text,
                     copyright_hints=copyright_hints,
+                    diagnostics=diagnostics,
                 )
             except Exception as exc:
                 self.logger.warning(
@@ -7110,6 +7149,7 @@ class PromptPipeline:
                         user_prompt=prompt,
                         anchors=semantic_anchors,
                         result=resolved_semantic,
+                        diagnostics=summary.setdefault("semantic_character_candidate_attempts", []),
                     )
                     if refined_anchors != semantic_anchors:
                         semantic_anchors = refined_anchors

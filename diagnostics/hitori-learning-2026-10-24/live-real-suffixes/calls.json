@@ -1,0 +1,188 @@
+[
+  {
+    "label": "current/oblivionis/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: Oblivionis\nKnown work/copyright scope hints: none\nUser request: Oblivionis（BanG Dream!）和Mortis（BanG Dream!）站在一起\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"Oblivionis\",\"copyright\":\"BanG Dream!\",\"tag_candidates\":[\"oblivionis\"]}",
+    "usage_available": true,
+    "input_tokens": 356,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 228,
+    "output_tokens": 28,
+    "reasoning_tokens": null,
+    "total_tokens": 384,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "oblivionis"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "oblivionis_(bang_dream!)"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/mortis/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: Mortis\nKnown work/copyright scope hints: none\nUser request: Oblivionis（BanG Dream!）和Mortis（BanG Dream!）站在一起\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"Mortis\",\"copyright\":\"BanG Dream!\",\"tag_candidates\":[\"mortis_(bang_dream!)\"]}",
+    "usage_available": true,
+    "input_tokens": 354,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 226,
+    "output_tokens": 28,
+    "reasoning_tokens": null,
+    "total_tokens": 382,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "mortis_(bang_dream!)"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "mortis_(bang_dream!)"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/borrowed_costume/1",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: Oblivionis\nKnown work/copyright scope hints: none\nUser request: 丰川祥子穿着Oblivionis（BanG Dream!）的衣服站立\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"Oblivionis\",\"copyright\":\"BanG Dream!\",\"tag_candidates\":[\"oblivionis\"]}",
+    "usage_available": true,
+    "input_tokens": 354,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 226,
+    "output_tokens": 28,
+    "reasoning_tokens": null,
+    "total_tokens": 382,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "oblivionis"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "oblivionis_(bang_dream!)"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/oblivionis/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: Oblivionis\nKnown work/copyright scope hints: none\nUser request: Oblivionis（BanG Dream!）和Mortis（BanG Dream!）站在一起\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"Oblivionis\",\"copyright\":\"BanG Dream!\",\"tag_candidates\":[\"oblivionis_(bang_dream!)\"]}",
+    "usage_available": true,
+    "input_tokens": 356,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 228,
+    "output_tokens": 33,
+    "reasoning_tokens": null,
+    "total_tokens": 389,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "oblivionis_(bang_dream!)"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "oblivionis_(bang_dream!)"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/mortis/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: Mortis\nKnown work/copyright scope hints: none\nUser request: Oblivionis（BanG Dream!）和Mortis（BanG Dream!）站在一起\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"Mortis\",\"copyright\":\"BanG Dream!\",\"tag_candidates\":[\"mortis_(bang_dream!)\"]}",
+    "usage_available": true,
+    "input_tokens": 354,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 226,
+    "output_tokens": 28,
+    "reasoning_tokens": null,
+    "total_tokens": 382,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "mortis_(bang_dream!)"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "mortis_(bang_dream!)"
+      ]
+    ],
+    "local_missing": []
+  },
+  {
+    "label": "current/borrowed_costume/2",
+    "stage": "character_candidates",
+    "requested": {
+      "prompt": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII and underscores. Preserve a disambiguation/persona suffix only when it belongs to the actual canonical tag; knowing the work does NOT mean the character tag needs a work suffix. Do not invent a suffix by appending the copyright. Preserve explicit character versions/personas from the request, and do not substitute their base character. Every candidate must name that same requested version/persona; do not include the base character as an extra alternative. Canonical punctuation such as ! and : is valid.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"canonical_character_tag\"]}.\nThe source_name must be an exact substring of the user request. When Target name is specified, resolve ONLY that exact entity and copy Target name exactly into source_name; other named characters are context, not alternative targets. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: Oblivionis\nKnown work/copyright scope hints: none\nUser request: 丰川祥子穿着Oblivionis（BanG Dream!）的衣服站立\nInitial character tags to cross-check: ",
+      "system_prompt": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers.",
+      "max_tokens": 350,
+      "thinking": {
+        "type": "disabled"
+      }
+    },
+    "raw": "{\"source_name\":\"Oblivionis\",\"copyright\":\"BanG Dream!\",\"tag_candidates\":[\"oblivionis_(bang_dream!)\"]}",
+    "usage_available": true,
+    "input_tokens": 354,
+    "input_cached_tokens": 128,
+    "input_uncached_tokens": 226,
+    "output_tokens": 33,
+    "reasoning_tokens": null,
+    "total_tokens": 387,
+    "finish_reason": "stop",
+    "parsed_candidates": [
+      "oblivionis_(bang_dream!)"
+    ],
+    "local_confirmed": [
+      [
+        "target",
+        "oblivionis_(bang_dream!)"
+      ]
+    ],
+    "local_missing": []
+  }
+]

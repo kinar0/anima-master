@@ -1,5 +1,11 @@
 # 故障排查
 
+## 单独角色能学习，双人请求却缺少该角色档案（2026-10-24）
+
+先核对 LLM1 的 `semantic_plan_raw` 是否已列出该角色，再看 `nai_anchor_roles[].candidates` 和 `confirmed_character_bindings`。中文实体存在不代表已转成可查的英文 tag。真实回归中，旧候选任务书诱导补上作品后缀，得到不存在的 `gotoh_hitori_(bocchi_the_rock!)`；旧字符校验又不接受 `!`，唯一候选因此变为空数组，尚未进入帖子学习。修复前对照中单人三次均取得有效候选，双人三次有两次出现此失败；修正后单人、双人各五次通过真实模型与词典验证，并在独立无该角色档案的副本中分别完成真实采样建档。历史 20:22 的补查原始回复没有留存，不能断言该次必然就是同一回包；历史参数透传方式的四次复测均成功，详见 `diagnostics/hitori-learning-2026-10-24/`。
+
+现在作品与 canonical 分开，不强加后缀，合法标点保留；仍须精确验证，不靠去后缀、模糊命中或角色特判建档。摘要 `semantic_character_candidate_attempts` 可区分 `invalid_json / invalid_object / ungrounded_source_name / wrong_target / invalid_candidates / empty_candidates / provider_error / candidates_ready`。后者仅表示候选解析成功，身份是否成立仍看后续绑定；开启 debug 才保存补查原始回复和任务书。来源/其他人物不能充当当前目标，明确版本不能被基础角色覆盖。重载插件后用于新请求，不自动重发历史任务，不覆盖运行中的人工档案。
+
 ## DeepSeek 输出 token 远多于输入，关闭思考或输出上限未生效（2026-10-24）
 
 当前安装的 AstrBot 4.29.1 OpenAI 适配器接收调用 kwargs，却未将 `thinking`、

@@ -1,0 +1,240 @@
+[
+  {
+    "at": "2026-10-24T13:18:12.483105+00:00",
+    "label": "historical/single/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:13.591709+00:00",
+    "label": "historical/single/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:15.611885+00:00",
+    "label": "historical/single/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:19.626797+00:00",
+    "label": "historical/single/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:27.638199+00:00",
+    "label": "historical/single/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:27.674610+00:00",
+    "label": "historical/double/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:28.696864+00:00",
+    "label": "historical/double/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:30.720707+00:00",
+    "label": "historical/double/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:34.739313+00:00",
+    "label": "historical/double/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:42.764131+00:00",
+    "label": "historical/double/1",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 千早爱音和后藤独并排站在一起比胸部大小，只穿了内衣\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:42.812426+00:00",
+    "label": "historical/single/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:43.836798+00:00",
+    "label": "historical/single/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:45.862064+00:00",
+    "label": "historical/single/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-10-24T13:18:49.874489+00:00",
+    "label": "historical/single/2",
+    "body": {
+      "model": "deepseek-v4-flash",
+      "messages": [
+        {
+          "role": "system",
+          "content": "You resolve named anime and game characters to candidate Danbooru tags. Return valid JSON only. Your candidates are search hints, not authoritative answers."
+        },
+        {
+          "role": "user",
+          "content": "Extract the explicitly named existing anime/game character from the user request and propose up to 6 possible canonical Danbooru character tags. Preserve the exact source-language name and infer the work/copyright separately. Candidate tags must use lowercase ASCII, underscores, and a work disambiguation suffix when known.\n\nReturn JSON only: {\"source_name\":\"原文中的名字\",\"copyright\":\"work name\",\"tag_candidates\":[\"name_(work)\"]}.\nThe source_name must be an exact substring of the user request. Do not invent a character when none is explicitly named. A localized class/title may be the official localized name of a character: recover that character's official English or romanized proper name instead of literally translating it as a generic noun.\n\nTarget name: 后藤独\nKnown work/copyright scope hints: none\nUser request: 画一个后藤独\nInitial character tags to cross-check: "
+        }
+      ]
+    }
+  }
+]
