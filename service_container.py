@@ -143,6 +143,7 @@ def build_services(
     remove_bg: Callable[[Any], Any],
     spell: Callable[[Any], Any],
     reverse: Callable[[Any], Any],
+    generation_usage_text: Callable[[Any], str] | None = None,
 ) -> AnimaServices:
     """Build all Anima services for the plugin entry point.
 
@@ -165,6 +166,7 @@ def build_services(
         remove_bg: Remove-background callback for LLM tools.
         spell: Spell extraction callback for LLM tools.
         reverse: Reverse prompt callback for LLM tools.
+        generation_usage_text: Daily usage query callback for chat commands.
 
     Returns:
         Constructed service container.
@@ -262,6 +264,7 @@ def build_services(
         maintenance=retention.run,
     )
     action_handler = CommandActionHandler(
+        generation_usage_text=generation_usage_text,
         config=config,
         config_store=config_store,
         task_recorder=task_recorder,

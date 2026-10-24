@@ -32,7 +32,7 @@ def test_autofilter_workflow_preserves_widgets_and_replaces_only_image() -> None
 
 def test_wardrobe_remains_the_plugin_page_entry() -> None:
     pages = sorted(path.parent.name for path in (ROOT / "pages").glob("*/index.html"))
-    assert pages == ["wardrobe"]
+    assert pages == ["wardrobe", "wardrobe_toolbox"]
     html = (ROOT / "pages" / "wardrobe" / "index.html").read_text(encoding="utf-8")
     assert "角色与通用服装词库" in html
     assert 'id="autofilter-settings"' in html

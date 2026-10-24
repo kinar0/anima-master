@@ -39,6 +39,7 @@ try:
     from .service_container import build_services
     from .danbooru_resolver import WardrobeValidationError
     from .usage_limiter import DailyUsageLimiter
+    from .opus_usage_monitor import OpusUsageMonitor
     from .generation_request_guard import generation_request_guard
     from .noun_translation_batch import (
         build_import_plan, parse_existing_mappings, review_rows,
@@ -68,6 +69,7 @@ except ImportError:  # pragma: no cover - fallback for direct script-style impor
     from service_container import build_services
     from danbooru_resolver import WardrobeValidationError
     from usage_limiter import DailyUsageLimiter
+    from opus_usage_monitor import OpusUsageMonitor
     from generation_request_guard import generation_request_guard
     from noun_translation_batch import (
         build_import_plan, parse_existing_mappings, review_rows,
@@ -126,7 +128,11 @@ class ComfyUIAgentPlugin(Star):
         self._unfinished_generation_requests = 0
         self._generation_request_guard = generation_request_guard
         self._daily_usage = DailyUsageLimiter(
-            plugin_data_path / "daily_generation_usage.json", logger
+            plugin_data_path / "daily_generation_usage.json", logger,
+            tasks_dir=plugin_data_path / "tasks",
+        )
+        self._opus_monitor = OpusUsageMonitor(
+            self.config, plugin_data_path / "opus_usage_cache.json"
         )
         self._autofilter_settings = AutofilterSettings(
             plugin_data_path / "autofilter_sessions.json"
@@ -162,6 +168,7 @@ class ComfyUIAgentPlugin(Star):
             remove_bg=self._remove_bg,
             spell=self._spell,
             reverse=self._reverse,
+            generation_usage_text=self._generation_usage_text,
         )
         self._runtime = self._services.runtime
         self._runtime.autofilter_settings = self._autofilter_settings
@@ -177,6 +184,10 @@ class ComfyUIAgentPlugin(Star):
             self.get_wardrobe,
             ["GET"],
             "查看 Anima 服装词库",
+        )
+        context.register_web_api(
+            "/astrbot_plugin_anima_master/opus-usage", self.get_opus_usage,
+            ["GET"], "查看 Opus 剩余额度缓存",
         )
         context.register_web_api(
             "/astrbot_plugin_anima_master/wardrobe/save",
@@ -258,6 +269,14 @@ class ComfyUIAgentPlugin(Star):
             return await asyncio.to_thread(self._toolbox_library.probe, self._toolbox_directory(), payload.get("text", ""))
         return await self._toolbox_api(operation)
 
+    async def get_opus_usage(self):
+        """Read the monitor cache; opening pages never triggers a NovelAI request."""
+        try:
+            self._ensure_dashboard_user()
+            return json_response(self._opus_monitor.snapshot())
+        except PermissionError:
+            return error_response("请先登录 AstrBot 管理页面。", status_code=403)
+
     async def get_autofilter(self):
         try:
             self._ensure_dashboard_user()
@@ -324,6 +343,7 @@ class ComfyUIAgentPlugin(Star):
             )
 
     async def initialize(self):
+        self._opus_monitor.start()
         img2img_enabled = self._bool("img2img_enabled", False)
         if img2img_enabled:
             edit_tool_changed = self.context.activate_llm_tool("comfyui_edit")
@@ -339,6 +359,9 @@ class ComfyUIAgentPlugin(Star):
             self._str("comfyui_base_url", "http://127.0.0.1:8188"),
             self._str("workflow", "anima_t2i"),
         )
+
+    async def terminate(self):
+        await self._opus_monitor.close()
 
     def _bool(self, key: str, default: bool) -> bool:
         return bool(self.config.get(key, default))
@@ -411,6 +434,7 @@ class ComfyUIAgentPlugin(Star):
             whitelisted=(
                 sender_id in self._sender_id_set("generation_whitelist_sender_ids")
             ),
+            total_limit=self._int("daily_total_generation_limit", 0),
         )
         self._generation_usage_summary.set(
             {
@@ -419,14 +443,43 @@ class ComfyUIAgentPlugin(Star):
                 "remaining": decision.remaining,
                 "whitelisted": decision.whitelisted,
                 "day": decision.day,
+                "total_used": decision.total_used,
+                "total_limit": decision.total_limit,
+                "total_remaining": decision.total_remaining,
             }
         )
         if not decision.allowed:
+            if decision.rejection == "total":
+                return (
+                    f"今日总生图次数已达上限（{decision.total_used}/{decision.total_limit}）。"
+                    "请明天再试。"
+                )
             return (
                 f"你今天的生图次数已用完（{decision.used}/{decision.limit}）。"
                 "请明天再试。"
             )
         return ""
+
+    def _generation_usage_text(self, event: AstrMessageEvent) -> str:
+        """Show persisted daily totals without invoking models or ComfyUI."""
+        state = self._daily_usage.snapshot()
+        total = state["total_used"]
+        total_limit = max(0, self._int("daily_total_generation_limit", 0))
+        sender = str(event.get_sender_id() or "").strip()
+        used = state["counts"].get(sender or "unknown", 0)
+        personal_limit = max(0, self._int("daily_generation_limit", 0))
+        whitelisted = sender in self._sender_id_set("generation_whitelist_sender_ids")
+        total_text = f"{total}/{total_limit}" if total_limit else f"{total}（不限额）"
+        personal_text = (
+            f"{used}（不限额）" if whitelisted or not personal_limit
+            else f"{used}/{personal_limit}"
+        )
+        return (
+            f"生图统计（{state['date']}）：\n"
+            f"今日总生图次数：{total_text}\n"
+            f"你的今日次数：{personal_text}\n"
+            "按已接受的文生图请求计数，失败不返还，自动重试不重复计数。"
+        )
 
     async def _run_tool(self, args: list[str]) -> dict[str, Any]:
         return await self._runtime.run_tool(args)
@@ -1075,6 +1128,11 @@ class ComfyUIAgentPlugin(Star):
     async def cmd_debug_status(self, event: AstrMessageEvent):
         event.stop_event()
         yield event.plain_result(await self._handle_action(event, "debug_status", ""))
+
+    @comfyui_group.command("stats", alias={"生图统计", "今日生图", "生图次数"})
+    async def cmd_generation_stats(self, event: AstrMessageEvent):
+        event.stop_event()
+        yield event.plain_result(await self._handle_action(event, "generation_stats", ""))
 
     @comfyui_group.command("generate", alias={"生图", "画图"})
     async def cmd_generate(self, event: AstrMessageEvent, prompt: GreedyStr):

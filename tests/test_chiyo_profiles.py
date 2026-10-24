@@ -64,7 +64,7 @@ def test_chiyo_profiles_apply_reversible_runtime_overrides() -> None:
     assert base["cfg"] == 5.0
     assert base["negative_prompt"] == "user negative"
     assert base_prompt.final_prompt.startswith(
-        "masterpiece, best quality, score_7, nsfw"
+        "masterpiece, best quality, score 7, nsfw"
     )
 
     assert turbo["unet_name"] == "anima_baseV10.safetensors"

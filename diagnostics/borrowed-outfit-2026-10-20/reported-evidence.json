@@ -1,0 +1,1047 @@
+[
+  {
+    "task_id": "746175b7190b4b9cbb3234f0b983607a",
+    "time": "2026-10-20T15:12:48.095597",
+    "original_prompt": "若叶睦穿着mortis的衣服一脸厌恶地用黑丝脚底踩着viewer，热气腾腾的靴子放在一边",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-151303-731584-f9e6e372_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "shirt",
+          "dress",
+          "white_shirt",
+          "black_jacket",
+          "black_dress",
+          "black_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "black_gloves",
+          "red_hat",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "shirt",
+          "dress",
+          "white_shirt",
+          "black_jacket",
+          "black_dress",
+          "black_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "black_gloves",
+          "red_hat",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "source_grounding_tags": [
+          "shirt",
+          "dress",
+          "white_shirt",
+          "black_jacket",
+          "black_dress",
+          "black_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "black_gloves",
+          "red_hat",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [],
+        "stale_cached_tags": [
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "若叶睦",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "shirt",
+            "dress",
+            "white_shirt",
+            "black_jacket",
+            "black_dress",
+            "black_skirt",
+            "long_sleeves",
+            "see-through_sleeves",
+            "black_gloves",
+            "red_hat",
+            "ribbon",
+            "frilled_choker",
+            "black_choker",
+            "pantyhose"
+          ],
+          "removed_tags": [],
+          "appearance_tags": [
+            "long_hair",
+            "green_hair",
+            "yellow_eyes",
+            "hair_ornament",
+            "small_breasts"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        },
+        {
+          "target_anchor_id": "target_2",
+          "target": "viewer",
+          "wardrobe_kind": "creative_fallback",
+          "wardrobe_anchor_id": "",
+          "effective_tags": [],
+          "removed_tags": [],
+          "appearance_tags": [],
+          "complete_named_profile": false,
+          "resolution_state": "unspecified",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"若叶睦\",\"aliases\":[],\"clothing\":\"mortis的衣服\",\"clothing_source\":\"mortis\",\"clothing_changes\":[],\"appearance_changes\":[]},{\"name\":\"viewer\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl, 1boy}\n{Characters: wakaba_mutsumi}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair with a hair ornament, yellow eyes, and a small chest}\n{Details: wakaba_mutsumi wears a red hat with a ribbon, a white shirt under a black jacket with long see-through sleeves, a frilled black choker, black gloves, a black dress with a black skirt, and black pantyhose, looking down with a disgusted expression as she presses her black pantyhose-covered sole onto the viewer}\n{Tags: pov, from below, foot on face, sole, pantyhose, black pantyhose, red hat, ribbon, white shirt, black jacket, long sleeves, see-through sleeves, black gloves, frilled choker, black choker, black dress, black skirt, displeased, disgust, furrowed brow, looking down, steam, hot boots, boots removed, boots on the side, indoor, dim room, carpet, lying down, viewer}\n{Nltags: wakaba_mutsumi stands over the viewer and presses her black pantyhose-covered sole against the viewer's face while looking down with disgust; a pair of steaming boots sits off to the side; background_mode_explicit_scene}",
+      "prompt_llm_retry_content": "",
+      "final_prompt": "masterpiece, best quality, questionable, 1people,\nwakaba mutsumi,\nbang dream!, artist\\:dino \\( dinoartforame \\), 0.6::artist:wlop::, 0.8::artist:stu_dts ::, 0.6:: artist:fukai ryosuke::, 0.7::artist:tony_taka::, 0.7, @zote illust, 0.6:: artist:quasarcake ::, 0.8::artist:rella ::, 0.7::artist:momisan::, @yoneyama mai, year 2025, year 2026, -0.5:: lips::, 20::very amazing quality::, detailed light, ray tracing, cinematic lighting,\nwakaba mutsumi has long green hair with a hair ornament, yellow eyes, a small chest,\nwakaba mutsumi wears a red hat with a ribbon, a white shirt under a black jacket with long see-through sleeves, a frilled black choker, black gloves, a black dress with a black skirt, and black pantyhose, looking down with a disgusted expression as she presses her black pantyhose-covered sole onto the viewer,\nwakaba mutsumi, pov, from below, foot on face, sole, pantyhose, black pantyhose, red hat, ribbon, white shirt, black jacket, long sleeves, see-through sleeves, black gloves, frilled choker, black choker, black dress, black skirt, displeased, disgust, furrowed brow, looking down, steam, hot boots, boots removed, boots on the side, indoor, dim room, carpet, lying down, viewer,\nNltags: wakaba mutsumi stands over the viewer and presses her black pantyhose-covered sole against the viewer's face while looking down with disgust, a pair of steaming boots sits off to the side"
+    }
+  },
+  {
+    "task_id": "0940cd4aa30147f7a0e22b842c2aa608",
+    "time": "2026-10-20T15:14:00.215006",
+    "original_prompt": "-s8 若叶睦穿着mortis的衣服一脸厌恶地抬起一只脚，用黑丝脚底对着镜头。热气腾腾的靴子放在地上",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-151408-944637-6518f71a_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "shirt",
+          "dress",
+          "white_shirt",
+          "black_jacket",
+          "black_dress",
+          "black_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "black_gloves",
+          "red_hat",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "dress",
+          "black_dress",
+          "black_skirt",
+          "see-through_sleeves",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "source_grounding_tags": [
+          "dress",
+          "black_dress",
+          "black_skirt",
+          "see-through_sleeves",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [
+          "shirt",
+          "white_shirt",
+          "black_jacket",
+          "long_sleeves",
+          "black_gloves",
+          "red_hat"
+        ],
+        "stale_cached_tags": [
+          "shirt",
+          "white_shirt",
+          "black_jacket",
+          "long_sleeves",
+          "black_gloves",
+          "red_hat",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "若叶睦",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "dress",
+            "black_dress",
+            "black_skirt",
+            "see-through_sleeves",
+            "ribbon",
+            "frilled_choker",
+            "black_choker",
+            "pantyhose"
+          ],
+          "removed_tags": [
+            "shirt",
+            "white_shirt",
+            "black_jacket",
+            "long_sleeves",
+            "black_gloves",
+            "red_hat"
+          ],
+          "appearance_tags": [
+            "long_hair",
+            "green_hair",
+            "yellow_eyes",
+            "hair_ornament",
+            "small_breasts"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"若叶睦\",\"aliases\":[],\"clothing\":\"mortis的衣服\",\"clothing_source\":\"mortis\",\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: wakaba_mutsumi}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair, yellow eyes, a hair ornament, and small breasts}\n{Details: wakaba_mutsumi wears a white shirt under a black jacket with long see-through sleeves, a black dress, a black skirt, black gloves, a red hat with a ribbon, a frilled black choker, and black pantyhose, with one leg raised so the sole of her pantyhose-clad foot faces the viewer, her expression showing disgust}\n{Tags: solo, long hair, green hair, yellow eyes, hair ornament, small breasts, white shirt, black jacket, long sleeves, see-through sleeves, black dress, black skirt, black gloves, red hat, ribbon, frilled choker, black choker, pantyhose, raised leg, foot focus, soles, disgust, looking at viewer, hot boot, steam, boots on ground, simple background, white background}\n{Nltags: wakaba_mutsumi stands facing the viewer with a disgusted expression and lifts one foot toward the camera, showing the sole of her black pantyhose; a steaming boot rests on the ground nearby; background_mode_default_portrait}",
+      "prompt_llm_retry_content": "",
+      "final_prompt": "masterpiece, best quality, questionable, 1girl,\nwakaba mutsumi,\nbang dream!, 2::blender ( medium ) ::, 3::3d::, 2::game screenshot::, -1:: realistic face::, 0.75::girls ' frontline 2: exilium style ::, 0.5::wuthering waves ( style ) ::, photorealistic, 0.3::detailed texture::, year 2025, year 2026, 10::very aesthetic::, 5:: masterpiece::, detailed light, ray tracing, cinematic lighting, depth of field,\nwakaba mutsumi has long green hair, yellow eyes, a hair ornament, small breasts,\nwakaba mutsumi under a black jacket with long see-through sleeves, a black dress, a black skirt with a ribbon, a frilled black choker, and black pantyhose, with one leg raised so the sole of her pantyhose-clad foot faces the viewer, her expression showing disgust,\nwakaba mutsumi, solo, see-through sleeves, black dress, black skirt, ribbon, frilled choker, black choker, pantyhose, raised leg, foot focus, soles, disgust, looking at viewer, hot boot, steam, boots on ground, simple background, white background,\nNltags: wakaba mutsumi stands facing the viewer with a disgusted expression and lifts one foot toward the camera, showing the sole of her black pantyhose, a steaming boot rests on the ground nearby"
+    }
+  },
+  {
+    "task_id": "83bbb3db54934fa392d7efa172c07262",
+    "time": "2026-10-20T15:14:28.427482",
+    "original_prompt": "-s8 若叶睦穿着mortis的衣服，一脸厌恶地抬起一只脚，用黑丝脚底对着镜头。热气腾腾的靴子放在地上",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-151444-274935-754c4c25_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [
+        "Characters is missing confirmed visible identities: mortis_(bang_dream!)"
+      ],
+      "structured_retry_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "shirt",
+          "dress",
+          "white_shirt",
+          "black_jacket",
+          "black_dress",
+          "black_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "black_gloves",
+          "red_hat",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "dress",
+          "black_dress",
+          "black_skirt",
+          "see-through_sleeves",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "source_grounding_tags": [
+          "dress",
+          "black_dress",
+          "black_skirt",
+          "see-through_sleeves",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [
+          "shirt",
+          "white_shirt",
+          "black_jacket",
+          "long_sleeves",
+          "black_gloves",
+          "red_hat"
+        ],
+        "stale_cached_tags": [
+          "shirt",
+          "white_shirt",
+          "black_jacket",
+          "long_sleeves",
+          "black_gloves",
+          "red_hat",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "若叶睦",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "dress",
+            "black_dress",
+            "black_skirt",
+            "see-through_sleeves",
+            "ribbon",
+            "frilled_choker",
+            "black_choker",
+            "pantyhose"
+          ],
+          "removed_tags": [
+            "shirt",
+            "white_shirt",
+            "black_jacket",
+            "long_sleeves",
+            "black_gloves",
+            "red_hat"
+          ],
+          "appearance_tags": [
+            "long_hair",
+            "green_hair",
+            "yellow_eyes",
+            "hair_ornament",
+            "small_breasts"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        },
+        {
+          "target_anchor_id": "target_2",
+          "target": "mortis",
+          "wardrobe_kind": "default_reference",
+          "wardrobe_anchor_id": "",
+          "effective_tags": [
+            "dress",
+            "black_dress",
+            "black_skirt",
+            "see-through_sleeves",
+            "ribbon",
+            "frilled_choker",
+            "black_choker",
+            "pantyhose"
+          ],
+          "removed_tags": [
+            "shirt",
+            "white_shirt",
+            "black_jacket",
+            "long_sleeves",
+            "black_gloves",
+            "red_hat"
+          ],
+          "appearance_tags": [
+            "green_hair",
+            "long_hair",
+            "yellow_eyes"
+          ],
+          "complete_named_profile": false,
+          "resolution_state": "unspecified",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"若叶睦\",\"aliases\":[],\"clothing\":\"mortis的衣服\",\"clothing_source\":\"mortis\",\"clothing_changes\":[],\"appearance_changes\":[]},{\"name\":\"mortis\",\"aliases\":[],\"clothing\":null,\"clothing_source\":null,\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: wakaba_mutsumi}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair, yellow eyes, a hair ornament, and small breasts}\n{Details: wakaba_mutsumi wears a red hat, a white shirt, a black jacket with long see-through sleeves, a black dress over a black skirt, black gloves, a frilled black choker with a ribbon, and black pantyhose, with a disgusted expression, raising one leg to show her black-pantyhose sole toward the viewer}\n{Tags: solo, red hat, hair ornament, white shirt, black jacket, long sleeves, see-through sleeves, black dress, black skirt, black gloves, frilled choker, black choker, ribbon, black pantyhose, soles, feet, foot focus, raised leg, standing on one leg, disgust, angry eyes, looking down, boots on ground, steaming boots, steam, simple background, white background, full body}\n{Nltags: wakaba_mutsumi stands on one leg and raises her other foot sole toward the camera, black pantyhose stretched over the sole; a pair of hot steaming boots rests on the ground beside her; background_mode_default_portrait}",
+      "prompt_llm_retry_content": "{Count: 1girl, 1other}\n{Characters: wakaba_mutsumi, mortis_(bang_dream!)}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair, yellow eyes, a hair ornament, and small breasts; mortis_(bang_dream!) is not physically present but her recognizable outfit is worn by wakaba_mutsumi}\n{Details: wakaba_mutsumi wears mortis_(bang_dream!)'s red hat, white shirt, black jacket with long see-through sleeves, black dress over a black skirt, black gloves, frilled black choker with a ribbon, and black pantyhose, with a disgusted expression, raising one leg to show her black-pantyhose sole toward the viewer}\n{Tags: solo, red hat, hair ornament, white shirt, black jacket, long sleeves, see-through sleeves, black dress, black skirt, black gloves, frilled choker, black choker, ribbon, black pantyhose, soles, feet, foot focus, raised leg, standing on one leg, disgust, angry eyes, looking down, boots on ground, steaming boots, steam, simple background, white background, full body}\n{Nltags: wakaba_mutsumi stands on one leg and raises her other foot sole toward the camera, black pantyhose stretched over the sole; a pair of hot steaming boots rests on the ground beside her; background_mode_default_portrait}",
+      "final_prompt": "masterpiece, best quality, questionable, 2people, 1other,\nwakaba mutsumi, mortis \\(bang dream!\\),\nbang dream!, 2::blender ( medium ) ::, 3::3d::, 2::game screenshot::, -1:: realistic face::, 0.75::girls ' frontline 2: exilium style ::, 0.5::wuthering waves ( style ) ::, photorealistic, 0.3::detailed texture::, year 2025, year 2026, 10::very aesthetic::, 5:: masterpiece::, detailed light, ray tracing, cinematic lighting, depth of field,\nwakaba mutsumi has long green hair, yellow eyes, a hair ornament, small breasts; mortis \\(bang dream!\\) is not physically present but her recognizable outfit is worn by wakaba mutsumi,\nwakaba mutsumi wears mortis \\(bang dream!\\)'s red hat with long see-through sleeves, black dress over a black skirt, frilled black choker with a ribbon, and black pantyhose, with a disgusted expression, raising one leg to show her black-pantyhose sole toward the viewer; mortis \\(bang dream!\\),\nbang dream!, wakaba mutsumi, solo, see-through sleeves, black dress, black skirt, frilled choker, black choker, ribbon, black pantyhose, soles, feet, foot focus, raised leg, standing on one leg, disgust, angry eyes, looking down, boots on ground, steaming boots, steam, simple background, white background, full body,\nNltags: wakaba mutsumi stands on one leg and raises her other foot sole toward the camera, black pantyhose stretched over the sole, a pair of hot steaming boots rests on the ground beside her"
+    }
+  },
+  {
+    "task_id": "b018deca308a44b283692f01c9f21ea4",
+    "time": "2026-10-20T15:16:02.344052",
+    "original_prompt": "若叶睦穿着mortis的衣服，一脸厌恶地抬起一只脚，用黑丝脚底对着镜头。脚底散发着蒸汽。热气腾腾的高筒皮靴放在地上",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-151616-374866-1e963033_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "shirt",
+          "dress",
+          "white_shirt",
+          "black_jacket",
+          "black_dress",
+          "black_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "black_gloves",
+          "red_hat",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "dress",
+          "black_dress",
+          "black_skirt",
+          "see-through_sleeves",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "source_grounding_tags": [
+          "dress",
+          "black_dress",
+          "black_skirt",
+          "see-through_sleeves",
+          "ribbon",
+          "frilled_choker",
+          "black_choker",
+          "pantyhose"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [
+          "shirt",
+          "white_shirt",
+          "black_jacket",
+          "long_sleeves",
+          "black_gloves",
+          "red_hat"
+        ],
+        "stale_cached_tags": [
+          "shirt",
+          "white_shirt",
+          "black_jacket",
+          "long_sleeves",
+          "black_gloves",
+          "red_hat",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "若叶睦",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "dress",
+            "black_dress",
+            "black_skirt",
+            "see-through_sleeves",
+            "ribbon",
+            "frilled_choker",
+            "black_choker",
+            "pantyhose"
+          ],
+          "removed_tags": [
+            "shirt",
+            "white_shirt",
+            "black_jacket",
+            "long_sleeves",
+            "black_gloves",
+            "red_hat"
+          ],
+          "appearance_tags": [
+            "long_hair",
+            "green_hair",
+            "yellow_eyes",
+            "hair_ornament",
+            "small_breasts"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"若叶睦\",\"aliases\":[],\"clothing\":\"mortis的衣服\",\"clothing_source\":\"mortis\",\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: wakaba_mutsumi}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair with a hair ornament and yellow eyes}\n{Details: wakaba_mutsumi wears a white shirt with long see-through sleeves, a black jacket, a black dress with a black skirt, black gloves, a red hat with a ribbon, a frilled black choker, and black pantyhose; she has a disgusted expression, raises one leg toward the camera, and shows the sole of her black-pantyhose-covered foot with steam rising from it}\n{Tags: solo, long hair, green hair, yellow eyes, hair ornament, red hat, ribbon, white shirt, long sleeves, see-through sleeves, black jacket, black dress, black skirt, black gloves, frilled choker, black choker, pantyhose, disgust, raised leg, foot focus, soles, steam, boots on ground, high boots, leather boots, simple background, white background, full body}\n{Nltags: wakaba_mutsumi stands facing the viewer with one leg lifted so the sole of her black-pantyhose foot is presented toward the camera, steam curling from that sole, while a pair of steaming high leather boots rests on the ground nearby; background_mode_explicit_scene}",
+      "prompt_llm_retry_content": "",
+      "final_prompt": "masterpiece, best quality, questionable, 1girl,\nwakaba mutsumi,\nbang dream!, artist\\:dino \\( dinoartforame \\), 0.6::artist:wlop::, 0.8::artist:stu_dts ::, 0.6:: artist:fukai ryosuke::, 0.7::artist:tony_taka::, 0.7, @zote illust, 0.6:: artist:quasarcake ::, 0.8::artist:rella ::, 0.7::artist:momisan::, @yoneyama mai, year 2025, year 2026, -0.5:: lips::, 20::very amazing quality::, detailed light, ray tracing, cinematic lighting,\nwakaba mutsumi has long green hair with a hair ornament, yellow eyes,\nwakaba mutsumi with long see-through sleeves, a black dress with a black skirt with a ribbon, a frilled black choker, and black pantyhose, she has a disgusted expression, raises one leg toward the camera, and shows the sole of her black-pantyhose-covered foot with steam rising from it,\nwakaba mutsumi, solo, ribbon, see-through sleeves, black dress, black skirt, frilled choker, black choker, pantyhose, disgust, raised leg, foot focus, soles, steam, boots on ground, high boots, leather boots, simple background, white background, full body,\nNltags: wakaba mutsumi stands facing the viewer with one leg lifted so the sole of her black-pantyhose foot is presented toward the camera, steam curling from that sole, while a pair of steaming high leather boots rests on the ground nearby"
+    }
+  },
+  {
+    "task_id": "e1357bc04d4c443f94ef894a863e11dc",
+    "time": "2026-10-20T15:17:34.798517",
+    "original_prompt": "若叶睦穿着mortis的衣服（没有面具），一脸厌恶地抬起一只脚，用黑丝脚底对着镜头。脚底散发着蒸汽。热气腾腾的高筒皮靴放在地上",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-151743-925387-3e8194ef_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "white_shirt",
+          "red_shorts",
+          "black_skirt",
+          "pantyhose_under_shorts",
+          "showgirl_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "puffy_long_sleeves",
+          "red_hat",
+          "black_mask",
+          "masquerade_mask",
+          "mouth_mask",
+          "green_brooch",
+          "choker",
+          "black_pantyhose",
+          "black_socks",
+          "thighhighs",
+          "red_shoes",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "frilled_choker",
+          "black_choker",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "white_shirt",
+          "red_shorts",
+          "black_skirt",
+          "pantyhose_under_shorts",
+          "showgirl_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "puffy_long_sleeves",
+          "red_hat",
+          "black_mask",
+          "masquerade_mask",
+          "mouth_mask",
+          "green_brooch",
+          "choker",
+          "black_pantyhose",
+          "black_socks",
+          "thighhighs",
+          "red_shoes"
+        ],
+        "source_grounding_tags": [
+          "white_shirt",
+          "red_shorts",
+          "black_skirt",
+          "pantyhose_under_shorts",
+          "showgirl_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "puffy_long_sleeves",
+          "red_hat",
+          "black_mask",
+          "masquerade_mask",
+          "mouth_mask",
+          "green_brooch",
+          "choker",
+          "black_pantyhose",
+          "black_socks",
+          "thighhighs",
+          "red_shoes"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [],
+        "stale_cached_tags": [
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "frilled_choker",
+          "black_choker",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "若叶睦",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "white_shirt",
+            "red_shorts",
+            "black_skirt",
+            "pantyhose_under_shorts",
+            "showgirl_skirt",
+            "long_sleeves",
+            "see-through_sleeves",
+            "puffy_long_sleeves",
+            "red_hat",
+            "black_mask",
+            "masquerade_mask",
+            "mouth_mask",
+            "green_brooch",
+            "choker",
+            "black_pantyhose",
+            "black_socks",
+            "thighhighs",
+            "red_shoes"
+          ],
+          "removed_tags": [],
+          "appearance_tags": [
+            "long_hair",
+            "green_hair",
+            "yellow_eyes",
+            "hair_ornament",
+            "small_breasts"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"若叶睦\",\"aliases\":[],\"clothing\":\"mortis的衣服（没有面具）\",\"clothing_source\":\"mortis\",\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: wakaba_mutsumi}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair with a hair ornament, yellow eyes, and a slender build}\n{Details: wakaba_mutsumi wears a white shirt with long see-through puffy sleeves, a green brooch, a choker, and a black mask hanging at her neck instead of covering her face; she wears a red hat, red shorts over black pantyhose with a black skirt layered over them, and red shoes; she stands with a disgusted expression and lifts one leg toward the camera, presenting the black pantyhose sole of her raised foot; a pair of steaming high leather boots sits on the ground nearby}\n{Tags: 1girl, solo, disgust, furrowed brow, looking down, standing on one leg, leg lift, foot toward viewer, sole, black pantyhose, pantyhose under shorts, red shorts, white shirt, long sleeves, see-through sleeves, puffy sleeves, green brooch, choker, red hat, black mask, masquerade mask, mouth mask, black skirt, showgirl skirt, red shoes, steam, steam from foot, boots, high boots, leather boots, boots on ground, full body, simple background, white background}\n{Nltags: wakaba_mutsumi stands on one leg and raises her other foot toward the viewer so the black-pantyhose sole faces the camera, steam rising from it; her removed steaming high leather boots rest on the ground beside her; she looks disgusted; background_mode_default_portrait}",
+      "prompt_llm_retry_content": "",
+      "final_prompt": "masterpiece, best quality, questionable, 1girl,\nwakaba mutsumi,\nbang dream!, artist\\:dino \\( dinoartforame \\), 0.6::artist:wlop::, 0.8::artist:stu_dts ::, 0.6:: artist:fukai ryosuke::, 0.7::artist:tony_taka::, 0.7, @zote illust, 0.6:: artist:quasarcake ::, 0.8::artist:rella ::, 0.7::artist:momisan::, @yoneyama mai, year 2025, year 2026, -0.5:: lips::, 20::very amazing quality::, detailed light, ray tracing, cinematic lighting,\nwakaba mutsumi has long green hair with a hair ornament, yellow eyes, a slender build,\nwakaba mutsumi wears a white shirt with long see-through puffy sleeves, a green brooch, a choker, and a black mask hanging at her neck instead of covering her face, she wears a red hat, red shorts over black pantyhose with a black skirt layered over them, and red shoes, she stands with a disgusted expression and lifts one leg toward the camera, presenting the black pantyhose sole of her raised foot, a pair of steaming high leather boots sits on the ground nearby,\nwakaba mutsumi, 1girl, solo, disgust, furrowed brow, looking down, standing on one leg, leg lift, foot toward viewer, sole, black pantyhose, pantyhose under shorts, red shorts, white shirt, long sleeves, see-through sleeves, green brooch, choker, red hat, black mask, masquerade mask, mouth mask, black skirt, showgirl skirt, red shoes, steam, steam from foot, boots, high boots, leather boots, boots on ground, full body, simple background, white background,\nNltags: wakaba mutsumi stands on one leg and raises her other foot toward the viewer so the black-pantyhose sole faces the camera, steam rising from it, her removed steaming high leather boots rest on the ground beside her, she looks disgusted"
+    }
+  },
+  {
+    "task_id": "afc3e971e108413c9c595ae73a1437ed",
+    "time": "2026-10-20T15:18:22.580276",
+    "original_prompt": "若叶睦穿着mortis的衣服（没有面具），一脸厌恶地抬起一只脚，用黑丝脚底对着镜头。脚底散发着蒸汽。热气腾腾的高筒皮靴放在地上.foot focus",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-151837-037115-4874d9d4_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "white_shirt",
+          "red_shorts",
+          "black_skirt",
+          "pantyhose_under_shorts",
+          "showgirl_skirt",
+          "long_sleeves",
+          "see-through_sleeves",
+          "puffy_long_sleeves",
+          "red_hat",
+          "black_mask",
+          "masquerade_mask",
+          "mouth_mask",
+          "green_brooch",
+          "choker",
+          "black_pantyhose",
+          "black_socks",
+          "thighhighs",
+          "red_shoes",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "frilled_choker",
+          "black_choker",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "red_shorts",
+          "black_skirt",
+          "pantyhose_under_shorts",
+          "showgirl_skirt",
+          "see-through_sleeves",
+          "green_brooch",
+          "choker",
+          "black_pantyhose",
+          "black_socks",
+          "thighhighs",
+          "red_shoes"
+        ],
+        "source_grounding_tags": [
+          "red_shorts",
+          "black_skirt",
+          "pantyhose_under_shorts",
+          "showgirl_skirt",
+          "see-through_sleeves",
+          "green_brooch",
+          "choker",
+          "black_pantyhose",
+          "black_socks",
+          "thighhighs",
+          "red_shoes"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [
+          "white_shirt",
+          "long_sleeves",
+          "puffy_long_sleeves",
+          "red_hat",
+          "black_mask",
+          "masquerade_mask",
+          "mouth_mask"
+        ],
+        "stale_cached_tags": [
+          "white_shirt",
+          "long_sleeves",
+          "puffy_long_sleeves",
+          "red_hat",
+          "black_mask",
+          "masquerade_mask",
+          "mouth_mask",
+          "blue_dress",
+          "plaid_dress",
+          "puffy_sleeves",
+          "neck_ribbon",
+          "green_ribbon",
+          "frilled_choker",
+          "black_choker",
+          "blue_choker",
+          "green_bow",
+          "white_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "若叶睦",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "red_shorts",
+            "black_skirt",
+            "pantyhose_under_shorts",
+            "showgirl_skirt",
+            "see-through_sleeves",
+            "green_brooch",
+            "choker",
+            "black_pantyhose",
+            "black_socks",
+            "thighhighs",
+            "red_shoes"
+          ],
+          "removed_tags": [
+            "white_shirt",
+            "long_sleeves",
+            "puffy_long_sleeves",
+            "red_hat",
+            "black_mask",
+            "masquerade_mask",
+            "mouth_mask"
+          ],
+          "appearance_tags": [
+            "long_hair",
+            "green_hair",
+            "yellow_eyes",
+            "hair_ornament",
+            "small_breasts"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"若叶睦\",\"aliases\":[],\"clothing\":\"mortis的衣服\",\"clothing_source\":\"mortis\",\"clothing_changes\":[],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: wakaba_mutsumi}\n{Copyright: bang_dream!}\n{Identity: wakaba_mutsumi has long green hair, yellow eyes, and a hair ornament, with a disgusted expression}\n{Details: wakaba_mutsumi wears a black showgirl skirt, red shorts with pantyhose underneath, see-through sleeves, a green brooch, a choker, black pantyhose, and black shoes, raising one leg toward the viewer so her black-pantyhose sole faces the camera, steam rising from the sole, with a steaming tall leather boot placed on the floor}\n{Tags: solo, foot focus, soles, black pantyhose, raised leg, steam, disgust, looking at viewer, black skirt, red shorts, see-through sleeves, green brooch, choker, high heel boots removed, boot on ground, floor, simple background, white background, full body}\n{Nltags: wakaba_mutsumi raises one foot directly toward the camera, presenting the steaming black-pantyhose sole as the focal point; her other boot rests steaming on the floor nearby; background_mode_default_portrait}",
+      "prompt_llm_retry_content": "",
+      "final_prompt": "masterpiece, best quality, questionable, 1girl,\nwakaba mutsumi,\nbang dream!, uncensored, questionable, (@nirowata:0.6), (@satsuya:0.4), (@momisan:0.5), (@sihana156:0.6),\nwakaba mutsumi has long green hair, yellow eyes, a hair ornament, a disgusted expression,\nwakaba mutsumi wears a black showgirl skirt, red shorts with pantyhose underneath, see-through sleeves, a green brooch, a choker, black pantyhose,, raising one leg toward the viewer so her black-pantyhose sole faces the camera, steam rising from the sole, with a steaming tall leather boot placed on the floor,\nwakaba mutsumi, solo, foot focus, soles, black pantyhose, raised leg, steam, disgust, looking at viewer, black skirt, red shorts, see-through sleeves, green brooch, choker, high heel boots removed, boot on ground, floor, simple background, white background, full body,\nNltags: wakaba mutsumi raises one foot directly toward the camera, presenting the steaming black-pantyhose sole as the focal point, her other boot rests steaming on the floor nearby"
+    }
+  },
+  {
+    "task_id": "a30844314446429da512a518dcd26634",
+    "time": "2026-10-20T15:20:44.142170",
+    "original_prompt": "-r 丰川祥子穿着oblivionis的衣服（没有面具），裙子经过剪裁，只留下身体侧面的部分，露出被黑丝包裹的双腿",
+    "ok": false,
+    "error": "nai_character_plan_failed",
+    "outputs": [],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"丰川祥子\",\"aliases\":[],\"clothing\":\"oblivionis的衣服\",\"clothing_source\":\"oblivionis\",\"clothing_changes\":[{\"operation\":\"keep_only\",\"slots\":[\"lower_body.all\"],\"color\":null,\"source_text\":\"裙子经过剪裁，只留下身体侧面的部分\"}],\"appearance_changes\":[]}]}",
+      "nai_structure_initial_validation_errors": [],
+      "nai_interaction_initial_validation_errors": [],
+      "nai_text_initial_validation_errors": [],
+      "nai_identity_initial_validation_errors": [
+        "Review omitted/source-classified identity oblivionis: return its visible instance or identity_review with visibility visible/donor/quoted/offscreen and exact contextual source_text. Shared clothing descriptions do not turn a co-present person into a donor."
+      ],
+      "nai_appearance_initial_validation_errors": [],
+      "prompt_llm_retry_content": "{\"composition_analysis\":{\"viewpoint\":\"portrait medium-full shot, slightly angled three-quarter front view, focus on the trimmed skirt's side panels and the black pantyhose-covered legs\",\"layout\":\"Togawa Sakiko alone, centered, standing with legs together and slightly turned so the side-only skirt panels and exposed front/back read clearly\",\"relations\":\"solo scene, no interpersonal interaction; skirt retains only side portions, front and back openings reveal black-pantyhose legs; no mask\"},\"global_prompt\":\"1girl, solo, full_body, standing, simple_background, white_background, 画面中只有丰川祥子一人，她身穿 oblivionis 的服装但没有戴面具，裙子被剪裁后只保留身体两侧的部分，前方与后方镂空，露出被黑丝包裹的双腿。\",\"characters\":[{\"name\":\"togawa_sakiko\",\"anchor_id\":\"target_1\",\"source_text\":[\"丰川祥子穿着oblivionis的衣服（没有面具），裙子经过剪裁，只留下身体侧面的部分，露出被黑丝包裹的双腿\"],\"prompt\":\"girl, togawa_sakiko, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, yellow_eyes_blue_hair, oblivionis_(bang_dream!), cosplay, sleeveless, bare_arms, cutout_skirt, side_slit, black_pantyhose, standing, no_mask, bare_face, expressionless, 丰川祥子留着蓝色长发和两侧发束，黄色眼睛，身穿 oblivionis 的服装但没有戴面具，露出了脸；裙子经过剪裁，只留下身体两侧的部分，前方和后方都镂空，露出被黑丝包裹的双腿，她安静站在白色背景前。\",\"interaction_tags\":[],\"position_reason\":\"solo scene; centered with full body in frame so the trimmed side-only skirt and black-pantyhose legs are both legible\",\"x\":0.5,\"y\":0.54}]}",
+      "nai_structure_retry_validation_errors": [],
+      "nai_interaction_retry_validation_errors": [],
+      "nai_text_retry_validation_errors": [],
+      "nai_identity_retry_validation_errors": [
+        "Review omitted/source-classified identity oblivionis: return its visible instance or identity_review with visibility visible/donor/quoted/offscreen and exact contextual source_text. Shared clothing descriptions do not turn a co-present person into a donor."
+      ],
+      "nai_appearance_retry_validation_errors": [],
+      "llm_error": "nai_identity_plan_invalid: Review omitted/source-classified identity oblivionis: return its visible instance or identity_review with visibility visible/donor/quoted/offscreen and exact contextual source_text. Shared clothing descriptions do not turn a co-present person into a donor.",
+      "nai_character_plan_raw": "{\"composition_analysis\":{\"viewpoint\":\"portrait medium-full shot, slightly angled three-quarter front view, focus on the trimmed skirt's side panels and the black pantyhose-covered legs\",\"layout\":\"Togawa Sakiko alone, centered, standing with legs together and slightly turned so the side-only skirt panels and exposed front/back read clearly\",\"relations\":\"solo scene, no interpersonal interaction; skirt retains only side portions, front and back openings reveal black-pantyhose legs; no mask\"},\"global_prompt\":\"1girl, solo, full_body, standing, simple_background, white_background, 画面中只有丰川祥子一人，她身穿 oblivionis 的服装但没有戴面具，裙子被剪裁后只保留身体两侧的部分，前方与后方镂空，露出被黑丝包裹的双腿。\",\"characters\":[{\"name\":\"togawa_sakiko\",\"anchor_id\":\"target_1\",\"source_text\":[\"丰川祥子穿着oblivionis的衣服（没有面具），裙子经过剪裁，只留下身体侧面的部分，露出被黑丝包裹的双腿\"],\"prompt\":\"girl, togawa_sakiko, blue_hair, long_hair, sidelocks, two_side_up, yellow_eyes, yellow_eyes_blue_hair, oblivionis_(bang_dream!), cosplay, sleeveless, bare_arms, cutout_skirt, side_slit, black_pantyhose, standing, no_mask, bare_face, expressionless, 丰川祥子留着蓝色长发和两侧发束，黄色眼睛，身穿 oblivionis 的服装但没有戴面具，露出了脸；裙子经过剪裁，只留下身体两侧的部分，前方和后方都镂空，露出被黑丝包裹的双腿，她安静站在白色背景前。\",\"interaction_tags\":[],\"position_reason\":\"solo scene; centered with full body in frame so the trimmed side-only skirt and black-pantyhose legs are both legible\",\"x\":0.5,\"y\":0.54}]}"
+    }
+  },
+  {
+    "task_id": "a7db70f43c6643138edb3692f003e562",
+    "time": "2026-10-20T15:21:21.784875",
+    "original_prompt": "丰川祥子穿着oblivionis的衣服（没有面具），裙子经过剪裁，只留下身体侧面的部分，露出被黑丝包裹的双腿",
+    "ok": true,
+    "error": "",
+    "outputs": [
+      "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\workspace\\outputs\\images\\20261020-152131-010854-e52a1f11_comfyui_1.png"
+    ],
+    "summary": {
+      "semantic_plan_validation_errors": [],
+      "structured_initial_validation_errors": [],
+      "wardrobe_authority": {
+        "has_character_plans": true,
+        "all_creative": false,
+        "cached_tags": [
+          "black_corset",
+          "red_shirt",
+          "black_skirt",
+          "puffy_short_sleeves",
+          "black_gloves",
+          "hair_ribbon",
+          "black_ribbon",
+          "black_mask",
+          "masquerade_mask",
+          "brooch",
+          "black_pantyhose",
+          "black_boots",
+          "high_heel_boots",
+          "white_shirt",
+          "collared_shirt",
+          "haneoka_school_uniform",
+          "grey_jacket",
+          "plaid_skirt",
+          "grey_skirt",
+          "pleated_skirt",
+          "long_sleeves",
+          "neck_ribbon",
+          "green_necktie",
+          "diagonal-striped_necktie",
+          "striped_necktie",
+          "white_socks",
+          "black_shoes"
+        ],
+        "explicit_tags": [],
+        "selected_tags": [
+          "black_skirt"
+        ],
+        "source_grounding_tags": [
+          "black_skirt"
+        ],
+        "unbound_grounding_tags": [],
+        "removed_tags": [
+          "black_corset",
+          "red_shirt",
+          "puffy_short_sleeves",
+          "black_gloves",
+          "hair_ribbon",
+          "black_ribbon",
+          "black_mask",
+          "masquerade_mask",
+          "brooch",
+          "black_pantyhose",
+          "black_boots",
+          "high_heel_boots"
+        ],
+        "stale_cached_tags": [
+          "black_corset",
+          "red_shirt",
+          "puffy_short_sleeves",
+          "black_gloves",
+          "hair_ribbon",
+          "black_ribbon",
+          "black_mask",
+          "masquerade_mask",
+          "brooch",
+          "black_pantyhose",
+          "black_boots",
+          "high_heel_boots",
+          "white_shirt",
+          "collared_shirt",
+          "haneoka_school_uniform",
+          "grey_jacket",
+          "plaid_skirt",
+          "grey_skirt",
+          "pleated_skirt",
+          "long_sleeves",
+          "neck_ribbon",
+          "green_necktie",
+          "diagonal-striped_necktie",
+          "striped_necktie",
+          "white_socks",
+          "black_shoes"
+        ]
+      },
+      "semantic_character_outfits": [
+        {
+          "target_anchor_id": "target_1",
+          "target": "丰川祥子",
+          "wardrobe_kind": "outfit_source",
+          "wardrobe_anchor_id": "intent_source_1_target_1_profile",
+          "effective_tags": [
+            "black_skirt"
+          ],
+          "removed_tags": [
+            "black_corset",
+            "red_shirt",
+            "puffy_short_sleeves",
+            "black_gloves",
+            "hair_ribbon",
+            "black_ribbon",
+            "black_mask",
+            "masquerade_mask",
+            "brooch",
+            "black_pantyhose",
+            "black_boots",
+            "high_heel_boots"
+          ],
+          "appearance_tags": [
+            "blue_hair",
+            "long_hair",
+            "yellow_eyes",
+            "sidelocks",
+            "two_side_up",
+            "large_breasts",
+            "yellow_eyes_blue_hair"
+          ],
+          "complete_named_profile": true,
+          "resolution_state": "resolved",
+          "unresolved_evidence": []
+        }
+      ],
+      "llm_error": "",
+      "semantic_plan_raw": "{\"characters\":[{\"name\":\"丰川祥子\",\"aliases\":[],\"clothing\":\"oblivionis的衣服（没有面具）\",\"clothing_source\":\"oblivionis\",\"clothing_changes\":[{\"operation\":\"keep_only\",\"slots\":[\"lower_body.skirt\"],\"color\":null,\"source_text\":\"裙子经过剪裁，只留下身体侧面的部分\"},{\"operation\":\"remove\",\"slots\":[\"face_accessory.mask\"],\"color\":null,\"source_text\":\"没有面具\"}],\"appearance_changes\":[]}]}",
+      "prompt_llm_initial_content": "{Count: 1girl}\n{Characters: togawa_sakiko}\n{Copyright: bang_dream!}\n{Identity: togawa_sakiko has blue hair in two side up with long sidelocks falling along her face, yellow eyes, and large breasts}\n{Details: togawa_sakiko wears a black outfit with a black skirt cut away at the front and back so only the side panels remain, black pantyhose covering her legs, and no mask, standing with her legs visible through the side openings of the skirt}\n{Tags: 1girl, solo, blue hair, long hair, two side up, sidelocks, yellow eyes, black pantyhose, black skirt, side slit, skirt cut, asymmetrical skirt, standing, simple background, white background, full body}\n{Nltags: togawa_sakiko stands alone against a plain white background; her black skirt is cut so that only the side portions remain, exposing her legs in black pantyhose; no mask covers her face. background_mode_default_portrait}",
+      "prompt_llm_retry_content": "",
+      "final_prompt": "masterpiece, best quality, questionable, 1girl,\ntogawa sakiko,\nbang dream!, 0.95::artist:ciloranko::, 1.2::artist:lemonail::, 0.4::artist:quasarcake::, 0.3::artist:nou ( nounknown ) ::, 0.1::artist:akina422 ::, 0.1::artist:watanabe tomari::, 0.1::artist:kamiya yuu::, 0.5::artist:hosato mikine::, 0.2::whoopin::, year 2024, year 2025, year 2026, dynamic angle, 2::thick outlines::, 1.5::dithering::, oekaki, skindentation,\ntogawa sakiko has blue hair in two side up with long sidelocks falling along her face, yellow eyes, large breasts,\ntogawa sakiko wears a black outfit with a black skirt cut away at the front and back so only the side panels remain covering her legs, and no mask, standing with her legs visible through the side openings of the skirt,\ntogawa sakiko, 1girl, solo, black skirt, side slit, skirt cut, asymmetrical skirt, standing, simple background, white background, full body,\nNltags: togawa sakiko stands alone against a plain white background, her black skirt is cut so that only the side portions remain, exposing her legs, no mask covers her face."
+    }
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-22",
+  "as_of": "2026-10-22T12:58:24+08:00",
+  "accepted_requests": 164,
+  "users": 6,
+  "task_status": {
+    "total_records": 164,
+    "success": 159,
+    "failed": 5
+  },
+  "latest_task_time": "2026-10-22T12:53:38.221299",
+  "source": "C:\\Users\\69493\\.astrbot_launcher\\instances\\1617d9a4-b150-48c1-a04e-cc719eaf7a73\\core\\data\\plugin_data\\astrbot_plugin_anima_master\\tasks",
+  "basis": "Accepted text-to-image requests; known automatic retries excluded; retained task records only. Live usage file unchanged."
+}

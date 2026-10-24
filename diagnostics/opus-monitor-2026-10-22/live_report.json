@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "interval_minutes": 120,
+  "status": "ok",
+  "checked_at": "2026-10-22T14:08:13+00:00",
+  "next_update_at": "2026-10-22T16:08:13.735352+00:00",
+  "stale": false,
+  "message": "",
+  "subscription": {
+    "active": true,
+    "tier": 3,
+    "percent": 85,
+    "is_negative": false,
+    "purchased_percent": 0,
+    "time_until_next_percent": 7888
+  }
+}

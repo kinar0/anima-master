@@ -267,13 +267,25 @@ class ToolboxVocabulary:
                 effective.append(entry)
             entries = [e for e in effective if e['tag'] not in disabled]
             by_tag = {e['tag']:e for e in entries}
+            literal_index: dict[str, Any] = {}
             for number, entry in enumerate(entries):
                 grams = set()
                 for name in (entry['tag'], *(s for k in _FIELDS for s in entry[k])):
                     grams.update(_grams(normalize(name)))
+                    # Search queries are whole clauses, often containing several
+                    # names/concepts. Preserve exact local aliases independently
+                    # of the clause's fuzzy overlap score. Build once per snapshot.
+                    for literal in {name.lower(), name.lower().replace('_', ' ')}:
+                        if not 2 <= len(literal) <= 48:
+                            continue
+                        node = literal_index
+                        for char in literal:
+                            node = node.setdefault(char, {})
+                        node.setdefault('', set()).add(entry['tag'])
                 for gram in grams:
                     index[gram].append(number)
             self._data = {"entries":entries, "by_tag":by_tag, "index":dict(index), "gloss":gloss,
+                          "literal_index":literal_index,
                           "categories":dict(categories), "deprecated":deprecated,
                           "catalog":effective, "base":base, "base_gloss":base_gloss,
                           "base_categories":base_categories, "overrides":overrides,
@@ -343,18 +355,49 @@ class ToolboxVocabulary:
 
     async def prepare(self, *, directory: str, mode: str, text: str,
                       mappings: tuple[tuple[str,str], ...] = (), phrases: tuple[str,...] = (),
+                      protected_phrases: tuple[str,...] = (),
                       max_chars: int = 1200) -> VocabularyPacket:
         if mode not in {"observe", "reference"}:
             return VocabularyPacket(diagnostics={"mode":"off"})
         if not directory.strip():
             return VocabularyPacket(diagnostics={"mode":mode, "state":"unconfigured"})
         try:
-            return await asyncio.to_thread(self._prepare, directory, mode, text, mappings, phrases, max_chars)
+            return await asyncio.to_thread(self._prepare, directory, mode, text, mappings, phrases, max_chars, protected_phrases)
         except Exception as exc:
             return VocabularyPacket(diagnostics={"mode":mode,"state":"unavailable","error_type":type(exc).__name__})
 
+    @staticmethod
+    def _literal_matches(data: dict[str, Any], text: str) -> list[tuple[str, int, int, tuple[str, ...]]]:
+        # Keep original character coordinates for negation/quotation checks.
+        # Lowercase each character only when it does not expand its length.
+        folded = ''.join(c.lower() if len(c.lower()) == 1 else c for c in text[:2000])
+        matches = []
+        for start in range(len(folded)):
+            node = data['literal_index']
+            for end in range(start, min(len(folded), start+48)):
+                node = node.get(folded[end])
+                if node is None:
+                    break
+                if '' not in node:
+                    continue
+                phrase = text[start:end+1]
+                if not has_cjk(phrase) and (
+                    (start and text[start-1].isalnum())
+                    or (end+1 < len(text) and text[end+1].isalnum())
+                ):
+                    continue
+                tags = tuple(sorted(node[''], key=lambda tag: (-data['by_tag'][tag]['count'], tag)))[:2]
+                matches.append((phrase, start, end+1, tags))
+        # Choose complete longer aliases before suppression, so negating a
+        # named concept cannot expose its internal shorter positive concept.
+        selected = []
+        for item in sorted(matches, key=lambda row: (row[1]-row[2], row[1])):
+            if not any(item[1] < other[2] and other[1] < item[2] for other in selected):
+                selected.append(item)
+        return sorted(selected, key=lambda row: row[1])
+
     def _prepare(self, directory: str, mode: str, text: str, mappings: tuple[tuple[str,str], ...],
-                 phrases: tuple[str,...], max_chars: int) -> VocabularyPacket:
+                 phrases: tuple[str,...], max_chars: int, protected_phrases: tuple[str,...] = ()) -> VocabularyPacket:
         started = time.perf_counter()
         with self._lock:
             try:
@@ -380,6 +423,14 @@ class ToolboxVocabulary:
                     break
             for alias, tag in mappings:
                 add(alias, tag)
+            literal_candidates = {}
+            protected = [m.span() for phrase in protected_phrases if phrase
+                         for m in re.finditer(re.escape(phrase), text, re.I)]
+            for phrase, a, b, tags in self._literal_matches(data, text):
+                if context.suppressed(a,b) or any(x <= a and b <= y for x,y in protected):
+                    continue
+                queries.append((phrase, a, b, None))
+                literal_candidates[(phrase,a,b)] = tags
             for phrase in phrases:
                 add(phrase)
             for m in re.finditer(r"[^，,。；;！!？?\n：:]+", text[:2000]):
@@ -399,6 +450,9 @@ class ToolboxVocabulary:
             for query,a,b,canonical in selected[:8]:
                 if canonical is not None:
                     candidates = ([{"tag":canonical,"score":1.0,"field":"configured_mapping"}] if canonical in data["by_tag"] else [])
+                elif (query,a,b) in literal_candidates:
+                    candidates = [{"tag":tag,"score":1.0,"field":"literal_alias"}
+                                  for tag in literal_candidates[(query,a,b)]]
                 else:
                     candidates, clipped = self._search(data, query)
                     clipped_searches += clipped

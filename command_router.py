@@ -178,6 +178,10 @@ def parse_hard_route(text: str) -> tuple[str, str] | None:
         # Administrative commands must be recognized before the /anm fallback,
         # which otherwise treats every unknown suffix as an image prompt.
         for keyword, action in (
+            ("stats", "generation_stats"),
+            ("生图统计", "generation_stats"),
+            ("今日生图", "generation_stats"),
+            ("生图次数", "generation_stats"),
             ("term_preview", "term_preview"),
             ("名词翻译预览", "term_preview"),
             ("term_translate", "term_translate"),

@@ -2,7 +2,7 @@
 import asyncio
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urljoin, urlsplit
 
 from astrbot.dashboard.services.plugin_page_service import PluginPageService
 
@@ -33,28 +33,33 @@ class Links(HTMLParser):
         self.items.append((tag, dict(attrs)))
 
 
-def test_compat_entry_roundtrip_uses_real_page_ticket_rewriting():
+def test_compat_entry_roundtrip_preserves_real_path_token():
     root = Path(__file__).resolve().parents[1]
     service = object.__new__(PluginPageService)
 
+    base = service.build_plugin_page_view_content_path(
+        'astrbot_plugin_anima_master', 'wardrobe', 'test-page-ticket',
+    )
+
     def rendered(path):
-        return Links(service.rewrite_plugin_page_html(
+        return Links(service.process_plugin_page_html(
             (root/'pages/wardrobe'/path).read_text(encoding='utf-8'),
-            'astrbot_plugin_anima_master', 'wardrobe', path,
             theme=None, extra_query_params={'asset_token':'test-page-ticket'},
         )).items
 
     entry = next(attrs['href'] for _, attrs in rendered('index.html') if attrs.get('id') == 'toolbox-entry')
     back = next(attrs['href'] for _, attrs in rendered('toolbox/index.html') if attrs.get('id') == 'return-wardrobe')
-    assert urlsplit(entry).path.endswith('/wardrobe/toolbox/index.html')
-    assert urlsplit(back).path.endswith('/wardrobe/index.html')
-    for url in (entry, back):
-        assert parse_qs(urlsplit(url).query)['asset_token'] == ['test-page-ticket']
+    entry_url = urljoin(base, entry)
+    back_url = urljoin(entry_url, back)
+    assert entry_url == base + 'toolbox/index.html'
+    assert back_url == base + 'index.html'
     assets = [attrs.get('src', attrs.get('href', '')) for tag, attrs in rendered('toolbox/index.html') if tag in {'script','link'}]
     for name in ('app.js', 'style.css'):
         url = next(x for x in assets if urlsplit(x).path.endswith('/'+name))
-        assert urlsplit(url).path.endswith('/wardrobe/toolbox/'+name)
-        assert parse_qs(urlsplit(url).query)['asset_token'] == ['test-page-ticket']
+        assert urljoin(entry_url, url) == base + 'toolbox/' + name
+    bridge = next(attrs['src'] for tag, attrs in rendered('toolbox/index.html')
+                  if tag == 'script' and '/bridge-sdk.js' in attrs.get('src', ''))
+    assert parse_qs(urlsplit(bridge).query)['asset_token'] == ['test-page-ticket']
 
 
 def test_compatibility_bundle_stays_in_sync_with_standalone_editor():

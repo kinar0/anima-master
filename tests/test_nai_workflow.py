@@ -348,6 +348,16 @@ def test_nai_global_restores_numeric_emphasis_artist_tags():
     )
 
 
+def test_nai_global_restores_wrapped_multi_tag_emphasis_without_duplicates():
+    artists = (
+        "<artist> 1.2::artist:alpha, artist:beta_(scope):: </artist>, "
+        "<style> -2::yellow themed, orange themed:: </style>"
+    )
+    expected = f"{artists}, 2girls, bedroom"
+    assert preserve_nai_global_artist_tags("2girls, bedroom", artists) == expected
+    assert preserve_nai_global_artist_tags(expected, artists) == expected
+
+
 def nai_graph() -> dict:
     return json.loads((PLUGIN_DIR / "nai_api.json").read_text(encoding="utf-8"))
 

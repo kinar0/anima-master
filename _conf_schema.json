@@ -51,6 +51,18 @@
           "custom_workflow_enabled": false
         }
       },
+      "opus_usage_monitor_enabled": {
+        "description": "显示并定期查询 Opus 额度",
+        "type": "bool",
+        "default": true,
+        "hint": "在插件的服装词库页面顶部显示 NAI V5 Opus 剩余额度。通过 ComfyUI 扩展读取同一 API 账户，不提交生图。需更新配套 NAI 扩展并重启 ComfyUI；查询失败保留旧值并标注。"
+      },
+      "opus_usage_refresh_minutes": {
+        "description": "Opus 额度更新间隔（分钟）",
+        "type": "int",
+        "default": 120,
+        "hint": "默认每 2 小时后台更新一次；可设 240、360 等更长时间，最短 5 分钟、最长 10080 分钟。打开页面只读取缓存，不会额外查询账户。修改后保存并重载插件。"
+      },
       "custom_workflow_enabled": {
         "description": "使用自定义 ComfyUI 工作流",
         "type": "bool",
@@ -333,7 +345,7 @@
       "danbooru_semantic_system_prompt": {
         "description": "LLM1 系统提示词",
         "type": "string",
-        "default": "Extract only what the user said about each visible character. Copy phrases exactly, use null for unknown clothing, never guess tags or lore, and return JSON only.",
+        "default": "Extract only what the user said about each visible character. Copy phrases exactly, preserve the user's complete visible-character roster without merging or omitting anyone, use null for unknown clothing, never guess tags or lore, and return JSON only.",
         "hint": "控制第一次 LLM 的逐角色意图 JSON：可见角色、明确服装或未知、服装修改、外貌修改。LLM1 不猜 Danbooru tag；主机随后匹配本地角色与衣柜证据。留空时使用内置默认值。",
         "collapsed": true,
         "condition": {
@@ -992,11 +1004,17 @@
         "default": 0,
         "hint": "按 QQ 号统计；0 表示不限制。请求被接受时计数，多人候选和自动重试不重复计数。"
       },
+      "daily_total_generation_limit": {
+        "description": "全体每天最大总生图次数",
+        "type": "int",
+        "default": 0,
+        "hint": "所有用户（含白名单）共享的每日总上限；0 表示不限制，但仍统计。按已接受的文生图请求计数，失败不返还，多人候选和自动重试不重复计数。通过 /anm 生图统计 查询。"
+      },
       "generation_whitelist_sender_ids": {
         "description": "生图免限额白名单",
         "type": "list",
         "default": [],
-        "hint": "填写 QQ 号或 AstrBot sender_id；白名单可绕过每日上限和“限制可用用户”，但不能绕过黑名单。",
+        "hint": "填写 QQ 号或 AstrBot sender_id；白名单可绕过个人每日上限和“限制可用用户”，但不能绕过全体总上限或黑名单。",
         "collapsed": true,
         "items": {
           "type": "string"

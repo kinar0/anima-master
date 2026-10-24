@@ -42,6 +42,10 @@ ComfyUI 需要允许外部访问。常见启动参数：
 
 不要把本机 `D:\...` 路径配置给服务器 NapCat。
 
+## Opus 额度查询
+
+Opus 额度显示也通过 `comfyui_base_url` 读取 ComfyUI NAI 扩展的 `/rs_nai/opus_usage`，无论同机或跨机都不读取远端文件或复制 API 凭据。更新扩展后需要重启 ComfyUI 加载新路由；404 表示尚未加载该接口，不会启动 ComfyUI 或阻塞生图。AstrBot 默认每 120 分钟后台查询，页面只读缓存，详见 [额度显示配置](configuration.md#opus-剩余额度条)。
+
 ## 由 AstrBot 启动 ComfyUI
 
 `auto_start` 只会在 AstrBot 所在机器执行命令。

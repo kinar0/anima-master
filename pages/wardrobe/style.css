@@ -131,6 +131,18 @@ h1 { margin: 0; font-size: clamp(30px, 4vw, 48px); line-height: 1.1; letter-spac
 @media (max-width: 680px) { .app-shell { padding: 25px 13px 100px; }.hero { flex-direction: column; }.hero-actions { width: 100%; flex-wrap: wrap; }.connection { margin-right: auto; }.overview { grid-template-columns: 1fr 1fr; }.overview article { min-height: 104px; padding: 16px; }.library-toolbar { padding: 10px; }.tabs { overflow-x: auto; }.tab { white-space: nowrap; }.toolbar-actions { flex-direction: column; align-items: stretch; }.search { min-height: 40px; }.section-intro { padding: 22px 18px 15px; }.entry, .entry.profile { grid-template-columns: 1fr auto; padding: 14px; }.entry .field, .entry .wide { grid-column: 1 / 2; }.delete-button { grid-column: 2; grid-row: 1; }.entry-list { padding: 0 10px 14px; } }
 @media (max-width: 680px) { .batch-panel { padding: 18px; }.batch-heading, .batch-heading-actions { align-items: stretch; flex-direction: column; }.batch-stats { grid-template-columns: repeat(2, 1fr); }.batch-actions { align-items: stretch; flex-direction: column; }.batch-actions label { min-width: 0; }.batch-pagination { align-items: stretch; flex-direction: column; } }
 @media (max-width: 680px) { .library-pagination { padding: 12px 18px; }.pagination { align-items: stretch; flex-direction: column; }.pagination-actions { gap: 7px; }.entry > .field-stack { grid-column: 1 / 2; } }
+.opus-panel { padding: 20px 24px; margin: 22px 0; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.opus-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.opus-heading h2 { margin: 3px 0 12px; font-size: 19px; }
+#opus-percent { color: var(--accent); font-size: 30px; }
+#opus-progress { width: 100%; height: 12px; accent-color: var(--accent); border: 0; border-radius: 8px; overflow: hidden; }
+#opus-progress::-webkit-progress-bar { background: var(--line); border-radius: 8px; }
+#opus-progress::-webkit-progress-value { background: var(--accent); border-radius: 8px; }
+.opus-low #opus-progress { accent-color: var(--danger); }
+.opus-low #opus-progress::-webkit-progress-value { background: var(--danger); }
+.opus-low #opus-percent { color: var(--danger); }
+.opus-stale #opus-progress { opacity: .45; }
+#opus-status { margin: 10px 0 6px; font-size: 12px; }
 details > summary { cursor: pointer; padding: 12px 0; color: var(--accent); font-weight: 700; }
 .review-list { display: grid; gap: 16px; margin: 18px 0; }
 .review-card { padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-solid); }

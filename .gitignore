@@ -13,5 +13,10 @@ config.local.toml
 AGENTS.md
 /data/
 
+# Keep diagnostic evidence, but exclude test scratch data and cold-cache state.
+diagnostics/**/pytest-temp/
+diagnostics/**/pytest*.xml
+diagnostics/hitori-learning-2026-10-24/cold-cache-learning/*/profiles.json
+
 # Download the censor model from Hugging Face; do not commit model weights.
 打码功能/*.pt

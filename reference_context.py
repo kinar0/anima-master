@@ -6,8 +6,10 @@ from astrbot.api.event import AstrMessageEvent
 
 try:
     from .llm_diagnostics import LLMDiagnostics
+    from .provider_selection import image_provider_id
 except ImportError:
     from llm_diagnostics import LLMDiagnostics
+    from provider_selection import image_provider_id
 
 
 class ReferenceContextBuilder:
@@ -62,13 +64,7 @@ class ReferenceContextBuilder:
         self._last_summary.set(dict(value))
 
     async def _image_caption_provider_id(self, event: AstrMessageEvent) -> str:
-        cfg = self._context.get_config(umo=event.unified_msg_origin)
-        provider_settings = cfg.get("provider_settings", {})
-        return str(
-            provider_settings.get("default_image_caption_provider_id")
-            or provider_settings.get("default_provider_id")
-            or ""
-        ).strip()
+        return await image_provider_id(self._context, event)
 
     async def image_spell_payload(
         self,

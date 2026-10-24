@@ -1,0 +1,183 @@
+{
+  "scope": "Local retrieval replay only; no model call, ComfyUI submission or image validation.",
+  "tasks": [
+    {
+      "task_id": "1fb51b8e244d44eba3bf52709e12f60f",
+      "time": "2026-10-22T11:36:14.948285",
+      "original_prompt": "-r 执事爱音公主抱若叶睦（禁止使用校服）",
+      "before": {
+        "mode": "reference",
+        "state": "ready",
+        "queries": 2,
+        "entries": 36893,
+        "candidates": [],
+        "rows_chars": 0,
+        "added_chars_upper_bound": 0,
+        "max_chars": 1200,
+        "load_ms": 6070.03,
+        "elapsed_ms": 12.78,
+        "clipped_searches": 0,
+        "weak_without_literal": 0
+      },
+      "after": {
+        "mode": "reference",
+        "state": "ready",
+        "queries": 3,
+        "entries": 36893,
+        "candidates": [
+          {
+            "tag": "butler",
+            "score": 1.0,
+            "field": "literal_alias"
+          },
+          {
+            "tag": "princess_carry",
+            "score": 1.0,
+            "field": "literal_alias"
+          }
+        ],
+        "rows_chars": 72,
+        "added_chars_upper_bound": 672,
+        "max_chars": 1200,
+        "load_ms": 8159.78,
+        "elapsed_ms": 8181.59,
+        "clipped_searches": 0,
+        "weak_without_literal": 0
+      },
+      "reference_rows": "- 执事 => butler — 男管家，富人家的男仆\n- 公主抱 => princess_carry — 公主抱，单臂托上身另一臂托腿抱起某人",
+      "protected_names": [
+        "爱音",
+        "若叶睦"
+      ],
+      "original_writer_interactions": [
+        [
+          "source#princess carry",
+          "source#holding"
+        ],
+        [
+          "target#princess carry",
+          "target#holding"
+        ]
+      ]
+    },
+    {
+      "task_id": "7b5af409c5d042978569882e0cdffa6a",
+      "time": "2026-10-22T11:36:59.356911",
+      "original_prompt": "-r 执事爱音公主抱若叶睦（禁止使用校服）（俩人不需要看镜头）",
+      "before": {
+        "mode": "reference",
+        "state": "ready",
+        "queries": 2,
+        "entries": 36893,
+        "candidates": [],
+        "rows_chars": 0,
+        "added_chars_upper_bound": 0,
+        "max_chars": 1200,
+        "load_ms": 6070.03,
+        "elapsed_ms": 3.77,
+        "clipped_searches": 0,
+        "weak_without_literal": 0
+      },
+      "after": {
+        "mode": "reference",
+        "state": "ready",
+        "queries": 2,
+        "entries": 36893,
+        "candidates": [
+          {
+            "tag": "princess_carry",
+            "score": 1.0,
+            "field": "literal_alias"
+          }
+        ],
+        "rows_chars": 44,
+        "added_chars_upper_bound": 644,
+        "max_chars": 1200,
+        "load_ms": 8159.78,
+        "elapsed_ms": 2.66,
+        "clipped_searches": 0,
+        "weak_without_literal": 0
+      },
+      "reference_rows": "- 公主抱 => princess_carry — 公主抱，单臂托上身另一臂托腿抱起某人",
+      "protected_names": [
+        "执事爱音",
+        "若叶睦"
+      ],
+      "original_writer_interactions": [
+        [
+          "source#bridal_carry"
+        ],
+        [
+          "target#bridal_carry"
+        ]
+      ]
+    },
+    {
+      "task_id": "1d422e8ed40b4ee0a614ed77dd40b730",
+      "time": "2026-10-22T11:38:15.969457",
+      "original_prompt": "-r 执事爱音公主抱淡绿色礼服若叶睦（禁止使用校服）（俩人不需要看镜头）",
+      "before": {
+        "mode": "reference",
+        "state": "ready",
+        "queries": 3,
+        "entries": 36893,
+        "candidates": [],
+        "rows_chars": 0,
+        "added_chars_upper_bound": 0,
+        "max_chars": 1200,
+        "load_ms": 6070.03,
+        "elapsed_ms": 11.19,
+        "clipped_searches": 0,
+        "weak_without_literal": 0
+      },
+      "after": {
+        "mode": "reference",
+        "state": "ready",
+        "queries": 4,
+        "entries": 36893,
+        "candidates": [
+          {
+            "tag": "princess_carry",
+            "score": 1.0,
+            "field": "literal_alias"
+          },
+          {
+            "tag": "green_theme",
+            "score": 1.0,
+            "field": "literal_alias"
+          },
+          {
+            "tag": "formal_clothes",
+            "score": 1.0,
+            "field": "literal_alias"
+          },
+          {
+            "tag": "evening_gown",
+            "score": 1.0,
+            "field": "literal_alias"
+          }
+        ],
+        "rows_chars": 165,
+        "added_chars_upper_bound": 765,
+        "max_chars": 1200,
+        "load_ms": 8159.78,
+        "elapsed_ms": 3.72,
+        "clipped_searches": 0,
+        "weak_without_literal": 0
+      },
+      "reference_rows": "- 公主抱 => princess_carry — 公主抱，单臂托上身另一臂托腿抱起某人\n- 绿色 => green_theme — 以绿色为主色调的画面\n- 礼服 => formal_clothes — 正式服装场景，如西装、礼服、晚礼服、皮鞋等\n- 礼服 => evening_gown — 晚礼服，及小腿到全长的正式女装长裙",
+      "protected_names": [
+        "执事爱音",
+        "若叶睦"
+      ],
+      "original_writer_interactions": [
+        [
+          "source#princess_carry"
+        ],
+        [
+          "target#princess_carry"
+        ]
+      ]
+    }
+  ]
+}

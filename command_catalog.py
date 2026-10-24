@@ -19,6 +19,10 @@ class CommandEntry:
 COMMAND_ENTRIES: tuple[CommandEntry, ...] = (
     CommandEntry("help", ("help", "帮助", "指令表", "指令", "菜单")),
     CommandEntry(
+        "generation_stats", ("stats", "生图统计", "今日生图", "生图次数"),
+        "- /anm 生图统计：查看今日总生图次数、总上限和个人次数", True,
+    ),
+    CommandEntry(
         "status", ("status", "状态"), "- /anm 状态：查看 ComfyUI / Anima 状态", True
     ),
     CommandEntry(
@@ -197,6 +201,7 @@ def build_help_text(img2img_enabled: bool = False) -> str:
             "旧多人模式：/anm 多人 <描述>（不常用兼容入口，仅 2–4 人）",
             "图片：附图或引用图片后用 /anm 解析法术、/anm 反推；/anm 改图 <要求> 需在配置中开启",
             "状态：/anm 状态｜/anm 诊断｜/anm 调试状态",
+            "次数：/anm 生图统计（全体今日总次数、总上限和个人次数）",
             "画师组：/anm 查看画师组｜/anm 创建画师组 <名称>=<tags>｜/anm 切换画师组 <名称>｜/anm 删除画师组 <名称>",
             "固定角色：/anm 添加角色 <名称>=<tags>",
             "同义前缀：/anima、/comfyui",

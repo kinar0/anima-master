@@ -70,7 +70,7 @@
   "prompt_builder_provider_id": "",
 
   // LLM1 只抽取逐角色原文意图；本地匹配发生在其后。留空时使用插件内置系统提示词。
-  "danbooru_semantic_system_prompt": "Extract only what the user said about each visible character. Copy phrases exactly, use null for unknown clothing, never guess tags or lore, and return JSON only.",
+  "danbooru_semantic_system_prompt": "Extract only what the user said about each visible character. Copy phrases exactly, preserve the user's complete visible-character roster without merging or omitting anyone, use null for unknown clothing, never guess tags or lore, and return JSON only.",
 
   // 提示词优化模型的输出控制。
   "prompt_builder_max_tokens": 1000,
@@ -177,7 +177,12 @@
   "allowed_sender_ids": [],
   // 每个 QQ 每天最多发起几次生图；0 表示不限。
   "daily_generation_limit": 0,
-  // 免每日上限，也不受 allowed_sender_ids 限制；黑名单仍然优先。
+  // 全体用户（含白名单）共享的每日总次数上限；0 不限额但仍统计。
+  "daily_total_generation_limit": 0,
+  // Opus 额度条：通过 ComfyUI 读取账户；默认每两小时更新一次。
+  "opus_usage_monitor_enabled": true,
+  "opus_usage_refresh_minutes": 120,
+  // 免个人每日上限，也不受 allowed_sender_ids 限制；仍受全体总上限和黑名单约束。
   "generation_whitelist_sender_ids": [],
   // 命中后禁止使用整个插件。
   "generation_blacklist_sender_ids": [],

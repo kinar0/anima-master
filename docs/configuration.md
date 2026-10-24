@@ -149,6 +149,19 @@ tag 或整句话；单人动作应留空。模型在同次直接写作中复核�
 
 `127.0.0.1` 指 AstrBot 所在机器。跨机器部署时，请填写局域网或 Tailscale 地址。
 
+## Opus 剩余额度条
+
+“服装词库”插件页面顶部显示当前 ComfyUI NAI API 账户的 V5 Opus 剩余额度、额外购买比例、查询时距下一百分点恢复的时间，以及上次成功/下次查询时间。超过 100% 的额度保留实际数字，条形最多填满；负额度和低于 20% 会提示低额度。该显示与每日次数限额分别计算，不自动拦截生图，不改变 `limit_opus_free`。
+
+“ComfyUI 连接”配置组提供：
+
+- `opus_usage_monitor_enabled`：默认开启；关闭后停止账户查询。
+- `opus_usage_refresh_minutes`：默认 `120`（2 小时），可以改为 `240`、`360` 等；有效范围 5–10080 分钟，越界值按边界处理。保存配置后重载插件。
+
+后台按间隔查询，即使页面关闭也会更新；页面每分钟只读取本地缓存，不额外访问 NovelAI。成功值和最近尝试时间保存在插件数据目录 `opus_usage_cache.json`，重载后沿用尚未到期的缓存。查询失败保留上次成功值并标注过期，下个配置周期再尝试；首次查询失败显示不可用，不当作 0%。关闭监控时保留旧值并注明已停用。切换 ComfyUI 地址后不沿用原地址的账户值。
+
+需同时更新本机 `ComfyUI_RS_NAI_API_Request` 扩展并重启 ComfyUI，再重载 AstrBot 插件。AstrBot 只向已配置的 ComfyUI 地址请求只读 `/rs_nai/opus_usage`；API 凭据继续只由 ComfyUI 扩展使用，不发给 AstrBot 或浏览器。该接口仅返回白名单额度字段，短时间内多次读取会合并并缓存至少 60 秒。跨机器部署沿用原 ComfyUI 地址，不需要让 AstrBot 读取 ComfyUI 主机的 `.env`。
+
 ## 出图
 
 - `width` / `height`：默认尺寸；宽和高都必须在 512–1756（含边界），且为 4 的倍数。用户本次明确指定尺寸时，非 `generation_whitelist_sender_ids` 白名单用户最多使用 1024×1024 像素（1MP）；比例快捷词也受此限制。未指定尺寸的默认配置不受此请求限制。
@@ -174,6 +187,7 @@ tag 或整句话；单人动作应留空。模型在同次直接写作中复核�
   屏蔽回复会在“请求包含禁止的词语组合，已拒绝生成。”之后列出“本次命中词语”，使用配置中的词条写法并去重。只列出完整触发规则中实际匹配的词，不列出未出现的备选词、仅单侧命中的其他规则或未完整命中的旧组合；生图与改图共用此回复。单个词是否拦截仍由现有组合规则决定。
 
 - `prompt_builder_provider_id`：指定用于优化提示词的模型。留空时使用当前会话主模型。
+- 图片反推与参考图理解优先使用 AstrBot 的 `default_image_caption_provider_id`；未指定时通过 SDK 读取当前会话模型，兼容 4.29.1 的模型配置结构。验图仍优先使用插件的 `verify_provider_id`（旧多人入口先看 `multi_verify_provider_id`），再沿用图片理解模型的选择；所选模型须支持识图。
 - `prompt_builder_max_tokens`：普通提示词优化模型最大输出长度，同时约束两次 LLM；普通请求的第一次语义规划最多使用 900 tokens。`-r` 为容纳最多 22 个角色实例，将第一次语义规划的输出预算提高到 7200 tokens，专用第二阶段按 `max(1200, min(7200, max(prompt_builder_max_tokens, 1200 + 260 × 模型角色上限)))` 计算；正常没有第三次拆分或审查写作；方向配对结构错误可额外修复一次。
 - `prompt_builder_max_content_tags`：LLM 内容段的硬上限，默认 65；不计算质量词、固定角色、画师组和画风。自然语言主题通常以 40–55 个内容 Tag 为目标，简单表情包或头像可以使用 30–45 个，复杂服装或构图约 60 个；已经是 Tag 串的输入不设最低数量。普通模式会在去除较多同义词后尝试一次按缺失画面槽位补全。
 - `unspecified_wardrobe_policy`：按角色处理“没有实际服装基础”的策略。`scene_adaptive`（默认）把角色 default 作为软参考；中性场景更倾向沿用，涩气或强场景允许第二次 LLM 按情境替换或补全。也可固定为 `default_profile`（仍以软参考方式提供）或 `creative_fallback`（完全不加载 default）。
@@ -294,10 +308,19 @@ Canonical Tag: haneoka_school_uniform
 - `admin_only`：是否仅管理员可用。
 - `allowed_sender_ids`：允许使用的用户 ID 列表。
 - `daily_generation_limit`：每个 QQ 号每天最多发起的生图次数；`0` 表示不限制。一次多人请求及其候选重试只计一次，请求被接受后即占用次数。
-- `generation_whitelist_sender_ids`：免限额白名单。名单内 QQ 不受每日次数和 `allowed_sender_ids` 限制。
+- `daily_total_generation_limit`：全体用户共享的每日总生图次数上限；`0` 表示不限制，但仍记录次数。所有用户（含白名单）都计入且受此总上限约束。总上限和个人上限在同一次加锁检查中扣减，任一超限都不增加计数。
+- `generation_whitelist_sender_ids`：个人免限额白名单。名单内 QQ 不受个人每日次数和 `allowed_sender_ids` 限制，仍受每日总上限约束。
 - `generation_blacklist_sender_ids`：黑名单，优先级最高；同时出现在黑白名单时按黑名单处理。
 
 每日计数按 AstrBot 服务器本地日期统计，并保存在插件数据目录的 `daily_generation_usage.json`，重启 AstrBot 不会清空当天计数。
+
+使用 `/anm 生图统计`、`/anm 今日生图`、`/anm 生图次数` 或 `/anm stats` 查询今日全体总次数、总上限和自己的次数，无需 ComfyUI 在线，不消耗额度。配置位于“发送与权限”中的“全体每天最大总生图次数”，保存后重载插件生效。
+
+开启绘画进度与剩余次数提示且设置了每日总上限时，完成提示还会显示本次预占后的全体剩余次数；并发或跨日时该值是本次接纳时的快照，实时数量以统计查询为准。
+
+计数口径沿用已接受的文生图请求：raw、普通、NAI `-r`、旧多人入口和 LLM 文生图工具共用入口；失败或取消不返还，验图重试和多人候选不另扣。权限、屏蔽词、尺寸等入口检查拒绝的请求不计数。实验性改图、反推、解析、发送前打码不计入该文生图额度。
+
+首次升级会从保留的逐任务记录补计当天次数，排除可识别的候选/重试；与旧版当天个人计数逐人取较大值，避免双计或丢失旧额度。补计后由新计数器持续记账，不反复扫描任务；旧记录已经清理或未保存的请求无法完整恢复。
 
 ## 由 AstrBot 启动 ComfyUI
 
@@ -365,7 +388,7 @@ Canonical Tag: haneoka_school_uniform
 在插件目录用 AstrBot bundled Python 执行。下例不安装解释器或额外词库服务：
 
 ```powershell
-$taskPython = Resolve-Path '..\..\..\.venv\Scripts\python.exe'
+$taskPython = Resolve-Path '..\..\..\..\venv\Scripts\python.exe'
 & $taskPython toolbox_terms.py --source 'D:\Users\69493\Desktop\llm-nai-toolbox-0.9.8-win-x64\resources\tagdb\tags_index_v2.json' --config '..\..\..\data\config\astrbot_plugin_anima_master_config.json' --report 'toolbox_import\下一次导入.json'
 ```
 

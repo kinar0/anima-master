@@ -192,3 +192,69 @@ def test_config_defaults_are_opt_in_and_survive_group_roundtrip():
     cfg={'toolbox_vocabulary_mode':'observe','toolbox_vocabulary_path':'local/tagdb','toolbox_vocabulary_max_chars':700}
     restored=flatten_config(group_config(cfg,schema))
     assert all(restored[k]==v for k,v in cfg.items())
+
+
+@pytest.mark.parametrize('text', [
+    '千早爱音公主抱若叶睦',
+    '执事爱音公主抱淡绿色礼服若叶睦（禁止使用校服）',
+    '陌生角色甲稳稳公主抱另一个角色乙，同时角色丙微笑',
+    '角色甲穿着湿衣服并抱着角色乙',
+])
+def test_embedded_local_alias_survives_long_names_and_modifiers(tmp_path, text):
+    path = embedded_data_dir(tmp_path)
+    p = packet(path, text)
+    expected = 'wet_clothes' if '湿衣服' in text else 'princess_carry'
+    assert expected in {row['tag'] for row in p.diagnostics['candidates']}
+    assert 'reverse_princess_carry' not in {row['tag'] for row in p.diagnostics['candidates']}
+    assert p.diagnostics['added_chars_upper_bound'] <= 1200
+
+
+def embedded_data_dir(tmp_path):
+    path = data_dir(tmp_path)
+    index = json.loads((path/'tags_index_v2.json').read_text(encoding='utf-8'))
+    index['general'] += [
+        dict(tag='princess_carry', count=1000, zh=['公主抱']),
+        dict(tag='reverse_princess_carry', count=100, zh=['反向公主抱']),
+    ]
+    (path/'tags_index_v2.json').write_text(json.dumps(index, ensure_ascii=False), encoding='utf-8')
+    gloss = json.loads((path/'tag_gloss.json').read_text(encoding='utf-8'))
+    gloss.update(princess_carry=dict(g='托住背部与腿弯横抱'),
+                 reverse_princess_carry=dict(g='性别角色颠倒的横抱'))
+    (path/'tag_gloss.json').write_text(json.dumps(gloss, ensure_ascii=False), encoding='utf-8')
+    return path
+
+
+@pytest.mark.parametrize('text', [
+    '千早爱音不要公主抱若叶睦',
+    '禁止使用公主抱',
+    '角色甲说：“公主抱若叶睦”',
+    '公主抱这个词写在纸上',
+    '心里的公主抱',
+    '不要反向公主抱',
+    '公主宝若叶睦',
+])
+def test_embedded_alias_keeps_negative_literal_and_nearby_counterexamples(tmp_path, text):
+    p = packet(embedded_data_dir(tmp_path), text)
+    assert not {'princess_carry', 'reverse_princess_carry'} & {
+        row['tag'] for row in p.diagnostics['candidates']}
+
+
+def test_longest_alias_and_independent_positive_occurrence(tmp_path):
+    path = embedded_data_dir(tmp_path)
+    p = packet(path, '角色甲反向公主抱角色乙')
+    assert {row['tag'] for row in p.diagnostics['candidates']} == {'reverse_princess_carry'}
+    p = packet(path, '角色甲不要公主抱，角色乙公主抱角色丙')
+    assert {row['tag'] for row in p.diagnostics['candidates']} == {'princess_carry'}
+
+
+def test_known_identity_span_does_not_turn_name_into_clothing(tmp_path):
+    path = embedded_data_dir(tmp_path)
+    index = json.loads((path/'tags_index_v2.json').read_text(encoding='utf-8'))
+    index['general'].append(dict(tag='chihaya_(clothing)', zh=['千早']))
+    (path/'tags_index_v2.json').write_text(json.dumps(index, ensure_ascii=False), encoding='utf-8')
+    gloss = json.loads((path/'tag_gloss.json').read_text(encoding='utf-8'))
+    gloss['chihaya_(clothing)'] = dict(g='巫女礼仪外衣')
+    (path/'tag_gloss.json').write_text(json.dumps(gloss, ensure_ascii=False), encoding='utf-8')
+    p = asyncio.run(ToolboxVocabulary().prepare(directory=str(path), mode='reference',
+        text='千早爱音公主抱若叶睦', protected_phrases=('千早爱音','若叶睦')))
+    assert {row['tag'] for row in p.diagnostics['candidates']} == {'princess_carry'}

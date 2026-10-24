@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 if str(PLUGIN_DIR) not in sys.path:
     sys.path.insert(0, str(PLUGIN_DIR))
@@ -12,6 +14,7 @@ from tag_cleaner import (  # noqa: E402
     clean_content_tags,
     display_tag_text,
     join_prompt_parts,
+    split_tags,
 )
 
 
@@ -302,6 +305,42 @@ def test_nai_numeric_artist_weights_survive_final_assembly() -> None:
 
     assert artists in result.final_prompt
     assert r"\:\:" not in result.final_prompt
+
+
+@pytest.mark.parametrize("artists", [
+    "1.2::artist:alpha, artist:beta::, year 2026",
+    "<artist> 0.6::artist:alpha_(scope)::, 1.2::artist:beta:: </artist>, "
+    "<style> -2::yellow themed, orange themed::, "
+    "8::best quality, absurdres, very aesthetic:: </style>",
+    "<artists>0.7::artist:alpha::, 1.2::artist:beta (scope)::</artists>, "
+    "<styles>dynamic angle, -2::upscaled, blurry::</styles>",
+    "0.8::artist:alpha:: 0.6::artist:beta ::, -0.5::lips::",
+    ".5::artist:alpha, artist:beta::, +.25::flat color::, -2.::blur::",
+    "2::artist:alpha, .5::artist:beta, artist:gamma::, artist:delta::",
+])
+@pytest.mark.parametrize("structured", [False, True])
+def test_nai_numeric_scopes_survive_all_final_assembly_modes(artists, structured):
+    config = _config()
+    config.update(artist_presets=[f"nai={artists}"], active_artist_preset="nai")
+    result = build_final_prompt(
+        user_prompt="a girl", llm_content="1girl, standing", config=config,
+        preserve_structured_order=structured,
+    )
+    assert artists in result.final_prompt
+    assert join_prompt_parts([artists]) == artists
+    assert join_prompt_parts([join_prompt_parts([artists])]) == artists
+    assert r"\:\:" not in result.final_prompt
+
+
+def test_nai_scope_preserves_internal_delimiters_and_duplicates():
+    group = "-1.3::simple illustration, flat color, flat color::"
+    assert split_tags(f"{group}, flat color") == [group, "flat color"]
+    assert join_prompt_parts([group, "flat color"]) == f"{group}, flat color"
+    assert display_tag_text(f"s:p_knight {group} character_(series)") == (
+        rf"s\:p knight {group} character \(series\)"
+    )
+    assert split_tags("Tags: standing:, sitting：") == ["standing", "sitting"]
+    assert display_tag_text(r"1.2\:\:literal") == r"1.2\:\:literal"
 
 
 def test_weighted_parenthesized_artist_preset_survives_final_assembly() -> None:

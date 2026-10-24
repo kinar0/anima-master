@@ -15,6 +15,8 @@
       "hint": "用于连接 ComfyUI。通常请先用绘世启动器、ComfyUI portable 或自己的方式启动 ComfyUI；AstrBot 在服务器时请填写本机的局域网或 Tailscale 地址。只有 AstrBot 和 ComfyUI 同机时，才建议开启“由 AstrBot 启动 ComfyUI”。",
       "items": [
         "comfyui_base_url",
+        "opus_usage_monitor_enabled",
+        "opus_usage_refresh_minutes",
         "workflow",
         "custom_workflow_enabled",
         "custom_workflow_path",
@@ -102,6 +104,9 @@
         "danbooru_character_alias_mappings",
         "danbooru_term_mappings_enabled",
         "danbooru_term_mappings",
+        "toolbox_vocabulary_mode",
+        "toolbox_vocabulary_path",
+        "toolbox_vocabulary_max_chars",
         "danbooru_tag_base_urls",
         "danbooru_tag_user_agent",
         "danbooru_tag_lookup_timeout",
@@ -167,6 +172,7 @@
         "admin_only",
         "allowed_sender_ids",
         "daily_generation_limit",
+        "daily_total_generation_limit",
         "generation_whitelist_sender_ids",
         "generation_blacklist_sender_ids"
       ]
@@ -177,6 +183,8 @@
       "hint": "只在排查问题时临时开启，平时建议保持关闭。",
       "items": [
         "debug_prompt_enabled",
+        "debug_llm_reasoning_enabled",
+        "debug_llm_usage_enabled",
         "debug_image_reference_enabled",
         "debug_send_payload_enabled"
       ]

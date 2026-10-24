@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from test_prompt_direct_writer import run, plan, Resolver, semantic_character
-from test_toolbox_vocabulary import data_dir
+from test_toolbox_vocabulary import data_dir, embedded_data_dir
 
 
 NORMAL = ('{Count: 1girl}{Characters: character_a}{Copyright: }'
@@ -109,3 +109,23 @@ def test_optional_candidates_do_not_change_multi_instance_wardrobe_or_population
     assert len(characters)==2
     assert 'white' in characters[0]['prompt'] and 'black' in characters[1]['prompt']
     assert all('from_above' not in r['prompt'] for r in characters)
+
+
+@pytest.mark.parametrize('nai', [False, True])
+def test_embedded_action_reaches_existing_writer_without_new_call_or_forced_tag(tmp_path, nai):
+    path = embedded_data_dir(tmp_path)
+    prompt = '角色甲稳稳公主抱角色乙（禁止使用校服）'
+    output = (plan([('character_a','girl, standing, 站立。',.4),
+                    ('character_b','girl, lying, 躺着。',.6)],'2girls, white background')
+              if nai else '{Count: 2girls}{Characters: character_a, character_b}{Copyright: }'
+              '{Identity: character_a: pink hair | character_b: blue hair}'
+              '{Details: character_a: standing | character_b: lying}'
+              '{Tags: white background}{Nltags: }')
+    result, calls = run(('-r ' if nai else '')+prompt,
+        {'characters':[semantic_character('角色甲'), semantic_character('角色乙')]},
+        output, {'toolbox_vocabulary_path':str(path), 'toolbox_vocabulary_mode':'reference'})
+    assert len(calls) == 2
+    assert '- 公主抱 => princess_carry — 托住背部与腿弯横抱' in calls[-1]['prompt']
+    assert 'reverse_princess_carry' not in calls[-1]['prompt']
+    assert 'princess' not in result.final_prompt
+    assert result.summary['toolbox_vocabulary']['added_chars_upper_bound'] <= 1200

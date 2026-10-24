@@ -77,6 +77,7 @@ class CommandActionHandler:
         shorten: Callable[[str, int], str],
         config_store: Any = None,
         image_input_summary: Callable[[], dict[str, Any]] | None = None,
+        generation_usage_text: Callable[[Any], str] | None = None,
     ):
         """Store dependencies for command-side action handling.
 
@@ -91,6 +92,7 @@ class CommandActionHandler:
             generate: Text-to-image generator.
             event_image_input: Image input resolver.
             image_input_summary: Latest image input summary callback.
+            generation_usage_text: Daily usage query callback without generation.
             build_prompt: Prompt builder for img2img.
             format_spell_payload: Spell payload formatter.
             get_bool: Config boolean accessor.
@@ -112,6 +114,7 @@ class CommandActionHandler:
         self._bool = get_bool
         self._shorten = shorten
         self.artist_session_settings = None
+        self._generation_usage_text = generation_usage_text
 
     def _active_artist(self, event: Any = None) -> str:
         settings = self.artist_session_settings
@@ -407,6 +410,10 @@ class CommandActionHandler:
             return "ComfyUI 助手已关闭，或当前用户没有使用权限。"
         if action == "help":
             return help_text(self._bool("img2img_enabled", False))
+        if action == "generation_stats":
+            if self._generation_usage_text is None:
+                return "生图统计暂不可用。"
+            return self._generation_usage_text(event)
         if action == "status":
             return self.status_text(await self._run_tool(["status"]))
         if action == "diagnose":

@@ -27,6 +27,14 @@
         </div>
       </header>
 
+      <section id="opus-usage" class="opus-panel" aria-label="Opus 剩余额度">
+        <div class="opus-heading"><div><span class="eyebrow">NOVELAI V5 / OPUS</span><h2>Opus 剩余额度</h2></div><strong id="opus-percent">—</strong></div>
+        <progress id="opus-progress" max="100" value="0" aria-label="Opus 剩余额度百分比" hidden></progress>
+        <p id="opus-status" role="status">正在读取额度缓存…</p>
+        <p id="opus-details" class="mapping-note"></p>
+        <p id="opus-updated" class="mapping-note">默认每 2 小时更新，可在插件配置中调整。</p>
+      </section>
+
       <section class="overview" aria-label="词库概览">
         <article><span>角色衣柜</span><strong id="outfit-count">0</strong><small>仅限角色本人变体</small></article>
         <article><span>通用套组</span><strong id="set-count">0</strong><small>可绑定任意角色</small></article>
@@ -123,5 +131,6 @@
     <script type="module" src="./noun_translation.js"></script>
     <script type="module" src="./vocabulary_review.js"></script>
     <script type="module" src="./autofilter.js"></script>
+    <script type="module" src="./opus_usage.js"></script>
   </body>
 </html>

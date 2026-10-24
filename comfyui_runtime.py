@@ -506,6 +506,15 @@ class ComfyUIRuntime:
             remaining = max(0, int(usage.get("remaining") or 0))
         except (TypeError, ValueError):
             return "今日剩余次数：不限"
-        if limit <= 0 or bool(usage.get("whitelisted")):
-            return "今日剩余次数：不限"
-        return f"今日剩余次数：{remaining}"
+        text = (
+            "今日剩余次数：不限"
+            if limit <= 0 or bool(usage.get("whitelisted"))
+            else f"今日剩余次数：{remaining}"
+        )
+        try:
+            if int(usage.get("total_limit") or 0) > 0:
+                total_remaining = max(0, int(usage.get("total_remaining") or 0))
+                text += f"\n全体今日剩余次数：{total_remaining}"
+        except (TypeError, ValueError):
+            pass
+        return text

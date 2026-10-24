@@ -7668,6 +7668,8 @@ class PromptPipeline:
             directory=str(prompt_config.get("toolbox_vocabulary_path", "")),
             mode=toolbox_mode, text=background_intent_prompt,
             mappings=matched_term_mappings,
+            protected_phrases=tuple(anchor.source_text for anchor in semantic_anchors
+                                    if anchor.role in {"target_character", "outfit_source", "copyright"}),
             phrases=tuple(dict.fromkeys((
                 *(anchor.source_text for anchor in semantic_anchors
                   if anchor.role in {"clothing", "outfit"}),

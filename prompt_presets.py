@@ -5,6 +5,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+try:
+    from .tag_cleaner import split_outside_nai_emphasis
+except ImportError:  # pragma: no cover - direct script-style imports.
+    from tag_cleaner import split_outside_nai_emphasis
+
 DEFAULT_QUALITY_TAGS = "masterpiece, best quality, score_7, safe,"
 DEFAULT_NEGATIVE_PROMPT = (
     "worst quality, low quality, score_1, score_2, score_3, artist name"
@@ -385,7 +390,7 @@ def merge_tag_text(existing: Any, addition: str) -> str:
     tags: list[str] = []
     seen: set[str] = set()
     for source in (existing, addition):
-        for tag in str(source or "").split(","):
+        for tag in split_outside_nai_emphasis(str(source or "")):
             text = tag.strip()
             if not text:
                 continue

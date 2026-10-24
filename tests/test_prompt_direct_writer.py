@@ -842,6 +842,32 @@ def test_direct_writer_keeps_request_artist_group_and_exact_nested_weight():
     assert "masterpiece" in result.final_prompt and "best quality" in result.final_prompt
 
 
+def test_direct_writer_keeps_wrapped_nai_artist_scopes_through_workflow(tmp_path):
+    from agent_tools.comfyui_workflows import workflow
+
+    artists = (
+        "<artist> 0.6::artist:alpha_(scope)::, 1.2::artist:beta:: </artist>, "
+        "<style> -2::yellow themed, orange themed::, "
+        "8::best quality, absurdres, very aesthetic:: </style>"
+    )
+    result, calls = run(
+        "-r -s2 一个女孩", {"characters": [semantic_character("一个女孩")]},
+        plan([("girl", "girl, standing", .5)], "1girl, white background"),
+        {"artist_presets": ["A=@unused", f"B={artists}"], "active_artist_preset": "A"},
+    )
+    assert result.final_prompt, result.summary
+    assert len(calls) == 2
+    assert result.final_prompt.count(artists) == 1
+    assert r"\:\:" not in result.final_prompt
+    path = tmp_path / "nai.json"
+    path.write_text((Path(__file__).resolve().parents[1] / "nai_api.json").read_text(encoding="utf-8"), encoding="utf-8")
+    graph = workflow(
+        {"custom_workflow_enabled": True, "custom_workflow_path": str(path)},
+        result.final_prompt, "blurry", 832, 1216, 20, 4.5, 42,
+    )
+    assert graph["3"]["inputs"]["text"] == result.final_prompt
+
+
 @pytest.mark.parametrize("repeat", [False, True])
 @pytest.mark.parametrize("invented_source", [False, True])
 def test_one_wearer_removing_shared_profile_component_does_not_remove_it_from_another(repeat, invented_source):

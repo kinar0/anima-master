@@ -201,9 +201,40 @@ ANIMA_WEIGHTED_TAG_RE = re.compile(
     r"(?P<weight>[-+]?(?:\d+(?:\.\d*)?|\.\d+))\)"
 )
 ANIMA_LITERAL_SYNTAX_CHARS = frozenset(":()[]")
-NAI_NUMERIC_EMPHASIS_RE = re.compile(
-    r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)::.+?::\s*$"
+NAI_EMPHASIS_TOKEN_RE = re.compile(
+    r"(?<![\\\w.])(?P<weight>[-+]?(?:\d+(?:\.\d*)?|\.\d+))::|(?<!\\)::"
 )
+
+
+def _nai_emphasis_spans(text: str) -> list[tuple[int, int]]:
+    """Locate complete numeric emphasis groups, including nested groups."""
+    stack: list[int] = []
+    spans: list[tuple[int, int]] = []
+    for token in NAI_EMPHASIS_TOKEN_RE.finditer(text):
+        if token.group("weight") is not None:
+            stack.append(token.start())
+        elif stack:
+            start = stack.pop()
+            if not stack:
+                spans.append((start, token.end()))
+    return spans
+
+
+def split_outside_nai_emphasis(text: str, separators: str = r",") -> list[str]:
+    """Split a stream without changing commas or scope inside NAI weights."""
+    spans = iter(_nai_emphasis_spans(text))
+    span = next(spans, None)
+    parts: list[str] = []
+    start = 0
+    for separator in re.finditer(separators, text):
+        while span is not None and separator.start() >= span[1]:
+            span = next(spans, None)
+        if span is not None and span[0] <= separator.start() < span[1]:
+            continue
+        parts.append(text[start:separator.start()])
+        start = separator.end()
+    parts.append(text[start:])
+    return parts
 
 
 def split_tags(text: str) -> list[str]:
@@ -212,8 +243,6 @@ def split_tags(text: str) -> list[str]:
     # LLMs sometimes wrap the whole stream in a Markdown fence.  Remove the
     # fence and its optional language label, not the tag content inside it.
     cleaned = re.sub(r"```(?:[a-z0-9_+.-]+)?[ \t]*(?:\r?\n)?", "", cleaned, flags=re.I)
-    cleaned = cleaned.replace("，", ",").replace("、", ",").replace(";", ",")
-    cleaned = cleaned.replace("\n", ",")
     cleaned = re.sub(
         r"^(?:positive|prompt|tags|提示词|正向提示词)\s*[:：]",
         "",
@@ -221,12 +250,15 @@ def split_tags(text: str) -> list[str]:
         flags=re.I,
     )
     parts = []
-    for fragment in cleaned.split(","):
-        part = fragment.strip(" \t\r\n,.;")
+    for fragment in split_outside_nai_emphasis(cleaned, r"[,，、;\n]"):
+        part = fragment.strip(" \t\r\n,;")
         # A final :: closes NovelAI numeric emphasis. Generic punctuation
         # trimming used to erase it before the prompt reached ComfyUI.
-        if not NAI_NUMERIC_EMPHASIS_RE.fullmatch(part):
-            part = part.strip(":：")
+        if not _nai_emphasis_spans(part):
+            part = part.strip(".:：")
+        else:
+            # A leading decimal point belongs to weights such as .5::...::.
+            part = part.rstrip(".")
         parts.append(part)
     return [part for part in parts if part]
 
@@ -323,11 +355,25 @@ def display_tag_text(tag: str) -> str:
         occur inside a longer character description.
     """
     original = re.sub(r"\s+", " ", str(tag or "")).strip()
-    # Numeric emphasis is intentional NAI syntax, including any artist:
-    # function inside it. Keep the configured expression byte-for-byte apart
-    # from whitespace normalization; literal Danbooru colons still escape.
-    if NAI_NUMERIC_EMPHASIS_RE.fullmatch(original):
-        return original
+    # Protect complete numeric scopes before literal formatting. They may
+    # contain commas, nested weights, or sit inside <artist>/<style> wrappers.
+    spans = _nai_emphasis_spans(original)
+    if spans:
+        rendered: list[str] = []
+        previous_end = 0
+        for start, end in spans:
+            # Keep boundary spaces when formatting the surrounding literals.
+            prefix = original[previous_end:start]
+            rendered.append(_display_literal_tag_text(prefix))
+            rendered.append(original[start:end])
+            previous_end = end
+        rendered.append(_display_literal_tag_text(original[previous_end:]))
+        return "".join(rendered)
+    return _display_literal_tag_text(original)
+
+
+def _display_literal_tag_text(original: str) -> str:
+    """Format a fragment outside protected NAI numeric emphasis."""
     # A weighted Danbooru artist can itself have a parenthesized qualifier.
     # Preserve that complete configured expression: replacing underscores or
     # escaping its inner parentheses changes the artist tag's meaning.

@@ -77,6 +77,18 @@ def test_create_artist_preset_preserves_nai_numeric_emphasis() -> None:
     ]
 
 
+def test_create_and_append_artist_group_preserves_nai_scope():
+    config = {"quality_prefix": "test"}
+    handler = _handler(config)
+    artists = "<artist> 1.2::artist:alpha, artist:beta:: </artist>"
+    style = "<style> -2::yellow themed, orange themed:: </style>"
+    handler.create_artist_preset(f"nai={artists}, {style}")
+    handler.append_artist_tags("nai=orange themed, 2::flat color, orange themed::")
+    assert config["artist_presets"] == [
+        f"nai={artists}, {style}, orange themed, 2::flat color, orange themed::,"
+    ]
+
+
 def test_edit_blocks_combination_before_comfyui_readiness() -> None:
     handler = _handler(
         config={

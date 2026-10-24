@@ -43,13 +43,14 @@ def test_new_day_resets_counts_lazily(tmp_path: Path) -> None:
     assert limiter.acquire("10001", 1).allowed is True
 
 
-def test_whitelist_and_zero_limit_do_not_write_usage(tmp_path: Path) -> None:
+def test_whitelist_and_zero_limit_still_record_usage(tmp_path: Path) -> None:
     path = tmp_path / "usage.json"
     limiter = DailyUsageLimiter(path, _Logger(), today=lambda: date(2026, 8, 14))
 
     assert limiter.acquire("white", 1, whitelisted=True).allowed is True
     assert limiter.acquire("unlimited", 0).allowed is True
-    assert not path.exists()
+    assert limiter.snapshot()["counts"] == {"white": 1, "unlimited": 1}
+    assert limiter.snapshot()["total_used"] == 2
 
 
 def test_concurrent_acquire_never_exceeds_limit(tmp_path: Path) -> None:

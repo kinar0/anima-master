@@ -7,10 +7,12 @@ from typing import Any
 try:
     from . import anima_verify
     from .llm_diagnostics import LLMDiagnostics
+    from .provider_selection import image_provider_id
     from .task_summary import apply_verification_summary
 except ImportError:  # pragma: no cover - fallback for direct script-style imports.
     import anima_verify
     from llm_diagnostics import LLMDiagnostics
+    from provider_selection import image_provider_id
     from task_summary import apply_verification_summary
 
 
@@ -348,16 +350,7 @@ class GenerationVerifier:
             configured = self._str("verify_provider_id", "").strip()
         if configured:
             return configured
-        try:
-            cfg = self.context.get_config(umo=event.unified_msg_origin)
-            provider_settings = cfg.get("provider_settings", {})
-            return str(
-                provider_settings.get("default_image_caption_provider_id")
-                or provider_settings.get("default_provider_id")
-                or ""
-            ).strip()
-        except Exception:  # noqa: BLE001 - config lookup is best-effort.
-            return ""
+        return await image_provider_id(self.context, event)
 
     def _make_verify_llm_call(
         self,

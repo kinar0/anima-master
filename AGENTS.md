@@ -10,12 +10,13 @@ this directory unless the task context explicitly says otherwise:
 - Python sources and tests are in this plugin directory. The current terminal
   has no globally available `python` or `py`; use AstrBot's bundled virtual
   environment for targeted tests and formatting checks instead.
-- The AstrBot instance's working Python is Python 3.12 in the parent core
-  virtual environment. From this plugin directory, invoke it explicitly:
+- After the AstrBot 4.29.1 launcher update, the instance's working Python is
+  Python 3.12 in the instance-level `venv`, alongside `core` (not `core/.venv`).
+  From this plugin directory, invoke it explicitly:
 
   ```powershell
   $taskCore = (Resolve-Path '..\..\..').Path
-  $taskPython = Resolve-Path '..\..\..\.venv\Scripts\python.exe'
+  $taskPython = Resolve-Path '..\..\..\..\venv\Scripts\python.exe'
   $env:PYTHONPATH = if ([string]::IsNullOrEmpty($env:PYTHONPATH)) {
       $taskCore
   } else {
@@ -32,6 +33,10 @@ this directory unless the task context explicitly says otherwise:
   A collection failure caused by omitting either option is an environment setup
   error and should be avoided rather than used as a diagnostic attempt.
 
+  If the system pytest temporary directory is inaccessible, set `TEMP` and
+  `TMP` to a task-specific directory inside this plugin and pass a fresh
+  `--basetemp` path there. Do not reuse or delete another task's temp directory.
+
   Do not install, download, or create a replacement Python runtime unless the
   task specifically requires it.
 - Before relying on runtime-specific details (current directory, Python
@@ -40,7 +45,7 @@ this directory unless the task context explicitly says otherwise:
 
   ```powershell
   Get-Location
-  $taskPython = Resolve-Path '..\..\..\.venv\Scripts\python.exe'
+  $taskPython = Resolve-Path '..\..\..\..\venv\Scripts\python.exe'
   & $taskPython --version
   git status --short
   ```

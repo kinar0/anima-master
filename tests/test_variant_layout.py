@@ -13,6 +13,7 @@ from prompt_presets import DEFAULT_QUALITY_TAGS  # noqa: E402
 from danbooru_semantic import DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT  # noqa: E402
 from prompt_templates import (  # noqa: E402
     DEFAULT_LLM_PROMPT_TEMPLATE,
+    build_llm_prompt,
 )
 
 
@@ -81,7 +82,12 @@ def test_advanced_example_uses_the_builtin_template() -> None:
 
     assert match is not None
     assert '"custom_workflow_enabled": false' in example
-    assert json.loads(match.group(1)) == DEFAULT_LLM_PROMPT_TEMPLATE
+    # Empty selects the current built-in instead of freezing a copied template.
+    configured_template = json.loads(match.group(1))
+    assert configured_template == ""
+    assert build_llm_prompt("测试主题", prompt_builder_template=configured_template) == (
+        build_llm_prompt("测试主题")
+    )
     assert semantic_match is not None
     assert json.loads(semantic_match.group(1)) == DEFAULT_SEMANTIC_PLAN_SYSTEM_PROMPT
 
@@ -114,11 +120,15 @@ def test_wardrobe_plugin_page_and_mapping_config_are_packaged() -> None:
 
 def test_builtin_template_prioritizes_one_pass_visual_quality() -> None:
     assert "一幅完整、协调、具有视觉吸引力的画面" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "服装只按末尾“角色服装权限”和动态服装上下文决定" in (
+    assert "服装和角色外表按用户要求和逐角色证据决定" in (
         DEFAULT_LLM_PROMPT_TEMPLATE
     )
-    assert "用户未明确要求地点、环境或背景时" in DEFAULT_LLM_PROMPT_TEMPLATE
-    assert "不要自行创造场景" in DEFAULT_LLM_PROMPT_TEMPLATE
+    actual_prompt = build_llm_prompt("测试主题")
+    assert "不得恢复明确删除或替换的衣物" in actual_prompt
+    assert "不得把一人的服装写给另一人" in actual_prompt
+    assert "默认使用 simple background 和 white background" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "明确或隐含需要环境" in DEFAULT_LLM_PROMPT_TEMPLATE
+    assert "没有场景需求时不要自行增加地点" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "以最终图像协调、精致、有表现力和好看为优先" in (DEFAULT_LLM_PROMPT_TEMPLATE)
     assert "不需要机械追求固定 Tag 数量" in DEFAULT_LLM_PROMPT_TEMPLATE
     assert "保持用户明确指定的角色、主体、人数" in DEFAULT_LLM_PROMPT_TEMPLATE

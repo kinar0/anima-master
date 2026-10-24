@@ -1,0 +1,81 @@
+{
+  "external_llm_calls": 0,
+  "generation_submissions": 0,
+  "chat_messages_sent": 0,
+  "comfyui": {
+    "version": "0.33.2",
+    "queue": {
+      "queue_running": [],
+      "queue_pending": []
+    }
+  },
+  "ordinary_nai": {
+    "graph_built": true,
+    "node_count": 6,
+    "missing_node_classes": [],
+    "novelai_models": [
+      {
+        "value": "NAI Diffusion V5 Full",
+        "available": true
+      }
+    ]
+  },
+  "nai_instances": {
+    "graph_built": true,
+    "node_count": 9,
+    "missing_node_classes": [],
+    "novelai_models": [
+      {
+        "value": "NAI Diffusion V5 Full",
+        "available": true
+      }
+    ],
+    "position_precision_preserved": true
+  },
+  "autofilter": {
+    "missing_node_classes": [],
+    "detector_model_choices": {
+      "model_name": {
+        "value": "bbox/censor_detect_v1.0_s.pt",
+        "available": true
+      }
+    }
+  },
+  "danbooru": {
+    "cli_exists": true,
+    "lookup_status": "resolved",
+    "confirmed_tags": [
+      "white_dress"
+    ],
+    "lookup_succeeded": true
+  },
+  "toolbox": {
+    "diagnostics": {
+      "mode": "reference",
+      "state": "ready",
+      "queries": 1,
+      "entries": 36893,
+      "candidates": [
+        {
+          "tag": "princess_carry",
+          "score": 1.0,
+          "field": "literal_alias"
+        }
+      ],
+      "rows_chars": 44,
+      "added_chars_upper_bound": 644,
+      "max_chars": 1200,
+      "load_ms": 16228.28,
+      "elapsed_ms": 16283.32,
+      "clipped_searches": 0,
+      "weak_without_literal": 0
+    },
+    "has_rows": true
+  },
+  "metadata_extraction": {
+    "subprocess_exit": 0,
+    "ok": true,
+    "positive_matches": true,
+    "negative_matches": true
+  }
+}
